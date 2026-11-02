@@ -383,6 +383,21 @@ for (const viewport of VIEWPORTS) {
         const switchedLabel = await gridLabel();
         assert.notEqual(switchedLabel.activeId, openedLabel.activeId, 'another chapter is active');
         assert.equal(switchedLabel.labelledBy, switchedLabel.activeId, 'the grid follows the active chapter');
+
+        // Clicking a locked chapter tab shows the unlock hint without switching chapters.
+        await page.locator('#levels-chapters [role="tab"].locked').first().click({ force: true });
+        await page.waitForFunction(
+          () => {
+            const el = document.querySelector('#levels-chapter-hint');
+            return Boolean(el) && !el.classList.contains('hidden') && (el.textContent || '').trim().length > 0;
+          },
+          null,
+          { timeout: WAIT_TIMEOUT_MS }
+        );
+        await waitShown(page, '#levels-chapter-hint');
+        const hintText = await page.textContent('#levels-chapter-hint');
+        assert.match(hintText, /\d+/, 'the locked chapter hint names the required level');
+        assert.equal((await gridLabel()).activeId, switchedLabel.activeId, 'the active chapter stays unchanged');
         assert.deepEqual(errors, []);
       } finally {
         await context.close();
@@ -559,10 +574,12 @@ describe('end of round (desktop)', () => {
       const victory = await page.evaluate(() => ({
         focused: document.activeElement?.id,
         stars: document.querySelector('#victory-stars').textContent.trim(),
+        nextStar: document.querySelector('#victory-next-star').textContent.trim(),
         score: document.querySelector('#victory-score').textContent.trim()
       }));
       assert.equal(victory.focused, 'btn-next-level');
       assert.ok(victory.stars.length > 0 && victory.score.length > 0, 'the victory screen states stars and score');
+      assert.ok(victory.nextStar.length > 0, 'the victory screen states the next star goal or 3-star completion');
       await page.click('#btn-next-level');
       await page.waitForFunction(() => window.__fluxEngine.currentLevelId === 2);
       assert.equal(await isShown(page, '#modal-victory'), false);
@@ -615,6 +632,7 @@ describe('end of round (desktop)', () => {
       await waitShown(page, '#modal-gameover');
       const reason = await page.evaluate(() => document.querySelector('#gameover-reason').textContent.trim());
       assert.ok(reason.length > 0, 'the game over screen states why');
+      assert.equal(await isShown(page, '#gameover-remaining'), true, 'campaign defeat shows remaining spheres');
       await page.click('#btn-retry');
       await page.waitForFunction((playing) => window.__fluxEngine.state === playing, GAME_STATES.PLAYING);
       assert.equal(await isShown(page, '#modal-gameover'), false);

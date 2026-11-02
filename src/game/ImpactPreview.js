@@ -14,7 +14,8 @@
  * limitations under the License.
  */
 
-import { SPECIAL_TYPES } from '../core/Constants.js';
+import { SPECIAL_TYPES, CLUSTER_MODIFIERS } from '../core/Constants.js';
+import { pickRocketTargets } from './SpecialBallController.js';
 
 /**
  * What a shot along an aim trajectory would hit, as the aim preview shows it: the spheres
@@ -96,6 +97,14 @@ export function predictImpact(
             destroyedIds.add(b.id);
             break;
           }
+        }
+      }
+    } else if (specType === SPECIAL_TYPES.ROCKET) {
+      const targets = pickRocketTargets({ x: endX, y: endY }, physicsWorld.balls, specCfg.rocketCount);
+      for (const target of targets) {
+        highlight.push(target);
+        if (target.clusterModifier !== CLUSTER_MODIFIERS.BOSS_CORE || target.armorHits <= 1) {
+          destroyedIds.add(target.id);
         }
       }
     }

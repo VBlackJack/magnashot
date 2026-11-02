@@ -661,3 +661,45 @@ test('Daily Game Over countdown refreshes on a config-driven interval with unref
   assert.match(uiManagerCode, /this\.gameConfig\?\.daily\?\.countdownRefreshMs/);
   assert.match(uiManagerCode, /this\.dailyCountdownTimer\?\.unref\?\.\(\)/);
 });
+
+test('source files never use raw HTML sinks (.innerHTML, .outerHTML, .insertAdjacentHTML)', () => {
+  const collectJsFiles = (dir) =>
+    readdirSync(dir, { withFileTypes: true }).flatMap((entry) =>
+      entry.isDirectory() ? collectJsFiles(join(dir, entry.name)) : entry.name.endsWith('.js') ? [join(dir, entry.name)] : []
+    );
+  const files = collectJsFiles('./src');
+  const normalized = files.map((file) => file.replace(/\\/g, '/'));
+  assert.ok(normalized.includes('src/ui/UIManager.js'), 'must reach src/ui/UIManager.js');
+  assert.ok(
+    normalized.includes('src/game/layouts/FluxStageGenerator.js'),
+    'must reach nested subdirectory src/game/layouts/FluxStageGenerator.js'
+  );
+  for (const file of files) {
+    const code = readFileSync(file, 'utf8')
+      .replace(/\/\*[\s\S]*?\*\//g, '')
+      .replace(/\/\/.*$/gm, '');
+    assert.doesNotMatch(
+      code,
+      /\.(?:innerHTML|outerHTML|insertAdjacentHTML)\b/,
+      `${file} must not use raw HTML sinks`
+    );
+  }
+});
+
+test('powerup buttons include keyboard badge 1-6 and locked chapters expose chapterLockedHint', () => {
+  assert.match(uiManagerCode, /document\.createElement\('kbd'\)/);
+  assert.match(uiManagerCode, /keyBadge\.className = 'powerup-key'/);
+  assert.match(uiManagerCode, /modals\.levelSelect\.chapterLockedHint/);
+  assert.match(indexHtml, /id="levels-chapter-hint"/);
+  assert.match(indexHtml, /id="victory-next-star"/);
+  assert.match(indexHtml, /id="gameover-remaining"/);
+  for (const lang of SUPPORTED) {
+    const locale = loadJson(`./locales/${lang}.json`);
+    assert.deepEqual(placeholdersOf(locale.modals.victory.nextStarHint), ['points', 'star', 'target']);
+    assert.ok(locale.modals.victory.allStarsEarned);
+    assert.ok(locale.modals.victory.stats.newRecordBadge);
+    assert.ok(locale.modals.gameOver.stats.newRecordBadge);
+    assert.deepEqual(placeholdersOf(locale.modals.gameOver.stats.remainingSpheres), ['count']);
+    assert.deepEqual(placeholdersOf(locale.modals.levelSelect.chapterLockedHint), ['level']);
+  }
+});

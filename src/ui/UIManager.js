@@ -407,6 +407,7 @@ export class UIManager {
       modalLevels: document.getElementById('modal-levels'),
       levelsStarsSummary: document.getElementById('levels-stars-summary'),
       levelsChapters: document.getElementById('levels-chapters'),
+      levelsChapterHint: document.getElementById('levels-chapter-hint'),
       levelsGrid: document.getElementById('levels-grid'),
       btnCloseLevels: document.getElementById('btn-close-levels'),
       btnPlayLevelModal: document.getElementById('btn-play-level-modal'),
@@ -427,6 +428,7 @@ export class UIManager {
       victoryScore: document.getElementById('victory-score'),
       victoryBonus: document.getElementById('victory-bonus'),
       victoryStars: document.getElementById('victory-stars'),
+      victoryNextStar: document.getElementById('victory-next-star'),
       btnNextLevel: document.getElementById('btn-next-level'),
       btnReplayVictory: document.getElementById('btn-replay-victory'),
       btnLevelsVictory: document.getElementById('btn-levels-victory'),
@@ -434,6 +436,7 @@ export class UIManager {
       gameOverReason: document.getElementById('gameover-reason'),
       gameOverScore: document.getElementById('gameover-score'),
       gameOverBest: document.getElementById('gameover-best'),
+      gameoverRemaining: document.getElementById('gameover-remaining'),
       gameOverStage: document.getElementById('gameover-stage'),
       gameOverDailyNext: document.getElementById('gameover-daily-next'),
       btnRetry: document.getElementById('btn-retry'),
@@ -656,15 +659,20 @@ export class UIManager {
 
   buildPowerupButtons() {
     const container = this.elements.powerupsContainer;
-    container.innerHTML = '';
+    container.replaceChildren();
 
-    for (const type of SPECIAL_TYPES_ORDER) {
+    SPECIAL_TYPES_ORDER.forEach((type, index) => {
       const spec = this.ballsConfig.specialTypes[type];
       const btn = document.createElement('button');
       btn.type = 'button';
       btn.className = 'powerup-btn';
       btn.dataset.specialType = type;
       btn.title = t(`hud.powerups.${type}.tooltip`);
+
+      const keyBadge = document.createElement('kbd');
+      keyBadge.className = 'powerup-key';
+      keyBadge.setAttribute('aria-hidden', 'true');
+      keyBadge.textContent = String(index + 1);
 
       const iconSpan = document.createElement('span');
       iconSpan.className = 'powerup-icon';
@@ -687,7 +695,7 @@ export class UIManager {
       // are carried by an explicit label rather than by the content.
       btn.setAttribute('aria-label', this.getPowerupAriaLabel(type, count));
 
-      btn.append(iconSpan, labelSpan, countSpan);
+      btn.append(keyBadge, iconSpan, labelSpan, countSpan);
       btn.addEventListener('click', () => {
         // An empty stock leads to where more can be bought.
         if (btn.classList.contains(EMPTY_POWERUP_CLASS)) {
@@ -698,7 +706,7 @@ export class UIManager {
       });
 
       container.appendChild(btn);
-    }
+    });
   }
 
   getPowerupAriaLabel(type, count) {
@@ -1580,14 +1588,20 @@ export class UIManager {
     this.elements.victoryStars.replaceChildren(glyphs, this.victoryStarsLabel);
   }
 
+  formatVictoryScoreText(value, isNewRecord = false) {
+    const base = t('modals.victory.stats.score', { score: formatNumber(value) });
+    return isNewRecord ? `${base} - ${t('modals.victory.stats.newRecordBadge')}` : base;
+  }
+
   /**
    * Rolls the victory score up from zero (ease-out), or writes it at once under reduced
    * motion. Every frame goes through the same i18n line as the final value.
    */
-  startScoreCountUp(finalScore) {
+  startScoreCountUp(finalScore, isNewRecord = false) {
     this.stopScoreCountUp();
+    this.elements.victoryScore?.classList.toggle('is-new-record', Boolean(isNewRecord));
     const writeScore = (value) => {
-      setTextIfChanged(this.elements.victoryScore, t('modals.victory.stats.score', { score: formatNumber(value) }));
+      setTextIfChanged(this.elements.victoryScore, this.formatVictoryScoreText(value, isNewRecord));
     };
     const durationMs = this.gameConfig.victory.countUpMs;
     if (this.storageManager.getReducedMotion() || durationMs <= 0 || typeof requestAnimationFrame !== 'function') {
@@ -2039,7 +2053,7 @@ export class UIManager {
     const coins = this.storageManager.getCoins();
     this.elements.shopBalance.textContent = t('modals.shop.balance.label', { coins: formatNumber(coins) });
     const grid = this.elements.shopGrid;
-    grid.innerHTML = '';
+    grid.replaceChildren();
 
     const upgradeEntries = Object.entries(this.gameConfig.upgrades);
     for (let slotIndex = 0; slotIndex < upgradeEntries.length; slotIndex++) {
@@ -2105,7 +2119,7 @@ export class UIManager {
 
     if (this.elements.shopAmmoGrid && this.gameConfig.specialShopCosts) {
       const ammoGrid = this.elements.shopAmmoGrid;
-      ammoGrid.innerHTML = '';
+      ammoGrid.replaceChildren();
       // Ammo is stocked into the current run, so it cannot be bought between runs.
       const canBuyAmmo = this.isRunActive();
       for (let slotIndex = 0; slotIndex < SPECIAL_TYPES_ORDER.length; slotIndex++) {
@@ -2163,7 +2177,7 @@ export class UIManager {
 
     if (this.elements.achievementsGrid && this.gameConfig.achievements) {
       const achGrid = this.elements.achievementsGrid;
-      achGrid.innerHTML = '';
+      achGrid.replaceChildren();
       const unlockedMap = this.storageManager.getUnlockedAchievements();
       const achEntries = Object.entries(this.gameConfig.achievements);
       let unlockedCount = 0;
@@ -2215,7 +2229,7 @@ export class UIManager {
     if (!pane) {
       return;
     }
-    pane.innerHTML = '';
+    pane.replaceChildren();
 
     const modHeading = document.createElement('h3');
     modHeading.className = 'modal-subtitle';
@@ -2372,6 +2386,7 @@ export class UIManager {
     }
 
     // The dialog opens on the chapter of the suggested level.
+    this.elements.levelsChapterHint?.classList.add('hidden');
     this.levelsChapterIndex = this.engine.levelCatalog.chapterIndexOf(suggestedLevelId);
     this.renderLevelChapters();
     const suggestedCard = this.renderLevelCards(suggestedLevelId);
@@ -2419,7 +2434,7 @@ export class UIManager {
     const maxStarsPerLevel = this.gameConfig.scoring.maxStars;
     const chapters = this.engine.levelCatalog.listChapters();
     const openable = chapters.filter((chapter) => chapter.firstId <= unlocked);
-    strip.innerHTML = '';
+    strip.replaceChildren();
 
     for (const chapter of chapters) {
       const isLocked = chapter.firstId > unlocked;
@@ -2440,7 +2455,9 @@ export class UIManager {
       tab.setAttribute('aria-controls', 'levels-grid');
       tab.tabIndex = isActive ? 0 : -1;
       if (isLocked) {
+        const requiredLevel = Math.max(1, chapter.firstId - 1);
         tab.setAttribute('aria-disabled', 'true');
+        tab.title = t('modals.levelSelect.chapterLockedHint', { level: requiredLevel });
       }
       tab.setAttribute(
         'aria-label',
@@ -2463,7 +2480,18 @@ export class UIManager {
         : t('modals.levelSelect.chapters.stars', { stars, maxStars });
       tab.append(titleEl, starsEl);
 
-      tab.addEventListener('click', () => this.selectLevelChapter(chapter.index));
+      tab.addEventListener('click', () => {
+        if (chapter.firstId > this.storageManager.getUnlockedLevel()) {
+          const msg = t('modals.levelSelect.chapterLockedHint', { level: Math.max(1, chapter.firstId - 1) });
+          if (this.elements.levelsChapterHint) {
+            this.elements.levelsChapterHint.textContent = msg;
+            this.elements.levelsChapterHint.classList.remove('hidden');
+          }
+          this.announce(msg);
+          return;
+        }
+        this.selectLevelChapter(chapter.index);
+      });
       tab.addEventListener('keydown', (e) => {
         if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft') {
           return;
@@ -2506,6 +2534,7 @@ export class UIManager {
     if (!chapter || chapter.firstId > this.storageManager.getUnlockedLevel()) {
       return;
     }
+    this.elements.levelsChapterHint?.classList.add('hidden');
     this.levelsChapterIndex = index;
     this.renderLevelChapters();
     this.renderLevelCards(this.getSuggestedLevelId());
@@ -2528,7 +2557,7 @@ export class UIManager {
     const stats = this.storageManager.getLevelStats();
     const grid = this.elements.levelsGrid;
     let suggestedCard = null;
-    grid.innerHTML = '';
+    grid.replaceChildren();
 
     for (let levelId = chapter.firstId; levelId <= chapter.lastId; levelId++) {
       const lvl = catalog.summarize(levelId);
@@ -2972,17 +3001,33 @@ export class UIManager {
       const stars = summary.stars || engine.computeStars(engine.score);
       const maxStars = this.gameConfig.scoring.maxStars;
       const scoreText = formatNumber(engine.score);
+      const isNewRecord = Boolean(summary.isNewRecord);
       // Score roll-up and star pops play once per victory, the first time the window
       // shows; later refreshes only keep the texts current (e.g. after a language switch).
       if (!this.isVictoryPresented) {
         this.isVictoryPresented = true;
         this.buildVictoryStars(stars, maxStars);
-        this.startScoreCountUp(engine.score);
+        this.startScoreCountUp(engine.score, isNewRecord);
       } else {
+        this.elements.victoryScore?.classList.toggle('is-new-record', isNewRecord);
         if (this.scoreCountUpFrame === null) {
-          setTextIfChanged(this.elements.victoryScore, t('modals.victory.stats.score', { score: scoreText }));
+          setTextIfChanged(this.elements.victoryScore, this.formatVictoryScoreText(engine.score, isNewRecord));
         }
         setTextIfChanged(this.victoryStarsLabel, t('modals.victory.stats.stars', { stars, maxStars }));
+      }
+      if (this.elements.victoryNextStar && summary) {
+        this.elements.victoryNextStar.classList.remove('hidden');
+        if (summary.nextStarTarget !== null && summary.nextStarTarget !== undefined) {
+          this.elements.victoryNextStar.textContent = t('modals.victory.nextStarHint', {
+            star: summary.nextStarNumber,
+            target: formatNumber(summary.nextStarTarget),
+            points: formatNumber(summary.pointsToNextStar)
+          });
+          this.elements.victoryNextStar.classList.remove('is-all-stars');
+        } else {
+          this.elements.victoryNextStar.textContent = t('modals.victory.allStarsEarned');
+          this.elements.victoryNextStar.classList.add('is-all-stars');
+        }
       }
       setTextIfChanged(
         this.elements.victoryBonus,
@@ -3008,16 +3053,32 @@ export class UIManager {
 
     if (engine.state === GAME_STATES.GAME_OVER) {
       this.closeDrawer({ resume: false });
-      const reasonKey = gameOverReasonKey(extra.gameOverReason);
+      const summary = engine.gameOverSummary;
+      const reasonKey = gameOverReasonKey(extra.gameOverReason || summary?.reasonKey);
       const scoreText = formatNumber(engine.score);
       setTextIfChanged(this.elements.gameOverReason, t(reasonKey));
       setTextIfChanged(this.elements.gameOverScore, t('modals.gameOver.stats.score', { score: scoreText }));
+      const highScoreText = t('modals.gameOver.stats.highScore', {
+        highScore: formatNumber(Math.max(bestScore, engine.score))
+      });
+      const isNewRecord = Boolean(summary?.isNewRecord);
       setTextIfChanged(
         this.elements.gameOverBest,
-        t('modals.gameOver.stats.highScore', {
-          highScore: formatNumber(Math.max(bestScore, engine.score))
-        })
+        isNewRecord ? `${highScoreText} - ${t('modals.gameOver.stats.newRecordBadge')}` : highScoreText
       );
+      this.elements.gameOverBest?.classList.toggle('is-new-record', isNewRecord);
+      if (this.elements.gameoverRemaining) {
+        const showRemaining = engine.usesShotBudget() && summary?.remainingSpheres > 0;
+        if (showRemaining) {
+          setTextIfChanged(
+            this.elements.gameoverRemaining,
+            t('modals.gameOver.stats.remainingSpheres', { count: formatNumber(summary.remainingSpheres) })
+          );
+          this.elements.gameoverRemaining.classList.remove('hidden');
+        } else {
+          this.elements.gameoverRemaining.classList.add('hidden');
+        }
+      }
       if (this.elements.gameOverStage) {
         const isFlux = engine.mode === GAME_MODES.FLUX;
         if (isFlux) {

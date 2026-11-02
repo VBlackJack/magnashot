@@ -262,12 +262,14 @@ export class StorageManager {
   }
 
   saveLevelResult(levelId, score, stars) {
+    const cleanScore = Math.max(0, Math.floor(Number(score) || 0));
+    const cleanStars = Math.max(0, Math.floor(Number(stars) || 0));
     const stats = this.getLevelStats();
     const existing = stats[levelId] || { bestScore: 0, stars: 0 };
-    const newlyEarnedStars = Math.max(0, stars - existing.stars);
+    const newlyEarnedStars = Math.max(0, cleanStars - existing.stars);
     stats[levelId] = {
-      bestScore: Math.max(existing.bestScore, score),
-      stars: Math.max(existing.stars, stars)
+      bestScore: Math.max(existing.bestScore, cleanScore),
+      stars: Math.max(existing.stars, cleanStars)
     };
     this.safeSetItem(this.storageConfig.keys.levelStats, JSON.stringify(stats));
     return { newlyEarnedStars };
@@ -347,9 +349,10 @@ export class StorageManager {
   }
 
   setEndlessHighScore(score) {
+    const cleanScore = Math.max(0, Math.floor(Number(score) || 0));
     const current = this.getEndlessHighScore();
-    if (score > current) {
-      this.safeSetItem(this.storageConfig.keys.endlessHighScore, score);
+    if (cleanScore > current) {
+      this.safeSetItem(this.storageConfig.keys.endlessHighScore, cleanScore);
     }
   }
 
@@ -371,11 +374,13 @@ export class StorageManager {
    * run is not always the highest-scoring one.
    */
   setFluxRecord(score, stage) {
-    if (score > this.getFluxHighScore()) {
-      this.safeSetItem(this.storageConfig.keys.fluxHighScore, Math.floor(score));
+    const cleanScore = Math.max(0, Math.floor(Number(score) || 0));
+    const cleanStage = Math.max(0, Math.floor(Number(stage) || 0));
+    if (cleanScore > this.getFluxHighScore()) {
+      this.safeSetItem(this.storageConfig.keys.fluxHighScore, cleanScore);
     }
-    if (stage > this.getFluxBestStage()) {
-      this.safeSetItem(this.storageConfig.keys.fluxBestStage, Math.floor(stage));
+    if (cleanStage > this.getFluxBestStage()) {
+      this.safeSetItem(this.storageConfig.keys.fluxBestStage, cleanStage);
     }
   }
 
@@ -390,11 +395,12 @@ export class StorageManager {
   }
 
   setDailyHighScore(score, dateKey = SeededRandom.getTodayDateKey()) {
+    const cleanScore = Math.max(0, Math.floor(Number(score) || 0));
     const current = this.getDailyHighScore(dateKey);
     const savedDate = this.safeGetItem(this.storageConfig.keys.dailyBestDate);
-    if (savedDate !== dateKey || score > current) {
+    if (savedDate !== dateKey || cleanScore > current) {
       this.safeSetItem(this.storageConfig.keys.dailyBestDate, dateKey);
-      this.safeSetItem(this.storageConfig.keys.dailyBest, Math.max(0, Math.floor(score)));
+      this.safeSetItem(this.storageConfig.keys.dailyBest, cleanScore);
     }
   }
 

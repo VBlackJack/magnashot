@@ -376,7 +376,8 @@
         "locked": "🔒 Verrouillé",
         "aria": "{{name}}, niveaux {{first}} à {{last}}, {{stars}} étoiles sur {{maxStars}}",
         "ariaLocked": "{{name}}, niveaux {{first}} à {{last}}, verrouillé"
-      }
+      },
+      "chapterLockedHint": "Terminez le niveau {{level}} pour débloquer ce chapitre."
     },
     "shop": {
       "title": {
@@ -584,8 +585,11 @@
       "title": {
         "main": "Niveau Terminé !"
       },
+      "nextStarHint": "Prochaine étoile ({{star}}★) : {{target}} pts (encore {{points}} pts)",
+      "allStarsEarned": "Objectif 3★ atteint !",
       "stats": {
         "score": "Score final : {{score}}",
+        "newRecordBadge": "Nouveau record !",
         "stars": "Étoiles obtenues : {{stars}} / {{maxStars}}",
         "shotsBonus": "Bonus de tirs : +{{bonus}} • Pièces : +{{coins}} ⬡"
       },
@@ -607,6 +611,8 @@
       "stats": {
         "score": "Score atteint : {{score}}",
         "highScore": "Meilleur score : {{highScore}}",
+        "newRecordBadge": "Nouveau record !",
+        "remainingSpheres": "Sphères restantes sur le plateau : {{count}}",
         "fluxStage": "Forme atteinte : {{stage}} (record : {{best}})"
       },
       "button": {

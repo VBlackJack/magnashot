@@ -106,6 +106,7 @@ export class GameEngine {
     this.outOfShotsGraceFrames = 0;
     this.victoryCelebrationFrames = 0;
     this.victorySummary = null;
+    this.gameOverSummary = null;
     this.hitStopFrames = 0;
     this.impactWave = null;
     this.trailFrameCounter = 0;
@@ -329,6 +330,7 @@ export class GameEngine {
     this.outOfShotsGraceFrames = 0;
     this.victoryCelebrationFrames = 0;
     this.victorySummary = null;
+    this.gameOverSummary = null;
     this.hitStopFrames = 0;
     this.impactWave = null;
     this.hasFiredInRound = false;
@@ -656,12 +658,7 @@ export class GameEngine {
     this.freezeTurnsRemaining = 0;
     this.stageIntroFrames = this.isReducedMotion ? 0 : this.fluxConfig.transition.introFrames;
 
-    for (const launcherBall of [this.currentBall, this.nextBall]) {
-      if (launcherBall && !launcherBall.specialType && !this.activePalette.includes(launcherBall.colorId)) {
-        launcherBall.colorId = this.pickLauncherColor();
-      }
-    }
-    this.upcomingColorIds = this.upcomingColorIds.map((color) => (this.activePalette.includes(color) ? color : this.pickLauncherColor()));
+    this.refreshStaleLauncherColors();
     if (this.currentBall) {
       this.updateAimFromAngle(this.aimAngle);
     }
@@ -1022,6 +1019,7 @@ export class GameEngine {
       this.stashedRegularColorId = null;
       this.audioManager.playEffect('snap');
       this.updateAimFromAngle(this.aimAngle);
+      this.saveRunSnapshot({ force: true });
       this.notifyUI();
       return;
     }
@@ -1039,6 +1037,7 @@ export class GameEngine {
     this.currentBall = this.createRandomLauncherBall(specialType);
     this.audioManager.playEffect('snap');
     this.updateAimFromAngle(this.aimAngle);
+    this.saveRunSnapshot({ force: true });
     this.notifyUI();
   }
 
@@ -1050,6 +1049,9 @@ export class GameEngine {
     if (this.activeDiscoveryId) {
       this.activeDiscoveryId = null;
       this.discoveryTurnCount = 0;
+      if (this.hasFiredInRound || this.storageManager.loadRunSnapshot() !== null) {
+        this.saveRunSnapshot({ force: true });
+      }
       this.notifyUI();
     }
   }
@@ -1202,6 +1204,7 @@ export class GameEngine {
     this.nextBall = temp;
     this.audioManager.playEffect('snap');
     this.updateAimFromAngle(this.aimAngle);
+    this.saveRunSnapshot({ force: true });
     this.notifyUI();
   }
 
@@ -1212,6 +1215,7 @@ export class GameEngine {
     this.isPolarityFlipped = !this.isPolarityFlipped;
     this.audioManager.playEffect('snap');
     this.updateAimFromAngle(this.aimAngle);
+    this.saveRunSnapshot({ force: true });
     this.notifyUI();
   }
 
@@ -2163,7 +2167,8 @@ export class GameEngine {
    * cleared color.
    */
   refreshStaleLauncherColors() {
-    const activeColors = new Set(this.physicsWorld.balls.map((b) => b.colorId).filter(Boolean));
+    const boardColors = new Set(this.physicsWorld.balls.map((b) => b.colorId).filter(Boolean));
+    const activeColors = boardColors.size > 0 ? boardColors : new Set(this.activePalette);
     if (activeColors.size === 0) {
       return;
     }
@@ -2387,6 +2392,12 @@ export class GameEngine {
         const bonus = this.shotsRemaining * this.gameConfig.scoring.remainingShotBonus;
         this.addScore(bonus);
         const stars = this.computeStars(this.score);
+        const previousStats = this.storageManager.getLevelStats()[this.currentLevelId] || { bestScore: 0, stars: 0 };
+        const isNewRecord = previousStats.bestScore > 0 && this.score > previousStats.bestScore;
+        const thresholds = this.getStarThresholds();
+        const nextStarTarget = thresholds.find((th) => th > this.score) ?? null;
+        const nextStarNumber = nextStarTarget !== null ? stars + 1 : null;
+        const pointsToNextStar = nextStarTarget !== null ? Math.max(1, nextStarTarget - this.score) : 0;
         const { newlyEarnedStars } = this.storageManager.saveLevelResult(this.currentLevelId, this.score, stars);
         const firstStarBonus = newlyEarnedStars * this.gameConfig.scoring.firstTimeStarCoinBonus;
         const earnedCoins = stars * this.gameConfig.scoring.coinsPerVictoryStar + firstStarBonus;
@@ -2400,7 +2411,15 @@ export class GameEngine {
         this.persistRunHighScore();
         this.storageManager.clearRunSnapshot();
         this.audioManager.playEffect('victory');
-        this.victorySummary = { victoryBonus: bonus, stars, earnedCoins };
+        this.victorySummary = {
+          victoryBonus: bonus,
+          stars,
+          earnedCoins,
+          isNewRecord,
+          nextStarTarget,
+          nextStarNumber,
+          pointsToNextStar
+        };
         this.victoryCelebrationFrames = this.gameConfig.victory.celebrationFrames;
         this.particleSystem.spawnFloatingText(
           this.gameConfig.canvas.logicalWidth * MATH_CONSTANTS.HALF,
@@ -2439,6 +2458,17 @@ export class GameEngine {
     if (this.state === GAME_STATES.GAME_OVER || this.state === GAME_STATES.VICTORY) {
       return;
     }
+    let previousBestScore = 0;
+    if (this.mode === GAME_MODES.ENDLESS) {
+      previousBestScore = this.storageManager.getEndlessHighScore();
+    } else if (this.mode === GAME_MODES.DAILY) {
+      previousBestScore = this.storageManager.getDailyHighScore(this.dailySeedKey || SeededRandom.getTodayDateKey());
+    } else if (this.mode === GAME_MODES.FLUX) {
+      previousBestScore = this.storageManager.getFluxHighScore();
+    }
+    const isNewRecord = this.mode !== GAME_MODES.CAMPAIGN && previousBestScore > 0 && this.score > previousBestScore;
+    const remainingSpheres = this.physicsWorld.balls.length;
+    this.gameOverSummary = { reasonKey, isNewRecord, remainingSpheres };
     this.state = GAME_STATES.GAME_OVER;
     this.persistRunHighScore();
     this.flushPendingRunCoins();

@@ -376,7 +376,8 @@
         "locked": "🔒 Locked",
         "aria": "{{name}}, levels {{first}} to {{last}}, {{stars}} of {{maxStars}} stars",
         "ariaLocked": "{{name}}, levels {{first}} to {{last}}, locked"
-      }
+      },
+      "chapterLockedHint": "Complete level {{level}} to unlock this chapter."
     },
     "shop": {
       "title": {
@@ -584,8 +585,11 @@
       "title": {
         "main": "Level Cleared!"
       },
+      "nextStarHint": "Next star ({{star}}★): {{target}} pts ({{points}} pts away)",
+      "allStarsEarned": "3★ target reached!",
       "stats": {
         "score": "Final Score: {{score}}",
+        "newRecordBadge": "New record!",
         "stars": "Stars Earned: {{stars}} / {{maxStars}}",
         "shotsBonus": "Shots Bonus: +{{bonus}} • Coins: +{{coins}} ⬡"
       },
@@ -607,6 +611,8 @@
       "stats": {
         "score": "Final Score: {{score}}",
         "highScore": "High Score: {{highScore}}",
+        "newRecordBadge": "New record!",
+        "remainingSpheres": "Spheres left on the board: {{count}}",
         "fluxStage": "Shape reached: {{stage}} (best: {{best}})"
       },
       "button": {

@@ -22,10 +22,11 @@ import { configRegistry } from '../src/core/ConfigRegistry.js';
 import { StorageManager } from '../src/core/StorageManager.js';
 import { Ball } from '../src/entities/Ball.js';
 import { GameEngine } from '../src/game/GameEngine.js';
+import { predictImpact } from '../src/game/ImpactPreview.js';
 import { Renderer } from '../src/game/Renderer.js';
 import { SeededRandom } from '../src/core/SeededRandom.js';
 import { generateLayout, MASK_CELLS } from '../src/game/layouts/LayoutGenerators.js';
-import { CLUSTER_MODIFIERS, LAYOUT_TYPES } from '../src/core/Constants.js';
+import { CLUSTER_MODIFIERS, LAYOUT_TYPES, SPECIAL_TYPES } from '../src/core/Constants.js';
 import { applyWorldGeometry } from '../src/core/WorldGeometry.js';
 
 const loadJson = (p) => JSON.parse(fs.readFileSync(p, 'utf8'));
@@ -413,6 +414,55 @@ test('A Rocket shot hits the hardest targets first and cracks a Boss Core shield
   assert.equal(boss.armorHits, 2, 'a rocket cracks one Boss Core shield, like a blast');
   assert.ok(gone(anchor), 'then anchors');
   assert.ok(!gone(plain) && extra.every((ball) => !gone(ball)), `only ${rocketSpec.rocketCount} rockets fly`);
+});
+
+test('Rocket aim preview highlights pickRocketTargets priority targets and destroys armored spheres but not multi-shield Boss Cores', () => {
+  const board = createEmptyBoard();
+  const armored = addBall(board, CENTER_X - REST_DISTANCE * 2, TOP_Y, {
+    clusterModifier: CLUSTER_MODIFIERS.ARMORED,
+    armorHits: ballsConfig.clusterModifiers.armored.initialArmor
+  });
+  const boss = addBall(board, CENTER_X + REST_DISTANCE * 2, TOP_Y, {
+    clusterModifier: CLUSTER_MODIFIERS.BOSS_CORE,
+    armorHits: 3
+  });
+  const anchor = addBall(board, CENTER_X + REST_DISTANCE * 4, TOP_Y, { isAnchor: true });
+  const plain = addBall(board, CENTER_X, TOP_Y + REST_DISTANCE);
+  const rocket = new Ball({ x: CENTER_X, y: TOP_Y + REST_DISTANCE * 2, radius: RADIUS, colorId: null, specialType: SPECIAL_TYPES.ROCKET });
+
+  const preview = predictImpact({
+    points: [{ x: CENTER_X, y: TOP_Y + REST_DISTANCE * 2 }],
+    currentBall: rocket,
+    physicsWorld: board.physicsWorld,
+    endX: CENTER_X,
+    endY: TOP_Y + REST_DISTANCE * 2,
+    blastMult: 1,
+    specialTypes: ballsConfig.specialTypes,
+    matchMinCount: gameConfig.defaults.matchMinCount
+  });
+
+  assert.deepEqual(
+    preview.highlight.map((b) => b.id),
+    [armored.id, boss.id, anchor.id],
+    'highlight lists modifier spheres first, then anchors, ignoring plain spheres beyond rocketCount'
+  );
+  assert.equal(preview.destroyedIds.has(armored.id), true, 'armored sphere is destroyed in 1 rocket hit');
+  assert.equal(preview.destroyedIds.has(anchor.id), true, 'anchor sphere is destroyed');
+  assert.equal(preview.destroyedIds.has(boss.id), false, 'Boss Core with armorHits > 1 is not destroyed');
+  assert.equal(preview.destroyedIds.has(plain.id), false);
+
+  boss.armorHits = 1;
+  const finalHitPreview = predictImpact({
+    points: [{ x: CENTER_X, y: TOP_Y + REST_DISTANCE * 2 }],
+    currentBall: rocket,
+    physicsWorld: board.physicsWorld,
+    endX: CENTER_X,
+    endY: TOP_Y + REST_DISTANCE * 2,
+    blastMult: 1,
+    specialTypes: ballsConfig.specialTypes,
+    matchMinCount: gameConfig.defaults.matchMinCount
+  });
+  assert.equal(finalHitPreview.destroyedIds.has(boss.id), true, 'Boss Core with 1 shield left is destroyed');
 });
 
 test('A rust sphere guaranteed by a level carries no hidden color', () => {

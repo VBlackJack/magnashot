@@ -825,3 +825,127 @@ test('A resumed Daily run keeps its wave log, and an older save rebuilds it', ()
   assert.equal(older.restoreSavedRun(), true);
   assert.deepEqual(older.waveLog, log);
 });
+
+test('A Flux stage transition refreshes launcher and stashed colors absent from the new board', () => {
+  const engine = createTestEngine();
+  engine.startFluxRun(TEST_FLUX_SEED);
+  const absentColor = 'nonexistent-board-color';
+  engine.specialInventory[SPECIAL_TYPES.BOMB] = 1;
+  engine.currentBall.colorId = absentColor;
+  engine.equipSpecialBall(SPECIAL_TYPES.BOMB);
+  assert.equal(engine.stashedRegularColorId, absentColor);
+  engine.nextBall.colorId = absentColor;
+  engine.upcomingColorIds = [absentColor, absentColor];
+
+  engine.fluxStage = 2;
+  engine.buildFluxStage({ persist: true });
+
+  const boardColors = new Set(engine.physicsWorld.balls.map((b) => b.colorId).filter(Boolean));
+  assert.ok(boardColors.size > 0);
+  assert.ok(boardColors.has(engine.stashedRegularColorId), 'stashed regular color is refreshed to a board color');
+  assert.ok(boardColors.has(engine.nextBall.colorId), 'next launcher ball is refreshed to a board color');
+  assert.ok(
+    engine.upcomingColorIds.every((color) => boardColors.has(color)),
+    'upcoming queue colors are refreshed to board colors'
+  );
+});
+
+test('Launcher preparation actions (swap, polarity flip, equip/unequip special) persist the run snapshot', () => {
+  const engine = createTestEngine();
+  engine.startCampaignLevel(1);
+  const initialCurrentColor = ballsConfig.standardColors[0].id;
+  const initialNextColor = ballsConfig.standardColors[1].id;
+  engine.currentBall.colorId = initialCurrentColor;
+  engine.nextBall.colorId = initialNextColor;
+
+  engine.swapLauncherBalls();
+  let snapshot = engine.storageManager.loadRunSnapshot();
+  assert.ok(snapshot, 'swapLauncherBalls saves a snapshot');
+  assert.equal(snapshot.currentBall.colorId, initialNextColor);
+  assert.equal(snapshot.nextBall.colorId, initialCurrentColor);
+
+  engine.togglePolarityFlip();
+  snapshot = engine.storageManager.loadRunSnapshot();
+  assert.equal(snapshot.engine.isPolarityFlipped, true, 'togglePolarityFlip updates the snapshot');
+
+  engine.specialInventory[SPECIAL_TYPES.BOMB] = 1;
+  engine.equipSpecialBall(SPECIAL_TYPES.BOMB);
+  snapshot = engine.storageManager.loadRunSnapshot();
+  assert.equal(snapshot.currentBall.specialType, SPECIAL_TYPES.BOMB, 'equipping a special ball updates the snapshot');
+  assert.equal(snapshot.engine.stashedRegularColorId, initialNextColor);
+
+  engine.equipSpecialBall(SPECIAL_TYPES.BOMB);
+  snapshot = engine.storageManager.loadRunSnapshot();
+  assert.equal(snapshot.currentBall.specialType, null, 'unequipping a special ball updates the snapshot');
+  assert.equal(snapshot.currentBall.colorId, initialNextColor);
+  assert.equal(snapshot.engine.stashedRegularColorId, null);
+});
+
+test('StorageManager floors decimal scores and stars to non-negative integers', () => {
+  const storage = new StorageManager();
+  storage.init();
+
+  storage.setEndlessHighScore(1234.89);
+  assert.equal(storage.getEndlessHighScore(), 1234);
+  assert.equal(storage.safeGetItem(gameConfig.storage.keys.endlessHighScore), '1234');
+
+  const { newlyEarnedStars } = storage.saveLevelResult(1, 2500.75, 2.9);
+  assert.equal(newlyEarnedStars, 2);
+  const stats = storage.getLevelStats();
+  assert.deepEqual(stats[1], { bestScore: 2500, stars: 2 });
+});
+
+test('victorySummary computes nextStarTarget, pointsToNextStar and isNewRecord', () => {
+  const engine = createTestEngine();
+  engine.startCampaignLevel(1);
+  const thresholds = engine.getStarThresholds();
+  engine.shotsRemaining = 0;
+  engine.score = thresholds[1] - 500;
+  engine.physicsWorld.clear();
+  engine.evaluateRoundEnd();
+
+  assert.equal(engine.state, GAME_STATES.VICTORY);
+  assert.equal(engine.victorySummary.isNewRecord, false, 'first clear is not flagged as beating an existing record');
+  assert.equal(engine.victorySummary.nextStarTarget, thresholds[1]);
+  assert.equal(engine.victorySummary.nextStarNumber, 2);
+  assert.equal(engine.victorySummary.pointsToNextStar, 500);
+
+  // Second clear beating the stored record and reaching 3 stars
+  engine.startCampaignLevel(1);
+  engine.shotsRemaining = 0;
+  engine.score = thresholds[2] + 1000;
+  engine.physicsWorld.clear();
+  engine.evaluateRoundEnd();
+
+  assert.equal(engine.victorySummary.isNewRecord, true, 'beating a positive bestScore sets isNewRecord');
+  assert.equal(engine.victorySummary.nextStarTarget, null);
+  assert.equal(engine.victorySummary.nextStarNumber, null);
+  assert.equal(engine.victorySummary.pointsToNextStar, 0);
+});
+
+test('gameOverSummary records remainingSpheres and detects isNewRecord before persisting high score', () => {
+  const engine = createTestEngine();
+  engine.startCampaignLevel(1);
+  const initialBalls = engine.physicsWorld.balls.length;
+  assert.ok(initialBalls > 0);
+  engine.score = 5000;
+  engine.triggerGameOver('outOfShots');
+
+  assert.equal(engine.gameOverSummary.remainingSpheres, initialBalls);
+  assert.equal(engine.gameOverSummary.isNewRecord, false, 'Campaign defeats never flag a new record');
+
+  // Survival mode: first run establishes a baseline record
+  engine.startEndlessMode();
+  assert.equal(engine.gameOverSummary, null, 'resetRunState clears gameOverSummary');
+  engine.score = 1200;
+  engine.triggerGameOver('lineCrossed');
+  assert.equal(engine.gameOverSummary.isNewRecord, false, 'first Survival score from 0 is not flagged as beating a record');
+  assert.equal(engine.storageManager.getEndlessHighScore(), 1200);
+
+  // Second Survival run beats the 1200 record
+  engine.startEndlessMode();
+  engine.score = 2500;
+  engine.triggerGameOver('lineCrossed');
+  assert.equal(engine.gameOverSummary.isNewRecord, true, 'beating existing Endless high score sets isNewRecord');
+  assert.equal(engine.storageManager.getEndlessHighScore(), 2500);
+});

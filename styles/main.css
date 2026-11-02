@@ -101,7 +101,8 @@
 }
 
 /* Hints written for one input mode only (the root carries data-input). */
-:root[data-input='touch'] .pointer-only {
+:root[data-input='touch'] .pointer-only,
+:root[data-input='touch'] .powerup-key {
   display: none;
 }
 
@@ -707,6 +708,7 @@ body {
 }
 
 .powerup-btn {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -718,6 +720,17 @@ body {
   color: var(--text-main);
   cursor: pointer;
   transition: all 0.15s ease;
+}
+
+.powerup-key {
+  position: absolute;
+  top: 3px;
+  left: 4px;
+  font-size: 0.6rem;
+  line-height: 1;
+  color: var(--text-muted);
+  pointer-events: none;
+  opacity: 0.75;
 }
 
 .powerup-btn:hover:not(:disabled) {
@@ -885,6 +898,21 @@ body {
 .modal-stat-line.muted {
   color: var(--text-muted);
   font-size: 0.9rem;
+}
+
+.modal-subtext {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.is-new-record {
+  color: var(--text-gold);
+  font-weight: 700;
+}
+
+.is-all-stars {
+  color: var(--accent-emerald);
+  font-weight: 700;
 }
 
 .share-fallback {
@@ -1478,6 +1506,9 @@ body {
     font-size: 0.75rem;
   }
   .powerup-name {
+    display: none;
+  }
+  .powerup-key {
     display: none;
   }
   .powerup-count {
@@ -2075,6 +2106,9 @@ body {
   .polarity-floating-btn,
   .swap-floating-btn {
     min-height: var(--touch-target);
+  }
+  .powerup-key {
+    display: none;
   }
 }
 
