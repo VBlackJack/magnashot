@@ -62,6 +62,11 @@ test('Service worker cache version matches package.json version', () => {
   assert.ok(source.includes(`APP_VERSION = '${pkg.version}'`));
 });
 
+test('index.html declares a Content-Security-Policy meta tag', () => {
+  const html = readFileSync(join(REPO_ROOT, 'index.html'), 'utf8');
+  assert.match(html, /<meta\s+http-equiv="Content-Security-Policy"\s+content="[^"]*default-src 'self'[^"]*"/);
+});
+
 /** Version of the newest released section of CHANGELOG.md, skipping [Unreleased]. */
 function readLatestReleasedVersion() {
   const changelog = readFileSync(join(REPO_ROOT, 'CHANGELOG.md'), 'utf8');
