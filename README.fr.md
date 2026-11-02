@@ -16,7 +16,7 @@
 - **Physique magnétique dynamique** : les sphères de même couleur s'attirent, les pôles opposés (`N`/`S`, `+`/`-`, `Ω`/`Φ`) se rapprochent, et les pôles identiques courbent la trajectoire du projectile. Répulseurs et attracteurs courbent les tirs et font aussi pencher les amas suspendus, à l'écart ou vers eux.
 - **Visée tactique et prévisualisation** :
   - Viseur laser courbe avec prédiction des rebonds sur les murs et les bumpers.
-  - Prévisualisation en temps réel de la zone d'effet des sphères spéciales (Bombe, Foudre, Prisme, Enclume, Cryo).
+  - Prévisualisation en temps réel de la zone d'effet des sphères spéciales (Bombe, Foudre, Prisme, Enclume, Cryo, Fusée).
   - Prédiction de l'**avalanche magnétique** : les sphères qui tomberont une fois leurs liens supérieurs rompus sont mises en évidence.
 - **Modes de jeu** :
   - **Campagne** : 24 niveaux conçus à la main, qui introduisent pendules, rotors à inertie, répulseurs, barrières oscillantes, verrous quantiques, portails liés, Noyaux Boss, ancres neutres qu'aucun groupe ne brise, sphères enchaînées, bulles, coeurs de givre, de foudre et de peinture, ancres sur rail, propulseurs, longues amarres et rouille. Puis 800 niveaux générés (25 à 824), en 20 chapitres de 40 : les 12 premiers autour d'une de ces mécaniques, les 8 derniers autour d'une paire. Plus de couleurs, de sphères et de modificateurs, et moins de tirs en réserve au fil des niveaux. Chaque série de 10 niveaux mêle les formats : des niveaux standard, deux variantes qui ajoutent une mécanique d'un autre chapitre, un niveau de précision (petit plateau, peu de tirs et une seule bombe), un niveau arsenal (grand plateau, moins de tirs et deux fois plus de balles spéciales) et un niveau marquant (une forme dessinée ou une paire, et un Noyau Boss). Le nom d'un niveau indique son format. Chaque niveau se reconstruit depuis son seul numéro. La sélection des niveaux montre un chapitre à la fois, avec les étoiles gagnées dans chacun, et s'ouvre sur le chapitre en cours.
@@ -73,6 +73,10 @@ Le code suit une architecture en modules ES sans dépendance, avec une séparati
 ├── configs/                  # Données externalisées : jeu, physique, sphères, obstacles, audio, niveaux, campagne et Mode Flux
 ├── icons/                    # Icônes PWA (SVG, SVG maskable, PNG 192 px et 512 px)
 ├── locales/                  # Dictionnaires de traduction (fr.json, en.json)
+├── scripts/
+│   ├── calibrate-campaign.mjs# Outil en ligne de commande de calibration hors ligne de la campagne
+│   └── bot/
+│       └── CampaignBot.js    # Bots de calibration glouton et arsenal
 ├── src/
 │   ├── main.js               # Démarrage, filtrage des entrées pointeur et enregistrement du Service Worker
 │   ├── core/
@@ -94,7 +98,9 @@ Le code suit une architecture en modules ES sans dépendance, avec une séparati
 │   │   ├── GameEngine.js     # Machine à états, génération des vagues, score et succès
 │   │   ├── GameLoop.js       # Boucle à pas fixe avec interpolation, ralenti au repos et arrêt sur erreur fatale
 │   │   ├── ImpactPreview.js  # Ce qu'un tir détruirait, partagé par la prévisualisation et le bot de calibration
+│   │   ├── LevelCatalog.js   # Catalogue des niveaux dessinés et générés de la campagne et empreintes
 │   │   ├── Renderer.js       # Rendu Canvas 2D HiDPI avec interpolation et prévisualisation de zone
+│   │   ├── RunSnapshot.js    # Sauvegarde et reprise après rechargement d'une partie en cours
 │   │   ├── SpecialBallController.js # Résolution des impacts Bombe, Éclair, Prisme, Enclume, Cryo et Fusée
 │   │   ├── Discovery.js      # Indices de première rencontre : mécaniques du plateau, prochaine inconnue, texte
 │   │   ├── DailyShare.js     # Texte de résultat du Défi du jour, sans rien dévoiler, pour le bouton Partager
@@ -105,6 +111,7 @@ Le code suit une architecture en modules ES sans dépendance, avec une séparati
 │   └── ui/
 │       └── UIManager.js      # Mise à jour du HUD, fenêtres accessibles (piège de focus + inert) et Codex
 ├── styles/main.css           # Mise en page adaptative et jetons de design
+├── eslint.config.js          # Configuration plate ESLint 9
 ├── index.html                # Squelette de l'application et bandeau d'erreur de démarrage statique
 ├── manifest.webmanifest      # Manifeste PWA
 ├── sw.js                     # Service Worker réseau d'abord, avec délai d'attente et repli hors ligne versionné
@@ -131,10 +138,10 @@ npm run lint
 npm run test:browser
 ```
 
-Les suites de `tests/` couvrent le moteur de jeu, la physique, la boucle de rendu, les utilitaires d'interface, les outils de calibration, et six gardes du dépôt :
+Les suites de `tests/` couvrent le moteur de jeu, la physique, la boucle de rendu, les utilitaires d'interface, les outils de calibration, et sept gardes du dépôt :
 
 - `typography.test.js` refuse, dans tous les fichiers texte, les variantes typographiques des caractères ASCII (tirets longs, guillemets courbes, points de suspension, espaces spéciales, ligatures).
-- `pwa.test.js` vérifie que chaque fichier de `src/`, `configs/`, `locales/` et `icons/` est mis en cache par `sw.js`, et que la version du cache du Service Worker correspond à `package.json`.
+- `pwa.test.js` vérifie que chaque fichier de `src/`, `configs/`, `locales/` et `icons/` est mis en cache par `sw.js`, que `index.html` déclare une `Content-Security-Policy`, et que la version du cache du Service Worker correspond à `package.json`.
 - `onboarding.test.js` vérifie que chaque mécanique a un indice dans les deux langues, qu'un niveau dont le tutoriel enseigne une mécanique l'affiche toujours, et que le niveau 1 ne montre que les bases.
 - `fluxGenerator.test.js` vérifie que le générateur produit au moins 1 000 formes distinctes, chacune tenant entre les murs et suspendue à ses ancres, nommée dans les deux langues.
 - `campaign.test.js` vérifie que les 800 niveaux générés sont des plateaux jouables, reconstruits à l'identique depuis leur numéro, que la difficulté monte d'un chapitre à l'autre, qu'un niveau marquant revient tous les 10 niveaux, que chaque niveau est nommé dans les deux langues, et que chacun est calibré pour le plateau qu'il est : un changement du générateur, des formes Flux ou de la courbe de la campagne le fait échouer tant que les niveaux ne sont pas mesurés à nouveau.

@@ -16,7 +16,7 @@
 - **Dynamic Magnetic Physics**: Same-color spheres attract, opposite magnetic poles (`N`/`S`, `+`/`-`, `Ω`/`Φ`) pull, and like poles curve projectile trajectories. Repulsors and attractors bend shots and also make the hanging clusters lean away from or toward them.
 - **Tactical Aiming & Predictive Preview**:
   - Curved laser sight with wall and bumper ricochet prediction.
-  - Real-time blast/effect radius preview for Special Balls (Bomb, Lightning, Prism, Anvil, Cryo).
+  - Real-time blast/effect radius preview for Special Balls (Bomb, Lightning, Prism, Anvil, Cryo, Rocket).
   - Live **Magnetic Avalanche** prediction highlighting unanchored spheres that will drop when upper bonds are severed.
 - **Game Modes**:
   - **Campaign**: 24 handcrafted levels introducing pendulums, inertia rotors, repulsors, oscillating barriers, quantum locks, linked portals, Boss Cores, neutral anchors no match can break, chained spheres, bubbles, freeze, lightning and paint cores, rail anchors, thrusters, long tethers and rust. Then 800 generated levels (25 to 824), in 20 chapters of 40: the first 12 each feature one of those mechanics, the last 8 a pair of them. More colors, spheres and modifiers, and a tighter shot margin as they go. Each block of 10 levels mixes formats: standard levels, two twists that add a mechanic from another chapter, a precision level (a small board, a tight shot count and a single bomb), an arsenal level (a big board, fewer shots and twice the special balls) and a landmark (a drawn shape or a pair, and a Boss Core). A level's name shows its format. Each level is rebuilt from its number alone. The level select shows one chapter at a time, with the stars won in each, and opens on the chapter being played.
@@ -73,6 +73,10 @@ The codebase follows a modular, zero-dependency ES module architecture with stri
 ├── configs/                  # Externalized game, physics, ball, obstacle, audio, level, campaign & Flux data
 ├── icons/                    # PWA icons (SVG, maskable SVG, 192 px and 512 px PNG)
 ├── locales/                  # Bilingual translation dictionaries (fr.json, en.json)
+├── scripts/
+│   ├── calibrate-campaign.mjs# Offline campaign level calibration CLI
+│   └── bot/
+│       └── CampaignBot.js    # Greedy and arsenal calibration bots
 ├── src/
 │   ├── main.js               # Application bootstrap, pointer input guards & Service Worker registration
 │   ├── core/
@@ -94,7 +98,9 @@ The codebase follows a modular, zero-dependency ES module architecture with stri
 │   │   ├── GameEngine.js     # Game state machine, wave spawner, scoring & achievements
 │   │   ├── GameLoop.js       # Fixed-step loop with interpolation, idle throttling and fatal error stop
 │   │   ├── ImpactPreview.js  # What a shot would destroy, shared by the aim preview and the calibration bot
+│   │   ├── LevelCatalog.js   # Authored and generated campaign level builder and fingerprint
 │   │   ├── Renderer.js       # HiDPI Canvas 2D renderer with alpha interpolation & AOE preview
+│   │   ├── RunSnapshot.js    # In-progress run serialization and reload-resume persistence
 │   │   ├── SpecialBallController.js # Bomb, Lightning, Prism, Anvil, Cryo & Rocket impact resolution
 │   │   ├── Discovery.js      # First-encounter hints: mechanics on a board, next unknown one, hint text
 │   │   ├── DailyShare.js     # Spoiler-free Daily Challenge result text for the Share button
@@ -105,6 +111,7 @@ The codebase follows a modular, zero-dependency ES module architecture with stri
 │   └── ui/
 │       └── UIManager.js      # HUD updates, accessible modals (focus trap + inert) & Codex
 ├── styles/main.css           # Responsive layout and design tokens
+├── eslint.config.js          # ESLint 9 flat configuration
 ├── index.html                # Application shell and static bootstrap error banner
 ├── manifest.webmanifest      # PWA manifest
 ├── sw.js                     # Network-first Service Worker with timeout and versioned offline fallback
@@ -131,10 +138,10 @@ npm run lint
 npm run test:browser
 ```
 
-The suites in `tests/` cover the game engine, physics, rendering loop, UI helpers, the calibration tooling, and six repository guards:
+The suites in `tests/` cover the game engine, physics, rendering loop, UI helpers, the calibration tooling, and seven repository guards:
 
 - `typography.test.js` rejects typographic look-alikes of ASCII characters (long dashes, curly quotes, ellipsis, special spaces, ligatures) in every text file.
-- `pwa.test.js` checks that every file under `src/`, `configs/`, `locales/` and `icons/` is precached by `sw.js`, and that the Service Worker cache version matches `package.json`.
+- `pwa.test.js` checks that every file under `src/`, `configs/`, `locales/` and `icons/` is precached by `sw.js`, that `index.html` declares a `Content-Security-Policy`, and that the Service Worker cache version matches `package.json`.
 - `onboarding.test.js` checks that every mechanic has a hint in both languages, that a level whose tutorial teaches a mechanic always shows it, and that level 1 shows only the basics.
 - `fluxGenerator.test.js` checks that the shape generator yields at least 1,000 distinct shapes, each fitting the board and hanging from its anchors, named in both languages.
 - `campaign.test.js` checks that the 800 generated levels are playable boards rebuilt the same from their number, that difficulty climbs from chapter to chapter, that a landmark comes every 10 levels, that each level is named in both languages, and that each one is calibrated for the board it is: a change to the generator, the Flux shapes or the campaign curve fails it until the levels are measured again.
