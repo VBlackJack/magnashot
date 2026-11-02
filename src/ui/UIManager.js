@@ -450,6 +450,7 @@ export class UIManager {
       btnPatternsPause: document.getElementById('btn-patterns-pause'),
       btnTiltPause: document.getElementById('btn-tilt-pause'),
       btnMotionPause: document.getElementById('btn-motion-pause'),
+      btnResetHintsPause: document.getElementById('btn-reset-hints-pause'),
       btnLangPause: document.getElementById('btn-lang-pause'),
       btnSettings: document.getElementById('btn-settings'),
       modalSettings: document.getElementById('modal-settings'),
@@ -468,6 +469,9 @@ export class UIManager {
     this.pendingConfirmCallback = null;
     this.confirmPausedRun = false;
     this.isSharing = false;
+    this.shareCopied = false;
+    this.hintsResetConfirmed = false;
+    this.dailyCountdownTimer = null;
     this.activeShopTab = SHOP_TABS.UPGRADES;
     // The deferred install prompt, kept until the player asks for it from Settings.
     this.installPromptEvent = null;
@@ -575,6 +579,8 @@ export class UIManager {
       this.updateTiltButton();
       this.updateMotionButton();
       this.updateLanguageButton();
+      this.updateResetHintsFeedback();
+      this.updateShareButtonLabel();
       this.refresh(this.engine, this.lastExtra);
     });
   }
@@ -1018,6 +1024,16 @@ export class UIManager {
     if (this.elements.btnResetHints) {
       this.elements.btnResetHints.addEventListener('click', () => {
         this.engine.resetDiscoveries();
+        this.hintsResetConfirmed = true;
+        this.updateResetHintsFeedback();
+        this.announce(t('hud.announcer.hints.reset'));
+      });
+    }
+    if (this.elements.btnResetHintsPause) {
+      this.elements.btnResetHintsPause.addEventListener('click', () => {
+        this.engine.resetDiscoveries();
+        this.hintsResetConfirmed = true;
+        this.updateResetHintsFeedback();
         this.announce(t('hud.announcer.hints.reset'));
       });
     }
@@ -1104,8 +1120,10 @@ export class UIManager {
         this.closeOverlayModal(this.elements.modalLevels);
         return;
       }
-      this.hideAllModals();
-      this.engine.startCampaignLevel(this.getSuggestedLevelId());
+      this.requestDestructiveAction(() => {
+        this.hideAllModals();
+        this.engine.startCampaignLevel(this.getSuggestedLevelId());
+      });
     });
 
     this.elements.btnNextLevel.addEventListener('click', () => {
@@ -1253,7 +1271,14 @@ export class UIManager {
         const idx = Number.parseInt(e.code.replace('Digit', ''), 10) - 1;
         if (idx >= 0 && idx < SPECIAL_TYPES_ORDER.length) {
           e.preventDefault();
-          this.engine.equipSpecialBall(SPECIAL_TYPES_ORDER[idx]);
+          const type = SPECIAL_TYPES_ORDER[idx];
+          const count = this.engine.specialInventory?.[type] || 0;
+          const isEquipped = this.engine.currentBall?.specialType === type;
+          if (count <= 0 && !isEquipped && this.engine.offersSpecialBalls?.() && this.isRunActive()) {
+            this.openShopModal(SHOP_TABS.AMMO);
+          } else {
+            this.engine.equipSpecialBall(type);
+          }
         }
       }
     });
@@ -1368,6 +1393,10 @@ export class UIManager {
   openOverlayModal(modal, focusTarget) {
     if (!modal) {
       return;
+    }
+    if (modal === this.elements.modalSettings && this.hintsResetConfirmed) {
+      this.hintsResetConfirmed = false;
+      this.updateResetHintsFeedback();
     }
     this.saveLastFocusedElement();
     if (this.engine.state === GAME_STATES.PLAYING) {
@@ -1831,6 +1860,58 @@ export class UIManager {
     }
   }
 
+  updateResetHintsFeedback() {
+    const iconKey = this.hintsResetConfirmed ? 'app.nav.button.resetHintsDone' : 'app.nav.button.resetHints';
+    const captionKey = this.hintsResetConfirmed
+      ? 'app.nav.button.resetHintsDoneCaption'
+      : 'app.nav.button.resetHintsCaption';
+    for (const btn of [this.elements?.btnResetHints, this.elements?.btnResetHintsPause]) {
+      if (btn) {
+        setTextIfChanged(btn, t(iconKey));
+        setTextIfChanged(document.querySelector(`[data-caption-for="${btn.id}"]`), t(captionKey));
+      }
+    }
+  }
+
+  updateShareButtonLabel() {
+    if (this.elements?.btnShareGameOver) {
+      setTextIfChanged(
+        this.elements.btnShareGameOver,
+        t(this.shareCopied ? 'modals.gameOver.button.shareCopied' : 'modals.gameOver.button.share')
+      );
+    }
+  }
+
+  updateDailyCountdownText() {
+    if (!this.elements?.gameOverDailyNext) {
+      return;
+    }
+    // The Daily seed is the UTC date, so the next challenge starts at UTC midnight.
+    const { hours, minutes } = formatDailyCountdown(getMsUntilNextDaily(Date.now()));
+    setTextIfChanged(
+      this.elements.gameOverDailyNext,
+      t('modals.gameOver.daily.nextIn', { hours: formatNumber(hours), minutes: formatNumber(minutes) })
+    );
+  }
+
+  stopDailyCountdown() {
+    if (this.dailyCountdownTimer !== null) {
+      clearInterval(this.dailyCountdownTimer);
+      this.dailyCountdownTimer = null;
+    }
+  }
+
+  startDailyCountdown() {
+    this.updateDailyCountdownText();
+    const refreshMs = this.gameConfig?.daily?.countdownRefreshMs;
+    if (this.dailyCountdownTimer === null && refreshMs > 0) {
+      this.dailyCountdownTimer = setInterval(() => {
+        this.updateDailyCountdownText();
+      }, refreshMs);
+      this.dailyCountdownTimer?.unref?.();
+    }
+  }
+
   /**
    * Shares the finished run (Daily Challenge, Survival or Flux): the system share sheet when
    * there is one, else the clipboard, else a read-only field with the text selected for a
@@ -1882,6 +1963,8 @@ export class UIManager {
     if (typeof navigator.clipboard?.writeText === 'function') {
       try {
         await navigator.clipboard.writeText(text);
+        this.shareCopied = true;
+        this.updateShareButtonLabel?.();
         this.announce(t('share.feedback.copied'));
         return;
       } catch {
@@ -1907,6 +1990,7 @@ export class UIManager {
   hideAllModals() {
     this.autoPausedByOverlay = false;
     this.confirmPausedRun = false;
+    this.stopDailyCountdown();
     for (const modal of this.getModalsByPriority()) {
       modal.classList.add('hidden');
     }
@@ -1930,7 +2014,7 @@ export class UIManager {
    * focus back on the same buy button (or the nearest usable one when that
    * button just became disabled).
    */
-  rerenderShopKeepingFocus(focusSelector) {
+  rerenderShopKeepingFocus(focusSelector, fallbackSlotIndex = 0) {
     this.renderShopContents();
     const modal = this.elements.modalShop;
     const target = modal.querySelector(focusSelector);
@@ -1938,8 +2022,13 @@ export class UIManager {
       target.focus();
       return;
     }
+    const candidates = filterFocusTrapCandidates(modal.querySelectorAll('.shop-pane button'));
+    const nextAtOrAfter = candidates.find(
+      (btn) => Number.parseInt(btn.dataset?.slotIndex ?? '0', 10) >= fallbackSlotIndex
+    );
     const fallback =
-      filterFocusTrapCandidates(modal.querySelectorAll('.shop-pane button'))[0] ||
+      nextAtOrAfter ||
+      candidates[candidates.length - 1] ||
       this.elements.btnCloseShop;
     if (fallback) {
       fallback.focus();
@@ -1952,7 +2041,9 @@ export class UIManager {
     const grid = this.elements.shopGrid;
     grid.innerHTML = '';
 
-    for (const [upgradeKey, spec] of Object.entries(this.gameConfig.upgrades)) {
+    const upgradeEntries = Object.entries(this.gameConfig.upgrades);
+    for (let slotIndex = 0; slotIndex < upgradeEntries.length; slotIndex++) {
+      const [upgradeKey, spec] = upgradeEntries[slotIndex];
       const currentLevel = this.storageManager.getUpgradeLevel(upgradeKey);
       const isMaxed = currentLevel >= spec.maxLevel;
       const cost = this.storageManager.getUpgradeCost(upgradeKey);
@@ -1995,6 +2086,7 @@ export class UIManager {
       buyBtn.type = 'button';
       buyBtn.className = 'modal-btn primary';
       buyBtn.dataset.upgradeKey = upgradeKey;
+      buyBtn.dataset.slotIndex = String(slotIndex);
       buyBtn.disabled = coins < cost;
       buyBtn.textContent = t('modals.shop.card.buy', { cost: formatNumber(cost) });
 
@@ -2003,7 +2095,7 @@ export class UIManager {
           this.audioManager.playEffect('match', currentLevel + 1);
           this.engine.updateAimFromAngle(this.engine.aimAngle);
           this.refresh(this.engine, this.lastExtra);
-          this.rerenderShopKeepingFocus(`[data-upgrade-key="${upgradeKey}"]`);
+          this.rerenderShopKeepingFocus(`[data-upgrade-key="${upgradeKey}"]`, slotIndex);
         }
       });
 
@@ -2016,7 +2108,8 @@ export class UIManager {
       ammoGrid.innerHTML = '';
       // Ammo is stocked into the current run, so it cannot be bought between runs.
       const canBuyAmmo = this.isRunActive();
-      for (const type of SPECIAL_TYPES_ORDER) {
+      for (let slotIndex = 0; slotIndex < SPECIAL_TYPES_ORDER.length; slotIndex++) {
+        const type = SPECIAL_TYPES_ORDER[slotIndex];
         const spec = this.ballsConfig.specialTypes[type];
         const cost = this.gameConfig.specialShopCosts[type];
         const count = this.engine.specialInventory[type] || 0;
@@ -2047,6 +2140,7 @@ export class UIManager {
         buyAmmoBtn.type = 'button';
         buyAmmoBtn.className = 'modal-btn primary ammo-buy-btn';
         buyAmmoBtn.dataset.specialType = type;
+        buyAmmoBtn.dataset.slotIndex = String(slotIndex);
         buyAmmoBtn.disabled = !canBuyAmmo || coins < cost;
         buyAmmoBtn.classList.toggle('unavailable', !canBuyAmmo);
         if (canBuyAmmo) {
@@ -2058,7 +2152,7 @@ export class UIManager {
 
         buyAmmoBtn.addEventListener('click', () => {
           if (this.engine.buySpecialAmmo(type)) {
-            this.rerenderShopKeepingFocus(`.ammo-buy-btn[data-special-type="${type}"]`);
+            this.rerenderShopKeepingFocus(`.ammo-buy-btn[data-special-type="${type}"]`, slotIndex);
           }
         });
 
@@ -2183,6 +2277,74 @@ export class UIManager {
       obsGrid.appendChild(card);
     }
     pane.appendChild(obsGrid);
+
+    const specialsHeading = document.createElement('h3');
+    specialsHeading.className = 'modal-subtitle';
+    specialsHeading.textContent = t('modals.shop.codex.specialsTitle');
+    pane.appendChild(specialsHeading);
+
+    const specialsGrid = document.createElement('div');
+    specialsGrid.className = 'codex-grid';
+    for (const type of SPECIAL_TYPES_ORDER) {
+      const spec = this.ballsConfig.specialTypes?.[type];
+      if (!spec) {
+        continue;
+      }
+      const card = document.createElement('div');
+      card.className = 'codex-card';
+
+      const badge = document.createElement('div');
+      badge.className = 'codex-badge';
+      badge.style.background = specialIconBackground(spec);
+      badge.textContent = spec.icon;
+
+      const info = document.createElement('div');
+      info.className = 'codex-info';
+      const title = document.createElement('div');
+      title.className = 'codex-title';
+      title.textContent = t(`hud.powerups.${type}.name`);
+      const desc = document.createElement('div');
+      desc.className = 'codex-desc';
+      desc.textContent = t(`hud.powerups.${type}.tooltip`);
+      info.append(title, desc);
+
+      card.append(badge, info);
+      specialsGrid.appendChild(card);
+    }
+    pane.appendChild(specialsGrid);
+
+    const mutatorKeys = Object.keys(this.gameConfig.daily?.mutators || {});
+    if (mutatorKeys.length > 0) {
+      const mutHeading = document.createElement('h3');
+      mutHeading.className = 'modal-subtitle';
+      mutHeading.textContent = t('modals.shop.codex.mutatorsTitle');
+      pane.appendChild(mutHeading);
+
+      const mutGrid = document.createElement('div');
+      mutGrid.className = 'codex-grid';
+      for (const mutKey of mutatorKeys) {
+        const card = document.createElement('div');
+        card.className = 'codex-card';
+
+        const badge = document.createElement('div');
+        badge.className = 'codex-badge';
+        badge.textContent = t(`modals.shop.codex.mutators.${mutKey}.icon`);
+
+        const info = document.createElement('div');
+        info.className = 'codex-info';
+        const title = document.createElement('div');
+        title.className = 'codex-title';
+        title.textContent = t(`gameplay.mutators.${mutKey}`);
+        const desc = document.createElement('div');
+        desc.className = 'codex-desc';
+        desc.textContent = t(`modals.shop.codex.mutators.${mutKey}.description`);
+        info.append(title, desc);
+
+        card.append(badge, info);
+        mutGrid.appendChild(card);
+      }
+      pane.appendChild(mutGrid);
+    }
   }
 
   isCampaignRunActive() {
@@ -2395,6 +2557,8 @@ export class UIManager {
 
       const desc = document.createElement('div');
       desc.className = 'level-card-desc';
+      const descId = `level-card-desc-${lvl.id}`;
+      desc.id = descId;
       desc.textContent = this.formatLevelDescription(lvl);
 
       const footer = document.createElement('div');
@@ -2402,6 +2566,7 @@ export class UIManager {
 
       if (isUnlocked) {
         const maxStars = this.gameConfig.scoring.maxStars;
+        const clampedStars = Math.max(0, Math.min(maxStars, lvlStat.stars));
         const starsEl = document.createElement('span');
         starsEl.className = 'level-stars';
         // Star glyphs are decorative; the hidden text states the count.
@@ -2411,17 +2576,29 @@ export class UIManager {
         const starsText = document.createElement('span');
         starsText.className = 'visually-hidden';
         starsText.textContent = t('modals.levelSelect.card.starsAria', {
-          stars: Math.max(0, Math.min(maxStars, lvlStat.stars)),
+          stars: clampedStars,
           maxStars
         });
         starsEl.append(starsGlyphs, starsText);
 
+        const bestText = t('modals.levelSelect.card.bestScore', { score: formatNumber(lvlStat.bestScore) });
         const scoreEl = document.createElement('span');
         scoreEl.className = 'level-best';
-        scoreEl.textContent = t('modals.levelSelect.card.bestScore', { score: formatNumber(lvlStat.bestScore) });
+        scoreEl.textContent = bestText;
 
         footer.append(starsEl, scoreEl);
         card.setAttribute('role', 'button');
+        card.setAttribute(
+          'aria-label',
+          t(lvl.id === suggestedLevelId ? 'modals.levelSelect.card.ariaCurrent' : 'modals.levelSelect.card.aria', {
+            id: lvl.id,
+            name: title.textContent,
+            stars: clampedStars,
+            maxStars,
+            best: bestText
+          })
+        );
+        card.setAttribute('aria-describedby', descId);
         card.tabIndex = 0;
         const selectLevel = () => {
           const isOtherLevelOrMidRound =
@@ -2758,6 +2935,10 @@ export class UIManager {
         }
       }
       if (transitionedState) {
+        if (this.hintsResetConfirmed) {
+          this.hintsResetConfirmed = false;
+          this.updateResetHintsFeedback();
+        }
         this.saveLastFocusedElement();
       }
       this.elements.modalPause.classList.remove('hidden');
@@ -2821,6 +3002,10 @@ export class UIManager {
       }
     }
 
+    if (engine.state !== GAME_STATES.GAME_OVER || engine.mode !== GAME_MODES.DAILY) {
+      this.stopDailyCountdown();
+    }
+
     if (engine.state === GAME_STATES.GAME_OVER) {
       this.closeDrawer({ resume: false });
       const reasonKey = gameOverReasonKey(extra.gameOverReason);
@@ -2849,18 +3034,15 @@ export class UIManager {
       if (this.elements.gameOverDailyNext) {
         const isDaily = engine.mode === GAME_MODES.DAILY;
         if (isDaily) {
-          // The Daily seed is the UTC date, so the next challenge starts at UTC midnight.
-          const { hours, minutes } = formatDailyCountdown(getMsUntilNextDaily(Date.now()));
-          setTextIfChanged(
-            this.elements.gameOverDailyNext,
-            t('modals.gameOver.daily.nextIn', { hours: formatNumber(hours), minutes: formatNumber(minutes) })
-          );
+          this.startDailyCountdown();
         }
         this.elements.gameOverDailyNext.classList.toggle('hidden', !isDaily);
       }
       // Every mode but the campaign has a result worth sharing.
       this.elements.btnShareGameOver?.classList.toggle('hidden', engine.mode === GAME_MODES.CAMPAIGN);
       if (transitionedState) {
+        this.shareCopied = false;
+        this.updateShareButtonLabel();
         this.elements.gameOverShareFallback?.classList.add('hidden');
         this.saveLastFocusedElement();
         this.announce(t('hud.announcer.round.gameOver', { reason: t(reasonKey), score: scoreText }));

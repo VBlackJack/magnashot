@@ -53,7 +53,9 @@
         "settingsIcon": "⚙",
         "resetHints": "💡",
         "resetHintsAria": "Show discovery hints again",
-        "resetHintsCaption": "Hints"
+        "resetHintsCaption": "Hints",
+        "resetHintsDone": "✓",
+        "resetHintsDoneCaption": "Reset ✓"
       },
       "groups": {
         "modes": "Game modes",
@@ -355,6 +357,8 @@
       "card": {
         "levelNumber": "Level {{id}}",
         "locked": "Locked: clear level {{previous}}",
+        "aria": "Level {{id}}: {{name}}, {{stars}} of {{maxStars}} stars, {{best}}",
+        "ariaCurrent": "Level {{id}} (Current): {{name}}, {{stars}} of {{maxStars}} stars, {{best}}",
         "bestScore": "Best: {{score}}",
         "starsAria": "Stars: {{stars}} of {{maxStars}}",
         "current": "Current"
@@ -397,6 +401,26 @@
       "codex": {
         "modifiersTitle": "Cluster Ball Modifiers",
         "obstaclesTitle": "Magnetic Anomalies & Obstacles",
+        "specialsTitle": "Special Balls (Arsenal)",
+        "mutatorsTitle": "Daily Challenge Mutators",
+        "mutators": {
+          "hyperGravity": {
+            "icon": "🪐",
+            "description": "Stronger gravity pulls the cluster down faster (+25% score)."
+          },
+          "turboRotors": {
+            "icon": "⚙️",
+            "description": "Inertia rotors spin much faster under torque (+20% score)."
+          },
+          "superMagnetism": {
+            "icon": "🧲",
+            "description": "Magnetic poles attract and repel with greater force (+20% score)."
+          },
+          "volatileCluster": {
+            "icon": "🛢️",
+            "description": "Extra Dormant Barrels spawn inside the cluster (+30% score)."
+          }
+        },
         "modifiers": {
           "armored": {
             "name": "Armored Sphere",
@@ -588,7 +612,8 @@
       "button": {
         "retry": "Try Again",
         "levels": "Select Level",
-        "share": "Share"
+        "share": "Share",
+        "shareCopied": "Copied ✓"
       },
       "share": {
         "field": {

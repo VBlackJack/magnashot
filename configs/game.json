@@ -250,6 +250,7 @@
   },
   "daily": {
     "firstPlayBonusCoins": 30,
+    "countdownRefreshMs": 60000,
     "singularityMarginRadiusFactor": 4,
     "singularityOffsetAboveDangerFactor": 5,
     "pivotClearanceY": 90,

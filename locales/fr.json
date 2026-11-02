@@ -53,7 +53,9 @@
         "settingsIcon": "⚙",
         "resetHints": "💡",
         "resetHintsAria": "Revoir les indices de découverte",
-        "resetHintsCaption": "Indices"
+        "resetHintsCaption": "Indices",
+        "resetHintsDone": "✓",
+        "resetHintsDoneCaption": "Réinitialisés ✓"
       },
       "groups": {
         "modes": "Modes de jeu",
@@ -355,6 +357,8 @@
       "card": {
         "levelNumber": "Niveau {{id}}",
         "locked": "Verrouillé : terminez le niveau {{previous}}",
+        "aria": "Niveau {{id}} : {{name}}, {{stars}} étoiles sur {{maxStars}}, {{best}}",
+        "ariaCurrent": "Niveau {{id}} (En cours) : {{name}}, {{stars}} étoiles sur {{maxStars}}, {{best}}",
         "bestScore": "Record : {{score}}",
         "starsAria": "Étoiles : {{stars}} sur {{maxStars}}",
         "current": "En cours"
@@ -395,8 +399,28 @@
         "unavailableHint": "Lancez un niveau, la Survie, le Défi du Jour ou le Mode Flux pour acheter des munitions."
       },
       "codex": {
-        "modifiersTitle": "Billes Spéciales de l'Amas",
+        "modifiersTitle": "Modificateurs de l'Amas",
         "obstaclesTitle": "Anomalies & Obstacles Magnétiques",
+        "specialsTitle": "Billes Spéciales (Arsenal)",
+        "mutatorsTitle": "Mutateurs du Défi du Jour",
+        "mutators": {
+          "hyperGravity": {
+            "icon": "🪐",
+            "description": "Une gravité renforcée tire l'amas plus fort vers le bas (+25 % de score)."
+          },
+          "turboRotors": {
+            "icon": "⚙️",
+            "description": "Les rotors à inertie tournent beaucoup plus vite (+20 % de score)."
+          },
+          "superMagnetism": {
+            "icon": "🧲",
+            "description": "Les pôles magnétiques attirent et repoussent avec plus de force (+20 % de score)."
+          },
+          "volatileCluster": {
+            "icon": "🛢️",
+            "description": "Davantage de Barils Explosifs apparaissent dans l'amas (+30 % de score)."
+          }
+        },
         "modifiers": {
           "armored": {
             "name": "Bille Blindée",
@@ -588,7 +612,8 @@
       "button": {
         "retry": "Réessayer",
         "levels": "Choisir un Niveau",
-        "share": "Partager"
+        "share": "Partager",
+        "shareCopied": "Copié ✓"
       },
       "share": {
         "field": {

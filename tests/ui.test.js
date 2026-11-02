@@ -577,3 +577,87 @@ test('the drawer duration is written once', () => {
   assert.equal(mainCss.split('0.22s').length - 1, 1, 'only the --drawer-duration definition holds 0.22s');
   assert.match(mainCss, /visibility 0s linear var\(--drawer-duration\)/);
 });
+
+test('btnPlayLevelModal asks for destructive confirmation when switching from an active non-campaign run', () => {
+  assert.match(
+    uiManagerCode,
+    /this\.elements\.btnPlayLevelModal\.addEventListener\('click',\s*\(\)\s*=>\s*\{\s*if \(this\.isCampaignRunActive\(\)\) \{\s*this\.closeOverlayModal\(this\.elements\.modalLevels\);\s*return;\s*\}\s*this\.requestDestructiveAction\(/
+  );
+});
+
+test('Pause and Settings modals both expose the reset-hints button and visible confirmation state', () => {
+  const pauseModal = elementMarkup(indexHtml, 'modal-pause');
+  const settingsModal = elementMarkup(indexHtml, 'modal-settings');
+  assert.match(pauseModal, /id="btn-reset-hints-pause"/);
+  assert.match(pauseModal, /data-caption-for="btn-reset-hints-pause"/);
+  assert.match(settingsModal, /id="btn-reset-hints"/);
+  assert.match(settingsModal, /data-caption-for="btn-reset-hints"/);
+  assert.match(uiManagerCode, /updateResetHintsFeedback\(\)/);
+  assert.match(uiManagerCode, /updateShareButtonLabel\(\)/);
+});
+
+test('Codex documents cluster modifiers, obstacles, special balls, and daily mutators', () => {
+  assert.match(uiManagerCode, /modals\.shop\.codex\.specialsTitle/);
+  assert.match(uiManagerCode, /modals\.shop\.codex\.mutatorsTitle/);
+  const frCodex = loadJson('./locales/fr.json').modals.shop.codex;
+  assert.equal(frCodex.modifiersTitle, "Modificateurs de l'Amas");
+  for (const lang of SUPPORTED) {
+    const codex = loadJson(`./locales/${lang}.json`).modals.shop.codex;
+    for (const mutKey of Object.keys(gameConfig.daily.mutators)) {
+      assert.ok(codex.mutators[mutKey]?.icon, `${lang} codex mutator icon for ${mutKey}`);
+      assert.ok(codex.mutators[mutKey]?.description, `${lang} codex mutator description for ${mutKey}`);
+    }
+  }
+});
+
+test('Digit1-Digit6 shortcut opens Workshop Ammo tab when pressing an empty special slot during a run', () => {
+  assert.match(
+    uiManagerCode,
+    /if \(count <= 0 && !isEquipped && this\.engine\.offersSpecialBalls\?\.\(\) && this\.isRunActive\(\)\) \{\s*this\.openShopModal\(SHOP_TABS\.AMMO\);/
+  );
+});
+
+test('rerenderShopKeepingFocus keeps focus at or after the upgraded slot index when an upgrade reaches MAX', () => {
+  let focusedId = null;
+  const makeBtn = (id, slotIndex) => ({
+    id,
+    disabled: false,
+    dataset: { slotIndex: String(slotIndex) },
+    closest: () => null,
+    focus() {
+      focusedId = id;
+    }
+  });
+  const btn0 = makeBtn('upgrade-0', 0);
+  const btn2 = makeBtn('upgrade-2', 2);
+  const closeBtn = makeBtn('close-shop', -1);
+  const fakeUi = {
+    renderShopContents() {},
+    elements: {
+      btnCloseShop: closeBtn,
+      modalShop: {
+        querySelector: () => null,
+        querySelectorAll: () => [btn0, btn2]
+      }
+    }
+  };
+  UIManager.prototype.rerenderShopKeepingFocus.call(fakeUi, '[data-upgrade-key="blastRadius"]', 1);
+  assert.equal(focusedId, 'upgrade-2', 'focus moves to the next upgrade button after slot 1 reaches MAX');
+});
+
+test('unlocked level cards expose a concise aria-label and aria-describedby', () => {
+  assert.match(uiManagerCode, /modals\.levelSelect\.card\.ariaCurrent/);
+  assert.match(uiManagerCode, /modals\.levelSelect\.card\.aria/);
+  assert.match(uiManagerCode, /card\.setAttribute\('aria-describedby',\s*descId\)/);
+  for (const lang of SUPPORTED) {
+    const cardLocale = loadJson(`./locales/${lang}.json`).modals.levelSelect.card;
+    assert.deepEqual(placeholdersOf(cardLocale.aria), ['best', 'id', 'maxStars', 'name', 'stars']);
+    assert.deepEqual(placeholdersOf(cardLocale.ariaCurrent), ['best', 'id', 'maxStars', 'name', 'stars']);
+  }
+});
+
+test('Daily Game Over countdown refreshes on a config-driven interval with unref', () => {
+  assert.ok(gameConfig.daily.countdownRefreshMs > 0);
+  assert.match(uiManagerCode, /this\.gameConfig\?\.daily\?\.countdownRefreshMs/);
+  assert.match(uiManagerCode, /this\.dailyCountdownTimer\?\.unref\?\.\(\)/);
+});
