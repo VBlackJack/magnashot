@@ -4,6 +4,19 @@ All notable changes to **FluxSpheres** are documented in this file.
 
 ## [Unreleased]
 
+## [1.7.2] - 2026-11-02
+
+### Security
+- **Content Security Policy**: `index.html` now declares a `Content-Security-Policy` meta tag restricting scripts, connections, media and base URIs to `'self'`, disallowing `<object>` and form actions, and verified by `tests/pwa.test.js`.
+- **Dependencies**: Pinned transitive `minimatch` to `^11.0.1` via `overrides` in `package.json` to resolve five moderate ReDoS advisories (`GHSA-g3hv-75wg-m249`).
+- **CI Permissions**: Added explicit `permissions: contents: read` and job `timeout-minutes` limits to `.github/workflows/ci.yml`.
+
+### Fixed
+- **Local Lint with Agent Worktrees**: `eslint.config.js`, `tests/typography.test.js` and `.gitignore` now ignore local agent directories (`.claude/`, `.codex/`, `.gemini/`, `.agent/`) so `npm run lint` no longer lints nested worktrees without browser globals.
+
+### Changed
+- **Repository Guards and Config Uniformity**: Expanded the `t()` literal key test in `tests/ui.test.js` to scan every `.js` file under `src/` alongside `index.html`, added `"rocket": 0` to `specialInventory` on authored levels 1 to 20 in `configs/levels.json` to match levels 21 to 24, and updated `README.md` and `README.fr.md`.
+
 ## [1.7.1] - 2026-10-29
 
 ### Fixed
