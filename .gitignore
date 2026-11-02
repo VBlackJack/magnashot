@@ -4,6 +4,12 @@ local/
 # Dependencies and tooling
 node_modules/
 .claude/
+.codex/
+.gemini/
+.agent/
+CLAUDE.md
+AGENTS.md
+GEMINI.md
 
 # OS artifacts
 Thumbs.db

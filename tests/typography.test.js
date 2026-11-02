@@ -19,10 +19,12 @@ import assert from 'node:assert/strict';
 import { readdirSync, readFileSync } from 'node:fs';
 import { join, relative, extname, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import eslintConfig from '../eslint.config.js';
 
 const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 
-const SKIPPED_DIRECTORIES = new Set(['.git', '.claude', 'node_modules', 'local']);
+const SKIPPED_DIRECTORIES = new Set(['.git', '.claude', '.codex', '.gemini', '.agent', 'node_modules', 'local']);
+const SKIPPED_FILES = new Set(['CLAUDE.md', 'AGENTS.md', 'GEMINI.md']);
 
 const SCANNED_EXTENSIONS = new Set([
   '.md', '.js', '.mjs', '.json', '.html', '.css', '.webmanifest', '.yml', '.yaml', '.svg', '.txt'
@@ -89,12 +91,22 @@ function collectFiles(directory) {
       if (!SKIPPED_DIRECTORIES.has(entry.name)) {
         files.push(...collectFiles(join(directory, entry.name)));
       }
-    } else if (SCANNED_EXTENSIONS.has(extname(entry.name)) || extname(entry.name) === EXTENSIONLESS) {
+    } else if (
+      !SKIPPED_FILES.has(entry.name) &&
+      (SCANNED_EXTENSIONS.has(extname(entry.name)) || extname(entry.name) === EXTENSIONLESS)
+    ) {
       files.push(join(directory, entry.name));
     }
   }
   return files;
 }
+
+test('ESLint and typography guard ignore agent worktree directories', () => {
+  const ignores = eslintConfig[0]?.ignores || [];
+  for (const dir of ['.claude/', '.codex/', '.gemini/', '.agent/']) {
+    assert.ok(ignores.includes(dir), `eslint.config.js must ignore ${dir}`);
+  }
+});
 
 test('Typography guard scans nested directories recursively', () => {
   const scanned = collectFiles(REPO_ROOT).map((file) => relative(REPO_ROOT, file).split('\\').join('/'));
