@@ -4,6 +4,20 @@ All notable changes to **FluxSpheres** are documented in this file.
 
 ## [Unreleased]
 
+## [1.7.3] - 2026-11-02
+
+### Added
+- **Expanded Codex & Guide**: `buildCodexPane()` now documents the player's 6 Special Balls (*Bomb*, *Lightning*, *Prism*, *Anvil*, *Cryo*, *Rocket*) and the 4 Daily Challenge mutators (*Hyper Gravity*, *Turbo Rotors*, *Super Magnetism*, *Volatile Cluster*), and the French heading for cluster modifiers is clarified as *"Modificateurs de l'Amas"*.
+- **Visible Feedback on Share & Hint Reset**: Copying a run result to the clipboard updates the Share button to `Copied ✓` (`Copié ✓`), and resetting discovery hints in Settings or Pause updates the button and caption to `✓` / `Reset ✓` (`Réinitialisés ✓`).
+- **Pause Dialog Parity**: Added the discovery hints reset button (`#btn-reset-hints-pause`) to the Pause modal alongside the other six settings controls.
+
+### Fixed
+- **Level Select Confirmation Guard**: Clicking the primary `Play level X` button (`#btn-play-level-modal`) in the Level Select modal during an active Survival, Daily Challenge, or Flux run now asks for confirmation before abandoning the run, matching level card clicks.
+- **Keyboard Special Ball Parity**: Pressing `1` to `6` (`Digit1`-`Digit6`) on an empty Special Ball slot during an active run now opens the Workshop on the Ammo tab, matching mouse and touch interactions.
+- **Workshop Upgrade Focus Retention**: Reaching the `MAX` rank on an upgrade in the Workshop now moves keyboard focus to the next available upgrade button at or after that slot instead of jumping back to the first card.
+- **Unlocked Level Card Accessibility**: Unlocked level cards in `#levels-grid` now expose a concise `aria-label` (level number, name, stars earned, best score) and reference their description via `aria-describedby`.
+- **Live Daily Challenge Countdown**: The `Next challenge in X h Y min` countdown in the Daily Challenge Game Over modal now refreshes periodically (`daily.countdownRefreshMs`) while the modal remains open.
+
 ## [1.7.2] - 2026-11-02
 
 ### Security

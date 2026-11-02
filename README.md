@@ -24,7 +24,7 @@
   - **Daily Challenge**: Deterministic daily seed with rotating physics mutators (*Hyper Gravity*, *Turbo Rotors*, *Super Magnetism*, *Volatile Cluster*) and a daily coin reward. When the run ends, **Share** sends a spoiler-free result (challenge number, mutator, wave, score, one symbol per wave passed with gold rush and boss waves marked) through the system share sheet, or copies it to the clipboard. Survival and Flux runs share their wave or shape and score the same way. The Daily game over says when the next challenge starts, and the menu marks a challenge already played today.
   - **Flux Mode**: An endless chain of procedurally generated shapes sharing one shot reserve. Three stages in four draw a generated silhouette among more than 1,200 distinct shapes: stars, flowers, gears, polygons, crescents and hearts, solid or hollow, of several sizes and proportions, named after their shape ("7-Point Star", "Hollow 5-Petal Flower"). The others draw a parametric rotor or pendulum, a hand-drawn silhouette (heart, crown, bell, lighthouse, ship anchor...), some held by neutral anchors, or a pair of small shapes, never the same family twice in a row. A difficulty budget adds bumpers, portals, repulsors and singularities as the run goes on, every fifth stage hides a Boss Core, later stages add chains, bubbles and freeze, lightning and paint cores, and clearing a shape refills shots. Runs are seeded, so a reload resumes on the same shape.
 - **Learning the Game**:
-  - A first-encounter hint explains each mechanic the first time it reaches the board, in every mode: the level tutorial when there is one, else its Codex entry. Each hint shows once; one left open gives way to the next after three turns, and **Settings** can show them all again. In the campaign, what the level is built around is explained first.
+  - A first-encounter hint explains each mechanic the first time it reaches the board, in every mode: the level tutorial when there is one, else its Codex entry. Each hint shows once; one left open gives way to the next after three turns, and **Settings** or **Pause** can show them all again. In the campaign, what the level is built around is explained first.
   - Level 1 keeps to matching and avalanches: three colors, no special ball, no modifier; the special ball slots appear once there is one to use.
   - A level that teaches a modifier always shows the same number of it, set in its definition.
 - **Game Feel**:
@@ -33,7 +33,7 @@
   - The victory score rolls up and the earned stars pop in one after another; both respect reduced motion.
 - **Workshop & Codex**:
   - Permanent upgrades (*Curved Laser Sight*, *Magnetic Amplifier*, *Overcharge Capacitor*, *Projectile Reserve*).
-  - In-run Special Ammo refills (an empty special ball opens this tab), Bounties/Achievements, and an illustrated **Codex & Guide**.
+  - In-run Special Ammo refills (clicking or pressing `1`-`6` on an empty special ball opens this tab), Bounties/Achievements, and an illustrated **Codex & Guide** covering cluster modifiers, magnetic obstacles, special balls, and Daily Challenge mutators.
 - **Accessibility & Comfort**:
   - Bilingual interface (**FR** / **EN**) with zero hardcoded strings; the first visit follows the browser language.
   - **High Contrast** mode with enhanced borders and polarity symbols; buttons meet WCAG AA contrast.
