@@ -16,7 +16,8 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
 
 import { GAME_OVER_REASONS, INPUT_MODES } from '../src/core/Constants.js';
 import { I18nService, i18n, resolveInitialLocale } from '../src/core/I18n.js';
@@ -153,7 +154,11 @@ test('en and fr locales have identical keys and identical placeholders', () => {
 test('every t() key literal used by the UI exists in both locales', () => {
   const en = flattenStrings(loadJson('./locales/en.json'));
   const fr = flattenStrings(loadJson('./locales/fr.json'));
-  const sources = [readFileSync('./src/ui/UIManager.js', 'utf8'), readFileSync('./index.html', 'utf8')];
+  const collectJsFiles = (dir) =>
+    readdirSync(dir, { withFileTypes: true }).flatMap((entry) =>
+      entry.isDirectory() ? collectJsFiles(join(dir, entry.name)) : entry.name.endsWith('.js') ? [join(dir, entry.name)] : []
+    );
+  const sources = [...collectJsFiles('./src').map((file) => readFileSync(file, 'utf8')), readFileSync('./index.html', 'utf8')];
   const keys = new Set();
   for (const source of sources) {
     for (const match of source.matchAll(/(?:\bt\(|data-i18n(?:-[a-z-]+)?=)\s*['"]([a-zA-Z0-9]+(?:\.[a-zA-Z0-9]+)+)['"]/g)) {

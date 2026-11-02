@@ -13,7 +13,8 @@
         "lightning": 0,
         "rainbow": 0,
         "anvil": 0,
-        "freeze": 0
+        "freeze": 0,
+        "rocket": 0
       },
       "modifierWeights": {},
       "layout": {
@@ -44,7 +45,8 @@
         "lightning": 1,
         "rainbow": 1,
         "anvil": 0,
-        "freeze": 1
+        "freeze": 1,
+        "rocket": 0
       },
       "modifierWeights": {
         "coinCore": 0.12,
@@ -81,7 +83,8 @@
         "lightning": 1,
         "rainbow": 1,
         "anvil": 1,
-        "freeze": 1
+        "freeze": 1,
+        "rocket": 0
       },
       "modifierWeights": {
         "coinCore": 0.14,
@@ -127,7 +130,8 @@
         "lightning": 1,
         "rainbow": 1,
         "anvil": 1,
-        "freeze": 1
+        "freeze": 1,
+        "rocket": 0
       },
       "modifierWeights": {
         "coinCore": 0.14,
@@ -166,7 +170,8 @@
         "lightning": 1,
         "rainbow": 2,
         "anvil": 1,
-        "freeze": 1
+        "freeze": 1,
+        "rocket": 0
       },
       "modifierWeights": {
         "armored": 0.12,
@@ -210,7 +215,8 @@
         "lightning": 2,
         "rainbow": 2,
         "anvil": 1,
-        "freeze": 2
+        "freeze": 2,
+        "rocket": 0
       },
       "modifierWeights": {
         "chameleon": 0.1,
@@ -270,7 +276,8 @@
         "lightning": 1,
         "rainbow": 2,
         "anvil": 1,
-        "freeze": 1
+        "freeze": 1,
+        "rocket": 0
       },
       "modifierWeights": {
         "chameleon": 0.15,
@@ -305,7 +312,8 @@
         "lightning": 2,
         "rainbow": 2,
         "anvil": 1,
-        "freeze": 2
+        "freeze": 2,
+        "rocket": 0
       },
       "modifierWeights": {
         "dormantBomb": 0.1,
@@ -354,7 +362,8 @@
         "lightning": 2,
         "rainbow": 2,
         "anvil": 2,
-        "freeze": 1
+        "freeze": 1,
+        "rocket": 0
       },
       "modifierWeights": {
         "dormantBomb": 0.12,
@@ -400,7 +409,8 @@
         "lightning": 2,
         "rainbow": 2,
         "anvil": 2,
-        "freeze": 2
+        "freeze": 2,
+        "rocket": 0
       },
       "modifierWeights": {
         "armored": 0.14,
@@ -466,7 +476,8 @@
         "lightning": 2,
         "rainbow": 2,
         "anvil": 2,
-        "freeze": 2
+        "freeze": 2,
+        "rocket": 0
       },
       "modifierWeights": {
         "armored": 0.14,
@@ -523,7 +534,8 @@
         "lightning": 3,
         "rainbow": 3,
         "anvil": 2,
-        "freeze": 2
+        "freeze": 2,
+        "rocket": 0
       },
       "modifierWeights": {
         "armored": 0.16,
@@ -605,7 +617,8 @@
         "lightning": 2,
         "rainbow": 2,
         "anvil": 1,
-        "freeze": 1
+        "freeze": 1,
+        "rocket": 0
       },
       "modifierWeights": {
         "coinCore": 0.16,
@@ -662,7 +675,8 @@
         "lightning": 2,
         "rainbow": 2,
         "anvil": 2,
-        "freeze": 2
+        "freeze": 2,
+        "rocket": 0
       },
       "modifierWeights": {
         "coinCore": 0.18,
@@ -712,7 +726,8 @@
         "lightning": 2,
         "rainbow": 2,
         "anvil": 2,
-        "freeze": 2
+        "freeze": 2,
+        "rocket": 0
       },
       "modifierWeights": {
         "laserLock": 0.14,
@@ -777,7 +792,8 @@
         "lightning": 3,
         "rainbow": 3,
         "anvil": 2,
-        "freeze": 3
+        "freeze": 3,
+        "rocket": 0
       },
       "modifierWeights": {
         "bossCore": 0.14,
@@ -845,7 +861,8 @@
         "lightning": 1,
         "rainbow": 1,
         "anvil": 1,
-        "freeze": 1
+        "freeze": 1,
+        "rocket": 0
       },
       "modifierWeights": {
         "coinCore": 0.12,
@@ -892,7 +909,8 @@
         "lightning": 1,
         "rainbow": 1,
         "anvil": 1,
-        "freeze": 1
+        "freeze": 1,
+        "rocket": 0
       },
       "modifierWeights": {
         "coinCore": 0.14,
@@ -944,7 +962,8 @@
         "lightning": 1,
         "rainbow": 2,
         "anvil": 1,
-        "freeze": 1
+        "freeze": 1,
+        "rocket": 0
       },
       "modifierWeights": {
         "coinCore": 0.12
@@ -992,7 +1011,8 @@
         "lightning": 2,
         "rainbow": 2,
         "anvil": 1,
-        "freeze": 1
+        "freeze": 1,
+        "rocket": 0
       },
       "modifierWeights": {
         "bubble": 0.06,
