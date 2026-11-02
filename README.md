@@ -30,7 +30,7 @@
 - **Game Feel**:
   - Slow motion when a shot flies close to one of the last three spheres of a level or Flux shape.
   - Every landing sends a swelling wave through the cluster, bond by bond and weaker at each step, with a light screen shake. The wave only changes how spheres are drawn; reduced motion turns both off.
-  - The victory score rolls up and the earned stars pop in one after another; both respect reduced motion.
+  - The victory score rolls up and the earned stars pop in one after another; both respect reduced motion. The victory screen also shows how many points remain to reach the next star (or confirms 3★), and highlights new personal records across Campaign, Survival, Daily Challenge, and Flux Mode, while Campaign and Flux defeats report how many spheres were left on the board.
 - **Workshop & Codex**:
   - Permanent upgrades (*Curved Laser Sight*, *Magnetic Amplifier*, *Overcharge Capacitor*, *Projectile Reserve*).
   - In-run Special Ammo refills (clicking or pressing `1`-`6` on an empty special ball opens this tab), Bounties/Achievements, and an illustrated **Codex & Guide** covering cluster modifiers, magnetic obstacles, special balls, and Daily Challenge mutators.

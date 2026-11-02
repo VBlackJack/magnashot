@@ -30,7 +30,7 @@
 - **Sensations de jeu** :
   - Ralenti quand un tir passe près de l'une des trois dernières sphères d'un niveau ou d'une forme Flux.
   - Chaque sphère qui se pose envoie une onde qui fait gonfler l'amas, de lien en lien et plus faiblement à chaque pas, avec un léger tremblement d'écran. L'onde ne change que le dessin des sphères ; le mode mouvements réduits coupe les deux.
-  - À la victoire, le score défile et les étoiles gagnées apparaissent une par une ; les deux respectent le mode mouvements réduits.
+  - À la victoire, le score défile et les étoiles gagnées apparaissent une par une ; les deux respectent le mode mouvements réduits. L'écran de victoire indique aussi combien de points manquent pour décrocher l'étoile suivante (ou confirme l'objectif 3★), signale les nouveaux records personnels en Campagne, Survie, Défi du jour et Mode Flux, et l'écran de défaite en Campagne ou Mode Flux précise combien de sphères restaient sur le plateau.
 - **Atelier et Codex** :
   - Améliorations permanentes (*Visée laser courbée*, *Amplificateur magnétique*, *Condensateur de surcharge*, *Réserve de projectiles*).
   - Recharges de munitions spéciales en cours de partie (cliquer ou presser `1`-`6` sur une bille spéciale épuisée ouvre cet onglet), primes et succès, et un **Codex et guide** illustré couvrant modificateurs d'amas, obstacles magnétiques, billes spéciales et mutateurs du Défi du jour.

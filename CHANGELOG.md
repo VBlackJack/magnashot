@@ -4,6 +4,15 @@ All notable changes to **FluxSpheres** are documented in this file.
 
 ## [Unreleased]
 
+## [1.7.4] - 2026-11-02
+
+### Added
+- **Rocket Aim & Avalanche Preview**: Aiming with a Rocket (`SPECIAL_TYPES.ROCKET`) now highlights the priority targets selected by `pickRocketTargets` and previews the resulting Magnetic Avalanche drops (`predictImpact` in `src/game/ImpactPreview.js`), while accounting for Boss Core multi-shield durability (`armorHits > 1`).
+- **Next Star Goal & New Record on Victory**: The Campaign Victory modal (`#modal-victory`) now displays the score needed for the next star (`#victory-next-star`, e.g., `Next star (3★): 10,400 pts (1,200 pts away)`) or `3★ target reached!`, and celebrates a new personal best when beating a previously recorded level score (`New record!` / `Nouveau record !`).
+- **Game Over New Record & Remaining Spheres**: The Game Over modal (`#modal-gameover`) now detects and highlights a new personal record in Survival, Daily Challenge, and Flux Mode before persisting the score, and displays the number of spheres left on the board (`#gameover-remaining`) when losing a shot-budgeted Campaign or Flux run.
+- **Desktop Special Ball Key Badges (`1`-`6`)**: Added `<kbd class="powerup-key">` shortcut badges (`1` to `6`) on Special Ball buttons for desktop pointer users, automatically hidden on touch devices and compact phone viewports.
+- **Locked Chapter Hint**: Clicking or hovering a locked chapter tab in the Level Select modal (`#modal-levels`) now explains which level must be completed to unlock that chapter (`#levels-chapter-hint` live region and tab tooltip).
+
 ## [1.7.3] - 2026-11-02
 
 ### Added
