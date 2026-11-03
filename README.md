@@ -16,14 +16,14 @@
 - **Dynamic Magnetic Physics**: Same-color spheres attract, opposite magnetic poles (`N`/`S`, `+`/`-`, `Ω`/`Φ`) pull, and like poles curve projectile trajectories. Repulsors and attractors bend shots and also make the hanging clusters lean away from or toward them.
 - **Tactical Aiming & Predictive Preview**:
   - Curved laser sight with wall and bumper ricochet prediction.
-  - Real-time blast/effect radius preview for Special Balls (Bomb, Lightning, Prism, Anvil, Cryo, Rocket).
+  - Real-time blast/effect radius preview for all 7 Special Balls (Bomb, Lightning, Prism, Anvil, Cryo, Rocket, Brush).
   - Live **Magnetic Avalanche** prediction highlighting unanchored spheres that will drop when upper bonds are severed.
-- **Game Modes**:
+- **8 Game Modes (Direct Nav, Clickable HUD Banner & Mode Cards)**:
   - **Campaign**: 24 handcrafted levels introducing pendulums, inertia rotors, repulsors, oscillating barriers, quantum locks, linked portals, Boss Cores, neutral anchors no match can break, chained spheres, bubbles, freeze, lightning and paint cores, rail anchors, thrusters, long tethers and rust. Then 800 generated levels (25 to 824), in 20 chapters of 40: the first 12 each feature one of those mechanics, the last 8 a pair of them. More colors, spheres and modifiers, and a tighter shot margin as they go. Each block of 10 levels mixes formats: standard levels, two twists that add a mechanic from another chapter, a precision level (a small board, a tight shot count and a single bomb), an arsenal level (a big board, fewer shots and twice the special balls) and a landmark (a drawn shape or a pair, and a Boss Core). A level's name and card badge (`Boss`, `Precision`, `Arsenal`, `Twist`) show its format. Each level is rebuilt from its number alone. The level select shows one chapter at a time, with the stars won in each, opens on the chapter being played, and offers a `< 3★` filter to show only unfinished unlocked levels (when active, the victory window's main button also jumps straight to the next `< 3★` level).
   - **Survival (Endless)**: Infinite wave defense with Gold Rush waves and Boss anomalies.
-  - **Daily Challenge**: Deterministic daily seed with rotating physics mutators (*Hyper Gravity*, *Turbo Rotors*, *Super Magnetism*, *Volatile Cluster*) and a daily coin reward. When the run ends, **Share** sends a spoiler-free result (challenge number, mutator, wave, score, one symbol per wave passed with gold rush and boss waves marked) through the system share sheet, or copies it to the clipboard. Survival and Flux runs share their wave or shape and score the same way. The Daily game over says when the next challenge starts, and the menu marks a challenge already played today.
+  - **Daily Challenge**: Deterministic daily seed with rotating physics mutators (*Hyper Gravity*, *Turbo Rotors*, *Super Magnetism*, *Volatile Cluster*), a daily coin reward, and an escalating consecutive-day **Daily Streak** bonus (`+15 ⬡/day`, up to `+90 ⬡`). When the run ends, **Share** sends a spoiler-free result (challenge number, mutator, wave, score, one symbol per wave passed with gold rush and boss waves marked) through the system share sheet, or copies it to the clipboard. Survival and Flux runs share their wave or shape and score the same way. The Daily game over says when the next challenge starts, and the menu marks a challenge already played today.
   - **Flux Mode**: An endless chain of procedurally generated shapes sharing one shot reserve. Three stages in four draw a generated silhouette among more than 1,200 distinct shapes: stars, flowers, gears, polygons, crescents and hearts, solid or hollow, of several sizes and proportions, named after their shape ("7-Point Star", "Hollow 5-Petal Flower"). The others draw a parametric rotor or pendulum, a hand-drawn silhouette (heart, crown, bell, lighthouse, ship anchor...), some held by neutral anchors, or a pair of small shapes, never the same family twice in a row. A difficulty budget adds bumpers, portals, repulsors and singularities as the run goes on, every fifth stage hides a Boss Core, later stages add chains, bubbles and freeze, lightning and paint cores, and clearing a shape refills shots. Runs are seeded, so a reload resumes on the same shape, a finished run can be replayed on the same seed (`Same Seed`), shared links (`?flux=<seed>`) open directly on that seed, and the Level Select toolbar lets players enter or paste any Flux seed code or share text directly.
-  - **Arcade Modes (in Level Select)**:
+  - **Arcade Modes (directly in Main Nav, HUD Mode Banner, and Level Select Cards)**:
     - **Puzzle Mode**: 5 deterministic trick-shot stages with a fixed launcher queue (`1` or `2` shots) and **Core Rescue** (`💎`) objectives where freeing all Rescue Cores shatters the remaining cluster into an instant avalanche.
     - **Blitz 90s**: 90-second Time Attack with unlimited shots, rapid automatic wave descent, and a 3-second hesitation auto-fire timer.
     - **Boss Rush**: Central rotor Titan (`👑`) surrounded by concentric rings where reaching 100% Overcharge directly cracks a Boss shield and defeating the Titan shatters the wave.
@@ -33,12 +33,12 @@
   - Level 1 keeps to matching and avalanches: three colors, no special ball, no modifier; the special ball slots appear once there is one to use.
   - A level that teaches a modifier always shows the same number of it, set in its definition.
 - **Game Feel**:
-  - Slow motion when a shot flies close to one of the last three spheres of a level or Flux shape.
+  - **Avalanche Collector Bins & Second Chance**: Falling avalanche spheres crossing the 5 bottom collector bins grant bonus points (`+35 pts`) and Overcharge (`+4%`). Running out of shots in Campaign or Flux Mode offers a once-per-round **Second Chance** (`+5 shots` for `40 ⬡`).
   - Every landing sends a swelling wave through the cluster, bond by bond and weaker at each step, with a light screen shake. The wave only changes how spheres are drawn; reduced motion turns both off.
   - The victory score rolls up and the earned stars pop in one after another; both respect reduced motion. The victory screen also shows how many points remain to reach the next star (or confirms 3★), and highlights new personal records across Campaign, Survival, Daily Challenge, and Flux Mode, while Campaign and Flux defeats report how many spheres were left on the board.
 - **Workshop & Codex**:
   - Permanent upgrades (*Curved Laser Sight*, *Magnetic Amplifier*, *Overcharge Capacitor*, *Projectile Reserve*).
-  - In-run Special Ammo refills (clicking or pressing `1`-`6` on an empty special ball opens this tab), Bounties/Achievements with persistent all-time personal-best progress bars, and an illustrated **Codex & Guide** covering cluster modifiers, magnetic obstacles, special balls, and Daily Challenge mutators.
+  - In-run Special Ammo refills (clicking or pressing `1`-`7` on an empty special ball opens this tab), **4 Unlockable Sphere Visual Styles** (*Classic*, *Crystal*, *Neon*, *Metallic*), Bounties/Achievements with persistent all-time personal-best progress bars, and an illustrated **Codex & Guide** covering cluster modifiers, magnetic obstacles, special balls, and Daily Challenge mutators.
 - **Accessibility & Comfort**:
   - Bilingual interface (**FR** / **EN**) with zero hardcoded strings; the first visit follows the browser language.
   - **High Contrast** mode with enhanced borders and polarity symbols; buttons meet WCAG AA contrast.
@@ -64,7 +64,7 @@
 | **Cancel Aim** | Drag below the launcher ring | - |
 | **Swap Ball** | Click secondary ball or **Swap** button | `Space` |
 | **Flip Polarity** | Click **Polarity** button | `F` |
-| **Equip / Unequip Special Ball** | Click Special Ball slot (click again to stash) | `1` to `6` |
+| **Equip / Unequip Special Ball** | Click Special Ball slot (click again to stash) | `1` to `7` |
 | **Pause / Close Modal** | Click **Pause** or modal backdrop | `Escape` |
 | **Settings** | Click **⚙ Settings**, or open **Pause** | - |
 
@@ -106,7 +106,7 @@ The codebase follows a modular, zero-dependency ES module architecture with stri
 │   │   ├── LevelCatalog.js   # Authored and generated campaign level builder and fingerprint
 │   │   ├── Renderer.js       # HiDPI Canvas 2D renderer with alpha interpolation & AOE preview
 │   │   ├── RunSnapshot.js    # In-progress run serialization and reload-resume persistence
-│   │   ├── SpecialBallController.js # Bomb, Lightning, Prism, Anvil, Cryo & Rocket impact resolution
+│   │   ├── SpecialBallController.js # Bomb, Lightning, Prism, Anvil, Cryo, Rocket & Brush impact resolution
 │   │   ├── Discovery.js      # First-encounter hints: mechanics on a board, next unknown one, hint text
 │   │   ├── DailyShare.js     # Spoiler-free Daily Challenge result text for the Share button
 │   │   └── layouts/

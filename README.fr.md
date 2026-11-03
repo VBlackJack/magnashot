@@ -16,14 +16,14 @@
 - **Physique magnétique dynamique** : les sphères de même couleur s'attirent, les pôles opposés (`N`/`S`, `+`/`-`, `Ω`/`Φ`) se rapprochent, et les pôles identiques courbent la trajectoire du projectile. Répulseurs et attracteurs courbent les tirs et font aussi pencher les amas suspendus, à l'écart ou vers eux.
 - **Visée tactique et prévisualisation** :
   - Viseur laser courbe avec prédiction des rebonds sur les murs et les bumpers.
-  - Prévisualisation en temps réel de la zone d'effet des sphères spéciales (Bombe, Foudre, Prisme, Enclume, Cryo, Fusée).
+  - Prévisualisation en temps réel de la zone d'effet des 7 sphères spéciales (Bombe, Foudre, Prisme, Enclume, Cryo, Fusée, Pinceau).
   - Prédiction de l'**avalanche magnétique** : les sphères qui tomberont une fois leurs liens supérieurs rompus sont mises en évidence.
-- **Modes de jeu** :
+- **8 Modes de jeu (barre de navigation, bannière HUD cliquable et cartes de modes)** :
   - **Campagne** : 24 niveaux conçus à la main, qui introduisent pendules, rotors à inertie, répulseurs, barrières oscillantes, verrous quantiques, portails liés, Noyaux Boss, ancres neutres qu'aucun groupe ne brise, sphères enchaînées, bulles, coeurs de givre, de foudre et de peinture, ancres sur rail, propulseurs, longues amarres et rouille. Puis 800 niveaux générés (25 à 824), en 20 chapitres de 40 : les 12 premiers autour d'une de ces mécaniques, les 8 derniers autour d'une paire. Plus de couleurs, de sphères et de modificateurs, et moins de tirs en réserve au fil des niveaux. Chaque série de 10 niveaux mêle les formats : des niveaux standard, deux variantes qui ajoutent une mécanique d'un autre chapitre, un niveau de précision (petit plateau, peu de tirs et une seule bombe), un niveau arsenal (grand plateau, moins de tirs et deux fois plus de balles spéciales) et un niveau marquant (une forme dessinée ou une paire, et un Noyau Boss). Le nom d'un niveau et son badge sur la carte (`Boss`, `Précision`, `Arsenal`, `Variante`) indiquent son format. Chaque niveau se reconstruit depuis son seul numéro. La sélection des niveaux montre un chapitre à la fois, avec les étoiles gagnées dans chacun, s'ouvre sur le chapitre en cours, et propose un filtre `< 3★` pour n'afficher que les niveaux déverrouillés incomplets (lorsqu'il est actif, le bouton principal de l'écran de victoire passe aussi directement au prochain niveau `< 3★`).
   - **Survie (sans fin)** : défense par vagues infinies, avec vagues de ruée vers l'or et anomalies Boss.
-  - **Défi du jour** : graine quotidienne déterministe, mutateurs physiques tournants (*Hyper Gravité*, *Rotors Turbo*, *Super Magnétisme*, *Amas Volatil*) et récompense quotidienne en pièces. En fin de partie, **Partager** envoie un résultat sans rien dévoiler (numéro du défi, mutateur, vague, score, un symbole par vague passée, vagues dorées et vagues de boss marquées) par la feuille de partage du système, ou le copie dans le presse-papiers. Les parties de Survie et de Mode Flux partagent de même leur vague ou leur forme et leur score. Le game over du Défi du jour indique quand commence le suivant, et le menu marque un défi déjà joué aujourd'hui.
+  - **Défi du jour** : graine quotidienne déterministe, mutateurs physiques tournants (*Hyper Gravité*, *Rotors Turbo*, *Super Magnétisme*, *Amas Volatil*), récompense quotidienne en pièces et bonus de **Série quotidienne** (`+15 ⬡/jour`, jusqu'à `+90 ⬡`). En fin de partie, **Partager** envoie un résultat sans rien dévoiler (numéro du défi, mutateur, vague, score, un symbole par vague passée, vagues dorées et vagues de boss marquées) par la feuille de partage du système, ou le copie dans le presse-papiers. Les parties de Survie et de Mode Flux partagent de même leur vague ou leur forme et leur score. Le game over du Défi du jour indique quand commence le suivant, et le menu marque un défi déjà joué aujourd'hui.
   - **Mode Flux** : un enchaînement sans fin de formes générées, avec une réserve de tirs commune. Trois formes sur quatre sont des silhouettes générées, parmi plus de 1 200 formes distinctes : étoiles, fleurs, engrenages, polygones, croissants et coeurs, pleins ou creux, de plusieurs tailles et proportions, nommés d'après leur forme ("Étoile à 7 branches", "Fleur creuse à 5 pétales"). Les autres sont un rotor ou un pendule paramétré, une silhouette dessinée (coeur, couronne, cloche, phare, ancre marine...), parfois tenue par des ancres neutres, ou une paire de petites formes, jamais deux fois de suite la même famille. Un budget de difficulté ajoute bumpers, portails, répulseurs et singularités au fil de la partie, une forme sur cinq cache un Noyau Boss, les formes avancées ajoutent chaînes, bulles et coeurs de givre, de foudre et de peinture, et vider une forme rend des tirs. Chaque partie a sa graine : un rechargement reprend sur la même forme, l'écran de fin permet de rejouer la même graine (`Même Graine`), un lien partagé (`?flux=<graine>`) lance directement cette graine, et la barre d'outils de la sélection des niveaux permet aussi de saisir ou coller directement un code de graine ou un texte partagé.
-  - **Modes Arcade (depuis la sélection des niveaux)** :
+  - **Modes Arcade (directement dans la navigation, la bannière HUD et la sélection des niveaux)** :
     - **Mode Puzzle** : 5 tableaux de précision déterministes avec file de tir fixée (`1` ou `2` tirs) et objectifs **Noyau Captif** (`💎`) où libérer tous les noyaux déclenche une avalanche immédiate.
     - **Blitz 90s** : contre-la-montre de 90 secondes à tirs illimités, descente rapide des vagues et tir automatique après 3 secondes d'hésitation.
     - **Boss Rush** : Titan central sur rotor (`👑`) entouré d'anneaux concentriques où chaque Surcharge à 100 % brise directement un bouclier du Boss.
@@ -33,12 +33,12 @@
   - Le niveau 1 s'en tient aux groupes et aux avalanches : trois couleurs, aucune sphère spéciale, aucun modificateur ; les emplacements des sphères spéciales apparaissent dès qu'il y en a une à utiliser.
   - Un niveau qui enseigne un modificateur en montre toujours le même nombre, fixé dans sa définition.
 - **Sensations de jeu** :
-  - Ralenti quand un tir passe près de l'une des trois dernières sphères d'un niveau ou d'une forme Flux.
+  - **Collecteurs d'avalanche et Seconde chance** : les sphères en chute libre traversant les 5 collecteurs magnétiques au bas du plateau rapportent des points bonus (`+35 pts`) et de la Surcharge (`+4 %`). Tomber à court de tirs en Campagne ou en Mode Flux propose une **Seconde chance** une fois par manche (`+5 tirs` pour `40 ⬡`).
   - Chaque sphère qui se pose envoie une onde qui fait gonfler l'amas, de lien en lien et plus faiblement à chaque pas, avec un léger tremblement d'écran. L'onde ne change que le dessin des sphères ; le mode mouvements réduits coupe les deux.
   - À la victoire, le score défile et les étoiles gagnées apparaissent une par une ; les deux respectent le mode mouvements réduits. L'écran de victoire indique aussi combien de points manquent pour décrocher l'étoile suivante (ou confirme l'objectif 3★), signale les nouveaux records personnels en Campagne, Survie, Défi du jour et Mode Flux, et l'écran de défaite en Campagne ou Mode Flux précise combien de sphères restaient sur le plateau.
 - **Atelier et Codex** :
   - Améliorations permanentes (*Visée laser courbée*, *Amplificateur magnétique*, *Condensateur de surcharge*, *Réserve de projectiles*).
-  - Recharges de munitions spéciales en cours de partie (cliquer ou presser `1`-`6` sur une bille spéciale épuisée ouvre cet onglet), primes et succès avec barres de progression persistantes basées sur vos meilleurs records, et un **Codex et guide** illustré couvrant modificateurs d'amas, obstacles magnétiques, billes spéciales et mutateurs du Défi du jour.
+  - Recharges de munitions spéciales en cours de partie (cliquer ou presser `1`-`7` sur une bille spéciale épuisée ouvre cet onglet), **4 styles visuels de sphères à débloquer** (*Classique*, *Cristal*, *Néon*, *Métallique*), primes et succès avec barres de progression persistantes basées sur vos meilleurs records, et un **Codex et guide** illustré couvrant modificateurs d'amas, obstacles magnétiques, billes spéciales et mutateurs du Défi du jour.
 - **Accessibilité et confort** :
   - Interface bilingue (**FR** / **EN**) sans aucun texte codé en dur ; à la première visite, la langue suit celle du navigateur.
   - Mode **contraste élevé** avec bordures renforcées et symboles de polarité ; les boutons respectent le contraste WCAG AA.
@@ -64,7 +64,7 @@
 | **Annuler la visée** | Glisser sous l'anneau du lanceur | - |
 | **Échanger la sphère** | Cliquer la sphère secondaire ou le bouton **Échanger** | `Espace` |
 | **Inverser la polarité** | Cliquer le bouton **Polarité** | `F` |
-| **Équiper / ranger une sphère spéciale** | Cliquer l'emplacement de la sphère spéciale (cliquer à nouveau pour la ranger) | `1` à `6` |
+| **Équiper / ranger une sphère spéciale** | Cliquer l'emplacement de la sphère spéciale (cliquer à nouveau pour la ranger) | `1` à `7` |
 | **Pause / fermer une fenêtre** | Cliquer **Pause** ou le fond de la fenêtre | `Échap` |
 | **Réglages** | Cliquer **⚙ Réglages**, ou ouvrir **Pause** | - |
 
@@ -106,7 +106,7 @@ Le code suit une architecture en modules ES sans dépendance, avec une séparati
 │   │   ├── LevelCatalog.js   # Catalogue des niveaux dessinés et générés de la campagne et empreintes
 │   │   ├── Renderer.js       # Rendu Canvas 2D HiDPI avec interpolation et prévisualisation de zone
 │   │   ├── RunSnapshot.js    # Sauvegarde et reprise après rechargement d'une partie en cours
-│   │   ├── SpecialBallController.js # Résolution des impacts Bombe, Éclair, Prisme, Enclume, Cryo et Fusée
+│   │   ├── SpecialBallController.js # Résolution des impacts Bombe, Éclair, Prisme, Enclume, Cryo, Fusée et Pinceau
 │   │   ├── Discovery.js      # Indices de première rencontre : mécaniques du plateau, prochaine inconnue, texte
 │   │   ├── DailyShare.js     # Texte de résultat du Défi du jour, sans rien dévoiler, pour le bouton Partager
 │   │   └── layouts/

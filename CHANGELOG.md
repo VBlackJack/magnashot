@@ -4,6 +4,12 @@ All notable changes to **MagnaShot** are documented in this file.
 
 ## [Unreleased]
 
+## [1.9.1] - 2026-11-03
+
+### Changed
+- **MagnaShot Rebrand**: Renamed the game, PWA manifest (`MagnaShot - Magnetic Physics Edition`), package (`magnashot`), Service Worker cache (`magnashot-cache-v*`), `localStorage` prefix (`magnashot_v1_`), share headers (`MagnaShot - ...`), and GitHub repository (`https://github.com/VBlackJack/magnashot`) / GitHub Pages URL (`https://vblackjack.github.io/magnashot/`).
+- **Mode Selection UX Overhaul**: Added all 8 game modes directly to the main navigation bar (`.nav-modes`), made the HUD `#hud-mode-banner` a clickable mode-switcher button, and upgraded the Arcade toolbar in `#modal-levels` into rich `.arcade-mode-card` cards with active highlights (`is-active` / `aria-pressed`) and descriptions.
+
 ## [1.9.0] - 2026-11-03
 
 ### Added
