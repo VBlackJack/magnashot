@@ -73,6 +73,32 @@ export function buildFluxShareUrl(baseUrl, seed) {
 }
 
 /**
+ * Removes the Flux seed query parameter from a URL or relative path+search+hash string.
+ * @param {string} urlString - Full URL or path with query string.
+ * @returns {string}
+ */
+export function stripFluxSeedFromUrl(urlString) {
+  if (typeof urlString !== 'string' || !urlString.includes(FLUX_SEED_QUERY_PARAM)) {
+    return urlString;
+  }
+  const hashIndex = urlString.indexOf('#');
+  const hash = hashIndex >= 0 ? urlString.slice(hashIndex) : '';
+  const beforeHash = hashIndex >= 0 ? urlString.slice(0, hashIndex) : urlString;
+  const queryIndex = beforeHash.indexOf('?');
+  if (queryIndex < 0) {
+    return urlString;
+  }
+  const basePath = beforeHash.slice(0, queryIndex);
+  const params = new URLSearchParams(beforeHash.slice(queryIndex + 1));
+  if (!params.has(FLUX_SEED_QUERY_PARAM)) {
+    return urlString;
+  }
+  params.delete(FLUX_SEED_QUERY_PARAM);
+  const remainingQuery = params.toString();
+  return `${basePath}${remainingQuery ? `?${remainingQuery}` : ''}${hash}`;
+}
+
+/**
  * Challenge number of a UTC date key ("YYYY-MM-DD"): the epoch day is challenge 1.
  * @param {string} dateKey - Daily seed date key.
  * @param {string} epochDateKey - Date key of challenge 1.

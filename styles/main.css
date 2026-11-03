@@ -2298,6 +2298,10 @@ body {
     color: GrayText;
     border-color: GrayText;
   }
+  .level-card.locked {
+    color: GrayText;
+    border: 1px dashed GrayText;
+  }
   .nav-btn.active-mode,
   .modal-tab.active,
   .level-chapter.active,

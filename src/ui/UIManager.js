@@ -152,17 +152,24 @@ export function computeStarProgressPct(score, thresholds, nextThreshold) {
  * @returns {{ current: number, target: number, pct: number }}
  */
 export function computeAchievementProgress(achId, achSpec, isUnlocked, progressContext = {}) {
-  let target = 1;
+  const threshold = Number.isFinite(achSpec?.threshold) && achSpec.threshold > 0 ? achSpec.threshold : null;
+  let target = threshold ?? 1;
   let rawCurrent = 0;
-  if (achSpec?.minChain) {
-    target = achSpec.minChain;
+  if (achId === 'comboMaster' || achSpec?.minChain) {
+    target = achSpec?.minChain ?? threshold ?? 1;
     rawCurrent = progressContext.maxCombo || 0;
-  } else if (achSpec?.targetStars) {
-    target = achSpec.targetStars;
+  } else if (achId === 'starCollector' || achSpec?.targetStars) {
+    target = achSpec?.targetStars ?? threshold ?? 1;
     rawCurrent = progressContext.totalStars || 0;
-  } else if (achSpec?.targetWave) {
-    target = achSpec.targetWave;
+  } else if (achId === 'survivorWave10' || achId === 'endlessSurvivor' || achSpec?.targetWave) {
+    target = achSpec?.targetWave ?? threshold ?? 1;
     rawCurrent = progressContext.endlessWave || 0;
+  } else if (achId === 'bossSlayer') {
+    rawCurrent = progressContext.bossesDestroyed || 0;
+  } else if (achId === 'firstAvalanche') {
+    rawCurrent = progressContext.maxAvalanche || 0;
+  } else if (achId === 'sharpshooter') {
+    rawCurrent = progressContext.shotsRemainingOnClear || 0;
   } else if (achId === 'campaignComplete') {
     target = Math.max(1, progressContext.campaignLevelCount || 1);
     rawCurrent = Math.max(0, (progressContext.unlockedLevel || 1) - 1);
@@ -1160,6 +1167,7 @@ export class UIManager {
 
     this.elements.btnLevelsFilterIncomplete?.addEventListener('click', () => {
       this.levelsFilterIncomplete = !this.levelsFilterIncomplete;
+      this.elements.levelsChapterHint?.classList.add('hidden');
       this.syncLevelsFilterButton();
       this.renderLevelCards(this.getSuggestedLevelId());
       this.announce(
@@ -1178,6 +1186,9 @@ export class UIManager {
     this.elements.btnPlayLevelModal.addEventListener('click', () => {
       if (this.isCampaignRunActive()) {
         this.closeOverlayModal(this.elements.modalLevels);
+        if (this.engine.state === GAME_STATES.PAUSED) {
+          this.engine.togglePause();
+        }
         return;
       }
       this.requestDestructiveAction(
@@ -1187,12 +1198,6 @@ export class UIManager {
         },
         () => t('modals.levelSelect.button.play', { level: this.getSuggestedLevelId() })
       );
-    });
-
-    this.elements.btnPlayLevelModal.addEventListener('click', () => {
-      if (this.isCampaignRunActive() && this.engine.state === GAME_STATES.PAUSED) {
-        this.engine.togglePause();
-      }
     });
 
     this.elements.btnNextLevel.addEventListener('click', () => {
@@ -1632,6 +1637,9 @@ export class UIManager {
 
   closeOverlayModal(modalElement) {
     modalElement.classList.add('hidden');
+    if (modalElement === this.elements.modalLevels) {
+      this.elements.levelsChapterHint?.classList.add('hidden');
+    }
     const otherOverlayStillOpen =
       this.isAnyOverlayModalOpen() ||
       Boolean(this.elements.modalConfirm && !this.elements.modalConfirm.classList.contains('hidden'));
@@ -2103,6 +2111,7 @@ export class UIManager {
     this.pendingConfirmCallback = null;
     this.pendingConfirmLabelResolver = null;
     this.stopDailyCountdown();
+    this.elements.levelsChapterHint?.classList.add('hidden');
     for (const modal of this.getModalsByPriority()) {
       modal.classList.add('hidden');
     }
@@ -2296,9 +2305,14 @@ export class UIManager {
       const unlockedMap = this.storageManager.getUnlockedAchievements();
       const achEntries = Object.entries(this.gameConfig.achievements);
       const progressContext = {
-        maxCombo: Math.max(this.engine.maxComboInRound || 0, this.engine.currentComboChain || 0),
+        maxCombo: Math.max(
+          this.engine.combo || 0,
+          this.engine.maxComboInRound || 0,
+          this.engine.currentComboChain || 0
+        ),
         totalStars: this.storageManager.getTotalStars(),
         endlessWave: this.engine.mode === GAME_MODES.ENDLESS ? this.engine.waveCount || 0 : 0,
+        bossesDestroyed: this.engine.bossesDestroyedInRun || 0,
         unlockedLevel: this.storageManager.getUnlockedLevel(),
         campaignLevelCount: this.engine.levelCatalog.count
       };
@@ -2632,12 +2646,7 @@ export class UIManager {
 
       tab.addEventListener('click', () => {
         if (chapter.firstId > this.storageManager.getUnlockedLevel()) {
-          const msg = t('modals.levelSelect.chapterLockedHint', { level: Math.max(1, chapter.firstId - 1) });
-          if (this.elements.levelsChapterHint) {
-            this.elements.levelsChapterHint.textContent = msg;
-            this.elements.levelsChapterHint.classList.remove('hidden');
-          }
-          this.announce(msg);
+          this.showLockedLevelHint(Math.max(1, chapter.firstId - 1), 'modals.levelSelect.chapterLockedHint');
           return;
         }
         this.selectLevelChapter(chapter.index);
@@ -2660,6 +2669,24 @@ export class UIManager {
       'aria-labelledby',
       `${LEVEL_CHAPTER_TAB_ID_PREFIX}${this.levelsChapterIndex}`
     );
+  }
+
+  /**
+   * Reveals the locked chapter or level requirement in the polite live region above the grid.
+   * @param {number} requiredLevel - Level number that must be cleared first.
+   * @param {string} [hintKey] - Localization key for the requirement message.
+   */
+  showLockedLevelHint(requiredLevel, hintKey = 'modals.levelSelect.chapterLockedHint') {
+    const hintEl = this.elements?.levelsChapterHint;
+    if (!hintEl) {
+      return;
+    }
+    revealLiveRegion({
+      region: hintEl,
+      textElement: hintEl,
+      text: t(hintKey, { level: requiredLevel }),
+      schedule: scheduleNextFrame
+    });
   }
 
   /** Scrolls the chapter strip, and only it, so the active chapter sits in the middle. */
@@ -2824,14 +2851,17 @@ export class UIManager {
           })
         );
         card.setAttribute('aria-describedby', descId);
+        card.tabIndex = 0;
         card.title = lockText;
-        card.addEventListener('click', () => {
-          const msg = t('modals.levelSelect.cardLockedHint', { level: requiredLevel });
-          if (this.elements.levelsChapterHint) {
-            this.elements.levelsChapterHint.textContent = msg;
-            this.elements.levelsChapterHint.classList.remove('hidden');
+        const showCardLockedHint = () => {
+          this.showLockedLevelHint(requiredLevel, 'modals.levelSelect.cardLockedHint');
+        };
+        card.addEventListener('click', showCardLockedHint);
+        card.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            showCardLockedHint();
           }
-          this.announce(msg);
         });
       }
 

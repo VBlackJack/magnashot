@@ -22,7 +22,8 @@ import { Renderer } from './game/Renderer.js';
 import { GameEngine } from './game/GameEngine.js';
 import { UIManager } from './ui/UIManager.js';
 import { createGameLoop } from './game/GameLoop.js';
-import { readFluxSeedFromSearch } from './game/DailyShare.js';
+import { readFluxSeedFromSearch, stripFluxSeedFromUrl } from './game/DailyShare.js';
+import { GAME_MODES } from './core/Constants.js';
 
 const BOOTSTRAP_ERROR_ELEMENT_ID = 'bootstrap-error';
 const HIDDEN_CLASS = 'hidden';
@@ -72,6 +73,10 @@ class Application {
         audioManager,
         storageManager,
         onStateChange: (eng, extra) => {
+          const urlFluxSeed = readFluxSeedFromSearch(window.location?.search, fluxConfig.seed);
+          if (urlFluxSeed && (eng.mode !== GAME_MODES.FLUX || eng.fluxSeed !== urlFluxSeed)) {
+            window.history?.replaceState?.(null, '', stripFluxSeedFromUrl(window.location?.href));
+          }
           if (uiManager) {
             uiManager.refresh(eng, extra);
           }

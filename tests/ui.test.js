@@ -42,6 +42,7 @@ import {
 } from '../src/ui/UIManager.js';
 import { applyWorldGeometry } from '../src/core/WorldGeometry.js';
 import { LevelCatalog } from '../src/game/LevelCatalog.js';
+import { stripFluxSeedFromUrl } from '../src/game/DailyShare.js';
 
 const loadJson = (p) => JSON.parse(readFileSync(p, 'utf8'));
 const gameConfig = applyWorldGeometry(loadJson('./configs/game.json'));
@@ -582,7 +583,7 @@ test('the drawer duration is written once', () => {
 test('btnPlayLevelModal asks for destructive confirmation when switching from an active non-campaign run', () => {
   assert.match(
     uiManagerCode,
-    /this\.elements\.btnPlayLevelModal\.addEventListener\('click',\s*\(\)\s*=>\s*\{\s*if \(this\.isCampaignRunActive\(\)\) \{\s*this\.closeOverlayModal\(this\.elements\.modalLevels\);\s*return;\s*\}\s*this\.requestDestructiveAction\(/
+    /this\.elements\.btnPlayLevelModal\.addEventListener\('click',\s*\(\)\s*=>\s*\{\s*if \(this\.isCampaignRunActive\(\)\) \{\s*this\.closeOverlayModal\(this\.elements\.modalLevels\);\s*if \(this\.engine\.state === GAME_STATES\.PAUSED\) \{\s*this\.engine\.togglePause\(\);\s*\}\s*return;\s*\}\s*this\.requestDestructiveAction\(/
   );
 });
 
@@ -728,13 +729,37 @@ test('Pause modal exposes Level Select button, Pause nav button exposes Esc tool
 });
 
 test('computeAchievementProgress computes bounded current, target, and percentage values for all achievement types', () => {
+  for (const [achKey, achSpec] of Object.entries(gameConfig.achievements)) {
+    const unlockedProgress = computeAchievementProgress(achKey, achSpec, true, {});
+    assert.deepEqual(
+      unlockedProgress,
+      { current: achSpec.threshold, target: achSpec.threshold, pct: 100 },
+      `unlocked achievement ${achKey} reaches its configured threshold`
+    );
+  }
   assert.deepEqual(
-    computeAchievementProgress('comboMaster', { minChain: 5 }, false, { maxCombo: 3 }),
-    { current: 3, target: 5, pct: 60 }
+    computeAchievementProgress('comboMaster', gameConfig.achievements.comboMaster, false, { maxCombo: 3 }),
+    { current: 3, target: 4, pct: 75 }
   );
   assert.deepEqual(
-    computeAchievementProgress('starCollector', { targetStars: 15 }, false, { totalStars: 20 }),
-    { current: 15, target: 15, pct: 100 }
+    computeAchievementProgress('starCollector', gameConfig.achievements.starCollector, false, { totalStars: 20 }),
+    { current: 18, target: 18, pct: 100 }
+  );
+  assert.deepEqual(
+    computeAchievementProgress('survivorWave10', gameConfig.achievements.survivorWave10, false, { endlessWave: 4 }),
+    { current: 4, target: 10, pct: 40 }
+  );
+  assert.deepEqual(
+    computeAchievementProgress('bossSlayer', gameConfig.achievements.bossSlayer, false, { bossesDestroyed: 0 }),
+    { current: 0, target: gameConfig.achievements.bossSlayer.threshold, pct: 0 }
+  );
+  assert.deepEqual(
+    computeAchievementProgress('firstAvalanche', gameConfig.achievements.firstAvalanche, false, {}),
+    { current: 0, target: gameConfig.achievements.firstAvalanche.threshold, pct: 0 }
+  );
+  assert.deepEqual(
+    computeAchievementProgress('sharpshooter', gameConfig.achievements.sharpshooter, false, {}),
+    { current: 0, target: gameConfig.achievements.sharpshooter.threshold, pct: 0 }
   );
   assert.deepEqual(
     computeAchievementProgress('endlessSurvivor', { targetWave: 10 }, false, { endlessWave: 4 }),
@@ -748,6 +773,16 @@ test('computeAchievementProgress computes bounded current, target, and percentag
     computeAchievementProgress('firstWin', {}, true, {}),
     { current: 1, target: 1, pct: 100 }
   );
+});
+
+test('stripFluxSeedFromUrl removes only the flux query parameter while preserving path, other query params, and hash', () => {
+  assert.equal(stripFluxSeedFromUrl('https://example.com/play?flux=4F2A1C'), 'https://example.com/play');
+  assert.equal(
+    stripFluxSeedFromUrl('https://example.com/play?lang=fr&flux=4F2A1C#board'),
+    'https://example.com/play?lang=fr#board'
+  );
+  assert.equal(stripFluxSeedFromUrl('/?flux=ABCDEF'), '/');
+  assert.equal(stripFluxSeedFromUrl(''), '');
 });
 
 test('Level select incomplete filter, Flux same-seed button, achievement progress, and contextual confirm label are wired', () => {
