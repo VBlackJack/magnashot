@@ -1,6 +1,6 @@
 {
   "name": "flux-spheres",
-  "version": "1.7.6",
+  "version": "1.7.7",
   "description": "Magnetic physics bubble shooter game",
   "engines": {
     "node": ">=22"

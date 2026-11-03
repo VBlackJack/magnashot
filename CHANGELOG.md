@@ -4,6 +4,17 @@ All notable changes to **FluxSpheres** are documented in this file.
 
 ## [Unreleased]
 
+## [1.7.7] - 2026-11-03
+
+### Added
+- **Persistent Achievement Progress Records**: Added `achievementRecords` to `StorageManager` (`getAchievementRecords`, `recordAchievementProgress`) and wired `GameEngine` to persist all-time personal bests (`maxCombo`, `endlessWave`, `maxAvalanche`, `bossesDestroyed`, `shotsRemainingOnClear`) so Workshop achievement progress bars retain progress across sessions and mode switches.
+- **Smart `< 3★` Victory Next Button**: When the `< 3★` filter is active in Level Select, the Campaign Victory modal's primary button (`#btn-next-level`) automatically targets and labels the next unlocked `< 3★` level (`resolveNextCampaignTarget` / `VICTORY_NEXT_ACTIONS.NEXT_INCOMPLETE`, wrapping around if needed).
+- **Direct Flux Seed Input**: Added a Flux seed input (`#input-flux-seed`) and launch button (`#btn-flux-seed-go`) in the Level Select toolbar (`parseFluxSeedInput` in `src/game/DailyShare.js`) accepting a 6-character code, `#code`, a `?flux=<seed>` URL, or full share text, alongside `[data-i18n-placeholder]` translation support in `I18n.translateDOM()`.
+- **Level Select Format Badges**: Level cards in `#levels-grid` now display distinct format badges (`.level-format-badge` for `Boss`, `Precision` / `Précision`, `Arsenal`, and `Twist` / `Variante`), including authored Boss levels marked via `isLandmark` in `LevelCatalog.summarize`.
+
+### Changed
+- **Modular UI Views**: Extracted `src/ui/CodexView.js`, `src/ui/WorkshopView.js`, and `src/ui/LevelSelectView.js` from `src/ui/UIManager.js` and registered the new modules in `sw.js` `PRECACHE_ASSETS`.
+
 ## [1.7.6] - 2026-11-03
 
 ### Fixed
