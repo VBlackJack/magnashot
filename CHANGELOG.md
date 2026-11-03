@@ -4,6 +4,20 @@ All notable changes to **FluxSpheres** are documented in this file.
 
 ## [Unreleased]
 
+## [1.7.5] - 2026-11-03
+
+### Added
+- **Shareable & Replayable Flux Seeds**: Sharing a Flux Mode result now includes the 6-character seed in the header (`#seed`) and appends `?flux=<seed>` to the share URL (`buildFluxShareUrl`). Opening `?flux=<seed>` starts a Flux run on that exact seed (`readFluxSeedFromSearch`), and the Flux Game Over modal adds a `Same Seed (#...)` button (`#btn-same-seed-gameover`) to replay the exact same run sequence.
+- **Level Select `< 3★` Filter**: Added a `< 3★` filter toggle button (`#btn-levels-filter-incomplete`, `aria-pressed`) in the Level Select modal toolbar to display only unlocked levels with fewer than 3 stars in the active chapter, with a clear empty-state message (`.levels-empty-filter`) when the chapter is already fully completed at `3★`.
+- **Visual Achievement Progress**: Achievement cards in the Workshop (`#achievements-grid`) now display a visual progress bar (`.achievement-progress-track` / `.achievement-progress-fill`) and a `{{current}} / {{target}}` progress counter (`computeAchievementProgress`) for locked achievements across combos, campaign stars, Survival waves, and campaign completion.
+- **Contextual Destructive Confirmation**: The confirmation button (`#btn-confirm-yes`) in `#modal-confirm` now dynamically names the target action (*Restart*, *Survival*, *Daily*, *Flux Mode*, *Play level X*) via `requestDestructiveAction(actionCallback, confirmLabelResolver)` and updates automatically on language switch.
+- **Level Select from Pause Modal**: Added a `Levels` button (`#btn-levels-pause`) to the Pause modal actions, returning to the Pause modal if Level Select is dismissed without starting a new run.
+- **Locked Level Card Accessibility & Feedback**: Locked level cards in `#levels-grid` now expose `role="button"`, `aria-disabled="true"`, `aria-label`, `aria-describedby`, and `title`, and clicking a locked card reveals and announces the required level in `#levels-chapter-hint`.
+
+### Fixed
+- **Immediate Projectile Reserve Application & Shop Announcements**: Purchasing *Projectile Reserve* (`startingShots`) during an active Campaign or Flux run now immediately credits the extra shots (`+2`) to `shotsRemaining` via `GameEngine.applyUpgradePurchase`, interpolates `{{shots}}` from `configs/game.json`, clarifies upgrade descriptions for Flux Mode and special cores, and announces Workshop upgrade and ammo purchases to screen readers.
+- **Pause Button Keyboard Shortcut Tooltip**: Added `data-i18n-title="app.nav.button.pauseTooltip"` (`Pause (Esc)` / `Pause (Échap)`) to `#btn-pause` in both the top navigation bar and the slide-in drawer.
+
 ## [1.7.4] - 2026-11-02
 
 ### Added
