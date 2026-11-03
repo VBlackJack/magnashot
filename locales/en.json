@@ -21,6 +21,7 @@
         "shopBadge": "Workshop ({{count}})",
         "restart": "Restart",
         "pause": "Pause",
+        "pauseTooltip": "Pause (Esc)",
         "soundOn": "🔊",
         "soundOff": "🔇",
         "soundOnAria": "Sound: ON",
@@ -357,6 +358,7 @@
       "card": {
         "levelNumber": "Level {{id}}",
         "locked": "Locked: clear level {{previous}}",
+        "ariaLocked": "Level {{id}}: {{name}}, locked, clear level {{previous}}",
         "aria": "Level {{id}}: {{name}}, {{stars}} of {{maxStars}} stars, {{best}}",
         "ariaCurrent": "Level {{id}} (Current): {{name}}, {{stars}} of {{maxStars}} stars, {{best}}",
         "bestScore": "Best: {{score}}",
@@ -377,7 +379,14 @@
         "aria": "{{name}}, levels {{first}} to {{last}}, {{stars}} of {{maxStars}} stars",
         "ariaLocked": "{{name}}, levels {{first}} to {{last}}, locked"
       },
-      "chapterLockedHint": "Complete level {{level}} to unlock this chapter."
+      "chapterLockedHint": "Complete level {{level}} to unlock this chapter.",
+      "cardLockedHint": "Complete level {{level}} to unlock this level.",
+      "filter": {
+        "incomplete": "Incomplete (< 3★)",
+        "allCompletedInChapter": "All unlocked levels in this chapter already have 3★!",
+        "announcedIncomplete": "Filter enabled: unlocked levels with fewer than 3 stars.",
+        "announcedAll": "Filter disabled: all levels in chapter."
+      }
     },
     "shop": {
       "title": {
@@ -526,6 +535,7 @@
         "reward": "Reward: +{{coins}} ⬡",
         "unlockedBadge": "Unlocked ✓",
         "lockedBadge": "In Progress",
+        "progress": "{{current}} / {{target}}",
         "items": {
           "firstAvalanche": {
             "name": "Avalanche Master",
@@ -566,7 +576,7 @@
         },
         "blastRadius": {
           "name": "Magnetic Amplifier",
-          "description": "Increases the area of effect of Bomb, Lightning, and Cryo balls."
+          "description": "Increases the area of effect of Bomb, Lightning, and Cryo balls as well as board core explosions."
         },
         "overchargeRate": {
           "name": "Overcharge Capacitor",
@@ -574,8 +584,12 @@
         },
         "startingShots": {
           "name": "Projectile Reserve",
-          "description": "Adds +2 starting shots per rank in all campaign levels."
+          "description": "Adds +{{shots}} starting shots per rank in Campaign and Flux Mode runs."
         }
+      },
+      "feedback": {
+        "upgradePurchased": "{{name}} upgraded to level {{level}} of {{maxLevel}}.",
+        "ammoPurchased": "{{name}} purchased. In stock: {{count}}."
       },
       "button": {
         "close": "Close"
@@ -617,6 +631,7 @@
       },
       "button": {
         "retry": "Try Again",
+        "sameSeed": "Same Seed (#{{seed}})",
         "levels": "Select Level",
         "share": "Share",
         "shareCopied": "Copied ✓"
@@ -653,7 +668,8 @@
       },
       "button": {
         "resume": "Resume",
-        "restart": "Restart"
+        "restart": "Restart",
+        "levels": "Select Level"
       }
     },
     "confirm": {
@@ -828,6 +844,7 @@
     },
     "flux": {
       "header": "FluxSpheres - Flux Mode",
+      "headerWithSeed": "FluxSpheres - Flux Mode (#{{seed}})",
       "stats": "Shape {{stage}} - {{score}} pts"
     },
     "feedback": {

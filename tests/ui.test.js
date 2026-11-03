@@ -26,6 +26,7 @@ import {
   INPUT_ARIA_HINTS,
   MODAL_FOCUSABLE_SELECTOR,
   canOpenDrawer,
+  computeAchievementProgress,
   computeStarProgressPct,
   filterFocusTrapCandidates,
   gameOverReasonKey,
@@ -701,5 +702,108 @@ test('powerup buttons include keyboard badge 1-6 and locked chapters expose chap
     assert.ok(locale.modals.gameOver.stats.newRecordBadge);
     assert.deepEqual(placeholdersOf(locale.modals.gameOver.stats.remainingSpheres), ['count']);
     assert.deepEqual(placeholdersOf(locale.modals.levelSelect.chapterLockedHint), ['level']);
+  }
+});
+
+test('Pause modal exposes Level Select button, Pause nav button exposes Esc tooltip, and locked cards expose ariaLocked and cardLockedHint', () => {
+  const pauseModal = elementMarkup(indexHtml, 'modal-pause');
+  assert.match(pauseModal, /id="btn-levels-pause"[^>]*data-i18n="modals\.pause\.button\.levels"/);
+  const pauseNav = elementMarkup(indexHtml, 'btn-pause');
+  assert.match(pauseNav, /data-i18n-title="app\.nav\.button\.pauseTooltip"/);
+  assert.match(uiManagerCode, /this\.engine\.applyUpgradePurchase\(upgradeKey\)/);
+  assert.match(uiManagerCode, /modals\.shop\.feedback\.upgradePurchased/);
+  assert.match(uiManagerCode, /modals\.shop\.feedback\.ammoPurchased/);
+  assert.match(uiManagerCode, /modals\.levelSelect\.card\.ariaLocked/);
+  assert.match(uiManagerCode, /modals\.levelSelect\.cardLockedHint/);
+  for (const lang of SUPPORTED) {
+    const locale = loadJson(`./locales/${lang}.json`);
+    assert.ok(locale.app.nav.button.pauseTooltip);
+    assert.ok(locale.modals.pause.button.levels);
+    assert.deepEqual(placeholdersOf(locale.modals.levelSelect.card.ariaLocked), ['id', 'name', 'previous']);
+    assert.deepEqual(placeholdersOf(locale.modals.levelSelect.cardLockedHint), ['level']);
+    assert.deepEqual(placeholdersOf(locale.modals.shop.upgrades.startingShots.description), ['shots']);
+    assert.deepEqual(placeholdersOf(locale.modals.shop.feedback.upgradePurchased), ['level', 'maxLevel', 'name']);
+    assert.deepEqual(placeholdersOf(locale.modals.shop.feedback.ammoPurchased), ['count', 'name']);
+  }
+});
+
+test('computeAchievementProgress computes bounded current, target, and percentage values for all achievement types', () => {
+  assert.deepEqual(
+    computeAchievementProgress('comboMaster', { minChain: 5 }, false, { maxCombo: 3 }),
+    { current: 3, target: 5, pct: 60 }
+  );
+  assert.deepEqual(
+    computeAchievementProgress('starCollector', { targetStars: 15 }, false, { totalStars: 20 }),
+    { current: 15, target: 15, pct: 100 }
+  );
+  assert.deepEqual(
+    computeAchievementProgress('endlessSurvivor', { targetWave: 10 }, false, { endlessWave: 4 }),
+    { current: 4, target: 10, pct: 40 }
+  );
+  assert.deepEqual(
+    computeAchievementProgress('campaignComplete', {}, false, { unlockedLevel: 11, campaignLevelCount: 50 }),
+    { current: 10, target: 50, pct: 20 }
+  );
+  assert.deepEqual(
+    computeAchievementProgress('firstWin', {}, true, {}),
+    { current: 1, target: 1, pct: 100 }
+  );
+});
+
+test('Level select incomplete filter, Flux same-seed button, achievement progress, and contextual confirm label are wired', () => {
+  const levelsModal = elementMarkup(indexHtml, 'modal-levels');
+  assert.match(
+    levelsModal,
+    /id="btn-levels-filter-incomplete"[^>]*aria-pressed="false"[^>]*data-i18n="modals\.levelSelect\.filter\.incomplete"/
+  );
+  const gameOverModal = elementMarkup(indexHtml, 'modal-gameover');
+  assert.match(gameOverModal, /id="btn-same-seed-gameover"[^>]*class="modal-btn hidden"/);
+  assert.match(uiManagerCode, /this\.engine\.startFluxRun\(this\.engine\.fluxSeed\)/);
+  assert.match(uiManagerCode, /achievement-progress-track/);
+  assert.match(uiManagerCode, /achievement-progress-fill/);
+  assert.match(uiManagerCode, /levels-empty-filter/);
+  assert.match(uiManagerCode, /requestDestructiveAction\(actionCallback, confirmLabelResolver = null\)/);
+
+  const ui = Object.create(UIManager.prototype);
+  ui.engine = {
+    state: 'playing',
+    hasFiredInRound: true,
+    physicsWorld: { balls: [{}] }
+  };
+  const btnConfirmYes = { textContent: 'Confirmer' };
+  const modalConfirm = {
+    classList: {
+      hidden: true,
+      remove() {
+        this.hidden = false;
+      },
+      add() {
+        this.hidden = true;
+      },
+      contains() {
+        return this.hidden;
+      }
+    }
+  };
+  ui.elements = { modalConfirm, btnConfirmYes, btnConfirmNo: { focus() {} } };
+  ui.isAnyModalOpen = () => false;
+  ui.saveLastFocusedElement = () => {};
+  ui.syncModalInertState = () => {};
+  ui.closeOverlayModal = () => {};
+
+  ui.requestDestructiveAction(() => {}, () => 'Survie');
+  assert.equal(btnConfirmYes.textContent, 'Survie');
+  ui.dismissConfirm();
+  assert.notEqual(btnConfirmYes.textContent, 'Survie');
+
+  for (const lang of SUPPORTED) {
+    const locale = loadJson(`./locales/${lang}.json`);
+    assert.ok(locale.modals.levelSelect.filter.incomplete);
+    assert.ok(locale.modals.levelSelect.filter.allCompletedInChapter);
+    assert.ok(locale.modals.levelSelect.filter.announcedIncomplete);
+    assert.ok(locale.modals.levelSelect.filter.announcedAll);
+    assert.deepEqual(placeholdersOf(locale.modals.shop.achievements.progress), ['current', 'target']);
+    assert.deepEqual(placeholdersOf(locale.modals.gameOver.button.sameSeed), ['seed']);
+    assert.deepEqual(placeholdersOf(locale.share.flux.headerWithSeed), ['seed']);
   }
 });

@@ -33,6 +33,45 @@ const FIRST_CHALLENGE_NUMBER = 1;
 const LINE_SEPARATOR = '\n';
 const SYMBOL_OVERFLOW_SEPARATOR = ' ';
 
+/** URL query parameter carrying a shared Flux run seed. */
+export const FLUX_SEED_QUERY_PARAM = 'flux';
+const FLUX_SEED_PATTERN = /^[0-9a-z]+$/;
+
+/**
+ * Extracts and validates a shared Flux seed from a location.search string.
+ * @param {string|null|undefined} search - Raw URL query string.
+ * @param {{length: number}} seedConfig - The `seed` section of configs/flux.json.
+ * @returns {string|null} Normalized lowercase seed, or null when absent or invalid.
+ */
+export function readFluxSeedFromSearch(search, seedConfig) {
+  if (typeof search !== 'string' || !search || !seedConfig || !(seedConfig.length > 0)) {
+    return null;
+  }
+  const raw = new URLSearchParams(search).get(FLUX_SEED_QUERY_PARAM);
+  if (typeof raw !== 'string') {
+    return null;
+  }
+  const normalized = raw.trim().toLowerCase();
+  if (normalized.length !== seedConfig.length || !FLUX_SEED_PATTERN.test(normalized)) {
+    return null;
+  }
+  return normalized;
+}
+
+/**
+ * Appends the Flux seed query parameter to the base share URL when a seed is present.
+ * @param {string} baseUrl - Base game URL.
+ * @param {string|null|undefined} seed - Flux run seed.
+ * @returns {string}
+ */
+export function buildFluxShareUrl(baseUrl, seed) {
+  if (typeof seed !== 'string' || seed.length === 0) {
+    return baseUrl;
+  }
+  const separator = String(baseUrl).includes('?') ? '&' : '?';
+  return `${baseUrl}${separator}${FLUX_SEED_QUERY_PARAM}=${encodeURIComponent(seed)}`;
+}
+
 /**
  * Challenge number of a UTC date key ("YYYY-MM-DD"): the epoch day is challenge 1.
  * @param {string} dateKey - Daily seed date key.
@@ -124,11 +163,11 @@ function buildSurvivalShareText({ wave, score, waveLog, url }, shareConfig) {
  * @param {string} run.url - Game address appended on the last line.
  * @returns {string}
  */
-function buildFluxShareText({ stage, score, url }) {
+function buildFluxShareText({ stage, score, seed, url }) {
   return [
-    t('share.flux.header'),
+    seed ? t('share.flux.headerWithSeed', { seed }) : t('share.flux.header'),
     t('share.flux.stats', { stage: formatNumber(stage), score: formatNumber(score) }),
-    url
+    buildFluxShareUrl(url, seed)
   ].join(LINE_SEPARATOR);
 }
 

@@ -1216,6 +1216,7 @@ body {
 /* Locked cards are dimmed by color, not opacity, so text keeps >= 4.5:1. */
 .level-card.locked {
   background: var(--surface-locked);
+  cursor: not-allowed;
   border-style: dashed;
 }
 
@@ -1261,6 +1262,53 @@ body {
 .level-locked-badge {
   color: var(--text-muted);
   font-style: italic;
+}
+
+.levels-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.nav-btn.badge-btn.active {
+  border-color: var(--accent-blue);
+  background: var(--accent-blue-alpha-22);
+  color: var(--text-main);
+}
+
+.levels-empty-filter {
+  grid-column: 1 / -1;
+  text-align: center;
+  padding: 18px 12px;
+  color: var(--text-muted);
+  font-size: var(--caption-font-size);
+}
+
+.achievement-progress-track {
+  width: 100%;
+  height: 5px;
+  background: var(--surface-sunken);
+  border: 1px solid var(--border-subtle);
+  border-radius: 999px;
+  overflow: hidden;
+  margin-top: 2px;
+}
+
+.achievement-progress-fill {
+  height: 100%;
+  background: var(--accent-amber);
+  transition: width 0.2s ease;
+}
+
+.level-card.unlocked .achievement-progress-fill {
+  background: var(--accent-emerald);
+}
+
+.achievement-progress-text {
+  color: var(--text-secondary);
+  font-weight: 600;
 }
 
 .level-card.current {
@@ -2254,7 +2302,8 @@ body {
   .modal-tab.active,
   .level-chapter.active,
   .powerup-btn.equipped,
-  .polarity-floating-btn.active {
+  .polarity-floating-btn.active,
+  .nav-btn.badge-btn.active {
     outline: 2px solid Highlight;
     outline-offset: 1px;
   }
@@ -2271,7 +2320,8 @@ body {
     -webkit-text-fill-color: CanvasText;
   }
   .overcharge-fill,
-  .star-meter-fill {
+  .star-meter-fill,
+  .achievement-progress-fill {
     background: Highlight;
   }
 }

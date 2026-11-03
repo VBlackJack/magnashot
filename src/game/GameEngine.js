@@ -403,6 +403,29 @@ export class GameEngine {
     return lvl * spec.shotsPerLevel;
   }
 
+  /**
+   * Applies a newly purchased Workshop upgrade to the active run so the player
+   * benefits immediately without having to restart the level.
+   * @param {string} upgradeKey - Purchased upgrade identifier.
+   */
+  applyUpgradePurchase(upgradeKey) {
+    if (
+      upgradeKey === 'startingShots' &&
+      this.usesShotBudget() &&
+      (this.state === GAME_STATES.PLAYING || this.state === GAME_STATES.PAUSED)
+    ) {
+      const shotsBonus = this.gameConfig.upgrades?.startingShots?.shotsPerLevel || 0;
+      if (shotsBonus > 0) {
+        this.shotsRemaining += shotsBonus;
+        if (this.shotsRemaining > 0) {
+          this.outOfShotsGraceFrames = 0;
+        }
+        this.saveRunSnapshot({ force: true });
+      }
+    }
+    this.updateAimFromAngle(this.aimAngle);
+  }
+
   /** Shield hits a ball starts with for its modifier (0 when it has no armor). */
   getInitialArmor(mod) {
     if (mod === CLUSTER_MODIFIERS.ARMORED) {

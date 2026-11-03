@@ -21,6 +21,7 @@
         "shopBadge": "Atelier ({{count}})",
         "restart": "Recommencer",
         "pause": "Pause",
+        "pauseTooltip": "Pause (Échap)",
         "soundOn": "🔊",
         "soundOff": "🔇",
         "soundOnAria": "Son : Activé",
@@ -357,6 +358,7 @@
       "card": {
         "levelNumber": "Niveau {{id}}",
         "locked": "Verrouillé : terminez le niveau {{previous}}",
+        "ariaLocked": "Niveau {{id}} : {{name}}, verrouillé, terminez le niveau {{previous}}",
         "aria": "Niveau {{id}} : {{name}}, {{stars}} étoiles sur {{maxStars}}, {{best}}",
         "ariaCurrent": "Niveau {{id}} (En cours) : {{name}}, {{stars}} étoiles sur {{maxStars}}, {{best}}",
         "bestScore": "Record : {{score}}",
@@ -377,7 +379,14 @@
         "aria": "{{name}}, niveaux {{first}} à {{last}}, {{stars}} étoiles sur {{maxStars}}",
         "ariaLocked": "{{name}}, niveaux {{first}} à {{last}}, verrouillé"
       },
-      "chapterLockedHint": "Terminez le niveau {{level}} pour débloquer ce chapitre."
+      "chapterLockedHint": "Terminez le niveau {{level}} pour débloquer ce chapitre.",
+      "cardLockedHint": "Terminez le niveau {{level}} pour débloquer ce niveau.",
+      "filter": {
+        "incomplete": "À compléter (< 3★)",
+        "allCompletedInChapter": "Tous les niveaux débloqués de ce chapitre ont déjà 3★ !",
+        "announcedIncomplete": "Filtre activé : niveaux débloqués à moins de 3 étoiles.",
+        "announcedAll": "Filtre désactivé : tous les niveaux du chapitre."
+      }
     },
     "shop": {
       "title": {
@@ -526,6 +535,7 @@
         "reward": "Récompense : +{{coins}} ⬡",
         "unlockedBadge": "Débloqué ✓",
         "lockedBadge": "En cours",
+        "progress": "{{current}} / {{target}}",
         "items": {
           "firstAvalanche": {
             "name": "Maître de l'Avalanche",
@@ -566,7 +576,7 @@
         },
         "blastRadius": {
           "name": "Amplificateur Magnétique",
-          "description": "Augmente le rayon d'action des billes Bombe, Foudre et Cryo."
+          "description": "Augmente le rayon d'action des billes Bombe, Foudre et Cryo ainsi que des coeurs explosifs du plateau."
         },
         "overchargeRate": {
           "name": "Condensateur de Surcharge",
@@ -574,8 +584,12 @@
         },
         "startingShots": {
           "name": "Réserve de Projectiles",
-          "description": "Ajoute +2 billes au début de chaque niveau de campagne par rang."
+          "description": "Ajoute +{{shots}} billes au début de chaque manche en Campagne et en Mode Flux par rang."
         }
+      },
+      "feedback": {
+        "upgradePurchased": "{{name}} amélioré au niveau {{level}} sur {{maxLevel}}.",
+        "ammoPurchased": "{{name}} acheté. En stock : {{count}}."
       },
       "button": {
         "close": "Fermer"
@@ -617,6 +631,7 @@
       },
       "button": {
         "retry": "Réessayer",
+        "sameSeed": "Même Graine (#{{seed}})",
         "levels": "Choisir un Niveau",
         "share": "Partager",
         "shareCopied": "Copié ✓"
@@ -653,7 +668,8 @@
       },
       "button": {
         "resume": "Reprendre",
-        "restart": "Recommencer"
+        "restart": "Recommencer",
+        "levels": "Choisir un Niveau"
       }
     },
     "confirm": {
@@ -828,6 +844,7 @@
     },
     "flux": {
       "header": "FluxSpheres - Mode Flux",
+      "headerWithSeed": "FluxSpheres - Mode Flux (#{{seed}})",
       "stats": "Forme {{stage}} - {{score}} pts"
     },
     "feedback": {

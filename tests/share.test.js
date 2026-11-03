@@ -22,10 +22,12 @@ import { GAME_MODES, WAVE_TYPES } from '../src/core/Constants.js';
 import { i18n, formatNumber } from '../src/core/I18n.js';
 import {
   buildDailyShareText,
+  buildFluxShareUrl,
   buildShareText,
   formatDailyCountdown,
   getDailyChallengeNumber,
-  getMsUntilNextDaily
+  getMsUntilNextDaily,
+  readFluxSeedFromSearch
 } from '../src/game/DailyShare.js';
 
 const loadJson = (p) => JSON.parse(fs.readFileSync(p, 'utf8'));
@@ -184,4 +186,29 @@ test('The Daily countdown rounds up to the minute and reads zero only when no ti
   assert.deepEqual(formatDailyCountdown(1), { hours: 0, minutes: 1 });
   assert.deepEqual(formatDailyCountdown(0), { hours: 0, minutes: 0 });
   assert.deepEqual(formatDailyCountdown(MS_PER_DAY), { hours: 24, minutes: 0 });
+});
+
+test('Flux share text includes seed header and ?flux=<seed> link when seed is provided, and readFluxSeedFromSearch validates bounds', () => {
+  const fluxSeedConfig = loadJson('./configs/flux.json').seed;
+  useLocale('en');
+  const linesEn = buildShareText({ ...FLUX_RUN, seed: 'k9x4m2' }, shareConfig).split('\n');
+  assert.deepEqual(linesEn, [
+    'FluxSpheres - Flux Mode (#k9x4m2)',
+    `Shape ${FLUX_RUN.stage} - ${formatNumber(FLUX_RUN.score)} pts`,
+    buildFluxShareUrl(shareConfig.url, 'k9x4m2')
+  ]);
+
+  useLocale('fr');
+  const linesFr = buildShareText({ ...FLUX_RUN, seed: 'k9x4m2' }, shareConfig).split('\n');
+  assert.deepEqual(linesFr, [
+    'FluxSpheres - Mode Flux (#k9x4m2)',
+    `Forme ${FLUX_RUN.stage} - ${formatFrench(FLUX_RUN.score)} pts`,
+    `${shareConfig.url}?flux=k9x4m2`
+  ]);
+
+  assert.equal(readFluxSeedFromSearch('?flux=K9X4M2', fluxSeedConfig), 'k9x4m2');
+  assert.equal(readFluxSeedFromSearch('?flux=0', fluxSeedConfig), null);
+  assert.equal(readFluxSeedFromSearch('?flux=abc-12', fluxSeedConfig), null);
+  assert.equal(readFluxSeedFromSearch('?flux=1000000', fluxSeedConfig), null);
+  assert.equal(readFluxSeedFromSearch('', fluxSeedConfig), null);
 });

@@ -697,13 +697,14 @@ describe('end of round (desktop)', () => {
         engine.notifyUI();
       });
       await page.waitForFunction((playing) => window.__fluxEngine.state === playing, GAME_STATES.PLAYING);
-      const stage = await page.evaluate(() => window.__fluxEngine.fluxStage);
+      const { stage, seed } = await page.evaluate(() => ({ stage: window.__fluxEngine.fluxStage, seed: window.__fluxEngine.fluxSeed }));
       await loseRun(page);
-      const fluxLines = await shareAndReadLines(page, config.url);
-      const fluxHeader = await page.evaluate(async () => (await import('/src/core/I18n.js')).t('share.flux.header'));
+      const fluxShareUrl = `${config.url}?flux=${seed}`;
+      const fluxLines = await shareAndReadLines(page, fluxShareUrl);
+      const fluxHeader = await page.evaluate(async (fluxSeed) => (await import('/src/core/I18n.js')).t('share.flux.headerWithSeed', { seed: fluxSeed }), seed);
       assert.equal(fluxLines[0], fluxHeader, 'a Flux result opens on its mode');
       assert.ok(
-        fluxLines.some((line) => new RegExp(`\\b${stage}\\b`).test(line) && line !== config.url),
+        fluxLines.some((line) => new RegExp(`\\b${stage}\\b`).test(line) && line !== fluxShareUrl),
         `a Flux result states shape ${stage}`
       );
       assert.deepEqual(errors, []);

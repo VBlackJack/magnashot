@@ -534,7 +534,6 @@ test('A finished run or a fresh start clears the stored run, and a corrupted one
   assert.ok(storage.loadRunSnapshot());
   engine.triggerGameOver('lineCrossed');
   assert.equal(storage.loadRunSnapshot(), null);
-
   engine.startCampaignLevel(1);
   engine.hasFiredInRound = true;
   engine.saveRunSnapshot();
@@ -545,4 +544,22 @@ test('A finished run or a fresh start clears the stored run, and a corrupted one
   const resumed = createTestEngine(storage);
   assert.equal(resumed.restoreSavedRun(), false);
   assert.equal(storage.loadRunSnapshot(), null);
+});
+
+test('applyUpgradePurchase credits startingShots immediately in active Campaign and Flux runs and clears outOfShotsGraceFrames', () => {
+  const storage = createTestStorage();
+  const engine = createTestEngine(storage);
+  engine.startCampaignLevel(1);
+  const initialShots = engine.shotsRemaining;
+  engine.outOfShotsGraceFrames = 10;
+
+  engine.applyUpgradePurchase('startingShots');
+  assert.equal(engine.shotsRemaining, initialShots + 2);
+  assert.equal(engine.outOfShotsGraceFrames, 0);
+  assert.equal(storage.loadRunSnapshot()?.engine?.shotsRemaining, initialShots + 2);
+
+  engine.startFluxRun('123456');
+  const initialFluxShots = engine.shotsRemaining;
+  engine.applyUpgradePurchase('startingShots');
+  assert.equal(engine.shotsRemaining, initialFluxShots + 2);
 });

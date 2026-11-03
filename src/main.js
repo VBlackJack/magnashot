@@ -22,6 +22,7 @@ import { Renderer } from './game/Renderer.js';
 import { GameEngine } from './game/GameEngine.js';
 import { UIManager } from './ui/UIManager.js';
 import { createGameLoop } from './game/GameLoop.js';
+import { readFluxSeedFromSearch } from './game/DailyShare.js';
 
 const BOOTSTRAP_ERROR_ELEMENT_ID = 'bootstrap-error';
 const HIDDEN_CLASS = 'hidden';
@@ -102,8 +103,15 @@ class Application {
         }
       });
 
-      if (!engine.restoreSavedRun()) {
-        engine.startCampaignLevel(storageManager.getUnlockedLevel());
+      const sharedFluxSeed = readFluxSeedFromSearch(window.location?.search, fluxConfig.seed);
+      const savedSnapshot = storageManager.loadRunSnapshot();
+      const canRestoreSaved = !sharedFluxSeed || savedSnapshot?.engine?.fluxSeed === sharedFluxSeed;
+      if (!canRestoreSaved || !engine.restoreSavedRun()) {
+        if (sharedFluxSeed) {
+          engine.startFluxRun(sharedFluxSeed);
+        } else {
+          engine.startCampaignLevel(storageManager.getUnlockedLevel());
+      }
       }
 
       const gameLoop = createGameLoop({

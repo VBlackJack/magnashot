@@ -144,6 +144,35 @@ export function computeStarProgressPct(score, thresholds, nextThreshold) {
 }
 
 /**
+ * Computes the player's current and target progress for an achievement card.
+ * @param {string} achId - Achievement key from config.
+ * @param {object} achSpec - Achievement specification from config.
+ * @param {boolean} isUnlocked - Whether the achievement is already unlocked.
+ * @param {object} [progressContext] - Current progress values.
+ * @returns {{ current: number, target: number, pct: number }}
+ */
+export function computeAchievementProgress(achId, achSpec, isUnlocked, progressContext = {}) {
+  let target = 1;
+  let rawCurrent = 0;
+  if (achSpec?.minChain) {
+    target = achSpec.minChain;
+    rawCurrent = progressContext.maxCombo || 0;
+  } else if (achSpec?.targetStars) {
+    target = achSpec.targetStars;
+    rawCurrent = progressContext.totalStars || 0;
+  } else if (achSpec?.targetWave) {
+    target = achSpec.targetWave;
+    rawCurrent = progressContext.endlessWave || 0;
+  } else if (achId === 'campaignComplete') {
+    target = Math.max(1, progressContext.campaignLevelCount || 1);
+    rawCurrent = Math.max(0, (progressContext.unlockedLevel || 1) - 1);
+  }
+  const current = isUnlocked ? target : Math.max(0, Math.min(target, rawCurrent));
+  const pct = target > 0 ? Math.round((current / target) * FULL_PERCENT) : 0;
+  return { current, target, pct };
+}
+
+/**
  * Maps a pointer event type to an input mode; mouse and unknown types keep the
  * mouse/keyboard wording.
  */
@@ -406,6 +435,7 @@ export class UIManager {
       cancelAimBanner: document.getElementById('cancel-aim-banner'),
       modalLevels: document.getElementById('modal-levels'),
       levelsStarsSummary: document.getElementById('levels-stars-summary'),
+      btnLevelsFilterIncomplete: document.getElementById('btn-levels-filter-incomplete'),
       levelsChapters: document.getElementById('levels-chapters'),
       levelsChapterHint: document.getElementById('levels-chapter-hint'),
       levelsGrid: document.getElementById('levels-grid'),
@@ -440,6 +470,7 @@ export class UIManager {
       gameOverStage: document.getElementById('gameover-stage'),
       gameOverDailyNext: document.getElementById('gameover-daily-next'),
       btnRetry: document.getElementById('btn-retry'),
+      btnSameSeedGameOver: document.getElementById('btn-same-seed-gameover'),
       btnLevelsGameOver: document.getElementById('btn-levels-gameover'),
       btnShareGameOver: document.getElementById('btn-share-gameover'),
       gameOverShareFallback: document.getElementById('gameover-share-fallback'),
@@ -448,6 +479,7 @@ export class UIManager {
       pauseLevelTip: document.getElementById('pause-level-tip'),
       btnResume: document.getElementById('btn-resume'),
       btnRestartPause: document.getElementById('btn-restart-pause'),
+      btnLevelsPause: document.getElementById('btn-levels-pause'),
       btnSoundPause: document.getElementById('btn-sound-pause'),
       btnContrastPause: document.getElementById('btn-contrast-pause'),
       btnPatternsPause: document.getElementById('btn-patterns-pause'),
@@ -470,6 +502,7 @@ export class UIManager {
     this.isAnnouncementScheduled = false;
     this.lastExtra = {};
     this.pendingConfirmCallback = null;
+    this.pendingConfirmLabelResolver = null;
     this.confirmPausedRun = false;
     this.isSharing = false;
     this.shareCopied = false;
@@ -479,6 +512,7 @@ export class UIManager {
     // The deferred install prompt, kept until the player asks for it from Settings.
     this.installPromptEvent = null;
     this.levelsChapterIndex = 0;
+    this.levelsFilterIncomplete = false;
     this.autoPausedByOverlay = false;
     this.lastFocusedElement = null;
     this.stackedModalOpener = null;
@@ -584,6 +618,7 @@ export class UIManager {
       this.updateLanguageButton();
       this.updateResetHintsFeedback();
       this.updateShareButtonLabel();
+      this.updateConfirmButtonLabel();
       this.refresh(this.engine, this.lastExtra);
     });
   }
@@ -888,7 +923,7 @@ export class UIManager {
       this.requestDestructiveAction(() => {
         this.hideAllModals();
         this.engine.startEndlessMode();
-      });
+      }, () => t('app.nav.button.endless'));
     });
 
     if (this.elements.btnDaily) {
@@ -896,7 +931,7 @@ export class UIManager {
         this.requestDestructiveAction(() => {
           this.hideAllModals();
           this.engine.startDailyChallenge();
-        });
+        }, () => t('app.nav.button.daily'));
       });
     }
 
@@ -905,7 +940,7 @@ export class UIManager {
         this.requestDestructiveAction(() => {
           this.hideAllModals();
           this.engine.startFluxRun();
-        });
+        }, () => t('app.nav.button.flux'));
       });
     }
 
@@ -926,10 +961,13 @@ export class UIManager {
     }
 
     this.elements.btnRestart.addEventListener('click', () => {
-      this.requestDestructiveAction(() => {
-        this.hideAllModals();
-        this.engine.restartCurrent();
-      });
+      this.requestDestructiveAction(
+        () => {
+          this.hideAllModals();
+          this.engine.restartCurrent();
+        },
+        () => t('app.nav.button.restart')
+      );
     });
 
     this.elements.btnPause.addEventListener('click', () => {
@@ -1075,6 +1113,7 @@ export class UIManager {
       this.elements.btnConfirmYes.addEventListener('click', () => {
         const cb = this.pendingConfirmCallback;
         this.pendingConfirmCallback = null;
+        this.pendingConfirmLabelResolver = null;
         this.confirmPausedRun = false;
         this.elements.modalConfirm.classList.add('hidden');
         if (cb) {
@@ -1119,6 +1158,19 @@ export class UIManager {
       this.closeOverlayModal(this.elements.modalLevels);
     });
 
+    this.elements.btnLevelsFilterIncomplete?.addEventListener('click', () => {
+      this.levelsFilterIncomplete = !this.levelsFilterIncomplete;
+      this.syncLevelsFilterButton();
+      this.renderLevelCards(this.getSuggestedLevelId());
+      this.announce(
+        t(
+          this.levelsFilterIncomplete
+            ? 'modals.levelSelect.filter.announcedIncomplete'
+            : 'modals.levelSelect.filter.announcedAll'
+        )
+      );
+    });
+
     this.elements.btnCloseShop.addEventListener('click', () => {
       this.closeOverlayModal(this.elements.modalShop);
     });
@@ -1128,10 +1180,19 @@ export class UIManager {
         this.closeOverlayModal(this.elements.modalLevels);
         return;
       }
-      this.requestDestructiveAction(() => {
-        this.hideAllModals();
-        this.engine.startCampaignLevel(this.getSuggestedLevelId());
-      });
+      this.requestDestructiveAction(
+        () => {
+          this.hideAllModals();
+          this.engine.startCampaignLevel(this.getSuggestedLevelId());
+        },
+        () => t('modals.levelSelect.button.play', { level: this.getSuggestedLevelId() })
+      );
+    });
+
+    this.elements.btnPlayLevelModal.addEventListener('click', () => {
+      if (this.isCampaignRunActive() && this.engine.state === GAME_STATES.PAUSED) {
+        this.engine.togglePause();
+      }
     });
 
     this.elements.btnNextLevel.addEventListener('click', () => {
@@ -1160,6 +1221,13 @@ export class UIManager {
       this.engine.restartCurrent();
     });
 
+    this.elements.btnSameSeedGameOver?.addEventListener('click', () => {
+      if (this.engine.fluxSeed) {
+        this.hideAllModals();
+        this.engine.startFluxRun(this.engine.fluxSeed);
+      }
+    });
+
     this.elements.btnLevelsGameOver.addEventListener('click', () => {
       this.hideAllModals();
       this.openLevelsModal();
@@ -1174,10 +1242,19 @@ export class UIManager {
     });
 
     this.elements.btnRestartPause.addEventListener('click', () => {
-      this.requestDestructiveAction(() => {
-        this.hideAllModals();
-        this.engine.restartCurrent();
-      });
+      this.requestDestructiveAction(
+        () => {
+          this.hideAllModals();
+          this.engine.restartCurrent();
+        },
+        () => t('app.nav.button.restart')
+      );
+    });
+
+    this.elements.btnLevelsPause?.addEventListener('click', () => {
+      this.openLevelsModal();
+      this.elements.modalPause.classList.add('hidden');
+      this.syncModalInertState();
     });
 
     // Capture phase: the mode must switch even when a handler below stops the event.
@@ -1292,7 +1369,7 @@ export class UIManager {
     });
   }
 
-  requestDestructiveAction(actionCallback) {
+  requestDestructiveAction(actionCallback, confirmLabelResolver = null) {
     const isMidRound =
       (this.engine.state === GAME_STATES.PLAYING || this.engine.state === GAME_STATES.PAUSED) &&
       this.engine.hasFiredInRound &&
@@ -1304,6 +1381,8 @@ export class UIManager {
     }
 
     this.pendingConfirmCallback = actionCallback;
+    this.pendingConfirmLabelResolver = confirmLabelResolver;
+    this.updateConfirmButtonLabel();
     // Over another dialog, its opener is where focus returns when the Confirm closes.
     this.stackedModalOpener = this.isAnyModalOpen() ? document.activeElement : null;
     this.saveLastFocusedElement();
@@ -1319,12 +1398,23 @@ export class UIManager {
     }
   }
 
+  updateConfirmButtonLabel() {
+    if (!this.elements?.btnConfirmYes) {
+      return;
+    }
+    const customLabel =
+      typeof this.pendingConfirmLabelResolver === 'function' ? this.pendingConfirmLabelResolver() : null;
+    setTextIfChanged(this.elements.btnConfirmYes, customLabel || t('modals.confirm.button.confirm'));
+  }
+
   /**
    * Closes the Confirm without its action (No, backdrop or Escape) and resumes the run it
    * paused. Yes does not come here: its action starts another run.
    */
   dismissConfirm() {
     this.pendingConfirmCallback = null;
+    this.pendingConfirmLabelResolver = null;
+    this.updateConfirmButtonLabel();
     if (this.confirmPausedRun) {
       this.confirmPausedRun = false;
       if (this.engine.state === GAME_STATES.PAUSED) {
@@ -1546,17 +1636,22 @@ export class UIManager {
       this.isAnyOverlayModalOpen() ||
       Boolean(this.elements.modalConfirm && !this.elements.modalConfirm.classList.contains('hidden'));
 
-    if (!otherOverlayStillOpen && this.autoPausedByOverlay && this.engine.state === GAME_STATES.PAUSED) {
-      this.autoPausedByOverlay = false;
-      this.engine.state = GAME_STATES.PLAYING;
-      this.elements.modalPause.classList.add('hidden');
-    } else if (this.engine.state === GAME_STATES.VICTORY && !this.engine.isVictoryCelebrating()) {
-      this.isVictoryModalRevealed = true;
-      this.elements.modalVictory.classList.remove('hidden');
-    } else if (this.engine.state === GAME_STATES.GAME_OVER) {
-      this.elements.modalGameOver.classList.remove('hidden');
-    } else if (this.engine.state === GAME_STATES.PAUSED && !this.isRunHeldByUi()) {
-      this.elements.modalPause.classList.remove('hidden');
+    if (!otherOverlayStillOpen) {
+      if (this.autoPausedByOverlay && this.engine.state === GAME_STATES.PAUSED) {
+        this.autoPausedByOverlay = false;
+        this.engine.state = GAME_STATES.PLAYING;
+        this.elements.modalPause.classList.add('hidden');
+      } else if (this.engine.state === GAME_STATES.VICTORY && !this.engine.isVictoryCelebrating()) {
+        this.isVictoryModalRevealed = true;
+        this.elements.modalVictory.classList.remove('hidden');
+      } else if (this.engine.state === GAME_STATES.GAME_OVER) {
+        this.elements.modalGameOver.classList.remove('hidden');
+      } else if (this.engine.state === GAME_STATES.PAUSED && !this.isRunHeldByUi()) {
+        if (modalElement === this.elements.modalLevels) {
+          this.stackedModalOpener = this.elements.btnLevelsPause;
+        }
+        this.elements.modalPause.classList.remove('hidden');
+      }
     }
     this.syncModalInertState();
   }
@@ -1958,6 +2053,7 @@ export class UIManager {
         score: engine.score,
         waveLog: engine.waveLog,
         stage: engine.fluxStage,
+        seed: engine.fluxSeed,
         url: shareConfig.url
       },
       shareConfig
@@ -2004,6 +2100,8 @@ export class UIManager {
   hideAllModals() {
     this.autoPausedByOverlay = false;
     this.confirmPausedRun = false;
+    this.pendingConfirmCallback = null;
+    this.pendingConfirmLabelResolver = null;
     this.stopDailyCountdown();
     for (const modal of this.getModalsByPriority()) {
       modal.classList.add('hidden');
@@ -2078,7 +2176,9 @@ export class UIManager {
 
       const desc = document.createElement('div');
       desc.className = 'level-card-desc';
-      desc.textContent = t(`modals.shop.upgrades.${upgradeKey}.description`);
+      desc.textContent = t(`modals.shop.upgrades.${upgradeKey}.description`, {
+        shots: formatNumber(spec.shotsPerLevel || 0)
+      });
 
       if (isMaxed) {
         // A finished upgrade shows a status, not a button that only looks pressable.
@@ -2106,9 +2206,17 @@ export class UIManager {
 
       buyBtn.addEventListener('click', () => {
         if (this.storageManager.purchaseUpgrade(upgradeKey)) {
-          this.audioManager.playEffect('match', currentLevel + 1);
-          this.engine.updateAimFromAngle(this.engine.aimAngle);
+          const newLevel = currentLevel + 1;
+          this.audioManager.playEffect('match', newLevel);
+          this.engine.applyUpgradePurchase(upgradeKey);
           this.refresh(this.engine, this.lastExtra);
+          this.announce(
+            t('modals.shop.feedback.upgradePurchased', {
+              name: title.textContent,
+              level: formatNumber(newLevel),
+              maxLevel: formatNumber(spec.maxLevel)
+            })
+          );
           this.rerenderShopKeepingFocus(`[data-upgrade-key="${upgradeKey}"]`, slotIndex);
         }
       });
@@ -2166,6 +2274,13 @@ export class UIManager {
 
         buyAmmoBtn.addEventListener('click', () => {
           if (this.engine.buySpecialAmmo(type)) {
+            const newCount = this.engine.specialInventory[type] || 0;
+            this.announce(
+              t('modals.shop.feedback.ammoPurchased', {
+                name: titleEl.textContent,
+                count: formatNumber(newCount)
+              })
+            );
             this.rerenderShopKeepingFocus(`.ammo-buy-btn[data-special-type="${type}"]`, slotIndex);
           }
         });
@@ -2180,6 +2295,13 @@ export class UIManager {
       achGrid.replaceChildren();
       const unlockedMap = this.storageManager.getUnlockedAchievements();
       const achEntries = Object.entries(this.gameConfig.achievements);
+      const progressContext = {
+        maxCombo: Math.max(this.engine.maxComboInRound || 0, this.engine.currentComboChain || 0),
+        totalStars: this.storageManager.getTotalStars(),
+        endlessWave: this.engine.mode === GAME_MODES.ENDLESS ? this.engine.waveCount || 0 : 0,
+        unlockedLevel: this.storageManager.getUnlockedLevel(),
+        campaignLevelCount: this.engine.levelCatalog.count
+      };
       let unlockedCount = 0;
 
       for (const [achId, achSpec] of achEntries) {
@@ -2187,6 +2309,7 @@ export class UIManager {
         if (isUnlocked) {
           unlockedCount++;
         }
+        const { current, target, pct } = computeAchievementProgress(achId, achSpec, isUnlocked, progressContext);
         const card = document.createElement('div');
         card.className = `level-card ${isUnlocked ? 'unlocked' : 'locked'}`;
 
@@ -2202,6 +2325,14 @@ export class UIManager {
         desc.className = 'level-card-desc';
         desc.textContent = t(`modals.shop.achievements.items.${achId}.description`);
 
+        const progressTrack = document.createElement('div');
+        progressTrack.className = 'achievement-progress-track';
+        progressTrack.setAttribute('aria-hidden', 'true');
+        const progressFill = document.createElement('div');
+        progressFill.className = 'achievement-progress-fill';
+        progressFill.style.width = `${pct}%`;
+        progressTrack.appendChild(progressFill);
+
         const footer = document.createElement('div');
         footer.className = 'level-card-footer';
         const statusEl = document.createElement('span');
@@ -2210,8 +2341,17 @@ export class UIManager {
           ? t('modals.shop.achievements.unlockedBadge')
           : t('modals.shop.achievements.lockedBadge');
         footer.appendChild(statusEl);
+        if (!isUnlocked) {
+          const progressText = document.createElement('span');
+          progressText.className = 'achievement-progress-text';
+          progressText.textContent = t('modals.shop.achievements.progress', {
+            current: formatNumber(current),
+            target: formatNumber(target)
+          });
+          footer.appendChild(progressText);
+        }
 
-        card.append(header, title, desc, footer);
+        card.append(header, title, desc, progressTrack, footer);
         achGrid.appendChild(card);
       }
 
@@ -2373,8 +2513,18 @@ export class UIManager {
     return Math.min(this.storageManager.getUnlockedLevel(), this.engine.levelCatalog.lastId);
   }
 
+  syncLevelsFilterButton() {
+    const btn = this.elements?.btnLevelsFilterIncomplete;
+    if (!btn) {
+      return;
+    }
+    btn.classList.toggle('active', Boolean(this.levelsFilterIncomplete));
+    btn.setAttribute('aria-pressed', String(Boolean(this.levelsFilterIncomplete)));
+  }
+
   openLevelsModal() {
     const suggestedLevelId = this.getSuggestedLevelId();
+    this.syncLevelsFilterButton();
 
     if (this.elements.levelsStarsSummary) {
       const totalStars = this.storageManager.getTotalStars();
@@ -2563,6 +2713,9 @@ export class UIManager {
       const lvl = catalog.summarize(levelId);
       const isUnlocked = lvl.id <= unlocked;
       const lvlStat = stats[lvl.id] || { bestScore: 0, stars: 0 };
+      if (this.levelsFilterIncomplete && (!isUnlocked || (lvlStat.stars || 0) >= this.gameConfig.scoring.maxStars)) {
+        continue;
+      }
 
       const card = document.createElement('div');
       card.className = `level-card ${isUnlocked ? 'unlocked' : 'locked'}`;
@@ -2634,10 +2787,13 @@ export class UIManager {
             lvl.id !== this.engine.currentLevelId ||
             (this.engine.hasFiredInRound && this.engine.physicsWorld.balls.length > 0);
           if (isOtherLevelOrMidRound) {
-            this.requestDestructiveAction(() => {
-              this.hideAllModals();
-              this.engine.startCampaignLevel(lvl.id);
-            });
+            this.requestDestructiveAction(
+              () => {
+                this.hideAllModals();
+                this.engine.startCampaignLevel(lvl.id);
+              },
+              () => t('modals.levelSelect.button.play', { level: lvl.id })
+            );
           } else {
             this.hideAllModals();
             this.engine.startCampaignLevel(lvl.id);
@@ -2651,14 +2807,42 @@ export class UIManager {
           }
         });
       } else {
+        const requiredLevel = Math.max(1, lvl.id - 1);
+        const lockText = t('modals.levelSelect.card.locked', { previous: requiredLevel });
         const lockEl = document.createElement('span');
         lockEl.className = 'level-locked-badge';
-        lockEl.textContent = t('modals.levelSelect.card.locked', { previous: lvl.id - 1 });
+        lockEl.textContent = lockText;
         footer.appendChild(lockEl);
+        card.setAttribute('role', 'button');
+        card.setAttribute('aria-disabled', 'true');
+        card.setAttribute(
+          'aria-label',
+          t('modals.levelSelect.card.ariaLocked', {
+            id: lvl.id,
+            name: title.textContent,
+            previous: requiredLevel
+          })
+        );
+        card.setAttribute('aria-describedby', descId);
+        card.title = lockText;
+        card.addEventListener('click', () => {
+          const msg = t('modals.levelSelect.cardLockedHint', { level: requiredLevel });
+          if (this.elements.levelsChapterHint) {
+            this.elements.levelsChapterHint.textContent = msg;
+            this.elements.levelsChapterHint.classList.remove('hidden');
+          }
+          this.announce(msg);
+        });
       }
 
       card.append(header, title, desc, footer);
       grid.appendChild(card);
+    }
+    if (grid.children.length === 0) {
+      const emptyMsg = document.createElement('p');
+      emptyMsg.className = 'levels-empty-filter';
+      emptyMsg.textContent = t('modals.levelSelect.filter.allCompletedInChapter');
+      grid.appendChild(emptyMsg);
     }
     return suggestedCard;
   }
@@ -2949,7 +3133,7 @@ export class UIManager {
       );
     }
 
-    if (engine.state === GAME_STATES.PAUSED && !this.isRunHeldByUi()) {
+    if (engine.state === GAME_STATES.PAUSED && !this.isRunHeldByUi() && !this.isAnyOverlayModalOpen()) {
       if (this.elements.pauseLevelTip) {
         if (engine.levelTutorialKey) {
           setTextIfChanged(
@@ -3101,6 +3285,16 @@ export class UIManager {
       }
       // Every mode but the campaign has a result worth sharing.
       this.elements.btnShareGameOver?.classList.toggle('hidden', engine.mode === GAME_MODES.CAMPAIGN);
+      if (this.elements.btnSameSeedGameOver) {
+        const hasFluxSeed = engine.mode === GAME_MODES.FLUX && Boolean(engine.fluxSeed);
+        if (hasFluxSeed) {
+          setTextIfChanged(
+            this.elements.btnSameSeedGameOver,
+            t('modals.gameOver.button.sameSeed', { seed: engine.fluxSeed })
+          );
+        }
+        this.elements.btnSameSeedGameOver.classList.toggle('hidden', !hasFluxSeed);
+      }
       if (transitionedState) {
         this.shareCopied = false;
         this.updateShareButtonLabel();
