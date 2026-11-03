@@ -4,6 +4,15 @@ All notable changes to **MagnaShot** are documented in this file.
 
 ## [Unreleased]
 
+## [1.9.4] - 2026-11-03
+
+### Fixed
+- **Cascade Drop Wave Stacking & Board Refill (`spawnCascadeDropWave`)**: Derived column positions from `cascadeCfg.dropCountPerWave`, searched upward from the lowest supported free row (`rIdx >= 0`) per platform column with ceiling and bond-support bounds so periodic waves never spawn unanchored midair spheres, added the `gameplay.feedback.wave.incoming` floating text popup, and refilled `initialDropRows` rows with a reset `cascadeTurnsUntilDrop` counter on board clear.
+- **Puzzle Mode Stage 4 Shelf Alignment, Locked Stage Cycling & Snapshot Queue Sync**: Lowered Stage 4 spheres in `configs/game.json` from `y: 192` to `y: 212` so all 3 spheres rest on the center shelf at frame 0 (`getAnchoredBallIds().size === 3`), clamped `UIManager.getSuggestedPuzzleStage()` to `unlockedStage` so cycling in Puzzle mode never enters locked stages, and synchronized `engine.puzzleQueue` with `engine.upcomingColorIds` in `applyRunSnapshot()`.
+- **Blitz 90s Wave Geometry, Snapshot Persistence & Survival Achievement Gate**: Updated `spawnEndlessRow()` and `spawnEndlessWave()` to read `columns`, `anchorColumns`, `startY`, and `descentStepY` (`34`) from `gameConfig.blitz` when in Blitz mode, persisted a run snapshot on periodic Blitz wave spawns, and gated the `survivorWave10` achievement unlock on `isSurvivalMode()`.
+- **Boss Rush Inner Guard Ring Respawn**: Respawned and bonded the inner rotor guard ring in `evaluateRoundEnd()` whenever the Boss Core is the only remaining sphere on the board (`balls.length === 1`) with shields remaining.
+- **Core Rescue HUD Progress Counter (`hud.stats.mode.coreRescueProgress`)**: Appended the localized Rescue Core progress suffix (`💎 {{rescued}}/{{total}}`) to `#hud-mode-banner` in `UIManager.refresh()` for Campaign and Puzzle stages using the `coreRescue` objective.
+
 ## [1.9.3] - 2026-11-03
 
 ### Fixed

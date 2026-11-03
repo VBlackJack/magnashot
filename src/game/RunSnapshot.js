@@ -351,7 +351,11 @@ export function applyRunSnapshot(engine, snapshot) {
   const savedQueue = snapshot.upcomingColorIds;
   const isValidQueue = Array.isArray(savedQueue) && savedQueue.every((color) => engine.activePalette.includes(color));
   engine.upcomingColorIds = isValidQueue ? [...savedQueue] : [];
-  engine.fillUpcomingColors();
+  if (snapshot.mode === GAME_MODES.PUZZLE) {
+    engine.puzzleQueue = engine.upcomingColorIds.map((colorId) => ({ colorId, specialType: null }));
+  } else {
+    engine.fillUpcomingColors();
+  }
   engine.state = GAME_STATES.PAUSED;
   world.aimCacheValid = false;
   engine.updateAimFromAngle(engine.aimAngle);

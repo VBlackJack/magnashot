@@ -884,7 +884,7 @@ export class GameEngine {
     }
 
     for (let row = 0; row < cascadeCfg.initialDropRows; row++) {
-      this.spawnCascadeDropWave(row);
+      this.spawnCascadeDropWave(0);
     }
     this.physicsWorld.rebuildInitialBonds();
     this.currentBall = this.createRandomLauncherBall();
@@ -901,30 +901,51 @@ export class GameEngine {
     const cascadeCfg = this.gameConfig.cascade;
     const centerX = this.gameConfig.canvas.logicalWidth * MATH_CONSTANTS.HALF;
     const r = this.physicsConfig.ball.radius;
+    const minWallY = this.gameConfig.canvas.wallMargin + r;
     const restDist = r * this.physicsConfig.simulation.bondRestDistanceFactor;
+    const maxBondDist = r * this.physicsConfig.simulation.bondCreationDistanceFactor;
+    const minClearance = r * cascadeCfg.overlapRadiusFactor;
+    const colCount = Math.max(1, cascadeCfg.dropCountPerWave || 1);
+    const halfCols = (colCount - 1) * MATH_CONSTANTS.HALF;
+    const minRow = Math.max(0, Math.floor(Number(rowIndex) || 0));
     const newBalls = [];
     for (const platSpec of cascadeCfg.platforms || []) {
       const platX = centerX + (platSpec.dx || 0);
       const baseTopY = platSpec.y - platSpec.height * MATH_CONSTANTS.HALF - r;
-      const spawnY = baseTopY - rowIndex * restDist;
-      for (const offsetIndex of [-1, 0, 1]) {
+      for (let colIdx = 0; colIdx < colCount; colIdx++) {
+        const offsetIndex = colIdx - halfCols;
         const spawnX = platX + offsetIndex * restDist;
-        const alreadyOccupied = this.physicsWorld.balls.some(
-          (b) => Math.hypot(b.x - spawnX, b.y - spawnY) < r * cascadeCfg.overlapRadiusFactor
-        );
-        if (alreadyOccupied) {
-          continue;
+        for (let rIdx = minRow; ; rIdx++) {
+          const spawnY = baseTopY - rIdx * restDist;
+          if (spawnY < minWallY) {
+            break;
+          }
+          if (rIdx > 0) {
+            const hasSupport = this.physicsWorld.balls.some(
+              (b) => b.y > spawnY && Math.hypot(b.x - spawnX, b.y - spawnY) <= maxBondDist
+            );
+            if (!hasSupport) {
+              break;
+            }
+          }
+          const alreadyOccupied = this.physicsWorld.balls.some(
+            (b) => Math.hypot(b.x - spawnX, b.y - spawnY) < minClearance
+          );
+          if (alreadyOccupied) {
+            continue;
+          }
+          const ball = this.createClusterBall({
+            x: spawnX,
+            y: spawnY,
+            radius: r,
+            colorId: this.pickPaletteColor(),
+            clusterModifier: this.rollEndlessModifier(),
+            isAnchor: false
+          });
+          this.physicsWorld.addBall(ball);
+          newBalls.push(ball);
+          break;
         }
-        const ball = this.createClusterBall({
-          x: spawnX,
-          y: spawnY,
-          radius: r,
-          colorId: this.pickPaletteColor(),
-          clusterModifier: this.rollEndlessModifier(),
-          isAnchor: false
-        });
-        this.physicsWorld.addBall(ball);
-        newBalls.push(ball);
       }
     }
     this.physicsWorld.rebuildInitialBonds();
@@ -1208,16 +1229,16 @@ export class GameEngine {
    * @returns {Array<import('../entities/Ball.js').Ball>} The balls created for the row.
    */
   spawnEndlessRow(y, parity, withAnchors, pickModifier) {
-    const endlessCfg = this.gameConfig.endless;
+    const waveCfg = this.mode === GAME_MODES.BLITZ ? this.gameConfig.blitz : this.gameConfig.endless;
     const r = this.physicsConfig.ball.radius;
-    const cols = endlessCfg.columns;
+    const cols = waveCfg.columns;
     const spacingX = r * this.physicsConfig.simulation.bondRestDistanceFactor;
     const totalW = (cols - 1) * spacingX;
     const startX = (this.gameConfig.canvas.logicalWidth - totalW) * MATH_CONSTANTS.HALF;
     const rowOffset = parity * r * MATH_CONSTANTS.HALF;
     const rowBalls = [];
     for (let col = 0; col < cols; col++) {
-      const isAnchor = withAnchors && endlessCfg.anchorColumns.includes(col);
+      const isAnchor = withAnchors && waveCfg.anchorColumns.includes(col);
       const ball = this.createClusterBall({
         x: startX + col * spacingX + rowOffset,
         y,
@@ -2010,6 +2031,7 @@ export class GameEngine {
         this.blitzWaveTimerFrames = blitzCfg.waveIntervalFrames;
         this.spawnEndlessWave();
         this.refreshStaleLauncherColors();
+        this.saveRunSnapshot();
         this.notifyUI();
       }
       if (!this.physicsWorld.projectile && this.physicsWorld.droppingBalls.length === 0) {
@@ -2755,9 +2777,15 @@ export class GameEngine {
       if (this.cascadeTurnsUntilDrop <= 0) {
         this.cascadeWave++;
         this.waveCount = this.cascadeWave;
-        this.spawnCascadeDropWave(1);
+        this.spawnCascadeDropWave(0);
         this.refreshStaleLauncherColors();
         this.cascadeTurnsUntilDrop = this.gameConfig.cascade.shotsBeforeDrop;
+        this.particleSystem.spawnFloatingText(
+          this.gameConfig.canvas.logicalWidth * MATH_CONSTANTS.HALF,
+          this.gameConfig.cascade.startY + this.gameConfig.canvas.wavePopupOffsetY,
+          t('gameplay.feedback.wave.incoming'),
+          this.gameConfig.theme.wavePopupColor
+        );
       }
     }
 
@@ -2803,33 +2831,36 @@ export class GameEngine {
 
   spawnEndlessWave() {
     const endlessCfg = this.gameConfig.endless;
+    const waveCfg = this.mode === GAME_MODES.BLITZ ? this.gameConfig.blitz : endlessCfg;
+    const descentStepY = waveCfg.descentStepY ?? endlessCfg.descentStepY;
+    const startY = waveCfg.startY ?? endlessCfg.startY;
     this.waveCount++;
     this.endlessRowParity = (this.endlessRowParity + 1) % 2;
 
     const previousAnchors = [];
     for (const obs of this.physicsWorld.obstacles) {
       if (obs.type === OBSTACLE_TYPES.PIVOT) {
-        obs.baseY += endlessCfg.descentStepY;
-        obs.y += endlessCfg.descentStepY;
-        obs.prevY += endlessCfg.descentStepY;
+        obs.baseY += descentStepY;
+        obs.y += descentStepY;
+        obs.prevY += descentStepY;
       }
     }
     for (const b of this.physicsWorld.balls) {
       if (b.pivotRef) {
-        b.y += endlessCfg.descentStepY;
-        b.prevY += endlessCfg.descentStepY;
-        b.anchorY += endlessCfg.descentStepY;
+        b.y += descentStepY;
+        b.prevY += descentStepY;
+        b.anchorY += descentStepY;
         continue;
       }
       if (b.isAnchor) {
         previousAnchors.push(b);
       }
       b.isAnchor = false;
-      b.y += endlessCfg.descentStepY;
-      b.anchorY += endlessCfg.descentStepY;
+      b.y += descentStepY;
+      b.anchorY += descentStepY;
     }
 
-    const cols = endlessCfg.columns;
+    const cols = waveCfg.columns ?? endlessCfg.columns;
     const waveType = this.getWaveType(this.waveCount);
     this.waveLog.push(waveType);
     const isBossWave = waveType === WAVE_TYPES.BOSS;
@@ -2837,7 +2868,7 @@ export class GameEngine {
     let remainingGoldCores = isGoldRushWave ? endlessCfg.goldRushCoinCoreCount : 0;
     let bossCorePlaced = false;
 
-    const newRowBalls = this.spawnEndlessRow(endlessCfg.startY, this.endlessRowParity, true, (col) => {
+    const newRowBalls = this.spawnEndlessRow(startY, this.endlessRowParity, true, (col) => {
       if (isBossWave && !bossCorePlaced && col >= Math.floor(cols * MATH_CONSTANTS.HALF)) {
         bossCorePlaced = true;
         return CLUSTER_MODIFIERS.BOSS_CORE;
@@ -2884,7 +2915,7 @@ export class GameEngine {
     if (this.mode === GAME_MODES.ENDLESS) {
       this.storageManager?.recordAchievementProgress?.({ endlessWave: this.waveCount });
     }
-    if (this.waveCount >= this.gameConfig.achievements.survivorWave10.threshold) {
+    if (this.isSurvivalMode() && this.waveCount >= this.gameConfig.achievements.survivorWave10.threshold) {
       this.checkAndUnlockAchievement('survivorWave10');
     }
 
@@ -2900,7 +2931,7 @@ export class GameEngine {
 
     this.particleSystem.spawnFloatingText(
       this.gameConfig.canvas.logicalWidth * MATH_CONSTANTS.HALF,
-      endlessCfg.startY + this.gameConfig.canvas.wavePopupOffsetY,
+      startY + this.gameConfig.canvas.wavePopupOffsetY,
       t(waveBannerKey),
       waveBannerColor
     );
@@ -3032,8 +3063,8 @@ export class GameEngine {
       }
       this.startOutOfShotsGraceIfNeeded();
     } else if (this.mode === GAME_MODES.BOSS_RUSH) {
-      const hasBoss = this.physicsWorld.balls.some((b) => b.clusterModifier === CLUSTER_MODIFIERS.BOSS_CORE);
-      if (!hasBoss) {
+      const bossBall = this.getBossBall();
+      if (!bossBall) {
         const bossRushCfg = this.gameConfig.bossRush;
         const canvasCfg = this.gameConfig.canvas;
         this.releaseRemainingBoardAsAvalanche();
@@ -3053,13 +3084,43 @@ export class GameEngine {
         this.refreshStaleLauncherColors();
         this.saveRunSnapshot({ force: true });
         this.notifyUI();
+      } else if (this.physicsWorld.balls.length === 1) {
+        const bossRushCfg = this.gameConfig.bossRush;
+        const r = this.physicsConfig.ball.radius;
+        const centralPivot = this.physicsWorld.obstacles.find((o) => o.type === OBSTACLE_TYPES.PIVOT) || null;
+        this.spawnConcentricRings(
+          bossBall.x,
+          bossBall.y,
+          [{ radius: r * bossRushCfg.innerRingRadiusFactor, count: bossRushCfg.innerRingCount }],
+          centralPivot,
+          this.gameConfig.endless.modifierWeights
+        );
+        for (const ball of this.physicsWorld.balls) {
+          if (ball.id !== bossBall.id) {
+            this.physicsWorld.createBond(bossBall, ball, false);
+          }
+        }
+        this.physicsWorld.rebuildInitialBonds();
+        this.refreshStaleLauncherColors();
       }
     } else if (this.mode === GAME_MODES.CASCADE) {
       if (this.physicsWorld.balls.length === 0) {
+        const cascadeCfg = this.gameConfig.cascade;
         this.cascadeWave++;
         this.waveCount = this.cascadeWave;
-        this.spawnCascadeDropWave(0);
+        this.cascadeTurnsUntilDrop = cascadeCfg.shotsBeforeDrop;
+        for (let row = 0; row < cascadeCfg.initialDropRows; row++) {
+          this.spawnCascadeDropWave(0);
+        }
         this.refreshStaleLauncherColors();
+        this.particleSystem.spawnFloatingText(
+          this.gameConfig.canvas.logicalWidth * MATH_CONSTANTS.HALF,
+          cascadeCfg.startY + this.gameConfig.canvas.wavePopupOffsetY,
+          t('gameplay.feedback.wave.incoming'),
+          this.gameConfig.theme.wavePopupColor
+        );
+        this.saveRunSnapshot();
+        this.notifyUI();
       }
     } else if ((this.isSurvivalMode() || this.mode === GAME_MODES.BLITZ) && this.physicsWorld.balls.length === 0) {
       this.spawnEndlessWave();

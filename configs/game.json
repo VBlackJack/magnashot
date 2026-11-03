@@ -436,9 +436,9 @@
         { "type": "platform", "dx": 0, "y": 240, "width": 120, "height": 16 }
       ],
       "balls": [
-        { "dx": -36, "y": 192, "colorId": "amber", "clusterModifier": "armored", "armorHits": 2 },
-        { "dx": 0, "y": 192, "colorId": "crimson", "clusterModifier": "rescueCore" },
-        { "dx": 36, "y": 192, "colorId": "crimson" }
+        { "dx": -36, "y": 212, "colorId": "amber", "clusterModifier": "armored", "armorHits": 2 },
+        { "dx": 0, "y": 212, "colorId": "crimson", "clusterModifier": "rescueCore" },
+        { "dx": 36, "y": 212, "colorId": "crimson" }
       ]
     },
     {

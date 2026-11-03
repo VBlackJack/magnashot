@@ -979,10 +979,10 @@ test('Arcade modes are accessible from both the main navigation bar and the rich
   };
   ui.engine = { mode: 'campaign', currentPuzzleStage: 1 };
   assert.equal(ui.getSuggestedPuzzleStage(), 3, 'Switching into Puzzle mode resumes at the best unlocked stage');
+  ui.engine = { mode: 'puzzle', currentPuzzleStage: 2 };
+  assert.equal(ui.getSuggestedPuzzleStage(), 3, 'Clicking Puzzle while already in Puzzle mode cycles to the next unlocked stage');
   ui.engine = { mode: 'puzzle', currentPuzzleStage: 3 };
-  assert.equal(ui.getSuggestedPuzzleStage(), 4, 'Clicking Puzzle while already in Puzzle mode cycles to the next stage');
-  ui.engine = { mode: 'puzzle', currentPuzzleStage: gameConfig.puzzles.length };
-  assert.equal(ui.getSuggestedPuzzleStage(), 1, 'Cycling past the final Puzzle stage wraps back to stage 1');
+  assert.equal(ui.getSuggestedPuzzleStage(), 1, 'Cycling past the highest unlocked Puzzle stage wraps back to stage 1');
 
   assert.match(levelsModal, /id="puzzle-stages-strip"[^>]*class="puzzle-stages-strip"/);
   assert.match(uiManagerCode, /style-preview-orb style-preview-\$\{styleId\}/);

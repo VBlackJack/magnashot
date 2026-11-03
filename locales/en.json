@@ -107,6 +107,7 @@
         "blitz": "Blitz 90s • {{seconds}}s",
         "bossRush": "Boss Rush • Wave {{wave}} (👑 {{shields}})",
         "cascade": "Cascade Drop • Wave {{wave}}",
+        "coreRescueProgress": "💎 {{rescued}}/{{total}}",
         "switchHint": "Click to change mode or level"
       },
       "shots": {

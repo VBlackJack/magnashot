@@ -987,3 +987,79 @@ test('Boss Rush Overcharge strikes the Titan and wave clear persists a snapshot'
   assert.ok(snapshot, 'Boss Rush wave clear force-saves a run snapshot');
   assert.equal(snapshot.engine.bossRushWave, 2);
 });
+
+test('Cascade Drop waves stack on platforms without detached floating spheres and refill on board clear', () => {
+  const engine = createTestEngine();
+  engine.startCascadeMode();
+  const initialCount = engine.physicsWorld.balls.length;
+  assert.ok(initialCount > 0);
+  assert.equal(
+    engine.physicsWorld.getAnchoredBallIds().size,
+    initialCount,
+    'all initial Cascade spheres are anchored to the platforms'
+  );
+
+  const spawned = engine.spawnCascadeDropWave(0);
+  assert.ok(spawned.length > 0, 'periodic Cascade drop wave spawns spheres onto existing columns');
+  const afterWaveCount = engine.physicsWorld.balls.length;
+  assert.equal(afterWaveCount, initialCount + spawned.length);
+  assert.equal(
+    engine.physicsWorld.getAnchoredBallIds().size,
+    afterWaveCount,
+    'periodic Cascade drop wave stacks onto existing rows without floating'
+  );
+
+  engine.physicsWorld.balls = [];
+  engine.physicsWorld.ballMap.clear();
+  engine.cascadeTurnsUntilDrop = 1;
+  engine.evaluateRoundEnd();
+  assert.equal(engine.state, GAME_STATES.PLAYING, 'Cascade continues on board clear instead of stalling');
+  assert.equal(engine.cascadeTurnsUntilDrop, gameConfig.cascade.shotsBeforeDrop);
+  assert.equal(engine.physicsWorld.balls.length, initialCount, 'empty Cascade board spawns a fresh multi-row wave');
+});
+
+test('Puzzle 4 initial spheres rest on the center shelf and RunSnapshot restores puzzleQueue', () => {
+  const engine = createTestEngine();
+  engine.startPuzzleMode(4);
+  assert.equal(engine.physicsWorld.balls.length, 3);
+  assert.equal(
+    engine.physicsWorld.getAnchoredBallIds().size,
+    3,
+    'Puzzle 4 initial spheres are supported by the shelf at frame 0'
+  );
+
+  engine.saveRunSnapshot({ force: true });
+  const restored = engine.restoreSavedRun();
+  assert.equal(restored, true);
+  assert.equal(
+    engine.puzzleQueue.length,
+    engine.upcomingColorIds.length,
+    'applyRunSnapshot synchronizes puzzleQueue with upcomingColorIds'
+  );
+});
+
+test('Blitz mode uses Blitz descent geometry and does not unlock Survival wave achievements', () => {
+  const engine = createTestEngine();
+  engine.startBlitzMode();
+  const minYBefore = Math.min(...engine.physicsWorld.balls.map((b) => b.y));
+  engine.waveCount = 9;
+  engine.spawnEndlessWave();
+  const maxYAfter = Math.max(...engine.physicsWorld.balls.map((b) => b.y));
+  assert.ok(maxYAfter >= minYBefore + gameConfig.blitz.descentStepY - 1, 'Blitz wave advances by blitz.descentStepY');
+  assert.equal(
+    Boolean(engine.storageManager.getUnlockedAchievements().survivorWave10),
+    false,
+    'Blitz wave 10 does not unlock the Survival wave 10 achievement'
+  );
+});
+
+test('Boss Rush respawns inner guard ring when only the Boss Core remains on the board', () => {
+  const engine = createTestEngine();
+  engine.startBossRushMode(1);
+  const boss = engine.physicsWorld.balls.find((b) => b.clusterModifier === CLUSTER_MODIFIERS.BOSS_CORE);
+  assert.ok(boss);
+  engine.physicsWorld.balls = [boss];
+  engine.physicsWorld.bonds = [];
+  engine.evaluateRoundEnd();
+  assert.ok(engine.physicsWorld.balls.length > 1, 'stranded Boss Core respawns its inner guard ring');
+});

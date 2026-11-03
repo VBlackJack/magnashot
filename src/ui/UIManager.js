@@ -20,6 +20,7 @@ import {
   GAME_STATES,
   INPUT_MODES,
   MATH_CONSTANTS,
+  OBJECTIVE_TYPES,
   SPECIAL_TYPES_ORDER
 } from '../core/Constants.js';
 import { i18n, t, formatNumber } from '../core/I18n.js';
@@ -2317,11 +2318,12 @@ export class UIManager {
    */
   getSuggestedPuzzleStage() {
     const totalPuzzles = Math.max(1, this.gameConfig?.puzzles?.length || 1);
-    if (this.engine?.mode === GAME_MODES.PUZZLE && this.engine.currentPuzzleStage >= 1) {
-      return (this.engine.currentPuzzleStage % totalPuzzles) + 1;
-    }
     const bestStage = this.storageManager?.getPuzzleBestStage?.() || 1;
-    return Math.min(totalPuzzles, Math.max(1, bestStage));
+    const unlockedStage = Math.min(totalPuzzles, Math.max(1, bestStage));
+    if (this.engine?.mode === GAME_MODES.PUZZLE && this.engine.currentPuzzleStage >= 1) {
+      return (Math.min(this.engine.currentPuzzleStage, unlockedStage) % unlockedStage) + 1;
+    }
+    return unlockedStage;
   }
 
   /** The level the select dialog puts forward: the one being played, else the furthest unlocked. */
@@ -2667,14 +2669,22 @@ export class UIManager {
 
     const warningShotsThreshold = this.gameConfig.canvas.survivalWaveWarningThreshold;
 
+    const coreRescueSuffix =
+      engine.currentObjective === OBJECTIVE_TYPES.CORE_RESCUE && engine.targetCoreCount > 0
+        ? ` • ${t('hud.stats.mode.coreRescueProgress', {
+            rescued: formatNumber(Math.min(engine.targetCoreCount, engine.rescuedCores || 0)),
+            total: formatNumber(engine.targetCoreCount)
+          })}`
+        : '';
+
     if (engine.mode === GAME_MODES.CAMPAIGN) {
       const lvl = engine.levelCatalog.summarize(engine.currentLevelId);
       setTextIfChanged(
         this.elements.modeBanner,
-        t('hud.stats.mode.campaign', {
+        `${t('hud.stats.mode.campaign', {
           level: engine.currentLevelId,
           name: lvl ? this.formatLevelName(lvl) : ''
-        })
+        })}${coreRescueSuffix}`
       );
       if (this.elements.shotsLabel) {
         setTextIfChanged(this.elements.shotsLabel, t('hud.stats.shots.label'));
@@ -2713,10 +2723,10 @@ export class UIManager {
     } else if (engine.mode === GAME_MODES.PUZZLE) {
       setTextIfChanged(
         this.elements.modeBanner,
-        t('hud.stats.mode.puzzle', {
+        `${t('hud.stats.mode.puzzle', {
           stage: engine.currentPuzzleStage,
           total: this.gameConfig.puzzles?.length || 1
-        })
+        })}${coreRescueSuffix}`
       );
       if (this.elements.shotsLabel) {
         setTextIfChanged(this.elements.shotsLabel, t('hud.stats.shots.label'));
