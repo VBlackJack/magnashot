@@ -120,14 +120,14 @@ const EMPTY_POWERUP_CLASS = 'is-empty';
 
 /** Mode buttons, keyed by the game mode each one starts. */
 const MODE_BUTTON_KEYS = Object.freeze({
-  [GAME_MODES.CAMPAIGN]: 'btnLevels',
-  [GAME_MODES.ENDLESS]: 'btnEndless',
-  [GAME_MODES.DAILY]: 'btnDaily',
-  [GAME_MODES.FLUX]: 'btnFlux',
-  [GAME_MODES.PUZZLE]: 'btnModePuzzle',
-  [GAME_MODES.BLITZ]: 'btnModeBlitz',
-  [GAME_MODES.BOSS_RUSH]: 'btnModeBossRush',
-  [GAME_MODES.CASCADE]: 'btnModeCascade'
+  [GAME_MODES.CAMPAIGN]: ['btnLevels'],
+  [GAME_MODES.ENDLESS]: ['btnEndless'],
+  [GAME_MODES.DAILY]: ['btnDaily'],
+  [GAME_MODES.FLUX]: ['btnFlux'],
+  [GAME_MODES.PUZZLE]: ['btnPuzzle', 'btnModePuzzle'],
+  [GAME_MODES.BLITZ]: ['btnBlitz', 'btnModeBlitz'],
+  [GAME_MODES.BOSS_RUSH]: ['btnBossRush', 'btnModeBossRush'],
+  [GAME_MODES.CASCADE]: ['btnCascade', 'btnModeCascade']
 });
 
 /** Pause modal hints that have one wording per input mode. */
@@ -430,6 +430,10 @@ export class UIManager {
       btnEndless: document.getElementById('btn-endless'),
       btnDaily: document.getElementById('btn-daily'),
       btnFlux: document.getElementById('btn-flux'),
+      btnPuzzle: document.getElementById('btn-puzzle'),
+      btnBlitz: document.getElementById('btn-blitz'),
+      btnBossRush: document.getElementById('btn-boss-rush'),
+      btnCascade: document.getElementById('btn-cascade'),
       btnShop: document.getElementById('btn-shop'),
       btnRestart: document.getElementById('btn-restart'),
       btnPause: document.getElementById('btn-pause'),
@@ -463,6 +467,10 @@ export class UIManager {
       btnModeBlitz: document.getElementById('btn-mode-blitz'),
       btnModeBossRush: document.getElementById('btn-mode-boss-rush'),
       btnModeCascade: document.getElementById('btn-mode-cascade'),
+      arcadeBestPuzzle: document.getElementById('arcade-best-puzzle'),
+      arcadeBestBlitz: document.getElementById('arcade-best-blitz'),
+      arcadeBestBossRush: document.getElementById('arcade-best-boss-rush'),
+      arcadeBestCascade: document.getElementById('arcade-best-cascade'),
       levelsStarsSummary: document.getElementById('levels-stars-summary'),
       btnLevelsFilterIncomplete: document.getElementById('btn-levels-filter-incomplete'),
       inputFluxSeed: document.getElementById('input-flux-seed'),
@@ -1211,33 +1219,52 @@ export class UIManager {
       this.submitFluxSeedInput();
     });
 
-    this.elements.btnModePuzzle?.addEventListener('click', () => {
-      this.requestDestructiveAction(() => {
-        this.hideAllModals();
-        this.engine.startPuzzleMode();
-      }, () => t('modals.levelSelect.arcade.puzzle'));
+    this.elements.modeBanner?.addEventListener('click', () => {
+      this.openLevelsModal();
     });
 
-    this.elements.btnModeBlitz?.addEventListener('click', () => {
-      this.requestDestructiveAction(() => {
-        this.hideAllModals();
-        this.engine.startBlitzMode();
-      }, () => t('modals.levelSelect.arcade.blitz'));
+    this.elements.modeBanner?.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        this.openLevelsModal();
+      }
     });
 
-    this.elements.btnModeBossRush?.addEventListener('click', () => {
-      this.requestDestructiveAction(() => {
-        this.hideAllModals();
-        this.engine.startBossRushMode();
-      }, () => t('modals.levelSelect.arcade.bossRush'));
-    });
+    for (const btn of [this.elements.btnPuzzle, this.elements.btnModePuzzle]) {
+      btn?.addEventListener('click', () => {
+        this.requestDestructiveAction(() => {
+          this.hideAllModals();
+          this.engine.startPuzzleMode();
+        }, () => t('modals.levelSelect.arcade.puzzle'));
+      });
+    }
 
-    this.elements.btnModeCascade?.addEventListener('click', () => {
-      this.requestDestructiveAction(() => {
-        this.hideAllModals();
-        this.engine.startCascadeMode();
-      }, () => t('modals.levelSelect.arcade.cascade'));
-    });
+    for (const btn of [this.elements.btnBlitz, this.elements.btnModeBlitz]) {
+      btn?.addEventListener('click', () => {
+        this.requestDestructiveAction(() => {
+          this.hideAllModals();
+          this.engine.startBlitzMode();
+        }, () => t('modals.levelSelect.arcade.blitz'));
+      });
+    }
+
+    for (const btn of [this.elements.btnBossRush, this.elements.btnModeBossRush]) {
+      btn?.addEventListener('click', () => {
+        this.requestDestructiveAction(() => {
+          this.hideAllModals();
+          this.engine.startBossRushMode();
+        }, () => t('modals.levelSelect.arcade.bossRush'));
+      });
+    }
+
+    for (const btn of [this.elements.btnCascade, this.elements.btnModeCascade]) {
+      btn?.addEventListener('click', () => {
+        this.requestDestructiveAction(() => {
+          this.hideAllModals();
+          this.engine.startCascadeMode();
+        }, () => t('modals.levelSelect.arcade.cascade'));
+      });
+    }
 
     this.elements.inputFluxSeed?.addEventListener('keydown', (e) => {
       if (e.key === 'Enter') {
@@ -2298,6 +2325,23 @@ export class UIManager {
     const suggestedLevelId = this.getSuggestedLevelId();
     this.syncLevelsFilterButton();
 
+    setTextIfChanged(
+      this.elements.arcadeBestPuzzle,
+      t('modals.levelSelect.card.bestScore', { score: formatNumber(this.storageManager.getPuzzleHighScore()) })
+    );
+    setTextIfChanged(
+      this.elements.arcadeBestBlitz,
+      t('modals.levelSelect.card.bestScore', { score: formatNumber(this.storageManager.getBlitzHighScore()) })
+    );
+    setTextIfChanged(
+      this.elements.arcadeBestBossRush,
+      t('modals.levelSelect.card.bestScore', { score: formatNumber(this.storageManager.getBossRushHighScore()) })
+    );
+    setTextIfChanged(
+      this.elements.arcadeBestCascade,
+      t('modals.levelSelect.card.bestScore', { score: formatNumber(this.storageManager.getCascadeHighScore()) })
+    );
+
     if (this.elements.levelsStarsSummary) {
       const totalStars = this.storageManager.getTotalStars();
       const maxCampaignStars = this.engine.levelCatalog.count * this.gameConfig.scoring.maxStars;
@@ -2437,15 +2481,17 @@ export class UIManager {
     this.elements.btnShop.classList.toggle('has-affordable', affordableCount > 0);
 
     // Only the mode being played stands out, and says so to screen readers.
-    for (const [mode, elementKey] of Object.entries(MODE_BUTTON_KEYS)) {
-      const button = this.elements[elementKey];
-      if (button) {
-        const isActive = engine.mode === mode;
-        button.classList.toggle('active-mode', isActive);
-        if (isActive) {
-          setAttributeIfChanged(button, 'aria-current', 'true');
-        } else {
-          button.removeAttribute('aria-current');
+    for (const [mode, elementKeys] of Object.entries(MODE_BUTTON_KEYS)) {
+      const isActive = engine.mode === mode;
+      for (const elementKey of elementKeys) {
+        const button = this.elements[elementKey];
+        if (button) {
+          button.classList.toggle('active-mode', isActive);
+          if (isActive) {
+            setAttributeIfChanged(button, 'aria-current', 'true');
+          } else {
+            button.removeAttribute('aria-current');
+          }
         }
       }
     }

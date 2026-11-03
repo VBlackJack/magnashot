@@ -949,3 +949,15 @@ test('resolveLevelFormatBadgeKey and LevelCatalog.summarize expose landmark and 
     'modals.levelSelect.card.formatBadge.twist'
   );
 });
+
+test('Arcade modes are accessible from both the main navigation bar and the rich cards in Modes & Level Select', () => {
+  const header = elementMarkup(indexHtml, 'app-drawer');
+  for (const id of ['btn-puzzle', 'btn-blitz', 'btn-boss-rush', 'btn-cascade']) {
+    assert.match(header, new RegExp(`id="${id}"[^>]*class="nav-btn mode-btn arcade-nav-btn"`));
+  }
+  const levelsModal = elementMarkup(indexHtml, 'modal-levels');
+  for (const id of ['btn-mode-puzzle', 'btn-mode-blitz', 'btn-mode-boss-rush', 'btn-mode-cascade']) {
+    assert.match(levelsModal, new RegExp(`id="${id}"[^>]*class="arcade-mode-card"`));
+  }
+  assert.match(indexHtml, /id="hud-mode-banner"[^>]*role="button"[^>]*tabindex="0"/);
+});

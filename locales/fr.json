@@ -106,7 +106,8 @@
         "puzzle": "Mode Puzzle • Niveau {{stage}} / {{total}}",
         "blitz": "Blitz 90s • {{seconds}} s",
         "bossRush": "Boss Rush • Vague {{wave}} (👑 {{shields}})",
-        "cascade": "Cascade • Vague {{wave}}"
+        "cascade": "Cascade • Vague {{wave}}",
+        "switchHint": "Cliquer pour changer de mode ou de niveau"
       },
       "shots": {
         "label": "Tirs restants",
@@ -384,7 +385,7 @@
   "modals": {
     "levelSelect": {
       "title": {
-        "main": "Sélection du Niveau"
+        "main": "Modes & Sélection du Niveau"
       },
       "starsTotal": "Étoiles de Campagne : {{stars}} / {{maxStars}} ★",
       "card": {
@@ -432,10 +433,15 @@
         "invalidHint": "Entrez une graine Flux valide de {{length}} caractères (lettres a-z et chiffres 0-9)."
       },
       "arcade": {
+        "sectionTitle": "Modes Arcade",
         "puzzle": "🎯 Puzzle",
+        "puzzleDesc": "5 défis à 1-2 tirs • Noyaux 💎",
         "blitz": "⏱ Blitz 90s",
+        "blitzDesc": "Chrono 90 s • Tirs illimités",
         "bossRush": "👑 Boss Rush",
-        "cascade": "⬇ Cascade"
+        "bossRushDesc": "Titan central • Surcharge -1 bouclier",
+        "cascade": "⬇ Cascade",
+        "cascadeDesc": "Puits haute gravité • Plateformes"
       }
     },
     "shop": {

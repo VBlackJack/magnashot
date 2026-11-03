@@ -418,6 +418,16 @@ body {
   font-weight: 700;
   color: var(--text-soft);
   text-align: center;
+  cursor: pointer;
+  border-radius: 6px;
+  padding: 2px 8px;
+  border: 1px solid transparent;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.hud-mode-banner:hover {
+  border-color: var(--accent-blue);
+  background: var(--accent-blue-alpha-14);
 }
 
 .hud-badges-row {
@@ -988,10 +998,71 @@ body {
   border-color: var(--accent-amber);
 }
 
+.arcade-modes-section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  background: var(--surface-sunken);
+  border: 1px solid var(--border-subtle);
+  border-radius: 10px;
+  padding: 8px 10px;
+}
+
+.arcade-modes-header {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-gold-soft);
+  text-align: left;
+}
+
 .arcade-modes-strip {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(145px, 1fr));
   gap: 6px;
+}
+
+.arcade-mode-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  padding: 6px 10px;
+  background: var(--surface-raised);
+  color: var(--text-main);
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
+}
+
+.arcade-mode-card:hover {
+  border-color: var(--accent-blue);
+}
+
+.arcade-mode-card.active-mode {
+  background: var(--accent-purple-alpha-38);
+  border-color: var(--accent-purple);
+  box-shadow: 0 0 10px var(--accent-purple-alpha-45);
+}
+
+.arcade-card-title {
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.arcade-card-desc {
+  font-size: 0.68rem;
+  color: var(--text-muted);
+  line-height: 1.25;
+}
+
+.arcade-card-best {
+  font-size: 0.68rem;
+  font-weight: 600;
 }
 
 .levels-grid {
@@ -2090,6 +2161,9 @@ body {
   }
   .nav-modes {
     grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+  .arcade-nav-btn {
+    display: none;
   }
   .nav-actions #btn-pause {
     flex-basis: auto;

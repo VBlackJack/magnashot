@@ -106,7 +106,8 @@
         "puzzle": "Puzzle Mode • Stage {{stage}} / {{total}}",
         "blitz": "Blitz 90s • {{seconds}}s",
         "bossRush": "Boss Rush • Wave {{wave}} (👑 {{shields}})",
-        "cascade": "Cascade Drop • Wave {{wave}}"
+        "cascade": "Cascade Drop • Wave {{wave}}",
+        "switchHint": "Click to change mode or level"
       },
       "shots": {
         "label": "Shots Left",
@@ -384,7 +385,7 @@
   "modals": {
     "levelSelect": {
       "title": {
-        "main": "Select Level"
+        "main": "Modes & Level Select"
       },
       "starsTotal": "Campaign Stars: {{stars}} / {{maxStars}} ★",
       "card": {
@@ -432,10 +433,15 @@
         "invalidHint": "Enter a valid {{length}}-character Flux seed (letters a-z and digits 0-9)."
       },
       "arcade": {
+        "sectionTitle": "Arcade Modes",
         "puzzle": "🎯 Puzzle",
+        "puzzleDesc": "5 trick-shot stages • Rescue Cores 💎",
         "blitz": "⏱ Blitz 90s",
+        "blitzDesc": "90s timer • Unlimited shots",
         "bossRush": "👑 Boss Rush",
-        "cascade": "⬇ Cascade"
+        "bossRushDesc": "Titan Core • Overcharge -1 shield",
+        "cascade": "⬇ Cascade",
+        "cascadeDesc": "High-gravity well • Platforms"
       }
     },
     "shop": {

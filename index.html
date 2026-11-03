@@ -67,6 +67,10 @@
           <button id="btn-endless" type="button" data-closes-drawer class="nav-btn mode-btn" data-i18n="app.nav.button.endless"></button>
           <button id="btn-daily" type="button" data-closes-drawer class="nav-btn mode-btn" data-i18n="app.nav.button.daily"></button>
           <button id="btn-flux" type="button" data-closes-drawer class="nav-btn mode-btn" data-i18n="app.nav.button.flux"></button>
+          <button id="btn-puzzle" type="button" data-closes-drawer class="nav-btn mode-btn arcade-nav-btn" data-i18n="modals.levelSelect.arcade.puzzle"></button>
+          <button id="btn-blitz" type="button" data-closes-drawer class="nav-btn mode-btn arcade-nav-btn" data-i18n="modals.levelSelect.arcade.blitz"></button>
+          <button id="btn-boss-rush" type="button" data-closes-drawer class="nav-btn mode-btn arcade-nav-btn" data-i18n="modals.levelSelect.arcade.bossRush"></button>
+          <button id="btn-cascade" type="button" data-closes-drawer class="nav-btn mode-btn arcade-nav-btn" data-i18n="modals.levelSelect.arcade.cascade"></button>
         </div>
         <div class="nav-group nav-actions" role="group" data-i18n-aria-label="app.nav.groups.round">
           <button id="btn-pause" type="button" data-closes-drawer class="nav-btn primary" data-i18n="app.nav.button.pause" data-i18n-title="app.nav.button.pauseTooltip"></button>
@@ -87,7 +91,7 @@
         <span id="hud-star-progress" class="hud-subvalue gold-text"><span id="hud-star-glyphs" class="hud-subvalue-part" aria-hidden="true"></span><span id="hud-star-count" class="visually-hidden"></span> <span id="hud-star-next" class="hud-subvalue-part"></span><span id="hud-star-meter" class="star-meter" role="progressbar" aria-valuemin="0" aria-valuemax="100" data-i18n-aria-label="hud.stats.score.progressAria"><span id="hud-star-meter-fill" class="star-meter-fill"></span></span></span>
       </div>
       <div class="hud-center-info">
-        <div id="hud-mode-banner" class="hud-mode-banner"></div>
+        <div id="hud-mode-banner" class="hud-mode-banner" role="button" tabindex="0" data-i18n-title="hud.stats.mode.switchHint"></div>
         <div class="hud-badges-row">
           <span id="hud-combo-badge" class="hud-badge combo hidden"></span>
           <span id="hud-frozen-badge" class="hud-badge frozen hidden"></span>
@@ -150,11 +154,30 @@
   <div id="modal-levels" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="modal-levels-title">
     <div class="modal-card wide">
       <h2 id="modal-levels-title" class="modal-title" data-i18n="modals.levelSelect.title.main"></h2>
-      <div class="arcade-modes-strip">
-        <button id="btn-mode-puzzle" type="button" class="nav-btn badge-btn" data-i18n="modals.levelSelect.arcade.puzzle"></button>
-        <button id="btn-mode-blitz" type="button" class="nav-btn badge-btn" data-i18n="modals.levelSelect.arcade.blitz"></button>
-        <button id="btn-mode-boss-rush" type="button" class="nav-btn badge-btn" data-i18n="modals.levelSelect.arcade.bossRush"></button>
-        <button id="btn-mode-cascade" type="button" class="nav-btn badge-btn" data-i18n="modals.levelSelect.arcade.cascade"></button>
+      <div class="arcade-modes-section">
+        <div class="arcade-modes-header" data-i18n="modals.levelSelect.arcade.sectionTitle"></div>
+        <div class="arcade-modes-strip">
+          <button id="btn-mode-puzzle" type="button" class="arcade-mode-card">
+            <span class="arcade-card-title" data-i18n="modals.levelSelect.arcade.puzzle"></span>
+            <span class="arcade-card-desc" data-i18n="modals.levelSelect.arcade.puzzleDesc"></span>
+            <span id="arcade-best-puzzle" class="arcade-card-best gold-text"></span>
+          </button>
+          <button id="btn-mode-blitz" type="button" class="arcade-mode-card">
+            <span class="arcade-card-title" data-i18n="modals.levelSelect.arcade.blitz"></span>
+            <span class="arcade-card-desc" data-i18n="modals.levelSelect.arcade.blitzDesc"></span>
+            <span id="arcade-best-blitz" class="arcade-card-best gold-text"></span>
+          </button>
+          <button id="btn-mode-boss-rush" type="button" class="arcade-mode-card">
+            <span class="arcade-card-title" data-i18n="modals.levelSelect.arcade.bossRush"></span>
+            <span class="arcade-card-desc" data-i18n="modals.levelSelect.arcade.bossRushDesc"></span>
+            <span id="arcade-best-boss-rush" class="arcade-card-best gold-text"></span>
+          </button>
+          <button id="btn-mode-cascade" type="button" class="arcade-mode-card">
+            <span class="arcade-card-title" data-i18n="modals.levelSelect.arcade.cascade"></span>
+            <span class="arcade-card-desc" data-i18n="modals.levelSelect.arcade.cascadeDesc"></span>
+            <span id="arcade-best-cascade" class="arcade-card-best gold-text"></span>
+          </button>
+        </div>
       </div>
       <div class="levels-toolbar">
         <p id="levels-stars-summary" class="modal-stat-line gold-text"></p>
