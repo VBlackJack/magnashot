@@ -2,10 +2,10 @@
 
 *Read this in [English](README.md).*
 
-[![Jouer en ligne](https://img.shields.io/badge/Jouer_en_ligne-GitHub_Pages-38bdf8?style=for-the-badge&logo=github)](https://vblackjack.github.io/flux-spheres/)
+[![Jouer en ligne](https://img.shields.io/badge/Jouer_en_ligne-GitHub_Pages-38bdf8?style=for-the-badge&logo=github)](https://vblackjack.github.io/magnashot/)
 [![Licence](https://img.shields.io/badge/Licence-Apache_2.0-blue.svg?style=for-the-badge)](http://www.apache.org/licenses/LICENSE-2.0)
 
-**Jeu en ligne :** [https://vblackjack.github.io/flux-spheres/](https://vblackjack.github.io/flux-spheres/)
+**Jeu en ligne :** [https://vblackjack.github.io/magnashot/](https://vblackjack.github.io/magnashot/)
 
 **MagnaShot** est un jeu de tir de bulles à physique magnétique, sans aucune dépendance externe à l'exécution : attraction et répulsion magnétiques dynamiques, rotors à inertie, portails quantiques, vortex de singularité et sphères spéciales.
 

@@ -911,7 +911,7 @@ test('parseFluxSeedInput extracts valid 6-char hex seeds from codes, #codes, URL
   assert.equal(parseFluxSeedInput('4F2A1C', seedConfig), '4f2a1c');
   assert.equal(parseFluxSeedInput('  #AB12CD ', seedConfig), 'ab12cd');
   assert.equal(
-    parseFluxSeedInput('https://vblackjack.github.io/flux-spheres/?flux=9E8D7C', seedConfig),
+    parseFluxSeedInput('https://vblackjack.github.io/magnashot/?flux=9E8D7C', seedConfig),
     '9e8d7c'
   );
   assert.equal(

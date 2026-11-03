@@ -2,10 +2,10 @@
 
 *Read this in [French](README.fr.md).*
 
-[![Play Online](https://img.shields.io/badge/Play_Online-GitHub_Pages-38bdf8?style=for-the-badge&logo=github)](https://vblackjack.github.io/flux-spheres/)
+[![Play Online](https://img.shields.io/badge/Play_Online-GitHub_Pages-38bdf8?style=for-the-badge&logo=github)](https://vblackjack.github.io/magnashot/)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg?style=for-the-badge)](http://www.apache.org/licenses/LICENSE-2.0)
 
-**Live Game:** [https://vblackjack.github.io/flux-spheres/](https://vblackjack.github.io/flux-spheres/)
+**Live Game:** [https://vblackjack.github.io/magnashot/](https://vblackjack.github.io/magnashot/)
 
 **MagnaShot** is a magnetic physics bubble shooter built with zero external runtime dependencies, featuring dynamic magnetic attraction and repulsion, inertia rotors, quantum portals, singularity vortices, and special power-up spheres.
 

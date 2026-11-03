@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to **MagnaShot** (formerly **FluxSpheres**) are documented in this file.
+All notable changes to **MagnaShot** are documented in this file.
 
 ## [Unreleased]
 
@@ -320,7 +320,7 @@ All notable changes to **MagnaShot** (formerly **FluxSpheres**) are documented i
 - **CI Workflow & Project Documentation**: Added GitHub Actions automated test workflow (`.github/workflows/ci.yml`), `LICENSE` (Apache 2.0), `CHANGELOG.md`, and architecture overview in `README.md`.
 
 ### Changed
-- **Service Worker Caching Strategy**: Switched `sw.js` to a network-first strategy with versioned offline cache fallback (`flux-spheres-cache-v1.2.0`) to prevent stale or mismatched ES module loads after deployments.
+- **Service Worker Caching Strategy**: Switched `sw.js` to a network-first strategy with versioned offline cache fallback (`magnashot-cache-v1.2.0`) to prevent stale or mismatched ES module loads after deployments.
 - **Collision-Free Spatial Hash Grid**: Replaced XOR prime hashing in `SpatialHashGrid` with an injective 2D integer pairing function so negative and positive cell coordinates never collide.
 - **In-Memory Upgrade Level Cache**: Cached parsed upgrade levels in `StorageManager` to eliminate `localStorage` + `JSON.parse` calls inside the 60 Hz physics and render loops.
 - **Date-Scoped Daily High Score**: Scoped `daily_best` to the active daily seed date key so each Daily Challenge tracks its own daily record.
@@ -334,4 +334,4 @@ All notable changes to **MagnaShot** (formerly **FluxSpheres**) are documented i
 ## [1.0.0] - 2026-10-26
 
 ### Added
-- Initial release of **FluxSpheres: Magnetic Physics Edition** with 16 Campaign levels, Survival mode, Daily Challenge, 5 Special Balls, 6 Cluster Modifiers, 7 Obstacle types, Web Audio synth effects, and FR/EN localization.
+- Initial release of **MagnaShot: Magnetic Physics Edition** with 16 Campaign levels, Survival mode, Daily Challenge, 5 Special Balls, 6 Cluster Modifiers, 7 Obstacle types, Web Audio synth effects, and FR/EN localization.
