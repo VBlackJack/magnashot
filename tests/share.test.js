@@ -69,7 +69,7 @@ test('The English share text lists challenge, mutator, wave, score, one symbol p
   const lines = buildDailyShareText(RUN, shareConfig).split('\n');
   const emoji = shareConfig.waveEmoji;
   assert.deepEqual(lines, [
-    `FluxSpheres - Daily #${DAYS_AFTER_EPOCH + 1} (${locales.en.gameplay.mutators.hyperGravity})`,
+    `MagnaShot - Daily #${DAYS_AFTER_EPOCH + 1} (${locales.en.gameplay.mutators.hyperGravity})`,
     `Wave 5 - ${formatNumber(RUN.score)} pts`,
     [emoji.normal, emoji.goldRush, emoji.normal, emoji.boss].join(''),
     shareConfig.url
@@ -79,7 +79,7 @@ test('The English share text lists challenge, mutator, wave, score, one symbol p
 test('The French share text uses French words and number grouping', () => {
   useLocale('fr');
   const lines = buildDailyShareText(RUN, shareConfig).split('\n');
-  assert.equal(lines[0], `FluxSpheres - Défi #${DAYS_AFTER_EPOCH + 1} (${locales.fr.gameplay.mutators.hyperGravity})`);
+  assert.equal(lines[0], `MagnaShot - Défi #${DAYS_AFTER_EPOCH + 1} (${locales.fr.gameplay.mutators.hyperGravity})`);
   assert.equal(lines[1], `Vague 5 - ${new Intl.NumberFormat('fr').format(RUN.score)} pts`);
   assert.equal(lines.at(-1), shareConfig.url);
 });
@@ -94,7 +94,7 @@ test('A long run shows the capped symbol row and counts the waves left out', () 
 
 test('A run lost before any wave has no symbol row, and a run without a mutator still gets a header', () => {
   const lines = buildDailyShareText({ ...RUN, mutatorKey: null, wave: 1, waveLog: [] }, shareConfig).split('\n');
-  assert.deepEqual(lines, [`FluxSpheres - Daily #${DAYS_AFTER_EPOCH + 1}`, 'Wave 1 - 48,300 pts', shareConfig.url]);
+  assert.deepEqual(lines, [`MagnaShot - Daily #${DAYS_AFTER_EPOCH + 1}`, 'Wave 1 - 48,300 pts', shareConfig.url]);
 });
 
 const SURVIVAL_RUN = Object.freeze({
@@ -193,7 +193,7 @@ test('Flux share text includes seed header and ?flux=<seed> link when seed is pr
   useLocale('en');
   const linesEn = buildShareText({ ...FLUX_RUN, seed: 'k9x4m2' }, shareConfig).split('\n');
   assert.deepEqual(linesEn, [
-    'FluxSpheres - Flux Mode (#k9x4m2)',
+    'MagnaShot - Flux Mode (#k9x4m2)',
     `Shape ${FLUX_RUN.stage} - ${formatNumber(FLUX_RUN.score)} pts`,
     buildFluxShareUrl(shareConfig.url, 'k9x4m2')
   ]);
@@ -201,7 +201,7 @@ test('Flux share text includes seed header and ?flux=<seed> link when seed is pr
   useLocale('fr');
   const linesFr = buildShareText({ ...FLUX_RUN, seed: 'k9x4m2' }, shareConfig).split('\n');
   assert.deepEqual(linesFr, [
-    'FluxSpheres - Mode Flux (#k9x4m2)',
+    'MagnaShot - Mode Flux (#k9x4m2)',
     `Forme ${FLUX_RUN.stage} - ${formatFrench(FLUX_RUN.score)} pts`,
     `${shareConfig.url}?flux=k9x4m2`
   ]);

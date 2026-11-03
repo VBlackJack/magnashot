@@ -1,4 +1,4 @@
-# FluxSpheres: Magnetic Physics Edition
+# MagnaShot: Magnetic Physics Edition
 
 *Read this in [French](README.fr.md).*
 
@@ -7,7 +7,7 @@
 
 **Live Game:** [https://vblackjack.github.io/flux-spheres/](https://vblackjack.github.io/flux-spheres/)
 
-**FluxSpheres** is a magnetic physics bubble shooter built with zero external runtime dependencies, featuring dynamic magnetic attraction and repulsion, inertia rotors, quantum portals, singularity vortices, and special power-up spheres.
+**MagnaShot** is a magnetic physics bubble shooter built with zero external runtime dependencies, featuring dynamic magnetic attraction and repulsion, inertia rotors, quantum portals, singularity vortices, and special power-up spheres.
 
 ---
 

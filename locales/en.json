@@ -2,7 +2,7 @@
   "app": {
     "header": {
       "title": {
-        "main": "FLUX SPHERES"
+        "main": "MAGNASHOT"
       },
       "subtitle": {
         "edition": "MAGNETIC PHYSICS EDITION",
@@ -933,18 +933,18 @@
   },
   "share": {
     "daily": {
-      "header": "FluxSpheres - Daily #{{number}} ({{mutator}})",
-      "headerNoMutator": "FluxSpheres - Daily #{{number}}",
+      "header": "MagnaShot - Daily #{{number}} ({{mutator}})",
+      "headerNoMutator": "MagnaShot - Daily #{{number}}",
       "stats": "Wave {{wave}} - {{score}} pts",
       "overflow": "+{{count}}"
     },
     "survival": {
-      "header": "FluxSpheres - Survival",
+      "header": "MagnaShot - Survival",
       "stats": "Wave {{wave}} - {{score}} pts"
     },
     "flux": {
-      "header": "FluxSpheres - Flux Mode",
-      "headerWithSeed": "FluxSpheres - Flux Mode (#{{seed}})",
+      "header": "MagnaShot - Flux Mode",
+      "headerWithSeed": "MagnaShot - Flux Mode (#{{seed}})",
       "stats": "Shape {{stage}} - {{score}} pts"
     },
     "feedback": {

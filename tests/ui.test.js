@@ -915,7 +915,7 @@ test('parseFluxSeedInput extracts valid 6-char hex seeds from codes, #codes, URL
     '9e8d7c'
   );
   assert.equal(
-    parseFluxSeedInput('Flux Spheres - Flux #1A2B3C\nStage 4 - 12,450 pts', seedConfig),
+    parseFluxSeedInput('MagnaShot - Flux Mode (#1A2B3C)\nShape 4 - 12,450 pts', seedConfig),
     '1a2b3c'
   );
   assert.equal(parseFluxSeedInput('not-a-seed', seedConfig), null);

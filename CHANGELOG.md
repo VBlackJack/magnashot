@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to **FluxSpheres** are documented in this file.
+All notable changes to **MagnaShot** (formerly **FluxSpheres**) are documented in this file.
 
 ## [Unreleased]
 

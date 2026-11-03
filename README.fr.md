@@ -1,4 +1,4 @@
-# FluxSpheres : édition Physique Magnétique
+# MagnaShot : édition Physique Magnétique
 
 *Read this in [English](README.md).*
 
@@ -7,7 +7,7 @@
 
 **Jeu en ligne :** [https://vblackjack.github.io/flux-spheres/](https://vblackjack.github.io/flux-spheres/)
 
-**FluxSpheres** est un jeu de tir de bulles à physique magnétique, sans aucune dépendance externe à l'exécution : attraction et répulsion magnétiques dynamiques, rotors à inertie, portails quantiques, vortex de singularité et sphères spéciales.
+**MagnaShot** est un jeu de tir de bulles à physique magnétique, sans aucune dépendance externe à l'exécution : attraction et répulsion magnétiques dynamiques, rotors à inertie, portails quantiques, vortex de singularité et sphères spéciales.
 
 ---
 
