@@ -98,6 +98,7 @@
   --install-hint-width: 32ch;
   /* Fade of the tutorial hint while a finger rests on the board (portrait phones). */
   --tutorial-fade: 120ms;
+  --tutorial-bottom: 18%;
 }
 
 /* Hints written for one input mode only (the root carries data-input). */
@@ -1117,7 +1118,7 @@ body {
 }
 
 .style-preview-classic {
-  background: radial-gradient(circle at 32% 30%, var(--text-main), var(--accent-blue) 60%, var(--bg-darker));
+  background: radial-gradient(circle at 32% 30%, var(--text-main), var(--accent-blue) 60%, var(--bg-dark));
 }
 
 .style-preview-crystal {
@@ -1132,12 +1133,12 @@ body {
 }
 
 .style-preview-neon {
-  background: radial-gradient(circle, var(--bg-darker) 52%, var(--accent-blue) 68%, var(--accent-purple));
+  background: radial-gradient(circle, var(--bg-dark) 52%, var(--accent-blue) 68%, var(--accent-purple));
   border-color: var(--accent-blue);
 }
 
 .style-preview-metallic {
-  background: linear-gradient(135deg, var(--text-main), var(--text-muted) 48%, var(--bg-darker));
+  background: linear-gradient(135deg, var(--text-main), var(--text-muted) 48%, var(--bg-dark));
   border: 2px double var(--text-main);
 }
 

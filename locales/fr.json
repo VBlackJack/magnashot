@@ -650,7 +650,7 @@
           },
           "bossSlayer": {
             "name": "Briseur de Couronne",
-            "description": "Détruire un Noyau Boss (👑) en Campagne, Survie ou Mode Flux."
+            "description": "Détruire un Noyau Boss (👑) en Campagne, Survie, Mode Flux ou Boss Rush."
           },
           "sharpshooter": {
             "name": "Tir de Précision",

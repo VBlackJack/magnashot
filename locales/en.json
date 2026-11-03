@@ -650,7 +650,7 @@
           },
           "bossSlayer": {
             "name": "Crown Breaker",
-            "description": "Destroy a Boss Core (👑) in Campaign, Survival or Flux Mode."
+            "description": "Destroy a Boss Core (👑) in Campaign, Survival, Flux Mode or Boss Rush."
           },
           "sharpshooter": {
             "name": "Sharpshooter",

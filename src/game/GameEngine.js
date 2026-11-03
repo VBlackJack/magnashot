@@ -461,6 +461,7 @@ export class GameEngine {
     if (
       upgradeKey === 'startingShots' &&
       this.usesShotBudget() &&
+      this.mode !== GAME_MODES.PUZZLE &&
       (this.state === GAME_STATES.PLAYING || this.state === GAME_STATES.PAUSED)
     ) {
       const shotsBonus = this.gameConfig.upgrades?.startingShots?.shotsPerLevel || 0;
@@ -636,10 +637,11 @@ export class GameEngine {
       return;
     }
     const cleanStage = Math.max(1, Math.floor(Number(stageIndex) || 1));
-    const puzzleDef = puzzles[(cleanStage - 1) % puzzles.length];
+    const boundedStage = ((cleanStage - 1) % puzzles.length) + 1;
+    const puzzleDef = puzzles[boundedStage - 1];
 
     this.resetRunState(GAME_MODES.PUZZLE);
-    this.currentPuzzleStage = cleanStage;
+    this.currentPuzzleStage = boundedStage;
     this.currentObjective = puzzleDef.objective || OBJECTIVE_TYPES.CLEAR_ALL;
     this.shotsRemaining = puzzleDef.shots;
     this.specialInventory = { ...puzzleDef.specialInventory };
@@ -1589,7 +1591,13 @@ export class GameEngine {
   }
 
   swapLauncherBalls() {
-    if (this.state !== GAME_STATES.PLAYING || this.physicsWorld.projectile || !this.currentBall || !this.nextBall) {
+    if (
+      this.state !== GAME_STATES.PLAYING ||
+      this.physicsWorld.projectile ||
+      !this.currentBall ||
+      !this.nextBall ||
+      (this.mode === GAME_MODES.PUZZLE && this.shotsRemaining <= 1)
+    ) {
       return;
     }
     const temp = this.currentBall;
@@ -2008,6 +2016,13 @@ export class GameEngine {
         this.blitzIdleFrames++;
         if (this.blitzIdleFrames >= blitzCfg.autoFireFrames) {
           this.blitzIdleFrames = 0;
+          const canvasCfg = this.gameConfig.canvas;
+          this.particleSystem.spawnFloatingText(
+            canvasCfg.launcherX,
+            canvasCfg.launcherY + canvasCfg.launcherPopupOffsetY,
+            t('gameplay.feedback.blitz.autoFire'),
+            theme.wavePopupColor
+          );
           this.shoot();
         }
       }
@@ -2637,6 +2652,13 @@ export class GameEngine {
         const bossBall = this.physicsWorld.balls.find((b) => b.clusterModifier === CLUSTER_MODIFIERS.BOSS_CORE);
         if (bossBall) {
           const bossSpec = this.ballsConfig.clusterModifiers.bossCore;
+          const canvasCfg = this.gameConfig.canvas;
+          this.particleSystem.spawnFloatingText(
+            bossBall.x,
+            bossBall.y - bossBall.radius + canvasCfg.floatingTextOffsetY,
+            t('gameplay.feedback.bossRush.overchargeStrike'),
+            this.gameConfig.theme.overchargePopupColor
+          );
           const destroyed = this.destroyClusterBall(bossBall, bossSpec.ringColor, false);
           if (destroyed) {
             this.evaluateRoundEnd();
@@ -2665,7 +2687,8 @@ export class GameEngine {
   takeUpcomingColor() {
     if (this.mode === GAME_MODES.PUZZLE) {
       const nextSpec = this.puzzleQueue.shift();
-      return nextSpec?.colorId || this.upcomingColorIds.shift() || this.activePalette[0];
+      const nextColor = this.upcomingColorIds.shift();
+      return nextSpec?.colorId || nextColor || this.activePalette[0];
     }
     const color = this.upcomingColorIds.shift() || this.pickLauncherColor();
     this.fillUpcomingColors();
@@ -3012,15 +3035,24 @@ export class GameEngine {
       const hasBoss = this.physicsWorld.balls.some((b) => b.clusterModifier === CLUSTER_MODIFIERS.BOSS_CORE);
       if (!hasBoss) {
         const bossRushCfg = this.gameConfig.bossRush;
+        const canvasCfg = this.gameConfig.canvas;
         this.releaseRemainingBoardAsAvalanche();
         const waveBonus = bossRushCfg.waveClearBonusBase * this.bossRushWave;
         this.addScore(waveBonus);
         this.awardRunCoins(bossRushCfg.waveClearCoinBonus);
+        this.particleSystem.spawnFloatingText(
+          canvasCfg.logicalWidth * MATH_CONSTANTS.HALF,
+          canvasCfg.logicalHeight * MATH_CONSTANTS.HALF,
+          t('gameplay.feedback.bossRush.waveCleared', { points: waveBonus }),
+          this.gameConfig.theme.victoryPopupColor
+        );
         this.bossRushWave++;
         this.waveCount = this.bossRushWave;
         this.persistRunHighScore();
         this.spawnBossRushWave();
         this.refreshStaleLauncherColors();
+        this.saveRunSnapshot({ force: true });
+        this.notifyUI();
       }
     } else if (this.mode === GAME_MODES.CASCADE) {
       if (this.physicsWorld.balls.length === 0) {
@@ -3089,6 +3121,7 @@ export class GameEngine {
     return Boolean(
       this.state === GAME_STATES.GAME_OVER
       && this.usesShotBudget()
+      && this.mode !== GAME_MODES.PUZZLE
       && this.gameOverSummary?.reasonKey === GAME_OVER_REASONS.OUT_OF_SHOTS
       && !this.hasUsedContinue
       && this.physicsWorld.balls.length > 0

@@ -182,7 +182,8 @@ export function renderWorkshopContents() {
     ammoGrid.replaceChildren();
     // Ammo is stocked into the current run, so it cannot be bought between runs or in Puzzle mode.
     const isPuzzleRun = this.engine.mode === GAME_MODES.PUZZLE && this.isRunActive();
-    const canBuyAmmo = this.isRunActive() && !isPuzzleRun;
+    const canBuyAmmo =
+      typeof this.canBuySpecialAmmo === 'function' ? this.canBuySpecialAmmo() : this.isRunActive() && !isPuzzleRun;
     for (let slotIndex = 0; slotIndex < SPECIAL_TYPES_ORDER.length; slotIndex++) {
       const type = SPECIAL_TYPES_ORDER[slotIndex];
       const spec = this.ballsConfig.specialTypes[type];

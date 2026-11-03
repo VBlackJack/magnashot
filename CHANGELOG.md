@@ -4,6 +4,14 @@ All notable changes to **MagnaShot** are documented in this file.
 
 ## [Unreleased]
 
+## [1.9.3] - 2026-11-03
+
+### Fixed
+- **Workshop Ball Style Preview Orbs (`.style-preview-*`)**: Replaced the undefined `--bg-darker` CSS custom property with `--bg-dark` on the `Classic`, `Neon`, and `Metallic` style preview orbs, declared a default `--tutorial-bottom` in `:root`, and extended the repository CSS variable guard in `tests/ui.test.js` to assert that every referenced `var(--*)` token is declared in `styles/main.css`.
+- **Puzzle Mode Special Ammo & HUD Shortcuts (`canBuySpecialAmmo`)**: Excluded `GAME_MODES.PUZZLE` from HUD special-ammo purchase affordances and `Digit1`-`Digit7` shortcut handlers so empty slots remain disabled with accurate screen-reader labels instead of opening the locked Ammo tab.
+- **Puzzle Mode Fixed-Shot Budget Enforcement**: Excluded `GAME_MODES.PUZZLE` from mid-run `startingShots` Workshop upgrades (`applyUpgradePurchase`) and Game Over Second Chance offers (`canContinueOutOfShots`), clamped `currentPuzzleStage` in `startPuzzleMode`, synchronized `upcomingColorIds` in `takeUpcomingColor`, and hid the launcher `nextBall` preview and swap control on 1-shot Puzzle stages.
+- **Arcade Mode Feedback Popups & Boss Rush Persistence**: Wired the `gameplay.feedback.blitz.autoFire`, `gameplay.feedback.bossRush.overchargeStrike`, and `gameplay.feedback.bossRush.waveCleared` floating text popups in `GameEngine.js`, forced a `saveRunSnapshot({ force: true })` and `notifyUI()` on Boss Rush wave clear, and updated the `bossSlayer` achievement description in both locales to include `Boss Rush`.
+
 ## [1.9.2] - 2026-11-03
 
 ### Added

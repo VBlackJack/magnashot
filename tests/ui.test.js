@@ -556,7 +556,7 @@ test('the scroll containers of the level select leave room for the whole focus r
   assert.ok(chapters.every((side) => side >= ring), `.level-chapters padding ${chapters} under ${ring}px`);
 });
 
-test('every custom property defined in main.css is used somewhere', () => {
+test('every custom property defined in main.css is used somewhere, and every referenced one is defined', () => {
   const rawCss = readFileSync('./styles/main.css', 'utf8');
   const consumers = [
     rawCss,
@@ -569,6 +569,9 @@ test('every custom property defined in main.css is used somewhere', () => {
   // Names hold only word characters and hyphens, so they need no escaping in a pattern.
   const unused = [...defined].filter((name) => !new RegExp(`var\\(${name}\\s*[,)]`).test(consumers));
   assert.deepEqual(unused, []);
+  const referencedInCss = new Set([...mainCss.matchAll(/var\(\s*(--[\w-]+)/g)].map((match) => match[1]));
+  const undefinedInCss = [...referencedInCss].filter((name) => !defined.has(name));
+  assert.deepEqual(undefinedInCss, [], 'every var(--*) in styles/main.css must be defined in styles/main.css');
 });
 
 test('the in-app and the system high contrast themes declare the same tokens', () => {
@@ -616,11 +619,17 @@ test('Codex documents cluster modifiers, obstacles, special balls, and daily mut
   }
 });
 
-test('Digit1-Digit6 shortcut opens Workshop Ammo tab when pressing an empty special slot during a run', () => {
+test('Digit1-Digit6 shortcut opens Workshop Ammo tab when pressing an empty special slot during a run (except Puzzle)', () => {
   assert.match(
     uiManagerCode,
-    /if \(count <= 0 && !isEquipped && this\.engine\.offersSpecialBalls\?\.\(\) && this\.isRunActive\(\)\) \{\s*this\.openShopModal\(SHOP_TABS\.AMMO\);/
+    /if \(count <= 0 && !isEquipped && this\.engine\.offersSpecialBalls\?\.\(\) && this\.canBuySpecialAmmo\(\)\) \{\s*this\.openShopModal\(SHOP_TABS\.AMMO\);/
   );
+  const ui = Object.create(UIManager.prototype);
+  ui.isRunActive = () => true;
+  ui.engine = { mode: 'campaign' };
+  assert.equal(ui.canBuySpecialAmmo(), true);
+  ui.engine = { mode: 'puzzle' };
+  assert.equal(ui.canBuySpecialAmmo(), false, 'Puzzle mode locks special ammo refills');
 });
 
 test('rerenderShopKeepingFocus keeps focus at or after the upgraded slot index when an upgrade reaches MAX', () => {

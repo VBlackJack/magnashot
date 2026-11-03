@@ -1585,7 +1585,10 @@ export class Renderer {
       }
     }
 
-    if (engineState.nextBall) {
+    if (
+      engineState.nextBall &&
+      !(engineState.mode === GAME_MODES.PUZZLE && engineState.shotsRemaining <= 1)
+    ) {
       const nx = lx + canvasCfg.nextBallOffsetX;
       const ny = ly + canvasCfg.nextBallOffsetY;
       ctx.save();

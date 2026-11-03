@@ -1480,7 +1480,7 @@ export class UIManager {
           const type = SPECIAL_TYPES_ORDER[idx];
           const count = this.engine.specialInventory?.[type] || 0;
           const isEquipped = this.engine.currentBall?.specialType === type;
-          if (count <= 0 && !isEquipped && this.engine.offersSpecialBalls?.() && this.isRunActive()) {
+          if (count <= 0 && !isEquipped && this.engine.offersSpecialBalls?.() && this.canBuySpecialAmmo()) {
             this.openShopModal(SHOP_TABS.AMMO);
           } else {
             this.engine.equipSpecialBall(type);
@@ -2306,6 +2306,11 @@ export class UIManager {
     return this.engine.mode === GAME_MODES.CAMPAIGN && this.isRunActive();
   }
 
+  /** True when the current run accepts special-ammo refills from the Workshop. */
+  canBuySpecialAmmo() {
+    return this.isRunActive() && this.engine.mode !== GAME_MODES.PUZZLE;
+  }
+
   /**
    * Puzzle stage launched from navigation: advances to the next stage when already in
    * Puzzle mode, otherwise resumes at the highest unlocked stage.
@@ -2898,7 +2903,7 @@ export class UIManager {
     this.elements.powerupsEmpty?.classList.toggle('hidden', offersSpecialBalls);
 
     const buttons = this.elements.powerupsContainer.querySelectorAll('.powerup-btn');
-    const canBuyAmmo = this.isRunActive();
+    const canBuyAmmo = this.canBuySpecialAmmo();
     for (const btn of buttons) {
       const type = btn.dataset.specialType;
       const count = engine.specialInventory[type] || 0;

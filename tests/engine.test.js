@@ -949,3 +949,41 @@ test('gameOverSummary records remainingSpheres and detects isNewRecord before pe
   assert.equal(engine.gameOverSummary.isNewRecord, true, 'beating existing Endless high score sets isNewRecord');
   assert.equal(engine.storageManager.getEndlessHighScore(), 2500);
 });
+
+
+test('Puzzle mode enforces fixed shot budget, clamps stage index, and blocks continues and 1-shot swaps', () => {
+  const engine = createTestEngine();
+  const totalPuzzles = gameConfig.puzzles.length;
+  engine.startPuzzleMode(totalPuzzles + 2);
+  assert.equal(engine.currentPuzzleStage, 2, 'stage index wraps into [1..puzzles.length]');
+  assert.equal(engine.shotsRemaining, 1, 'Puzzle stage 2 starts with 1 shot');
+
+  engine.applyUpgradePurchase('startingShots');
+  assert.equal(engine.shotsRemaining, 1, 'startingShots upgrade does not alter Puzzle shot budget');
+
+  engine.currentBall.colorId = 'crimson';
+  engine.nextBall.colorId = 'cobalt';
+  engine.swapLauncherBalls();
+  assert.equal(engine.currentBall.colorId, 'crimson', 'swapLauncherBalls is ignored on a 1-shot puzzle');
+
+  engine.triggerGameOver('outOfShots');
+  assert.equal(engine.canContinueOutOfShots(), false, 'Puzzle mode refuses out-of-shots continue pack');
+});
+
+test('Boss Rush Overcharge strikes the Titan and wave clear persists a snapshot', () => {
+  const engine = createTestEngine();
+  engine.startBossRushMode(1);
+  const boss = engine.physicsWorld.balls.find((b) => b.clusterModifier === CLUSTER_MODIFIERS.BOSS_CORE);
+  assert.ok(boss, 'Boss Rush wave 1 spawns a Boss Core');
+  const initialArmor = boss.armorHits;
+  engine.addOvercharge(gameConfig.scoring.overchargeMax);
+  assert.equal(boss.armorHits, initialArmor - 1, '100% Overcharge strikes the Boss Core for 1 shield');
+
+  while (engine.bossRushWave === 1) {
+    engine.addOvercharge(gameConfig.scoring.overchargeMax);
+  }
+  assert.equal(engine.bossRushWave, 2, 'shattering the Titan advances to Boss Rush wave 2');
+  const snapshot = engine.storageManager.loadRunSnapshot();
+  assert.ok(snapshot, 'Boss Rush wave clear force-saves a run snapshot');
+  assert.equal(snapshot.engine.bossRushWave, 2);
+});

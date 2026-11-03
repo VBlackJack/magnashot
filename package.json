@@ -1,6 +1,6 @@
 {
   "name": "magnashot",
-  "version": "1.9.2",
+  "version": "1.9.3",
   "description": "Magnetic physics bubble shooter game",
   "engines": {
     "node": ">=22"
