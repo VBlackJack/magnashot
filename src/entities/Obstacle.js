@@ -70,6 +70,8 @@ export class Obstacle {
     this.oscillatePhase = 0;
     this.fieldRadius = fromDef('fieldRadius');
     this.force = fromDef('force');
+    this.clusterRepelForce = fromDef('clusterRepelForce');
+    this.supportFriction = fromDef('supportFriction');
     this.captureRadius = fromDef('captureRadius');
     this.pullRadius = fromDef('pullRadius');
     this.pullForce = fromDef('pullForce');
@@ -135,7 +137,10 @@ export class Obstacle {
     } else if (this.type === OBSTACLE_TYPES.PORTAL || this.type === OBSTACLE_TYPES.SINGULARITY) {
       this.angle += this.spinSpeed;
     }
-    if (this.type === OBSTACLE_TYPES.BARRIER && (this.oscillateRangeX > 0 || this.oscillateRangeY > 0)) {
+    if (
+      (this.type === OBSTACLE_TYPES.BARRIER || this.type === OBSTACLE_TYPES.PLATFORM)
+      && (this.oscillateRangeX > 0 || this.oscillateRangeY > 0)
+    ) {
       this.oscillatePhase += this.oscillateSpeed;
       const sinPhase = Math.sin(this.oscillatePhase);
       if (this.oscillateRangeX > 0) {

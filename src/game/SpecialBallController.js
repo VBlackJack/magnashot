@@ -61,6 +61,9 @@ export class SpecialBallController {
     if (specialType === SPECIAL_TYPES.ROCKET) {
       return this.triggerRocket(ball, specs, physicsWorld, particleSystem, audioManager, destroyBallFn);
     }
+    if (specialType === SPECIAL_TYPES.BRUSH) {
+      return this.triggerBrush(ball, specs, physicsWorld, particleSystem, audioManager, radiusMultiplier);
+    }
 
     return { destroyed: [], scoreDelta: 0, freezeTurns: 0 };
   }
@@ -191,6 +194,86 @@ export class SpecialBallController {
     );
     audioManager.playEffect('snap');
     return { painted, scoreDelta: painted.length * specs.pointsPerBall };
+  }
+
+  /**
+   * Repaints spheres within the Brush radius into a single unifying color (and scrubs
+   * rust off rusted spheres), then queues them for delayed chain matching.
+   */
+  triggerBrush(ball, specs, physicsWorld, particleSystem, audioManager, radiusMultiplier) {
+    const paintRadius = ball.radius * specs.paintRadiusFactor * radiusMultiplier;
+    if (physicsWorld.ballMap.has(ball.id)) {
+      physicsWorld.removeBall(ball);
+    }
+
+    const targetsInRadius = [];
+    const colorCounts = new Map();
+    for (const target of physicsWorld.balls) {
+      if (target.id === ball.id || target.specialType) {
+        continue;
+      }
+      const isRust = target.clusterModifier === CLUSTER_MODIFIERS.RUST;
+      if (!target.colorId && !isRust) {
+        continue;
+      }
+      if (Math.hypot(target.x - ball.x, target.y - ball.y) <= paintRadius) {
+        targetsInRadius.push(target);
+        if (target.colorId) {
+          colorCounts.set(target.colorId, (colorCounts.get(target.colorId) || 0) + 1);
+        }
+      }
+    }
+
+    let targetColor = ball.colorId || null;
+    if (!targetColor) {
+      let bestCount = 0;
+      for (const [colorId, count] of colorCounts.entries()) {
+        if (count > bestCount) {
+          bestCount = count;
+          targetColor = colorId;
+        }
+      }
+    }
+    if (!targetColor) {
+      for (const other of physicsWorld.balls) {
+        if (other.colorId) {
+          targetColor = other.colorId;
+          break;
+        }
+      }
+    }
+    if (!targetColor) {
+      targetColor = this.ballsConfig.standardColors[0]?.id || null;
+    }
+
+    const painted = [];
+    if (targetColor) {
+      for (const target of targetsInRadius) {
+        const isRust = target.clusterModifier === CLUSTER_MODIFIERS.RUST;
+        if (isRust) {
+          target.clusterModifier = null;
+        }
+        target.colorId = targetColor;
+        physicsWorld.pendingChainCandidateIds.add(target.id);
+        painted.push(target);
+      }
+    }
+
+    particleSystem.spawnShockwave(ball.x, ball.y, specs.highlight, paintRadius);
+    particleSystem.spawnBurst(ball.x, ball.y, specs.highlight, specs.burstCount, specs.burstSpeed);
+    particleSystem.spawnFloatingText(
+      ball.x,
+      ball.y + this.gameConfig.canvas.floatingTextOffsetY,
+      t('gameplay.feedback.special.brush', { count: painted.length }),
+      specs.highlight
+    );
+    audioManager.playEffect('snap');
+    return {
+      destroyed: [],
+      painted,
+      scoreDelta: painted.length * specs.pointsPerBall,
+      freezeTurns: 0
+    };
   }
 
   triggerLightning(ball, specs, physicsWorld, particleSystem, audioManager, radiusMultiplier, destroyBallFn) {

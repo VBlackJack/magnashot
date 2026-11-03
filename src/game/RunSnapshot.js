@@ -34,6 +34,7 @@ const ENGINE_SCALAR_FIELDS = [
   'chainCooldown',
   'outOfShotsGraceFrames',
   'hasFiredInRound',
+  'hasUsedContinue',
   'bossesDestroyedInRun',
   'activeDiscoveryId',
   'discoveryTurnCount',

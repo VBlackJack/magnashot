@@ -178,6 +178,7 @@
       <div class="modal-tabs" role="tablist">
         <button id="tab-shop-upgrades" type="button" class="modal-tab active" role="tab" aria-selected="true" aria-controls="shop-upgrades-pane" tabindex="0" data-i18n="modals.shop.tabs.upgrades"></button>
         <button id="tab-shop-ammo" type="button" class="modal-tab" role="tab" aria-selected="false" aria-controls="shop-ammo-pane" tabindex="-1" data-i18n="modals.shop.tabs.ammo"></button>
+        <button id="tab-shop-styles" type="button" class="modal-tab" role="tab" aria-selected="false" aria-controls="shop-styles-pane" tabindex="-1" data-i18n="modals.shop.tabs.styles"></button>
         <button id="tab-shop-achievements" type="button" class="modal-tab" role="tab" aria-selected="false" aria-controls="achievements-grid" tabindex="-1"></button>
         <button id="tab-shop-codex" type="button" class="modal-tab" role="tab" aria-selected="false" aria-controls="codex-pane" tabindex="-1" data-i18n="modals.shop.tabs.codex"></button>
       </div>
@@ -187,6 +188,9 @@
       <div id="shop-ammo-pane" class="shop-pane hidden" role="tabpanel" aria-labelledby="tab-shop-ammo">
         <h3 class="modal-subtitle" data-i18n="modals.shop.specialAmmo.title"></h3>
         <div id="shop-ammo-grid" class="ammo-shop-grid"></div>
+      </div>
+      <div id="shop-styles-pane" class="shop-pane hidden" role="tabpanel" aria-labelledby="tab-shop-styles">
+        <div id="shop-styles-grid" class="levels-grid"></div>
       </div>
       <div id="achievements-grid" class="levels-grid hidden" role="tabpanel" aria-labelledby="tab-shop-achievements"></div>
       <div id="codex-pane" class="codex-pane hidden" role="tabpanel" aria-labelledby="tab-shop-codex"></div>
@@ -223,6 +227,7 @@
       <p id="gameover-stage" class="modal-stat-line hidden"></p>
       <p id="gameover-daily-next" class="modal-stat-line muted hidden"></p>
       <div class="modal-actions">
+        <button id="btn-continue-gameover" type="button" class="modal-btn primary hidden"></button>
         <button id="btn-retry" type="button" class="modal-btn primary" data-i18n="modals.gameOver.button.retry"></button>
         <button id="btn-same-seed-gameover" type="button" class="modal-btn hidden"></button>
         <button id="btn-levels-gameover" type="button" class="modal-btn" data-i18n="modals.gameOver.button.levels"></button>

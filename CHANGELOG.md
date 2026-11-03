@@ -4,6 +4,16 @@ All notable changes to **FluxSpheres** are documented in this file.
 
 ## [Unreleased]
 
+## [1.8.0] - 2026-11-03
+
+### Added
+- **Daily Streak & Escalating Coin Bonus**: Added consecutive UTC day streak tracking (`dailyStreak`, `dailyStreakDate` in `StorageManager`), awarding `+15 ⬡` extra per consecutive day (capped at `+90 ⬡`) on top of the daily first-play bonus and displaying the active streak in the HUD banner, Daily button badge, and Game Over summary.
+- **Second Chance on Out-of-Shots**: In shot-budgeted modes (Campaign and Flux Mode), running out of shots while spheres remain on the board offers a one-time-per-round `#btn-continue-gameover` action (`+5 shots (40 ⬡)`) to resume the round, persisted in `RunSnapshot`.
+- **Avalanche Collector Bins**: Falling avalanche spheres (`droppingBalls`) crossing the magnetic collector slots at the bottom of the board award collector bonus points (`+35 pts`) and overcharge (`+4%`), with 5 collector slots rendered along the bottom of the canvas in `Renderer.js`.
+- **Unlockable Sphere Visual Styles**: Added a `Styles` tab (`#tab-shop-styles`) in the Workshop with 4 sphere styles (`classic`, `crystal`, `neon`, `metallic`) defined in `configs/balls.json`, persisted in `StorageManager` (`unlockedBallStyles`, `activeBallStyle`), and rendered via `Renderer.drawBallStyleOverlay`.
+- **7th Equipable Special Ball - Brush (`SPECIAL_TYPES.BRUSH`)**: Added the Brush special ball (shortcut `7` / `Digit7`) that repaints spheres within `paintRadiusFactor: 3.2` and scrubs `RUST` spheres into a unified color without breaking bonds, complete with `ImpactPreview` and `Renderer` AOE circle preview and a 9-column mobile portrait dock layout.
+- **Platform & Antimagnet Obstacles (`OBSTACLE_TYPES.PLATFORM`, `OBSTACLE_TYPES.ANTIMAGNET`)**: Added support platforms (`resolvePlatformSupports`, `isSupportedByPlatform`) that physically hold non-anchor cluster spheres from below while letting upward projectiles pass through, and Antimagnet fields (`applyClusterFields`) that repel nearby hanging cluster spheres without deflecting fired projectiles, integrated into Flux Mode (`platformPair`, `antimagnetField`), Codex, and onboarding hints.
+
 ## [1.7.7] - 2026-11-03
 
 ### Added

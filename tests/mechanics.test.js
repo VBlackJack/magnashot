@@ -21,12 +21,13 @@ import fs from 'node:fs';
 import { configRegistry } from '../src/core/ConfigRegistry.js';
 import { StorageManager } from '../src/core/StorageManager.js';
 import { Ball } from '../src/entities/Ball.js';
+import { Obstacle } from '../src/entities/Obstacle.js';
 import { GameEngine } from '../src/game/GameEngine.js';
 import { predictImpact } from '../src/game/ImpactPreview.js';
 import { Renderer } from '../src/game/Renderer.js';
 import { SeededRandom } from '../src/core/SeededRandom.js';
 import { generateLayout, MASK_CELLS } from '../src/game/layouts/LayoutGenerators.js';
-import { CLUSTER_MODIFIERS, LAYOUT_TYPES, SPECIAL_TYPES } from '../src/core/Constants.js';
+import { CLUSTER_MODIFIERS, LAYOUT_TYPES, OBSTACLE_TYPES, SPECIAL_TYPES } from '../src/core/Constants.js';
 import { applyWorldGeometry } from '../src/core/WorldGeometry.js';
 
 const loadJson = (p) => JSON.parse(fs.readFileSync(p, 'utf8'));
@@ -498,4 +499,102 @@ test('Every cluster modifier, level and tutorial has its texts in both languages
       }
     }
   }
+});
+
+test('Brush special ball repaints nearby spheres, scrubs rust into unified color, and populates aim preview', () => {
+  const board = createEmptyBoard();
+  const { anchor, row } = addHangingRow(board, [COLOR_A, COLOR_B, COLOR_B], { colorId: COLOR_A });
+  const rusty = addBall(board, row[1].x, row[1].y + REST_DISTANCE, {
+    colorId: null,
+    clusterModifier: CLUSTER_MODIFIERS.RUST
+  });
+  board.physicsWorld.createBond(row[1], rusty, false);
+
+  const brushBall = new Ball({
+    x: row[1].x,
+    y: row[1].y + REST_DISTANCE * 0.5,
+    radius: RADIUS,
+    colorId: null,
+    specialType: SPECIAL_TYPES.BRUSH
+  });
+  const preview = predictImpact({
+    points: [
+      { x: brushBall.x, y: brushBall.y + 20 },
+      { x: brushBall.x, y: brushBall.y }
+    ],
+    currentBall: brushBall,
+    physicsWorld: board.physicsWorld,
+    endX: brushBall.x,
+    endY: brushBall.y,
+    blastMult: 1,
+    specialTypes: ballsConfig.specialTypes,
+    matchMinCount: gameConfig.defaults.matchMinCount
+  });
+  assert.ok(preview.highlight.includes(row[1]), 'Brush preview highlights colored spheres in paint range');
+  assert.ok(preview.highlight.includes(rusty), 'Brush preview highlights rust spheres in paint range');
+
+  board.physicsWorld.addBall(brushBall);
+  board.handleProjectileSnapped(brushBall, row[1]);
+  assert.equal(rusty.clusterModifier, null, 'Brush scrubs rust modifier');
+  assert.ok(rusty.colorId !== null, 'Scrubbed rust sphere receives unified paint color');
+  assert.equal(anchor.isAnchor, true);
+});
+
+test('Platform obstacle supports hanging non-anchor spheres from below while letting upward projectiles pass through', () => {
+  const board = createEmptyBoard();
+  const world = board.physicsWorld;
+  const platform = new Obstacle({
+    type: OBSTACLE_TYPES.PLATFORM,
+    x: CENTER_X,
+    y: 260,
+    width: 140,
+    height: 16
+  }, obstaclesConfig);
+  world.obstacles.push(platform);
+
+  const supported = addBall(board, CENTER_X, 260 - 8 - RADIUS, { colorId: COLOR_A, isAnchor: false });
+  const bondedAbove = addBall(board, CENTER_X, 260 - 8 - RADIUS - REST_DISTANCE, { colorId: COLOR_B, isAnchor: false });
+  world.createBond(supported, bondedAbove, false);
+
+  const anchoredIds = world.getAnchoredBallIds();
+  assert.equal(anchoredIds.has(supported.id), true, 'Sphere resting on a platform counts as supported');
+  assert.equal(anchoredIds.has(bondedAbove.id), true, 'Sphere bonded to a platform-supported sphere stays anchored');
+
+  // Projectile fired upward from below passes through the platform without bouncing downward
+  world.balls.length = 0;
+  world.ballMap.clear();
+  const shot = new Ball({ x: CENTER_X, y: 290, radius: RADIUS, colorId: COLOR_A, isProjectile: true });
+  shot.vy = -14;
+  world.projectile = shot;
+  for (let i = 0; i < 6 && world.projectile; i++) {
+    world.step({});
+  }
+  assert.ok(shot.y < 260 && shot.vy < 0, 'Upward projectile passes through the platform without bouncing downward');
+});
+
+test('Antimagnet obstacle repels hanging cluster spheres without deflecting fired projectiles', () => {
+  const board = createEmptyBoard();
+  const world = board.physicsWorld;
+  const antimagnet = new Obstacle({
+    type: OBSTACLE_TYPES.ANTIMAGNET,
+    x: CENTER_X,
+    y: 220,
+    radius: 20,
+    fieldRadius: 120,
+    clusterRepelForce: 0.45
+  }, obstaclesConfig);
+  world.obstacles.push(antimagnet);
+
+  const clusterBall = addBall(board, CENTER_X + 45, 220, { colorId: COLOR_A, isAnchor: false });
+  const initialX = clusterBall.x;
+  world.step({});
+  assert.ok(clusterBall.x > initialX, 'Antimagnet pushes nearby cluster sphere outward');
+
+  world.balls.length = 0;
+  world.ballMap.clear();
+  const shot = new Ball({ x: CENTER_X + 35, y: 320, radius: RADIUS, colorId: COLOR_A, isProjectile: true });
+  shot.vy = -12;
+  world.projectile = shot;
+  world.step({});
+  assert.equal(shot.vx, 0, 'Antimagnet does not deflect projectile horizontal velocity');
 });

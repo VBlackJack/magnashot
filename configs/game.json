@@ -73,7 +73,18 @@
     "coinsPerAvalancheBall": 2,
     "overchargeMax": 100,
     "overchargePerMatchedBall": 8,
-    "overchargePerDroppedBall": 5
+    "overchargePerDroppedBall": 5,
+    "continuePack": {
+      "shots": 5,
+      "costCoins": 40
+    },
+    "collector": {
+      "bonusPointsPerBall": 35,
+      "overchargePerBall": 4,
+      "zoneHeight": 18,
+      "slotCount": 5,
+      "lineWidth": 1.5
+    }
   },
   "victory": {
     "celebrationFrames": 120,
@@ -120,7 +131,8 @@
     "rainbow": 25,
     "anvil": 35,
     "freeze": 20,
-    "rocket": 40
+    "rocket": 40,
+    "brush": 35
   },
   "juice": {
     "shakeDecay": 0.86,
@@ -228,7 +240,8 @@
       "rainbow": 2,
       "anvil": 1,
       "freeze": 2,
-      "rocket": 1
+      "rocket": 1,
+      "brush": 1
     },
     "modifierWeights": {
       "armored": 0.045,
@@ -250,6 +263,8 @@
   },
   "daily": {
     "firstPlayBonusCoins": 30,
+    "streakStepCoins": 15,
+    "maxStreakBonusCoins": 90,
     "countdownRefreshMs": 60000,
     "singularityMarginRadiusFactor": 4,
     "singularityOffsetAboveDangerFactor": 5,
@@ -327,7 +342,8 @@
     "order": [
       "basics", "pivot", "coinCore", "dormantBomb", "bumper", "armored", "repulsor", "chameleon",
       "barrier", "attractor", "bossCore", "portal", "laserLock", "singularity", "neutralAnchor",
-      "chained", "bubble", "freezeCore", "lightningCore", "paintCore", "rail", "thruster", "tether", "rust"
+      "chained", "bubble", "freezeCore", "lightningCore", "paintCore", "rail", "thruster", "tether", "rust",
+      "platform", "antimagnet"
     ],
     "mechanics": {
       "basics": { "hintKey": "gameplay.tutorial.pendulum" },
@@ -353,7 +369,9 @@
       "rail": { "hintKey": "gameplay.tutorial.rail" },
       "thruster": { "hintKey": "gameplay.tutorial.thruster" },
       "tether": { "hintKey": "gameplay.tutorial.tether" },
-      "rust": { "hintKey": "gameplay.tutorial.rust" }
+      "rust": { "hintKey": "gameplay.tutorial.rust" },
+      "platform": { "hintKey": "gameplay.tutorial.platform" },
+      "antimagnet": { "hintKey": "gameplay.tutorial.antimagnet" }
     }
   },
   "storage": {
@@ -373,12 +391,16 @@
       "dailyBest": "daily_best",
       "dailyBestDate": "daily_best_date",
       "dailyLastPlayedDate": "daily_last_date",
+      "dailyStreak": "daily_streak",
+      "dailyStreakDate": "daily_streak_date",
       "coins": "coins",
       "upgrades": "upgrades",
       "achievements": "achievements",
       "achievementRecords": "achievement_records",
       "runSnapshot": "run_snapshot",
-      "discoveries": "discoveries"
+      "discoveries": "discoveries",
+      "unlockedBallStyles": "ball_styles",
+      "activeBallStyle": "ball_style"
     },
     "runSnapshotVersion": 1
   },
@@ -388,6 +410,7 @@
     "initialUnlockedLevel": 1,
     "matchMinCount": 3,
     "initialCoins": 50,
+    "ballStyle": "classic",
     "reducedMotionMediaQuery": "(prefers-reduced-motion: reduce)",
     "coarsePointerMediaQuery": "(pointer: coarse)",
     "drawerMediaQuery": "(max-width: 680px)"
@@ -459,6 +482,10 @@
     "lockPopupColor": "#38bdf8",
     "victoryPopupColor": "#4ade80",
     "floatingTextShadowColor": "#090d16",
+    "collectorSlotFill": "rgba(56, 189, 248, 0.12)",
+    "collectorSlotStroke": "rgba(56, 189, 248, 0.52)",
+    "collectorDividerColor": "rgba(148, 163, 184, 0.45)",
+    "collectorLabelColor": "rgba(186, 230, 253, 0.72)",
     "starFilledSymbol": "★",
     "starEmptySymbol": "☆"
   }

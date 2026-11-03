@@ -469,6 +469,9 @@ export class UIManager {
       tabShopUpgrades: document.getElementById('tab-shop-upgrades'),
       tabShopAmmo: document.getElementById('tab-shop-ammo'),
       shopAmmoPane: document.getElementById('shop-ammo-pane'),
+      tabShopStyles: document.getElementById('tab-shop-styles'),
+      shopStylesPane: document.getElementById('shop-styles-pane'),
+      shopStylesGrid: document.getElementById('shop-styles-grid'),
       tabShopAchievements: document.getElementById('tab-shop-achievements'),
       tabShopCodex: document.getElementById('tab-shop-codex'),
       shopUpgradesPane: document.getElementById('shop-upgrades-pane'),
@@ -492,6 +495,7 @@ export class UIManager {
       gameoverRemaining: document.getElementById('gameover-remaining'),
       gameOverStage: document.getElementById('gameover-stage'),
       gameOverDailyNext: document.getElementById('gameover-daily-next'),
+      btnContinueGameOver: document.getElementById('btn-continue-gameover'),
       btnRetry: document.getElementById('btn-retry'),
       btnSameSeedGameOver: document.getElementById('btn-same-seed-gameover'),
       btnLevelsGameOver: document.getElementById('btn-levels-gameover'),
@@ -1253,6 +1257,13 @@ export class UIManager {
       this.openLevelsModal();
     });
 
+    this.elements.btnContinueGameOver?.addEventListener('click', () => {
+      if (this.engine.continueOutOfShots()) {
+        this.hideAllModals();
+        this.refresh(this.engine, this.lastExtra);
+      }
+    });
+
     this.elements.btnRetry.addEventListener('click', () => {
       this.hideAllModals();
       this.engine.restartCurrent();
@@ -1686,6 +1697,7 @@ export class UIManager {
     return [
       { name: SHOP_TABS.UPGRADES, el: this.elements.tabShopUpgrades, pane: this.elements.shopUpgradesPane },
       { name: SHOP_TABS.AMMO, el: this.elements.tabShopAmmo, pane: this.elements.shopAmmoPane },
+      { name: SHOP_TABS.STYLES, el: this.elements.tabShopStyles, pane: this.elements.shopStylesPane },
       { name: SHOP_TABS.ACHIEVEMENTS, el: this.elements.tabShopAchievements, pane: this.elements.achievementsGrid },
       { name: SHOP_TABS.CODEX, el: this.elements.tabShopCodex, pane: this.elements.codexPane }
     ].filter((tab) => tab.el && tab.pane);
@@ -2059,10 +2071,15 @@ export class UIManager {
     }
     // The Daily seed is the UTC date, so the next challenge starts at UTC midnight.
     const { hours, minutes } = formatDailyCountdown(getMsUntilNextDaily(Date.now()));
-    setTextIfChanged(
-      this.elements.gameOverDailyNext,
-      t('modals.gameOver.daily.nextIn', { hours: formatNumber(hours), minutes: formatNumber(minutes) })
-    );
+    const nextText = t('modals.gameOver.daily.nextIn', {
+      hours: formatNumber(hours),
+      minutes: formatNumber(minutes)
+    });
+    const streak = this.storageManager?.getDailyStreak?.() || 0;
+    const text = streak > 0
+      ? `${t('modals.gameOver.daily.streak', { streak: formatNumber(streak) })} - ${nextText}`
+      : nextText;
+    setTextIfChanged(this.elements.gameOverDailyNext, text);
   }
 
   stopDailyCountdown() {
@@ -2380,10 +2397,13 @@ export class UIManager {
     if (this.elements.btnDaily) {
       const todayKey = SeededRandom.getTodayDateKey();
       const dailyBonusCoins = this.gameConfig.daily?.firstPlayBonusCoins || 0;
+      const streak = this.storageManager.getDailyStreak?.(todayKey) || 0;
       let dailyLabel = t('app.nav.button.daily');
       if (this.storageManager.hasPlayedDailyToday(todayKey)) {
         // Today's challenge is done: say so rather than fall back to the plain label.
-        dailyLabel = t('app.nav.button.dailyPlayedBadge');
+        dailyLabel = streak > 1
+          ? t('app.nav.button.dailyPlayedStreakBadge', { streak: formatNumber(streak) })
+          : t('app.nav.button.dailyPlayedBadge');
       } else if (dailyBonusCoins > 0) {
         dailyLabel = t('app.nav.button.dailyBonusBadge', { coins: dailyBonusCoins });
       }
@@ -2770,6 +2790,22 @@ export class UIManager {
       }
       // Every mode but the campaign has a result worth sharing.
       this.elements.btnShareGameOver?.classList.toggle('hidden', engine.mode === GAME_MODES.CAMPAIGN);
+      if (this.elements.btnContinueGameOver) {
+        const canContinue = Boolean(engine.canContinueOutOfShots?.());
+        if (canContinue) {
+          const pack = engine.getContinuePackSpec();
+          const canAfford = this.storageManager.getCoins() >= pack.costCoins;
+          setTextIfChanged(
+            this.elements.btnContinueGameOver,
+            t('modals.gameOver.button.continueShots', {
+              shots: formatNumber(pack.shots),
+              cost: formatNumber(pack.costCoins)
+            })
+          );
+          this.elements.btnContinueGameOver.disabled = !canAfford;
+        }
+        this.elements.btnContinueGameOver.classList.toggle('hidden', !canContinue);
+      }
       if (this.elements.btnSameSeedGameOver) {
         const hasFluxSeed = engine.mode === GAME_MODES.FLUX && Boolean(engine.fluxSeed);
         if (hasFluxSeed) {
@@ -2791,6 +2827,8 @@ export class UIManager {
       if (transitionedState) {
         this.focusInTopModal(this.elements.btnRetry);
       }
+    } else {
+      this.elements.modalGameOver.classList.add('hidden');
     }
 
     setTextIfChanged(

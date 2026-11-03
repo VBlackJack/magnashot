@@ -563,3 +563,80 @@ test('applyUpgradePurchase credits startingShots immediately in active Campaign 
   engine.applyUpgradePurchase('startingShots');
   assert.equal(engine.shotsRemaining, initialFluxShots + 2);
 });
+
+test('Daily streak increments on consecutive UTC days, awards escalating bonus coins, and resets after a gap', () => {
+  const storage = createTestStorage();
+  const engine = createTestEngine(storage);
+  storage.setCoins(0);
+
+  engine.startDailyChallenge('2026-11-01');
+  assert.equal(storage.getDailyStreak('2026-11-01'), 1);
+  assert.equal(storage.getCoins(), gameConfig.daily.firstPlayBonusCoins);
+
+  engine.startDailyChallenge('2026-11-02');
+  assert.equal(storage.getDailyStreak('2026-11-02'), 2);
+  const expectedDay2 = gameConfig.daily.firstPlayBonusCoins + gameConfig.daily.streakStepCoins;
+  assert.equal(storage.getCoins(), gameConfig.daily.firstPlayBonusCoins + expectedDay2);
+
+  engine.startDailyChallenge('2026-11-05');
+  assert.equal(storage.getDailyStreak('2026-11-05'), 1, 'Streak resets to 1 after a skipped UTC day');
+});
+
+test('Second chance continueOutOfShots spends coins, grants extra shots once per round, and resumes playing', () => {
+  const storage = createTestStorage();
+  const engine = createTestEngine(storage);
+  engine.startCampaignLevel(1);
+  const pack = engine.getContinuePackSpec();
+  storage.setCoins(pack.costCoins + 10);
+  engine.hasFiredInRound = true;
+  engine.shotsRemaining = 0;
+  engine.evaluateRoundEnd();
+  while (engine.outOfShotsGraceFrames > 0) {
+    engine.update();
+  }
+  assert.equal(engine.state, 'game_over');
+  assert.equal(engine.canContinueOutOfShots(), true);
+
+  assert.equal(engine.continueOutOfShots(), true);
+  assert.equal(engine.state, 'playing');
+  assert.equal(engine.shotsRemaining, pack.shots);
+  assert.equal(storage.getCoins(), 10);
+  assert.equal(engine.hasUsedContinue, true);
+
+  engine.shotsRemaining = 0;
+  engine.evaluateRoundEnd();
+  while (engine.outOfShotsGraceFrames > 0) {
+    engine.update();
+  }
+  assert.equal(engine.state, 'game_over');
+  assert.equal(engine.canContinueOutOfShots(), false, 'Second chance can only be used once per round');
+});
+
+test('Ball styles can be unlocked with coins and persisted in StorageManager', () => {
+  const storage = createTestStorage();
+  assert.equal(storage.getActiveBallStyle(), 'classic');
+  assert.equal(storage.isBallStyleUnlocked('classic'), true);
+  assert.equal(storage.isBallStyleUnlocked('neon'), false);
+
+  storage.setCoins(ballsConfig.styles.neon.cost);
+  assert.equal(storage.purchaseBallStyle('neon', ballsConfig.styles.neon.cost), true);
+  assert.equal(storage.isBallStyleUnlocked('neon'), true);
+  assert.equal(storage.getCoins(), 0);
+  assert.equal(storage.setActiveBallStyle('neon'), true);
+  assert.equal(storage.getActiveBallStyle(), 'neon');
+});
+
+test('Avalanche collector bins award bonus score and overcharge when a dropping ball crosses the collector zone', () => {
+  const engine = createTestEngine();
+  engine.startCampaignLevel(1);
+  const initialScore = engine.score;
+  const initialOvercharge = engine.overcharge;
+  const collectorY = gameConfig.canvas.logicalHeight - gameConfig.scoring.collector.zoneHeight + 4;
+  const dropBall = new Ball({ x: 200, y: collectorY, radius: 20, colorId: 'crimson' });
+  engine.physicsWorld.droppingBalls.push(dropBall);
+
+  engine.update();
+  assert.equal(dropBall.collectedByBin, true);
+  assert.ok(engine.score >= initialScore + gameConfig.scoring.collector.bonusPointsPerBall);
+  assert.ok(engine.overcharge >= initialOvercharge + gameConfig.scoring.collector.overchargePerBall);
+});

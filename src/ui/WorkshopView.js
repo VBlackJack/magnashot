@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-import { GAME_MODES, SPECIAL_TYPES_ORDER } from '../core/Constants.js';
+import { BALL_STYLES, BALL_STYLES_ORDER, GAME_MODES, SPECIAL_TYPES_ORDER } from '../core/Constants.js';
 import { t, formatNumber } from '../core/I18n.js';
 import { specialIconBackground } from './CodexView.js';
 import { filterFocusTrapCandidates } from './UIManager.js';
@@ -27,6 +27,7 @@ export { FULL_PERCENT };
 export const SHOP_TABS = Object.freeze({
   UPGRADES: 'upgrades',
   AMMO: 'ammo',
+  STYLES: 'styles',
   ACHIEVEMENTS: 'achievements',
   CODEX: 'codex'
 });
@@ -238,6 +239,83 @@ export function renderWorkshopContents() {
 
       card.append(iconSpan, titleEl, descEl, stockEl, buyAmmoBtn);
       ammoGrid.appendChild(card);
+    }
+  }
+
+  if (this.elements.shopStylesGrid && this.ballsConfig?.styles) {
+    const stylesGrid = this.elements.shopStylesGrid;
+    stylesGrid.replaceChildren();
+    const activeStyle = this.storageManager.getActiveBallStyle?.() || BALL_STYLES.CLASSIC;
+    for (let slotIndex = 0; slotIndex < BALL_STYLES_ORDER.length; slotIndex++) {
+      const styleId = BALL_STYLES_ORDER[slotIndex];
+      const spec = this.ballsConfig.styles[styleId];
+      if (!spec) {
+        continue;
+      }
+      const isUnlocked = Boolean(this.storageManager.isBallStyleUnlocked?.(styleId));
+      const isActive = activeStyle === styleId;
+      const cost = spec.cost || 0;
+
+      const card = document.createElement('div');
+      card.className = `level-card ${isUnlocked ? 'unlocked' : ''}`.trim();
+
+      const header = document.createElement('div');
+      header.className = 'level-card-header';
+      if (isActive) {
+        header.textContent = t('modals.shop.styles.equipped');
+      } else if (isUnlocked || cost <= 0) {
+        header.textContent = t('modals.shop.styles.unlocked');
+      } else {
+        header.textContent = t('modals.shop.styles.cost', { cost: formatNumber(cost) });
+      }
+
+      const title = document.createElement('div');
+      title.className = 'level-card-title';
+      title.textContent = `${spec.icon || ''} ${t(`modals.shop.styles.items.${styleId}.name`)}`.trim();
+
+      const desc = document.createElement('div');
+      desc.className = 'level-card-desc';
+      desc.textContent = t(`modals.shop.styles.items.${styleId}.description`);
+
+      if (isActive) {
+        const equippedBadge = document.createElement('span');
+        equippedBadge.className = 'upgrade-maxed-badge';
+        equippedBadge.textContent = t('modals.shop.styles.equipped');
+        card.append(header, title, desc, equippedBadge);
+        stylesGrid.appendChild(card);
+        continue;
+      }
+
+      const actionBtn = document.createElement('button');
+      actionBtn.type = 'button';
+      actionBtn.className = 'modal-btn primary style-action-btn';
+      actionBtn.dataset.styleId = styleId;
+      actionBtn.dataset.slotIndex = String(slotIndex);
+
+      if (isUnlocked) {
+        actionBtn.textContent = t('modals.shop.styles.equip');
+        actionBtn.addEventListener('click', () => {
+          if (this.storageManager.setActiveBallStyle(styleId)) {
+            this.renderer?.setBallStyle?.(styleId);
+            this.audioManager.playEffect('snap');
+            this.rerenderShopKeepingFocus(`.style-action-btn[data-style-id="${styleId}"]`, slotIndex);
+          }
+        });
+      } else {
+        actionBtn.disabled = coins < cost;
+        actionBtn.textContent = t('modals.shop.card.buy', { cost: formatNumber(cost) });
+        actionBtn.addEventListener('click', () => {
+          if (this.storageManager.purchaseBallStyle(styleId, cost)) {
+            this.renderer?.setBallStyle?.(styleId);
+            this.audioManager.playEffect('match', 2);
+            this.refresh(this.engine, this.lastExtra);
+            this.rerenderShopKeepingFocus(`.style-action-btn[data-style-id="${styleId}"]`, slotIndex);
+          }
+        });
+      }
+
+      card.append(header, title, desc, actionBtn);
+      stylesGrid.appendChild(card);
     }
   }
 

@@ -107,6 +107,13 @@ export function predictImpact(
           destroyedIds.add(target.id);
         }
       }
+    } else if (specType === SPECIAL_TYPES.BRUSH) {
+      const aoeRadius = currentBall.radius * specCfg.paintRadiusFactor * blastMult;
+      for (const b of physicsWorld.balls) {
+        if ((b.colorId || b.clusterModifier === CLUSTER_MODIFIERS.RUST) && Math.hypot(b.x - endX, b.y - endY) <= aoeRadius) {
+          highlight.push(b);
+        }
+      }
     }
     isMatch = true;
   } else if (points.snapTarget) {

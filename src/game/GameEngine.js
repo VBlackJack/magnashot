@@ -111,6 +111,7 @@ export class GameEngine {
     this.impactWave = null;
     this.trailFrameCounter = 0;
     this.hasFiredInRound = false;
+    this.hasUsedContinue = false;
     this.bossesDestroyedInRun = 0;
     this.activeDiscoveryId = null;
     this.discoveryTurnCount = 0;
@@ -334,6 +335,7 @@ export class GameEngine {
     this.hitStopFrames = 0;
     this.impactWave = null;
     this.hasFiredInRound = false;
+    this.hasUsedContinue = false;
     this.bossesDestroyedInRun = 0;
     this.activeDiscoveryId = null;
     this.discoveryTurnCount = 0;
@@ -578,13 +580,20 @@ export class GameEngine {
   startDailyChallenge(customSeed = null, isRestart = false) {
     const seed = customSeed || SeededRandom.getTodayDateKey();
     this.initSurvivalRun(GAME_MODES.DAILY, seed);
-    const bonusCoins = this.gameConfig.daily.firstPlayBonusCoins;
-    if (!isRestart && bonusCoins > 0 && this.storageManager.claimDailyPlayBonus(seed, bonusCoins)) {
+    const dailyCfg = this.gameConfig.daily;
+    const bonusCoins = dailyCfg.firstPlayBonusCoins;
+    if (!isRestart && bonusCoins > 0 && this.storageManager.claimDailyPlayBonus(seed, bonusCoins, dailyCfg)) {
+      const streak = this.storageManager.getDailyStreak?.(seed) || 1;
+      const streakBonus = this.storageManager.computeDailyStreakBonus?.(streak, dailyCfg) || 0;
+      const totalCoins = bonusCoins + streakBonus;
+      const popupText = streak > 1
+        ? t('gameplay.feedback.dailyBonus.streakClaimed', { coins: totalCoins, streak })
+        : t('gameplay.feedback.dailyBonus.claimed', { coins: totalCoins });
       this.audioManager.playEffect('achievement');
       this.particleSystem.spawnFloatingText(
         this.gameConfig.canvas.logicalWidth * MATH_CONSTANTS.HALF,
         this.gameConfig.canvas.launcherY + this.gameConfig.canvas.launcherPopupOffsetY,
-        t('gameplay.feedback.dailyBonus.claimed', { coins: bonusCoins }),
+        popupText,
         this.gameConfig.theme.coinPopupColor
       );
     }
@@ -1349,6 +1358,24 @@ export class GameEngine {
       onBallDroppedOut: (ball) => {
         this.particleSystem.splashLiquid(ball.x / this.gameConfig.canvas.logicalWidth, ball.vy);
       },
+      onCollectorBinPass: (ball) => {
+        if (!this.isRunPlaying()) {
+          return;
+        }
+        const collectorCfg = this.gameConfig.scoring.collector;
+        if (!collectorCfg) {
+          return;
+        }
+        const bonusPts = Math.round(collectorCfg.bonusPointsPerBall * Math.max(1, this.combo));
+        this.addScore(bonusPts);
+        this.addOvercharge(collectorCfg.overchargePerBall);
+        this.particleSystem.spawnFloatingText(
+          ball.x,
+          this.gameConfig.canvas.logicalHeight - collectorCfg.zoneHeight + this.gameConfig.canvas.floatingTextOffsetY,
+          t('gameplay.feedback.collector.bin', { points: bonusPts }),
+          this.gameConfig.theme.avalanchePopupColor
+        );
+      },
       onPortalWarp: (entryPortal, exitPortal) => {
         const portalCfg = this.obstaclesConfig.types.portal;
         this.audioManager.playEffect('portal');
@@ -1970,10 +1997,14 @@ export class GameEngine {
         this.addOvercharge(result.destroyed.length * this.gameConfig.scoring.overchargePerMatchedBall);
         this.hitStopFrames = this.gameConfig.juice.hitStopFramesSpecial;
       }
+      if (result.painted?.length > 0) {
+        this.addOvercharge(result.painted.length * this.gameConfig.scoring.overchargePerDroppedBall);
+      }
       if (result.freezeTurns > 0) {
         this.freezeTurnsRemaining = result.freezeTurns;
       }
-      this.handlePostTurnCleanup(result.destroyed.length > 0, result.freezeTurns > 0);
+      const madeProgress = result.destroyed.length > 0 || (result.painted?.length || 0) > 0;
+      this.handlePostTurnCleanup(madeProgress, result.freezeTurns > 0);
       return;
     }
 
@@ -2506,6 +2537,48 @@ export class GameEngine {
     this.storageManager.clearRunSnapshot();
     this.audioManager.playEffect('gameOver');
     this.notifyUI({ gameOverReason: reasonKey });
+  }
+
+  getContinuePackSpec() {
+    return this.gameConfig.scoring.continuePack;
+  }
+
+  canContinueOutOfShots() {
+    return Boolean(
+      this.state === GAME_STATES.GAME_OVER
+      && this.usesShotBudget()
+      && this.gameOverSummary?.reasonKey === GAME_OVER_REASONS.OUT_OF_SHOTS
+      && !this.hasUsedContinue
+      && this.physicsWorld.balls.length > 0
+    );
+  }
+
+  continueOutOfShots() {
+    if (!this.canContinueOutOfShots()) {
+      return false;
+    }
+    const pack = this.getContinuePackSpec();
+    const coins = this.storageManager.getCoins();
+    if (coins < pack.costCoins) {
+      return false;
+    }
+    this.storageManager.setCoins(coins - pack.costCoins);
+    this.hasUsedContinue = true;
+    this.shotsRemaining = pack.shots;
+    this.outOfShotsGraceFrames = 0;
+    this.gameOverSummary = null;
+    this.state = GAME_STATES.PLAYING;
+    if (!this.currentBall) {
+      this.currentBall = this.createRandomLauncherBall();
+    }
+    if (!this.nextBall) {
+      this.nextBall = this.createRandomLauncherBall();
+    }
+    this.updateAimFromAngle(this.aimAngle);
+    this.audioManager.playEffect('upgrade');
+    this.saveRunSnapshot({ force: true });
+    this.notifyUI({ continuedOutOfShots: true });
+    return true;
   }
 
   /**

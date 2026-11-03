@@ -84,7 +84,8 @@ export const SPECIAL_TYPES = Object.freeze({
   RAINBOW: 'rainbow',
   ANVIL: 'anvil',
   FREEZE: 'freeze',
-  ROCKET: 'rocket'
+  ROCKET: 'rocket',
+  BRUSH: 'brush'
 });
 
 export const SPECIAL_TYPES_ORDER = Object.freeze([
@@ -93,7 +94,22 @@ export const SPECIAL_TYPES_ORDER = Object.freeze([
   SPECIAL_TYPES.RAINBOW,
   SPECIAL_TYPES.ANVIL,
   SPECIAL_TYPES.FREEZE,
-  SPECIAL_TYPES.ROCKET
+  SPECIAL_TYPES.ROCKET,
+  SPECIAL_TYPES.BRUSH
+]);
+
+export const BALL_STYLES = Object.freeze({
+  CLASSIC: 'classic',
+  CRYSTAL: 'crystal',
+  NEON: 'neon',
+  METALLIC: 'metallic'
+});
+
+export const BALL_STYLES_ORDER = Object.freeze([
+  BALL_STYLES.CLASSIC,
+  BALL_STYLES.CRYSTAL,
+  BALL_STYLES.NEON,
+  BALL_STYLES.METALLIC
 ]);
 
 export const CLUSTER_MODIFIERS = Object.freeze({
@@ -121,7 +137,9 @@ export const OBSTACLE_TYPES = Object.freeze({
   ATTRACTOR: 'attractor',
   BARRIER: 'barrier',
   PORTAL: 'portal',
-  SINGULARITY: 'singularity'
+  SINGULARITY: 'singularity',
+  PLATFORM: 'platform',
+  ANTIMAGNET: 'antimagnet'
 });
 
 export const OBSTACLE_TYPES_ORDER = Object.freeze([
@@ -131,7 +149,9 @@ export const OBSTACLE_TYPES_ORDER = Object.freeze([
   OBSTACLE_TYPES.ATTRACTOR,
   OBSTACLE_TYPES.BARRIER,
   OBSTACLE_TYPES.PORTAL,
-  OBSTACLE_TYPES.SINGULARITY
+  OBSTACLE_TYPES.SINGULARITY,
+  OBSTACLE_TYPES.PLATFORM,
+  OBSTACLE_TYPES.ANTIMAGNET
 ]);
 
 /**

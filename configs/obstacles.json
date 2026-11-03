@@ -13,6 +13,8 @@
     "oscillateSpeed": 0,
     "fieldRadius": 0,
     "force": 0,
+    "clusterRepelForce": 0,
+    "supportFriction": 0,
     "captureRadius": 24,
     "pullRadius": 0,
     "pullForce": 0,
@@ -111,6 +113,24 @@
       "swirlArcAngleFactor": 1.4,
       "burstCount": 10,
       "burstSpeed": 4.0
+    },
+    "platform": {
+      "radius": 24,
+      "width": 116,
+      "height": 14,
+      "fillColor": "#0f766e",
+      "borderColor": "#5eead4",
+      "supportFriction": 0.78,
+      "restitution": 0.9
+    },
+    "antimagnet": {
+      "radius": 22,
+      "fieldRadius": 135,
+      "clusterRepelForce": -3.2,
+      "coreColor": "#14b8a6",
+      "outerColor": "#134e4a",
+      "ringColor": "#99f6e4",
+      "fieldColor": "rgba(20, 184, 166, 0.16)"
     }
   }
 }

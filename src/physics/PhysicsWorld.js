@@ -18,6 +18,7 @@ import { OBSTACLE_TYPES, SPECIAL_TYPES, CLUSTER_MODIFIERS, MATH_CONSTANTS, SEPAR
 import { SpatialHashGrid } from './SpatialHashGrid.js';
 
 const NOT_FOUND_INDEX = -1;
+const PLATFORM_SUPPORT_TOLERANCE_PX = 4;
 
 /** A bond touching a chained ball is a chain link: stretching never breaks it. */
 export function isChainLink(a, b) {
@@ -533,7 +534,13 @@ export class PhysicsWorld {
     const fields = this.clusterFieldBuffer;
     fields.length = 0;
     for (const obs of this.obstacles) {
-      if (!obs.disabled && obs.force !== 0 && (obs.type === OBSTACLE_TYPES.REPULSOR || obs.type === OBSTACLE_TYPES.ATTRACTOR)) {
+      if (obs.disabled) {
+        continue;
+      }
+      if (
+        (obs.force !== 0 && (obs.type === OBSTACLE_TYPES.REPULSOR || obs.type === OBSTACLE_TYPES.ATTRACTOR))
+        || (obs.clusterRepelForce !== 0 && obs.type === OBSTACLE_TYPES.ANTIMAGNET)
+      ) {
         fields.push(obs);
       }
     }
@@ -541,9 +548,9 @@ export class PhysicsWorld {
   }
 
   /**
-   * Pushes a hanging sphere away from repulsors and toward attractors, with the same
-   * linear falloff the shots feel, scaled down by simulation.clusterFieldFactor so the
-   * cluster leans and sways without tearing.
+   * Pushes a hanging sphere away from repulsors and antimagnets and toward attractors,
+   * with linear falloff scaled down by simulation.clusterFieldFactor so the cluster leans
+   * and sways without tearing.
    * @param {object} ball - A sphere that is not an anchor.
    * @param {Array<object>} fields - Fields from collectClusterFields.
    * @param {number} scale - clusterFieldFactor times the substep fraction.
@@ -560,7 +567,8 @@ export class PhysicsWorld {
       if (dist <= MATH_CONSTANTS.EPSILON) {
         continue;
       }
-      const push = (1 - dist / obs.fieldRadius) * obs.force * scale;
+      const fieldForce = obs.type === OBSTACLE_TYPES.ANTIMAGNET ? -Math.abs(obs.clusterRepelForce) : obs.force;
+      const push = (1 - dist / obs.fieldRadius) * fieldForce * scale;
       ball.vx += (dx / dist) * push;
       ball.vy += (dy / dist) * push;
     }
@@ -769,6 +777,64 @@ export class PhysicsWorld {
         }
       }
     }
+
+    this.resolvePlatformSupports(balls, ballRadius, dt);
+  }
+
+  /**
+   * Resolves one-way horizontal platform shelves that support hanging cluster spheres
+   * from below while letting fired projectiles pass through unhindered.
+   */
+  resolvePlatformSupports(balls, ballRadius, dt) {
+    for (const obs of this.obstacles) {
+      if (obs.disabled || obs.type !== OBSTACLE_TYPES.PLATFORM) {
+        continue;
+      }
+      const halfW = obs.width * MATH_CONSTANTS.HALF + ballRadius * MATH_CONSTANTS.HALF;
+      const halfH = obs.height * MATH_CONSTANTS.HALF;
+      const shelfTopY = obs.y - halfH;
+      const shelfBottomY = obs.y + halfH + ballRadius;
+      const friction = obs.supportFriction > 0 ? Math.pow(obs.supportFriction, dt) : 1;
+      for (const ball of balls) {
+        if (ball.isAnchor) {
+          continue;
+        }
+        if (Math.abs(ball.x - obs.x) > halfW) {
+          continue;
+        }
+        const ballBottom = ball.y + ballRadius;
+        const prevBottom = (ball.prevY ?? ball.y) + ballRadius;
+        if (ballBottom >= shelfTopY && ballBottom <= shelfBottomY && prevBottom <= shelfBottomY) {
+          ball.y = shelfTopY - ballRadius;
+          if (ball.vy > 0) {
+            ball.vy = 0;
+          }
+          ball.vx *= friction;
+        }
+      }
+    }
+  }
+
+  isSupportedByPlatform(ball) {
+    if (!ball) {
+      return false;
+    }
+    const ballRadius = ball.radius || this.physicsConfig.ball.radius;
+    for (const obs of this.obstacles) {
+      if (obs.disabled || obs.type !== OBSTACLE_TYPES.PLATFORM) {
+        continue;
+      }
+      const halfW = obs.width * MATH_CONSTANTS.HALF + ballRadius * MATH_CONSTANTS.HALF;
+      if (Math.abs(ball.x - obs.x) > halfW) {
+        continue;
+      }
+      const shelfTopY = obs.y - obs.height * MATH_CONSTANTS.HALF;
+      const ballBottom = ball.y + ballRadius;
+      if (ballBottom >= shelfTopY - PLATFORM_SUPPORT_TOLERANCE_PX && ballBottom <= shelfTopY + obs.height + ballRadius) {
+        return true;
+      }
+    }
+    return false;
   }
 
   /**
@@ -1250,7 +1316,7 @@ export class PhysicsWorld {
       if (excludedIds && excludedIds.has(ball.id)) {
         continue;
       }
-      if (ball.isAnchor || ball.pivotRef) {
+      if (ball.isAnchor || ball.pivotRef || this.isSupportedByPlatform(ball)) {
         anchoredSet.add(ball.id);
         queue.push(ball);
       }
@@ -1369,6 +1435,18 @@ export class PhysicsWorld {
 
       b.x += b.vx;
       b.y += b.vy;
+
+      const collectorZoneHeight = this.gameConfig.scoring?.collector?.zoneHeight || 0;
+      if (
+        collectorZoneHeight > 0
+        && !b.collectedByBin
+        && b.y >= canvasCfg.logicalHeight - collectorZoneHeight
+      ) {
+        b.collectedByBin = true;
+        if (callbacks?.onCollectorBinPass) {
+          callbacks.onCollectorBinPass(b);
+        }
+      }
 
       const minWallX = canvasCfg.wallMargin + b.radius;
       const maxWallX = canvasCfg.logicalWidth - canvasCfg.wallMargin - b.radius;

@@ -139,6 +139,52 @@
       "burstCount": 12,
       "burstSpeed": 5,
       "pointsPerBall": 150
+    },
+    "brush": {
+      "id": "brush",
+      "fill": "#db2777",
+      "highlight": "#f9a8d4",
+      "shadow": "#500724",
+      "glow": "rgba(244, 114, 182, 0.85)",
+      "icon": "🖌",
+      "paintRadiusFactor": 3.2,
+      "visualShockwaveFactor": 3.2,
+      "burstCount": 14,
+      "burstSpeed": 4.2,
+      "pointsPerBall": 45
+    }
+  },
+  "styles": {
+    "classic": {
+      "id": "classic",
+      "cost": 0,
+      "icon": "●"
+    },
+    "crystal": {
+      "id": "crystal",
+      "cost": 120,
+      "icon": "◈",
+      "facetSides": 6,
+      "facetAlpha": 0.48,
+      "innerRadiusFactor": 0.56,
+      "rimWidth": 2.1
+    },
+    "neon": {
+      "id": "neon",
+      "cost": 180,
+      "icon": "◎",
+      "coreFill": "#090d16",
+      "coreRadiusFactor": 0.58,
+      "ringRadiusFactor": 0.82,
+      "ringLineWidth": 2.6
+    },
+    "metallic": {
+      "id": "metallic",
+      "cost": 240,
+      "icon": "◉",
+      "rimStroke": "rgba(241, 245, 249, 0.78)",
+      "innerRingRadiusFactor": 0.72,
+      "bandAlpha": 0.36
     }
   },
   "clusterModifiers": {

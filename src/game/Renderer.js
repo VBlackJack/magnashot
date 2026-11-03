@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-import { OBSTACLE_TYPES, SPECIAL_TYPES, CLUSTER_MODIFIERS, MATH_CONSTANTS } from '../core/Constants.js';
+import { OBSTACLE_TYPES, SPECIAL_TYPES, CLUSTER_MODIFIERS, BALL_STYLES, MATH_CONSTANTS } from '../core/Constants.js';
 import { isChainLink, isTetherLink } from '../physics/PhysicsWorld.js';
 import { Ball } from '../entities/Ball.js';
 import { predictImpact } from './ImpactPreview.js';
@@ -118,6 +118,7 @@ export class Renderer {
     this.ballGradientCache = new Map();
     this.highContrast = false;
     this.colorPatterns = false;
+    this.activeBallStyle = gameConfig.defaults?.ballStyle || BALL_STYLES.CLASSIC;
     this.bindResolutionListeners();
     this.updateCanvasResolution();
   }
@@ -235,6 +236,13 @@ export class Renderer {
     this.highContrast = Boolean(enabled);
   }
 
+  setBallStyle(styleId) {
+    if (styleId && typeof styleId === 'string') {
+      this.activeBallStyle = styleId;
+      this.ballGradientCache.clear();
+    }
+  }
+
   /**
    * Polarity glyphs are the color-independent cue for a ball, so on a small canvas
    * they grow toward the ball edge to stay at a readable on-screen size.
@@ -337,6 +345,7 @@ export class Renderer {
     ctx.drawImage(this.staticLayer, 0, 0, width, height);
     this.drawWallCracks(ctx, engineState.particleSystem);
     this.drawLiquid(ctx, engineState.particleSystem, width, height);
+    this.drawCollectorBins(ctx, width, height, theme);
 
     this.drawDangerZone(ctx, width, height, theme, engineState.physicsWorld.balls, now, alpha);
 
@@ -712,18 +721,22 @@ export class Renderer {
         ctx.beginPath();
         ctx.arc(0, 0, obs.radius * cfg.swirlRadiusFactor, 0, MATH_CONSTANTS.TWO_PI);
         ctx.fill();
-      } else if (obs.type === OBSTACLE_TYPES.REPULSOR || obs.type === OBSTACLE_TYPES.ATTRACTOR) {
+      } else if (
+        obs.type === OBSTACLE_TYPES.REPULSOR
+        || obs.type === OBSTACLE_TYPES.ATTRACTOR
+        || obs.type === OBSTACLE_TYPES.ANTIMAGNET
+      ) {
         const wave = (now * obsDefaults.fieldWaveSpeed) % obs.fieldRadius;
-        const radiusWave = obs.type === OBSTACLE_TYPES.REPULSOR
-          ? wave
-          : obs.fieldRadius - wave;
+        const radiusWave = obs.type === OBSTACLE_TYPES.ATTRACTOR
+          ? obs.fieldRadius - wave
+          : wave;
 
         ctx.fillStyle = cfg.fieldColor;
         ctx.beginPath();
         ctx.arc(ox, oy, obs.fieldRadius, 0, MATH_CONSTANTS.TWO_PI);
         ctx.fill();
 
-        ctx.strokeStyle = cfg.coreColor;
+        ctx.strokeStyle = cfg.ringColor || cfg.coreColor;
         ctx.globalAlpha = obsDefaults.fieldWaveAlpha;
         ctx.lineWidth = obsDefaults.lineWidth;
         ctx.beginPath();
@@ -776,7 +789,7 @@ export class Renderer {
         ctx.beginPath();
         ctx.arc(0, 0, obs.radius * obsDefaults.bumperCoreRadiusFactor, 0, MATH_CONSTANTS.TWO_PI);
         ctx.fill();
-      } else if (obs.type === OBSTACLE_TYPES.BARRIER) {
+      } else if (obs.type === OBSTACLE_TYPES.BARRIER || obs.type === OBSTACLE_TYPES.PLATFORM) {
         const halfW = obs.width * MATH_CONSTANTS.HALF;
         const halfH = obs.height * MATH_CONSTANTS.HALF;
         ctx.fillStyle = cfg.fillColor;
@@ -851,6 +864,11 @@ export class Renderer {
     ctx.beginPath();
     ctx.arc(0, 0, r, 0, MATH_CONSTANTS.TWO_PI);
     ctx.fill();
+    if (this.activeBallStyle !== BALL_STYLES.CLASSIC) {
+      this.drawBallStyleOverlay(ctx, palette, r);
+      ctx.beginPath();
+      ctx.arc(0, 0, r, 0, MATH_CONSTANTS.TWO_PI);
+    }
     if (this.colorPatterns && palette.pattern) {
       this.drawColorPattern(ctx, palette.pattern, r);
       // save/restore does not keep the current path: rebuild the outline the border strokes.
@@ -953,6 +971,89 @@ export class Renderer {
       this.drawBubbleShell(ctx, r);
     }
 
+    ctx.restore();
+  }
+
+  drawBallStyleOverlay(ctx, palette, r) {
+    const stylesCfg = this.ballsConfig.styles || {};
+    const styleSpec = stylesCfg[this.activeBallStyle];
+    if (!styleSpec) {
+      return;
+    }
+    ctx.save();
+    if (this.activeBallStyle === BALL_STYLES.CRYSTAL) {
+      const innerR = r * styleSpec.innerRadiusFactor;
+      const sides = styleSpec.facetSides;
+      ctx.strokeStyle = palette.highlight;
+      ctx.globalAlpha = styleSpec.facetAlpha;
+      ctx.lineWidth = styleSpec.rimWidth;
+      ctx.beginPath();
+      for (let i = 0; i < sides; i++) {
+        const angle = (MATH_CONSTANTS.TWO_PI * i) / sides;
+        const px = Math.cos(angle) * innerR;
+        const py = Math.sin(angle) * innerR;
+        if (i === 0) {
+          ctx.moveTo(px, py);
+        } else {
+          ctx.lineTo(px, py);
+        }
+      }
+      ctx.closePath();
+      ctx.stroke();
+    } else if (this.activeBallStyle === BALL_STYLES.NEON) {
+      ctx.fillStyle = styleSpec.coreFill;
+      ctx.beginPath();
+      ctx.arc(0, 0, r * styleSpec.coreRadiusFactor, 0, MATH_CONSTANTS.TWO_PI);
+      ctx.fill();
+      ctx.strokeStyle = palette.highlight;
+      ctx.lineWidth = styleSpec.ringLineWidth;
+      ctx.beginPath();
+      ctx.arc(0, 0, r * styleSpec.ringRadiusFactor, 0, MATH_CONSTANTS.TWO_PI);
+      ctx.stroke();
+    } else if (this.activeBallStyle === BALL_STYLES.METALLIC) {
+      ctx.strokeStyle = styleSpec.rimStroke || palette.highlight;
+      ctx.globalAlpha = styleSpec.bandAlpha;
+      ctx.lineWidth = this.ballsConfig.render.modifierRingLineWidth;
+      ctx.beginPath();
+      ctx.arc(0, 0, r * styleSpec.innerRingRadiusFactor, 0, MATH_CONSTANTS.TWO_PI);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  /**
+   * Draws magnetic collector slots along the bottom edge of the board where falling
+   * avalanche spheres score extra collector points and overcharge.
+   */
+  drawCollectorBins(ctx, width, height, theme) {
+    const collectorCfg = this.gameConfig.scoring?.collector;
+    if (!collectorCfg || !collectorCfg.zoneHeight || !collectorCfg.slotCount) {
+      return;
+    }
+    const margin = this.gameConfig.canvas.wallMargin;
+    const innerWidth = width - margin * 2;
+    const topY = height - collectorCfg.zoneHeight;
+    const slotWidth = innerWidth / collectorCfg.slotCount;
+
+    ctx.save();
+    ctx.fillStyle = theme.collectorSlotFill || theme.dangerZoneFill;
+    ctx.fillRect(margin, topY, innerWidth, collectorCfg.zoneHeight);
+
+    ctx.strokeStyle = theme.collectorSlotStroke || theme.wallColor;
+    ctx.lineWidth = collectorCfg.lineWidth;
+    ctx.beginPath();
+    ctx.moveTo(margin, topY);
+    ctx.lineTo(width - margin, topY);
+    ctx.stroke();
+
+    ctx.strokeStyle = theme.collectorDividerColor || theme.wallColor;
+    ctx.beginPath();
+    for (let i = 1; i < collectorCfg.slotCount; i++) {
+      const dividerX = margin + i * slotWidth;
+      ctx.moveTo(dividerX, topY);
+      ctx.lineTo(dividerX, height - margin * MATH_CONSTANTS.HALF);
+    }
+    ctx.stroke();
     ctx.restore();
   }
 
@@ -1325,10 +1426,17 @@ export class Renderer {
     if (currentBall.specialType) {
       const specType = currentBall.specialType;
       const specCfg = this.ballsConfig.specialTypes[specType];
-      if (specType === SPECIAL_TYPES.BOMB || specType === SPECIAL_TYPES.FREEZE) {
-        const radiusFactor = specType === SPECIAL_TYPES.BOMB
-          ? specCfg.blastRadiusFactor
-          : specCfg.freezeRadiusFactor;
+      if (
+        specType === SPECIAL_TYPES.BOMB
+        || specType === SPECIAL_TYPES.FREEZE
+        || specType === SPECIAL_TYPES.BRUSH
+      ) {
+        let radiusFactor = specCfg.freezeRadiusFactor;
+        if (specType === SPECIAL_TYPES.BOMB) {
+          radiusFactor = specCfg.blastRadiusFactor;
+        } else if (specType === SPECIAL_TYPES.BRUSH) {
+          radiusFactor = specCfg.paintRadiusFactor;
+        }
         const aoeRadius = currentBall.radius * radiusFactor * blastRadiusMultiplier;
         ctx.save();
         ctx.fillStyle = palette.highlight;

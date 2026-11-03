@@ -16,6 +16,7 @@
         "daily": "Défi du Jour",
         "dailyBonusBadge": "Défi du Jour (+{{coins}} ⬡)",
         "dailyPlayedBadge": "Défi du Jour ✓",
+        "dailyPlayedStreakBadge": "Défi du Jour ✓ ({{streak}}j)",
         "flux": "Mode Flux",
         "shop": "Atelier",
         "shopBadge": "Atelier ({{count}})",
@@ -175,6 +176,10 @@
         "name": "Fusée",
         "tooltip": "Tire trois fusées à tête chercheuse sur les sphères les plus coriaces"
       },
+      "brush": {
+        "name": "Pinceau",
+        "tooltip": "Repeint les sphères voisines d'une même couleur et décape la rouille"
+      },
       "button": {
         "aria": "{{name}} : {{count}} en stock",
         "buyAria": "{{name}} : aucune en stock. Ouvrir l'Atelier pour en acheter",
@@ -241,7 +246,11 @@
         "unlocked": "SUCCÈS : {{name}} (+{{coins}} ⬡)"
       },
       "dailyBonus": {
-        "claimed": "BONUS DU JOUR ! +{{coins}} ⬡"
+        "claimed": "BONUS DU JOUR ! +{{coins}} ⬡",
+        "streakClaimed": "SÉRIE JOUR {{streak}} ! +{{coins}} ⬡"
+      },
+      "collector": {
+        "bin": "COLLECTEUR +{{points}}"
       },
       "special": {
         "bomb": "EXPLOSION !",
@@ -249,7 +258,8 @@
         "rainbow": "RÉSONANCE PRISMATIQUE !",
         "anvil": "IMPACT LOURD !",
         "freeze": "CHAMP CRYOGÉNIQUE !",
-        "rocket": "SALVE DE FUSÉES !"
+        "rocket": "SALVE DE FUSÉES !",
+        "brush": "COUP DE PINCEAU x{{count}} !"
       },
       "wave": {
         "incoming": "Nouvelle rangée magnétique !",
@@ -343,7 +353,9 @@
       "rail": "Les ancres sur rail glissent le long de leur piste : videz un côté et le poids de l'autre entraîne l'ancre !",
       "thruster": "Les propulseurs (⏫) poussent leur amas vers le haut : détruisez-les et l'amas s'affaisse vers la ligne de danger !",
       "tether": "Les sphères amarres (∿) retiennent des sphères éloignées par de longs liens incassables : coupez la sphère amarre pour les faire tomber !",
-      "rust": "La rouille (⚙) bloque tous les groupes : faites-la sauter, tomber, ou repeignez-la. Les fusées (🚀) visent les cibles les plus coriaces !"
+      "rust": "La rouille (⚙) bloque tous les groupes : faites-la sauter, tomber, ou repeignez-la. Les fusées (🚀) visent les cibles les plus coriaces !",
+      "platform": "Les plateformes soutiennent les sphères par en dessous tout en laissant passer vos tirs !",
+      "antimagnet": "Les coussins antimagnétiques repoussent l'amas suspendu sans dévier vos projectiles !"
     },
     "discovery": {
       "hint": "Nouveau : {{icon}} {{name}}. {{description}}"
@@ -406,9 +418,35 @@
       },
       "tabs": {
         "upgrades": "Améliorations",
+        "styles": "Styles",
         "achievements": "Succès ({{unlocked}}/{{total}})",
         "codex": "Codex & Guide",
         "ammo": "Munitions"
+      },
+      "styles": {
+        "free": "Par défaut",
+        "unlocked": "Débloqué",
+        "equipped": "Équipé ✓",
+        "equip": "Équiper",
+        "cost": "{{cost}} ⬡",
+        "items": {
+          "classic": {
+            "name": "Magnétique Classique",
+            "description": "Sphères magnétiques brillantes standard avec dégradé radial."
+          },
+          "crystal": {
+            "name": "Cristal Prismatique",
+            "description": "Géométrie interne hexagonale à facettes qui réfracte la lumière."
+          },
+          "neon": {
+            "name": "Cyber Néon",
+            "description": "Coeur sombre entouré d'un anneau de plasma lumineux à fort contraste."
+          },
+          "metallic": {
+            "name": "Chrome Brossé",
+            "description": "Finition métallique à double anneau et reflet d'alliage spéculaire."
+          }
+        }
       },
       "balance": {
         "label": "Pièces disponibles : {{coins}} ⬡"
@@ -540,6 +578,16 @@
             "icon": "🕳️",
             "name": "Vortex de Singularité",
             "description": "Aspire les billes qui tombent en avalanche pour octroyer un bonus de score et de Surcharge."
+          },
+          "platform": {
+            "icon": "▬",
+            "name": "Plateforme Porteuse",
+            "description": "Étagère à sens unique qui soutient les sphères par en dessous tout en laissant traverser vos tirs."
+          },
+          "antimagnet": {
+            "icon": "💠",
+            "name": "Coussin Antimagnétique",
+            "description": "Repousse les sphères suspendues de l'amas sans dévier les projectiles tirés."
           }
         }
       },
@@ -643,6 +691,7 @@
         "fluxStage": "Forme atteinte : {{stage}} (record : {{best}})"
       },
       "button": {
+        "continueShots": "+{{shots}} tirs ({{cost}} ⬡)",
         "retry": "Réessayer",
         "sameSeed": "Même Graine (#{{seed}})",
         "levels": "Choisir un Niveau",
@@ -655,6 +704,7 @@
         }
       },
       "daily": {
+        "streak": "Série : {{streak}} j",
         "nextIn": "Prochain défi dans {{hours}} h {{minutes}} min"
       }
     },
@@ -676,7 +726,7 @@
           "pointer": "Annuler un tir : relâchez le clic sous le lanceur",
           "touch": "Annuler un tir : ramenez le doigt sous le lanceur avant de relâcher"
         },
-        "keyboard": "Clavier : Flèches pour affiner la visée (Maj : plus vite), Entrée pour tirer, F pour inverser la polarité, 1-6 pour les billes spéciales",
+        "keyboard": "Clavier : Flèches pour affiner la visée (Maj : plus vite), Entrée pour tirer, F pour inverser la polarité, 1-7 pour les billes spéciales",
         "physics": "Astuce : Détachez les ancres ou déséquilibrez les rotors pour créer des réactions en chaîne !"
       },
       "button": {

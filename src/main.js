@@ -59,6 +59,7 @@ class Application {
       const renderer = new Renderer(canvas, gameConfig, ballsConfig, obstaclesConfig);
       renderer.setHighContrast(storageManager.getHighContrast());
       renderer.setColorPatterns(storageManager.getColorPatterns());
+      renderer.setBallStyle(storageManager.getActiveBallStyle());
 
       let uiManager = null;
       const engine = new GameEngine({

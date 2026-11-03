@@ -1820,14 +1820,14 @@ body {
 
   /*
    * Board, overcharge line and control row share one grid: the wrappers around the
-   * launcher buttons and special balls step aside so all eight buttons (Swap, Polarity and
-   * the six special balls) sit in one row.
+   * launcher buttons and special balls step aside so all nine buttons (Swap, Polarity and
+   * the seven special balls) sit in one row.
    */
   .stage-container {
     display: grid;
-    grid-template-columns: repeat(8, minmax(0, 1fr));
+    grid-template-columns: repeat(9, minmax(0, 1fr));
     grid-template-rows: minmax(0, 1fr) auto auto;
-    gap: var(--stage-column-gap) 4px;
+    gap: var(--stage-column-gap) 3px;
     align-items: stretch;
     justify-items: stretch;
   }
@@ -1906,9 +1906,9 @@ body {
     display: block;
     flex: none;
     max-width: 100%;
-    font-size: 0.56rem;
+    font-size: 0.52rem;
     font-weight: 600;
-    letter-spacing: -0.01em;
+    letter-spacing: -0.02em;
     line-height: 1.1;
     text-align: center;
     white-space: nowrap;
@@ -2228,7 +2228,7 @@ body {
 }
 
 /*
- * Portrait phones keep their single control row over the touch minimum above: the eight
+ * Portrait phones keep their single control row over the touch minimum above: the nine
  * buttons share the screen width, so none may ask for 44px of it, and the row keeps its
  * own height, which is taller (room for a caption under each icon).
  */
@@ -2247,13 +2247,23 @@ body {
  */
 @media (max-width: 389px) {
   .stage-container {
-    column-gap: 2px;
+    column-gap: 1px;
+  }
+  .polarity-floating-btn {
+    margin-left: max(2px, env(safe-area-inset-left));
+  }
+  .powerup-btn:last-child {
+    margin-right: max(2px, env(safe-area-inset-right));
   }
   .polarity-floating-btn,
   .swap-floating-btn,
   .powerup-btn {
     padding-left: 0;
     padding-right: 0;
+  }
+  .launcher-caption,
+  .powerup-name {
+    font-size: 0.48rem;
   }
 }
 

@@ -15,8 +15,11 @@
  */
 
 import { configRegistry } from './ConfigRegistry.js';
+import { BALL_STYLES } from './Constants.js';
 import { SeededRandom } from './SeededRandom.js';
 import { countCampaignLevels } from '../game/LevelCatalog.js';
+
+const MS_PER_UTC_DAY = 86_400_000;
 
 /**
  * Manages persistent player progress, settings, currency, and upgrades
@@ -218,13 +221,89 @@ export class StorageManager {
     return lastDate === dateKey;
   }
 
-  claimDailyPlayBonus(dateKey, bonusCoins) {
+  static parseUtcDateKeyMs(dateKey) {
+    if (typeof dateKey !== 'string') {
+      return Number.NaN;
+    }
+    const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateKey);
+    if (!match) {
+      return Number.NaN;
+    }
+    return Date.UTC(
+      Number.parseInt(match[1], 10),
+      Number.parseInt(match[2], 10) - 1,
+      Number.parseInt(match[3], 10)
+    );
+  }
+
+  static isPreviousUtcDay(previousDateKey, currentDateKey) {
+    const prevMs = StorageManager.parseUtcDateKeyMs(previousDateKey);
+    const currMs = StorageManager.parseUtcDateKeyMs(currentDateKey);
+    if (!Number.isFinite(prevMs) || !Number.isFinite(currMs)) {
+      return false;
+    }
+    return currMs - prevMs === MS_PER_UTC_DAY;
+  }
+
+  getDailyStreak(referenceDateKey = SeededRandom.getTodayDateKey()) {
+    const streakKey = this.storageConfig?.keys?.dailyStreak;
+    const dateKeyProp = this.storageConfig?.keys?.dailyStreakDate;
+    if (!streakKey) {
+      return 0;
+    }
+    const storedStreak = this.readNonNegativeInt(streakKey);
+    const storedDate = (dateKeyProp && this.safeGetItem(dateKeyProp))
+      || this.safeGetItem(this.storageConfig.keys.dailyLastPlayedDate);
+    if (storedStreak <= 0 || !storedDate) {
+      return 0;
+    }
+    if (
+      storedDate === referenceDateKey
+      || StorageManager.isPreviousUtcDay(storedDate, referenceDateKey)
+    ) {
+      return storedStreak;
+    }
+    return 0;
+  }
+
+  computeDailyStreakBonus(streak, streakOptions = null) {
+    if (!streakOptions || streak <= 1) {
+      return 0;
+    }
+    const step = StorageManager.toNonNegativeNumber(streakOptions.streakStepCoins);
+    const cap = StorageManager.toNonNegativeNumber(streakOptions.maxStreakBonusCoins);
+    if (step <= 0 || cap <= 0) {
+      return 0;
+    }
+    return Math.min(cap, (streak - 1) * step);
+  }
+
+  claimDailyPlayBonus(dateKey, bonusCoins, streakOptions = null) {
     if (this.hasPlayedDailyToday(dateKey)) {
       return false;
     }
+    const streakKey = this.storageConfig?.keys?.dailyStreak;
+    const streakDateKey = this.storageConfig?.keys?.dailyStreakDate;
+    const prevDate = (streakDateKey && this.safeGetItem(streakDateKey))
+      || this.safeGetItem(this.storageConfig.keys.dailyLastPlayedDate);
+    const prevStreak = streakKey ? this.readNonNegativeInt(streakKey) : 0;
+    const nextStreak = prevDate && StorageManager.isPreviousUtcDay(prevDate, dateKey)
+      ? Math.max(1, prevStreak) + 1
+      : 1;
+
     this.safeSetItem(this.storageConfig.keys.dailyLastPlayedDate, dateKey);
-    if (bonusCoins > 0) {
-      this.addCoins(bonusCoins);
+    if (streakDateKey) {
+      this.safeSetItem(streakDateKey, dateKey);
+    }
+    if (streakKey) {
+      this.safeSetItem(streakKey, nextStreak);
+    }
+
+    const baseCoins = Math.max(0, Math.floor(Number(bonusCoins) || 0));
+    const streakBonus = this.computeDailyStreakBonus(nextStreak, streakOptions);
+    const totalBonus = baseCoins + streakBonus;
+    if (totalBonus > 0) {
+      this.addCoins(totalBonus);
     }
     return true;
   }
@@ -512,6 +591,74 @@ export class StorageManager {
     upgrades[upgradeKey] = currentLevel + 1;
     this.upgradesCache = upgrades;
     this.safeSetItem(this.storageConfig.keys.upgrades, JSON.stringify(upgrades));
+    return true;
+  }
+
+  getUnlockedBallStyles() {
+    const defaultStyle = this.defaultsConfig?.ballStyle || BALL_STYLES.CLASSIC;
+    const key = this.storageConfig?.keys?.unlockedBallStyles;
+    const parsed = key ? this.readJsonObject(key) : {};
+    const unlocked = { [defaultStyle]: true };
+    for (const [styleId, value] of Object.entries(parsed)) {
+      if (value === true) {
+        unlocked[styleId] = true;
+      }
+    }
+    return unlocked;
+  }
+
+  isBallStyleUnlocked(styleId) {
+    if (!styleId || typeof styleId !== 'string') {
+      return false;
+    }
+    const unlocked = this.getUnlockedBallStyles();
+    return unlocked[styleId] === true;
+  }
+
+  getActiveBallStyle() {
+    const defaultStyle = this.defaultsConfig?.ballStyle || BALL_STYLES.CLASSIC;
+    const key = this.storageConfig?.keys?.activeBallStyle;
+    const stored = key ? this.safeGetItem(key) : null;
+    if (stored && this.isBallStyleUnlocked(stored)) {
+      return stored;
+    }
+    return defaultStyle;
+  }
+
+  setActiveBallStyle(styleId) {
+    if (!this.isBallStyleUnlocked(styleId)) {
+      return false;
+    }
+    const key = this.storageConfig?.keys?.activeBallStyle;
+    if (key) {
+      this.safeSetItem(key, styleId);
+    }
+    return true;
+  }
+
+  purchaseBallStyle(styleId, cost) {
+    const stylesCatalog = configRegistry.get('balls')?.styles || {};
+    const spec = stylesCatalog[styleId];
+    if (!spec) {
+      return false;
+    }
+    if (this.isBallStyleUnlocked(styleId)) {
+      this.setActiveBallStyle(styleId);
+      return false;
+    }
+    const cleanCost = Math.max(0, Math.floor(Number(cost ?? spec.cost) || 0));
+    const coins = this.getCoins();
+    if (coins < cleanCost) {
+      return false;
+    }
+    this.setCoins(coins - cleanCost);
+    const unlocked = this.getUnlockedBallStyles();
+    unlocked[styleId] = true;
+    const key = this.storageConfig?.keys?.unlockedBallStyles;
+    if (key) {
+      this.safeSetItem(key, JSON.stringify(unlocked));
+    }
+    this.setActiveBallStyle(styleId);
     return true;
   }
 

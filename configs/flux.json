@@ -21,7 +21,8 @@
     "rainbow": 1,
     "anvil": 0,
     "freeze": 1,
-    "rocket": 0
+    "rocket": 0,
+    "brush": 0
   },
   "bossStageInterval": 5,
   "difficultyRampStages": 12,
@@ -102,6 +103,23 @@
       "placements": [
         { "type": "singularity", "x": 135, "y": 525 },
         { "type": "singularity", "x": 405, "y": 525 }
+      ]
+    },
+    {
+      "id": "platformPair",
+      "cost": 2,
+      "minStage": 31,
+      "placements": [
+        { "type": "platform", "x": 160, "y": 380, "width": 110, "height": 14 },
+        { "type": "platform", "x": 380, "y": 380, "width": 110, "height": 14 }
+      ]
+    },
+    {
+      "id": "antimagnetField",
+      "cost": 2,
+      "minStage": 32,
+      "placements": [
+        { "type": "antimagnet", "x": 270, "y": 420 }
       ]
     }
   ],
