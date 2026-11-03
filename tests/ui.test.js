@@ -1002,3 +1002,33 @@ test('Arcade modes are accessible from both the main navigation bar and the rich
     'formatGameOverStageSummary formats Boss Rush wave and coins earned'
   );
 });
+
+test('Graphical audit guards: collector labels, floating-text clamping, Antimagnet ring, Puzzle swap lock, Codex obstacle colors, and forced-colors tracks', () => {
+  const rendererCode = readFileSync('./src/game/Renderer.js', 'utf8')
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/\/\/.*$/gm, '');
+  assert.match(rendererCode, /theme\.collectorLabelColor/, 'drawCollectorBins uses theme.collectorLabelColor');
+  assert.match(rendererCode, /gameplay\.feedback\.collector\.slotLabel/, 'drawCollectorBins renders localized slot bonus');
+  assert.match(rendererCode, /ctx\.measureText\?\.\(ft\.text\)\?\.width/, 'drawParticles measures floating text width to prevent horizontal clipping');
+  assert.match(rendererCode, /if \(cfg\.outerColor\)/, 'drawObstacles renders outerColor and ringColor on Antimagnet');
+  assert.match(
+    uiManagerCode,
+    /const isSwapLocked = engine\.mode === GAME_MODES\.PUZZLE && engine\.shotsRemaining <= 1;\s*this\.elements\.swapBtn\.disabled = isSwapLocked;/,
+    'UIManager disables #btn-swap-ball when only 1 shot remains in Puzzle mode'
+  );
+  assert.match(
+    uiManagerCode,
+    /const badgeColor = obsSpec\?\.ringColor \|\| obsSpec\?\.borderColor \|\| obsSpec\?\.coreColor \|\| obsSpec\?\.beamColor;/,
+    'CodexView colors obstacle badges from obstacles.json'
+  );
+  const forcedBlock = cssBlock(mainCss, '@media (forced-colors: active)');
+  for (const selector of ['.overcharge-track', '.star-meter', '.achievement-progress-track', '.codex-card', '.ammo-card']) {
+    assert.ok(forcedBlock.includes(selector), `${selector} has an explicit border in forced-colors mode`);
+  }
+  assert.match(mainCss, /\.swap-floating-btn:disabled,\s*\.polarity-floating-btn:disabled\s*\{/);
+  assert.match(
+    cssBlock(mainCss, '.codex-badge'),
+    /box-shadow:\s*inset 0 2px 4px var\(--highlight-alpha-40\),\s*0 2px 6px var\(--shadow-alpha-45\);/,
+    '.codex-badge has 3D orb inner highlight and drop shadow'
+  );
+});

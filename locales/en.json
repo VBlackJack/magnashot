@@ -261,7 +261,8 @@
         "streakClaimed": "STREAK DAY {{streak}}! +{{coins}} ⬡"
       },
       "collector": {
-        "bin": "COLLECTOR +{{points}}"
+        "bin": "COLLECTOR +{{points}}",
+        "slotLabel": "+{{points}}"
       },
       "rescueCore": {
         "freed": "CORE RESCUED! +{{points}}"

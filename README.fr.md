@@ -15,7 +15,7 @@
 
 - **Physique magnétique dynamique** : les sphères de même couleur s'attirent, les pôles opposés (`N`/`S`, `+`/`-`, `Ω`/`Φ`) se rapprochent, et les pôles identiques courbent la trajectoire du projectile. Répulseurs et attracteurs courbent les tirs et font aussi pencher les amas suspendus, à l'écart ou vers eux.
 - **Visée tactique et prévisualisation** :
-  - Viseur laser courbe avec prédiction des rebonds sur les murs et les bumpers.
+  - Viseur laser néon courbe avec défilement animé, halo lumineux et pastilles aux points de rebond sur les murs, obstacles et portails.
   - Prévisualisation en temps réel de la zone d'effet des 7 sphères spéciales (Bombe, Foudre, Prisme, Enclume, Cryo, Fusée, Pinceau).
   - Prédiction de l'**avalanche magnétique** : les sphères qui tomberont une fois leurs liens supérieurs rompus sont mises en évidence.
 - **8 Modes de jeu (barre de navigation, bannière HUD cliquable et cartes de modes)** :
@@ -33,7 +33,8 @@
   - Le niveau 1 s'en tient aux groupes et aux avalanches : trois couleurs, aucune sphère spéciale, aucun modificateur ; les emplacements des sphères spéciales apparaissent dès qu'il y en a une à utiliser.
   - Un niveau qui enseigne un modificateur en montre toujours le même nombre, fixé dans sa définition.
 - **Sensations de jeu** :
-  - **Collecteurs d'avalanche et Seconde chance** : les sphères en chute libre traversant les 5 collecteurs magnétiques au bas du plateau rapportent des points bonus (`+35 pts`) et de la Surcharge (`+4 %`). Tomber à court de tirs en Campagne ou en Mode Flux propose une **Seconde chance** une fois par manche (`+5 tirs` pour `40 ⬡`).
+  - **Collecteurs d'avalanche et Seconde chance** : les sphères en chute libre traversant les 5 collecteurs magnétiques au bas du plateau (marqués `+35`) rapportent des points bonus (`+35 pts`) et de la Surcharge (`+4 %`). Tomber à court de tirs en Campagne ou en Mode Flux propose une **Seconde chance** une fois par manche (`+5 tirs` pour `40 ⬡`).
+  - **Sprites de sphères en cache offscreen et atmosphère d'arène** : les sphères sont pré-rendues en cache avec contre-jour (rim-light) et double reflet spéculaire, les liens magnétiques pulsent avec un halo énergétique à double passe, les textes flottants apparaissent avec un rebond élastique sans jamais déborder des murs, et le calque de fond statique combine halo d'horizon sous le lanceur, vignettage, noeuds de grille et équerres d'angle.
   - **Halo d'alerte sur la ligne de danger et bilan de manche enrichi** : les sphères proches de la ligne de défaite émettent un halo radial pulsé (statique en mode mouvements réduits), et l'écran de fin de partie détaille la vague ou le tableau atteint, le combo maximal et les pièces gagnées, avec partage en un clic dans les 7 modes hors Campagne.
   - Chaque sphère qui se pose envoie une onde qui fait gonfler l'amas, de lien en lien et plus faiblement à chaque pas, avec un léger tremblement d'écran. L'onde ne change que le dessin des sphères ; le mode mouvements réduits coupe les deux.
   - À la victoire, le score défile et les étoiles gagnées apparaissent une par une ; les deux respectent le mode mouvements réduits. L'écran de victoire indique aussi combien de points manquent pour décrocher l'étoile suivante (ou confirme l'objectif 3★), signale les nouveaux records personnels en Campagne, Survie, Défi du jour et Mode Flux, et l'écran de défaite en Campagne ou Mode Flux précise combien de sphères restaient sur le plateau.

@@ -15,6 +15,7 @@
  */
 
 import { GAME_MODES, OBSTACLE_TYPES, SPECIAL_TYPES, CLUSTER_MODIFIERS, BALL_STYLES, MATH_CONSTANTS } from '../core/Constants.js';
+import { t } from '../core/I18n.js';
 import { isChainLink, isTetherLink } from '../physics/PhysicsWorld.js';
 import { Ball } from '../entities/Ball.js';
 import { predictImpact } from './ImpactPreview.js';
@@ -78,6 +79,8 @@ export class Renderer {
 
     const theme = this.gameConfig.theme;
     this.floatingTextFont = `bold ${gameConfig.juice.particles.floatingTextFontSize}px ${theme.fontFamily}`;
+    const collectorLabelPx = gameConfig.scoring?.collector?.labelFontSize || gameConfig.juice.particles.floatingTextFontSize;
+    this.collectorLabelFont = `bold ${collectorLabelPx}px ${theme.fontFamily}`;
     this.labelFontCache = new Map();
     // CSS pixels per logical unit; ball labels are enlarged when it gets small.
     this.displayScale = 1;
@@ -116,6 +119,7 @@ export class Renderer {
     this.aimPreviewComputeCount = 0;
 
     this.ballGradientCache = new Map();
+    this.ballSpriteCache = new Map();
     this.highContrast = false;
     this.colorPatterns = false;
     this.activeBallStyle = gameConfig.defaults?.ballStyle || BALL_STYLES.CLASSIC;
@@ -184,6 +188,7 @@ export class Renderer {
       this.canvas.width = targetW;
       this.canvas.height = targetH;
       this.staticLayerDirty = true;
+      this.ballSpriteCache?.clear();
     }
     this.scaleX = this.canvas.width / this.logicalWidth;
     this.scaleY = this.canvas.height / this.logicalHeight;
@@ -199,7 +204,10 @@ export class Renderer {
   }
 
   createLayerCanvas() {
-    return document.createElement('canvas');
+    if (typeof document !== 'undefined' && typeof document.createElement === 'function') {
+      return document.createElement('canvas');
+    }
+    return null;
   }
 
   /**
@@ -223,23 +231,59 @@ export class Renderer {
     bgGradient.addColorStop(1, theme.backgroundBottom);
     layerCtx.fillStyle = bgGradient;
     layerCtx.fillRect(0, 0, width, height);
+    if (theme.horizonGlowColor && typeof layerCtx.createRadialGradient === 'function') {
+      const launcherY = this.gameConfig.canvas.launcherY ?? (height - (this.gameConfig.canvas.launcherBottomOffset || 0));
+      const glowRadius = width * (theme.horizonGlowRadiusFactor || 0.72);
+      const horizonGrad = layerCtx.createRadialGradient(
+        width * MATH_CONSTANTS.HALF,
+        launcherY,
+        0,
+        width * MATH_CONSTANTS.HALF,
+        launcherY,
+        glowRadius
+      );
+      horizonGrad.addColorStop(0, theme.horizonGlowColor);
+      horizonGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+      layerCtx.fillStyle = horizonGrad;
+      layerCtx.fillRect(0, 0, width, height);
+    }
     this.drawGrid(layerCtx, width, height, theme);
+    if (theme.vignetteColor && typeof layerCtx.createRadialGradient === 'function') {
+      const cx = width * MATH_CONSTANTS.HALF;
+      const cy = height * MATH_CONSTANTS.HALF;
+      const innerR = width * (theme.vignetteInnerRadiusFactor || 0.35);
+      const outerR = height * (theme.vignetteOuterRadiusFactor || 0.78);
+      const vignetteGrad = layerCtx.createRadialGradient(cx, cy, innerR, cx, cy, outerR);
+      vignetteGrad.addColorStop(0, 'rgba(0, 0, 0, 0)');
+      vignetteGrad.addColorStop(1, theme.vignetteColor);
+      layerCtx.fillStyle = vignetteGrad;
+      layerCtx.fillRect(0, 0, width, height);
+    }
     this.drawWalls(layerCtx, width, height, theme);
     this.staticLayerDirty = false;
   }
 
   setColorPatterns(enabled) {
-    this.colorPatterns = Boolean(enabled);
+    const next = Boolean(enabled);
+    if (this.colorPatterns !== next) {
+      this.colorPatterns = next;
+      this.ballSpriteCache?.clear();
+    }
   }
 
   setHighContrast(enabled) {
-    this.highContrast = Boolean(enabled);
+    const next = Boolean(enabled);
+    if (this.highContrast !== next) {
+      this.highContrast = next;
+      this.ballSpriteCache?.clear();
+    }
   }
 
   setBallStyle(styleId) {
     if (styleId && typeof styleId === 'string') {
       this.activeBallStyle = styleId;
       this.ballGradientCache.clear();
+      this.ballSpriteCache?.clear();
     }
   }
 
@@ -412,6 +456,17 @@ export class Renderer {
       ctx.lineTo(width, y);
     }
     ctx.stroke();
+
+    if (theme.gridNodeColor && theme.gridNodeSize) {
+      const nodeSize = theme.gridNodeSize;
+      const halfNode = nodeSize * MATH_CONSTANTS.HALF;
+      ctx.fillStyle = theme.gridNodeColor;
+      for (let x = step; x < width; x += step) {
+        for (let y = step; y < height; y += step) {
+          ctx.fillRect(x - halfNode, y - halfNode, nodeSize, nodeSize);
+        }
+      }
+    }
   }
 
   isBallInDangerWarning(ball, warningThresholdY, alpha) {
@@ -486,6 +541,31 @@ export class Renderer {
     ctx.strokeStyle = theme.wallColor;
     ctx.lineWidth = theme.wallLineWidth;
     ctx.strokeRect(margin * MATH_CONSTANTS.HALF, margin * MATH_CONSTANTS.HALF, width - margin, height - margin);
+
+    if (theme.wallCornerColor && theme.wallCornerLength) {
+      const inset = margin * MATH_CONSTANTS.HALF;
+      const left = inset;
+      const top = inset;
+      const right = width - inset;
+      const bottom = height - inset;
+      const len = theme.wallCornerLength;
+      ctx.strokeStyle = theme.wallCornerColor;
+      ctx.lineWidth = theme.wallCornerLineWidth || theme.wallLineWidth;
+      ctx.beginPath();
+      ctx.moveTo(left, top + len);
+      ctx.lineTo(left, top);
+      ctx.lineTo(left + len, top);
+      ctx.moveTo(right - len, top);
+      ctx.lineTo(right, top);
+      ctx.lineTo(right, top + len);
+      ctx.moveTo(left, bottom - len);
+      ctx.lineTo(left, bottom);
+      ctx.lineTo(left + len, bottom);
+      ctx.moveTo(right - len, bottom);
+      ctx.lineTo(right, bottom);
+      ctx.lineTo(right, bottom - len);
+      ctx.stroke();
+    }
   }
 
   drawMagneticBonds(ctx, physicsWorld, theme, now, alpha = 1.0) {
@@ -556,6 +636,21 @@ export class Renderer {
         }
         segments[style].push(ax, ay, bx, by);
       }
+    }
+
+    if (theme.magneticBondGlowWidth) {
+      ctx.lineWidth = theme.magneticBondGlowWidth;
+      if (segments[BOND_STYLE.STRESSED].length > 0 && theme.magneticStressGlowColor) {
+        this.strokeSegments(ctx, segments[BOND_STYLE.STRESSED], theme.magneticStressGlowColor);
+      }
+      if (segments[BOND_STYLE.SAME_COLOR].length > 0 && theme.magneticBondGlowAlpha) {
+        this.strokeSegments(
+          ctx,
+          segments[BOND_STYLE.SAME_COLOR],
+          `rgba(${theme.magneticSameColorBase}, ${theme.magneticBondGlowAlpha * pulse})`
+        );
+      }
+      ctx.lineWidth = theme.magneticBondLineWidth;
     }
 
     if (segments[BOND_STYLE.STRESSED].length > 0) {
@@ -754,10 +849,31 @@ export class Renderer {
         ctx.stroke();
         ctx.globalAlpha = 1;
 
-        ctx.fillStyle = cfg.coreColor;
-        ctx.beginPath();
-        ctx.arc(ox, oy, obs.radius, 0, MATH_CONSTANTS.TWO_PI);
-        ctx.fill();
+        if (cfg.outerColor) {
+          const inset = obsDefaults.ringInset;
+          ctx.fillStyle = cfg.outerColor;
+          ctx.beginPath();
+          ctx.arc(ox, oy, obs.radius, 0, MATH_CONSTANTS.TWO_PI);
+          ctx.fill();
+
+          if (cfg.ringColor) {
+            ctx.strokeStyle = cfg.ringColor;
+            ctx.lineWidth = obsDefaults.lineWidth;
+            ctx.beginPath();
+            ctx.arc(ox, oy, Math.max(obsDefaults.fieldWaveMinRadius, obs.radius - inset), 0, MATH_CONSTANTS.TWO_PI);
+            ctx.stroke();
+          }
+
+          ctx.fillStyle = cfg.coreColor;
+          ctx.beginPath();
+          ctx.arc(ox, oy, Math.max(obsDefaults.fieldWaveMinRadius, obs.radius - inset * 2), 0, MATH_CONSTANTS.TWO_PI);
+          ctx.fill();
+        } else {
+          ctx.fillStyle = cfg.coreColor;
+          ctx.beginPath();
+          ctx.arc(ox, oy, obs.radius, 0, MATH_CONSTANTS.TWO_PI);
+          ctx.fill();
+        }
       } else if (obs.type === OBSTACLE_TYPES.PIVOT) {
         const inset = obsDefaults.ringInset;
         ctx.translate(ox, oy);
@@ -835,6 +951,106 @@ export class Renderer {
     );
   }
 
+  /**
+   * Renders the sphere body (radial gradient, active style overlay, colorblind pattern,
+   * outline border, rim-light arc, and specular highlights) centered at (0, 0).
+   */
+  drawBallOrb(ctx, palette, r) {
+    const renderCfg = this.ballsConfig.render;
+    ctx.fillStyle = this.getCachedBallGradient(palette, r);
+    ctx.beginPath();
+    ctx.arc(0, 0, r, 0, MATH_CONSTANTS.TWO_PI);
+    ctx.fill();
+    if (this.activeBallStyle && this.activeBallStyle !== BALL_STYLES.CLASSIC) {
+      this.drawBallStyleOverlay(ctx, palette, r);
+      ctx.beginPath();
+      ctx.arc(0, 0, r, 0, MATH_CONSTANTS.TWO_PI);
+    }
+    if (this.colorPatterns && palette.pattern) {
+      this.drawColorPattern(ctx, palette.pattern, r);
+      // save/restore does not keep the current path: rebuild the outline the border strokes.
+      ctx.beginPath();
+      ctx.arc(0, 0, r, 0, MATH_CONSTANTS.TWO_PI);
+    }
+
+    ctx.strokeStyle = this.highContrast ? renderCfg.borderStrokeHighContrast : renderCfg.borderStrokeNormal;
+    ctx.lineWidth = this.highContrast ? renderCfg.borderWidthHighContrast : renderCfg.borderWidthNormal;
+    ctx.stroke();
+
+    if (renderCfg.rimLightAlpha && !this.highContrast) {
+      ctx.save();
+      ctx.strokeStyle = palette.highlight;
+      ctx.globalAlpha = renderCfg.rimLightAlpha;
+      ctx.lineWidth = renderCfg.borderWidthNormal;
+      ctx.beginPath();
+      ctx.arc(
+        0,
+        0,
+        Math.max(1, r - (renderCfg.rimLightInset || 1.5)),
+        renderCfg.rimLightStartAngle ?? 0.35,
+        renderCfg.rimLightEndAngle ?? 1.95
+      );
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    ctx.fillStyle = renderCfg.shineColor;
+    ctx.beginPath();
+    ctx.ellipse(
+      r * renderCfg.shineOffsetFactor,
+      r * renderCfg.shineOffsetFactor,
+      r * renderCfg.shineRadiusXFactor,
+      r * renderCfg.shineRadiusYFactor,
+      -MATH_CONSTANTS.QUARTER_PI,
+      0,
+      MATH_CONSTANTS.TWO_PI
+    );
+    ctx.fill();
+
+    if (renderCfg.secondaryShineRadiusFactor) {
+      ctx.save();
+      ctx.fillStyle = renderCfg.shineColor;
+      ctx.globalAlpha = renderCfg.secondaryShineAlpha || 1.0;
+      const secOffset = r * (renderCfg.secondaryShineOffsetFactor || -0.14);
+      ctx.beginPath();
+      ctx.arc(secOffset, secOffset, r * renderCfg.secondaryShineRadiusFactor, 0, MATH_CONSTANTS.TWO_PI);
+      ctx.fill();
+      ctx.restore();
+    }
+  }
+
+  /**
+   * Returns a cached offscreen sprite canvas for a sphere's static orb layer, keyed by
+   * palette, radius, ball style, colorblind pattern, and high-contrast state.
+   */
+  getCachedBallSprite(palette, radius) {
+    if (!this.ballSpriteCache) {
+      return null;
+    }
+    const styleKey = this.activeBallStyle || BALL_STYLES.CLASSIC;
+    const key = `${palette.id}_${radius}_${styleKey}_${this.colorPatterns ? 1 : 0}_${this.highContrast ? 1 : 0}`;
+    let entry = this.ballSpriteCache.get(key);
+    if (!entry) {
+      const spriteCanvas = this.createLayerCanvas();
+      if (!spriteCanvas) {
+        return null;
+      }
+      const pad = this.ballsConfig.render.spritePadding || 4;
+      const halfLogical = radius + pad;
+      const logicalSize = halfLogical * 2;
+      const scaleX = this.scaleX || 1;
+      const scaleY = this.scaleY || 1;
+      spriteCanvas.width = Math.max(1, Math.ceil(logicalSize * scaleX));
+      spriteCanvas.height = Math.max(1, Math.ceil(logicalSize * scaleY));
+      const spriteCtx = spriteCanvas.getContext('2d');
+      spriteCtx.setTransform(scaleX, 0, 0, scaleY, halfLogical * scaleX, halfLogical * scaleY);
+      this.drawBallOrb(spriteCtx, palette, radius);
+      entry = { canvas: spriteCanvas, halfLogical, logicalSize };
+      this.ballSpriteCache.set(key, entry);
+    }
+    return entry;
+  }
+
   drawBallAt(ctx, ball, bxPos, byPos, now) {
     const palette = this.getBallPalette(ball);
     const r = ball.radius;
@@ -870,38 +1086,18 @@ export class Renderer {
       ctx.fill();
     }
 
-    ctx.fillStyle = this.getCachedBallGradient(palette, r);
-    ctx.beginPath();
-    ctx.arc(0, 0, r, 0, MATH_CONSTANTS.TWO_PI);
-    ctx.fill();
-    if (this.activeBallStyle !== BALL_STYLES.CLASSIC) {
-      this.drawBallStyleOverlay(ctx, palette, r);
-      ctx.beginPath();
-      ctx.arc(0, 0, r, 0, MATH_CONSTANTS.TWO_PI);
+    const sprite = this.getCachedBallSprite(palette, r);
+    if (sprite) {
+      ctx.drawImage(
+        sprite.canvas,
+        -sprite.halfLogical,
+        -sprite.halfLogical,
+        sprite.logicalSize,
+        sprite.logicalSize
+      );
+    } else {
+      this.drawBallOrb(ctx, palette, r);
     }
-    if (this.colorPatterns && palette.pattern) {
-      this.drawColorPattern(ctx, palette.pattern, r);
-      // save/restore does not keep the current path: rebuild the outline the border strokes.
-      ctx.beginPath();
-      ctx.arc(0, 0, r, 0, MATH_CONSTANTS.TWO_PI);
-    }
-
-    ctx.strokeStyle = this.highContrast ? renderCfg.borderStrokeHighContrast : renderCfg.borderStrokeNormal;
-    ctx.lineWidth = this.highContrast ? renderCfg.borderWidthHighContrast : renderCfg.borderWidthNormal;
-    ctx.stroke();
-
-    ctx.fillStyle = renderCfg.shineColor;
-    ctx.beginPath();
-    ctx.ellipse(
-      r * renderCfg.shineOffsetFactor,
-      r * renderCfg.shineOffsetFactor,
-      r * renderCfg.shineRadiusXFactor,
-      r * renderCfg.shineRadiusYFactor,
-      -MATH_CONSTANTS.QUARTER_PI,
-      0,
-      MATH_CONSTANTS.TWO_PI
-    );
-    ctx.fill();
 
     if (ball.isFrozen) {
       ctx.fillStyle = theme.frozenOverlayColor;
@@ -1064,6 +1260,21 @@ export class Renderer {
       ctx.lineTo(dividerX, height - margin * MATH_CONSTANTS.HALF);
     }
     ctx.stroke();
+
+    if (theme.collectorLabelColor && collectorCfg.bonusPointsPerBall > 0) {
+      const labelText = t('gameplay.feedback.collector.slotLabel', {
+        points: collectorCfg.bonusPointsPerBall
+      });
+      ctx.fillStyle = theme.collectorLabelColor;
+      ctx.font = this.collectorLabelFont;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      const labelY = topY + collectorCfg.zoneHeight * MATH_CONSTANTS.HALF;
+      for (let i = 0; i < collectorCfg.slotCount; i++) {
+        const slotCenterX = margin + (i + MATH_CONSTANTS.HALF) * slotWidth;
+        ctx.fillText(labelText, slotCenterX, labelY);
+      }
+    }
     ctx.restore();
   }
 
@@ -1396,9 +1607,7 @@ export class Renderer {
     const palette = this.getBallPalette(currentBall);
 
     ctx.save();
-    ctx.strokeStyle = palette.highlight;
-    ctx.lineWidth = theme.aimLineWidth;
-    ctx.setLineDash(theme.aimLineDash);
+    const dashOffset = this.reducedMotion || !theme.aimDashSpeed ? 0 : -(now * theme.aimDashSpeed);
     ctx.beginPath();
     ctx.moveTo(points[0].x, points[0].y);
     for (let i = 1; i < points.length; i++) {
@@ -1408,8 +1617,34 @@ export class Renderer {
         ctx.lineTo(points[i].x, points[i].y);
       }
     }
+    if (theme.aimGlowWidth && theme.aimGlowAlpha) {
+      ctx.strokeStyle = palette.fill;
+      ctx.lineWidth = theme.aimGlowWidth;
+      ctx.globalAlpha = theme.aimGlowAlpha;
+      ctx.setLineDash([]);
+      ctx.stroke();
+    }
+    ctx.globalAlpha = 1.0;
+    ctx.strokeStyle = palette.highlight;
+    ctx.lineWidth = theme.aimLineWidth;
+    ctx.setLineDash(theme.aimLineDash);
+    ctx.lineDashOffset = dashOffset;
     ctx.stroke();
     ctx.setLineDash([]);
+    ctx.lineDashOffset = 0;
+
+    if (theme.aimBounceNodeRadius) {
+      ctx.fillStyle = palette.highlight;
+      ctx.globalAlpha = theme.aimBounceNodeAlpha || 1.0;
+      for (let i = 1; i < points.length - 1; i++) {
+        if (points[i].isBounce) {
+          ctx.beginPath();
+          ctx.arc(points[i].x, points[i].y, theme.aimBounceNodeRadius, 0, MATH_CONSTANTS.TWO_PI);
+          ctx.fill();
+        }
+      }
+      ctx.globalAlpha = 1.0;
+    }
 
     const endX = points.landingX !== undefined ? points.landingX : points[points.length - 1].x;
     const endY = points.landingY !== undefined ? points.landingY : points[points.length - 1].y;
@@ -1696,15 +1931,34 @@ export class Renderer {
 
     const shadowColor = theme.floatingTextShadowColor;
     const shadowOffset = pCfg.floatingTextShadowOffset;
+    const wallMargin = this.gameConfig.canvas.wallMargin;
+    const maxTextWidth = Math.max(0, this.logicalWidth - wallMargin * 2);
     ctx.font = this.floatingTextFont;
     ctx.textAlign = 'center';
     for (const ft of particleSystem.floatingTexts) {
       const fy = this.interpolate(ft.prevY, ft.y, alpha);
+      const measuredWidth = Math.min(maxTextWidth, ctx.measureText?.(ft.text)?.width || 0);
+      const halfWidth = measuredWidth * MATH_CONSTANTS.HALF;
+      const minX = wallMargin + halfWidth;
+      const maxX = Math.max(minX, this.logicalWidth - wallMargin - halfWidth);
+      const fx = Math.min(maxX, Math.max(minX, ft.x));
       ctx.globalAlpha = Math.max(0, ft.alpha);
-      ctx.fillStyle = shadowColor;
-      ctx.fillText(ft.text, ft.x + shadowOffset, fy + shadowOffset);
-      ctx.fillStyle = ft.color;
-      ctx.fillText(ft.text, ft.x, fy);
+      const scale = ft.scale && ft.scale !== 1 ? ft.scale : 1;
+      if (scale !== 1) {
+        ctx.save();
+        ctx.translate(fx, fy);
+        ctx.scale(scale, scale);
+        ctx.fillStyle = shadowColor;
+        ctx.fillText(ft.text, shadowOffset, shadowOffset, maxTextWidth);
+        ctx.fillStyle = ft.color;
+        ctx.fillText(ft.text, 0, 0, maxTextWidth);
+        ctx.restore();
+      } else {
+        ctx.fillStyle = shadowColor;
+        ctx.fillText(ft.text, fx + shadowOffset, fy + shadowOffset, maxTextWidth);
+        ctx.fillStyle = ft.color;
+        ctx.fillText(ft.text, fx, fy, maxTextWidth);
+      }
     }
 
     ctx.restore();

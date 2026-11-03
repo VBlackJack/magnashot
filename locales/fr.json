@@ -261,7 +261,8 @@
         "streakClaimed": "SÉRIE JOUR {{streak}} ! +{{coins}} ⬡"
       },
       "collector": {
-        "bin": "COLLECTEUR +{{points}}"
+        "bin": "COLLECTEUR +{{points}}",
+        "slotLabel": "+{{points}}"
       },
       "rescueCore": {
         "freed": "NOYAU SAUVÉ ! +{{points}}"

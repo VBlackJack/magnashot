@@ -2667,6 +2667,11 @@ export class UIManager {
       this.elements.polarityBtn.classList.toggle('active', Boolean(engine.isPolarityFlipped));
     }
 
+    if (this.elements.swapBtn) {
+      const isSwapLocked = engine.mode === GAME_MODES.PUZZLE && engine.shotsRemaining <= 1;
+      this.elements.swapBtn.disabled = isSwapLocked;
+    }
+
     const warningShotsThreshold = this.gameConfig.canvas.survivalWaveWarningThreshold;
 
     const coreRescueSuffix =

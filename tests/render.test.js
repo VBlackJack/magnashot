@@ -59,7 +59,12 @@ const createStubContext = () => {
         return target[prop];
       }
       if (prop === 'createLinearGradient' || prop === 'createRadialGradient') {
-        return () => ({ addColorStop() {} });
+        return (...args) => {
+          for (const arg of args) {
+            assert.ok(Number.isFinite(arg), `${prop} received non-finite coordinate: ${arg}`);
+          }
+          return { addColorStop() {} };
+        };
       }
       return () => {};
     },
@@ -623,4 +628,142 @@ test('Blitz auto-fire countdown ring and danger zone proximity glow render witho
   assert.doesNotThrow(() => renderer.render(engine, 1.0));
   engine.setReducedMotion(true);
   assert.doesNotThrow(() => renderer.render(engine, 1.0));
+});
+
+test('drawParticles clamps floating texts horizontally within wall margins and drawObstacles renders Antimagnet rings', () => {
+  const engine = createTestEngine();
+  engine.startCascadeMode();
+  const renderer = createRenderer();
+  const fillTextCalls = [];
+  renderer.ctx.measureText = () => ({ width: 160 });
+  renderer.ctx.fillText = (text, x, y, maxWidth) => {
+    fillTextCalls.push({ text, x, y, maxWidth });
+  };
+
+  engine.particleSystem.spawnFloatingText(10, 200, 'LEFT EDGE CLIP TEST', '#ffffff');
+  engine.particleSystem.spawnFloatingText(460, 200, 'RIGHT EDGE CLIP TEST', '#ffffff');
+  renderer.drawParticles(renderer.ctx, engine.particleSystem, 1.0);
+
+  const wallMargin = gameConfig.canvas.wallMargin;
+  const expectedMinX = wallMargin + 80;
+  const expectedMaxX = gameConfig.canvas.logicalWidth - wallMargin - 80;
+  const leftMainCall = fillTextCalls.find((c) => c.text === 'LEFT EDGE CLIP TEST' && c.x === expectedMinX);
+  const rightMainCall = fillTextCalls.find((c) => c.text === 'RIGHT EDGE CLIP TEST' && c.x === expectedMaxX);
+  assert.ok(leftMainCall, 'floating text near left wall is clamped to wallMargin + halfWidth');
+  assert.ok(rightMainCall, 'floating text near right wall is clamped to logicalWidth - wallMargin - halfWidth');
+  assert.equal(leftMainCall.maxWidth, gameConfig.canvas.logicalWidth - wallMargin * 2);
+
+  assert.doesNotThrow(() => renderer.render(engine, 1.0));
+});
+
+test('Ball sprite cache reuses offscreen sprites per palette and invalidates on style, pattern, or contrast changes', () => {
+  const engine = createTestEngine();
+  engine.startCampaignLevel(1);
+  const renderer = createRenderer();
+  let createdCanvases = 0;
+  renderer.createLayerCanvas = () => {
+    createdCanvases++;
+    return createStubCanvas();
+  };
+
+  renderer.render(engine, 1.0);
+  const afterFirstFrame = createdCanvases;
+  const cachedCount = renderer.ballSpriteCache.size;
+  assert.ok(cachedCount > 0, 'sphere sprites are cached on the first render pass');
+
+  renderer.render(engine, 1.0);
+  assert.equal(createdCanvases, afterFirstFrame, 'subsequent frame reuses cached sphere sprites without allocating new canvases');
+
+  renderer.setBallStyle('plasma');
+  assert.equal(renderer.ballSpriteCache.size, 0, 'changing ball style clears the sprite cache');
+  renderer.render(engine, 1.0);
+  assert.ok(renderer.ballSpriteCache.size > 0);
+
+  renderer.setColorPatterns(true);
+  assert.equal(renderer.ballSpriteCache.size, 0, 'toggling color patterns clears the sprite cache');
+  renderer.render(engine, 1.0);
+  assert.ok(renderer.ballSpriteCache.size > 0);
+
+  renderer.setHighContrast(true);
+  assert.equal(renderer.ballSpriteCache.size, 0, 'toggling high contrast clears the sprite cache');
+});
+
+test('Floating texts play an elastic pop-in scale animation unless reduced motion is active', () => {
+  const engine = createTestEngine();
+  engine.startCampaignLevel(1);
+  const ps = engine.particleSystem;
+  ps.spawnFloatingText(235, 300, '+500', '#38bdf8');
+  const ft = ps.floatingTexts[0];
+  assert.equal(ft.scale, 1.0);
+
+  ps.update();
+  assert.ok(ft.scale !== 1.0, 'pop-in animation adjusts scale during initial frames');
+
+  let maxScale = ft.scale;
+  for (let i = 0; i < gameConfig.juice.particles.floatingTextPopFrames + 2; i++) {
+    ps.update();
+    if (ft.scale > maxScale) {
+      maxScale = ft.scale;
+    }
+  }
+  assert.ok(maxScale > 1.0, 'elastic pop-in overshoots above 1.0');
+  assert.equal(ft.scale, 1.0, 'scale settles back to 1.0 once pop-in completes');
+
+  engine.setReducedMotion(true);
+  ps.spawnFloatingText(235, 300, '+250', '#38bdf8');
+  const reducedFt = ps.floatingTexts.at(-1);
+  ps.update();
+  assert.equal(reducedFt.scale, 1.0, 'reduced motion keeps floating text scale at 1.0');
+});
+
+test('Aim trajectory marks wall bounce vertices with isBounce and renders glow, animated dash, and bounce nodes', () => {
+  const engine = createTestEngine();
+  engine.startCampaignLevel(1);
+  // Aim sharply toward the left wall so the trajectory bounces off the wall.
+  engine.updateAim(gameConfig.canvas.wallMargin + 5, gameConfig.canvas.launcherY - 120);
+  assert.ok(
+    engine.aimPoints.some((pt) => pt.isBounce),
+    'wall bounce vertex along the aim trajectory is tagged with isBounce = true'
+  );
+
+  const renderer = createRenderer();
+  const dashOffsets = [];
+  let arcCount = 0;
+  renderer.ctx = new Proxy(
+    {},
+    {
+      get(target, prop) {
+        if (prop === 'arc') {
+          return () => {
+            arcCount++;
+          };
+        }
+        if (prop === 'createLinearGradient' || prop === 'createRadialGradient') {
+          return () => ({ addColorStop() {} });
+        }
+        return target[prop] || (() => {});
+      },
+      set(target, prop, value) {
+        if (prop === 'lineDashOffset') {
+          dashOffsets.push(value);
+        }
+        target[prop] = value;
+        return true;
+      }
+    }
+  );
+
+  renderer.drawAimTrajectory(
+    renderer.ctx,
+    engine.aimPoints,
+    engine.currentBall,
+    engine.physicsWorld,
+    gameConfig.theme,
+    200,
+    engine.getBlastRadiusMultiplier(),
+    engine.aimAngle,
+    1.0
+  );
+  assert.ok(dashOffsets.some((offset) => offset < 0), 'aim laser animates lineDashOffset when reducedMotion is false');
+  assert.ok(arcCount >= 2, 'aim laser draws both the landing ghost circle and bounce node circles');
 });

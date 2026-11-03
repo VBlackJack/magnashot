@@ -4,6 +4,23 @@ All notable changes to **MagnaShot** are documented in this file.
 
 ## [Unreleased]
 
+## [1.9.5] - 2026-11-03
+
+### Added
+- **Offscreen Sphere Sprite Cache & 3D Lighting (`ballSpriteCache`, `drawBallOrb`)**: Pre-rendered static sphere layers (radial gradient, active visual style overlay, colorblind pattern, outline border, bottom-right rim-light arc, and dual specular highlights) into offscreen sprite canvases cached by `(color, radius, style, pattern, highContrast)`, with automatic invalidation on style, pattern, contrast, or DPR changes.
+- **Animated Neon Aim Laser & Bounce Nodes (`drawAimTrajectory`, `traceAimTrajectory`)**: Tagged wall, obstacle, and portal ricochet vertices along the aim trajectory with `isBounce = true` and rendered a dual-pass neon aim laser (outer colored glow + animated marching dashes respecting `reducedMotion`) with luminous circular nodes at every bounce point.
+- **Enriched Static Arena Background (`buildStaticLayer`, `drawGrid`, `drawWalls`)**: Added a radial launcher horizon glow, peripheral radial vignette, subtle grid intersection nodes, and glowing wall corner brackets to the pre-rendered static background layer at zero per-frame rendering cost.
+- **Magnetic Bond Energy Halo (`drawMagneticBonds`)**: Added an outer energy glow pass behind stressed and same-color magnetic bonds before stroking their bright inner cores.
+- **Elastic Floating Text Pop-In (`ParticleSystem.update`, `drawParticles`)**: Added an elastic scale curve (`floatingTextPopFrames`, `floatingTextPopStartScale`, `floatingTextPopOvershoot`) when floating combat texts spawn, bypassed when `reducedMotion` is enabled.
+- **3D Orbs Across All Codex Badges (`CodexView.js`, `.codex-badge`)**: Applied 3D radial gradients (`specialIconBackground`) and inner-highlight / drop-shadow styling across cluster modifier, magnetic obstacle, special ball, and Daily Challenge mutator badges in the Workshop Codex.
+
+### Fixed
+- **Horizontal Clamping of Canvas Floating Texts (`drawParticles`)**: Measured rendered text width and clamped floating text `x` coordinates within `[wallMargin + width / 2, logicalWidth - wallMargin - width / 2]` with `maxWidth` enforcement so edge spawns never clip against the canvas walls.
+- **Collector Bin Bonus Labels (`drawCollectorBins`)**: Rendered localized `+35` bonus labels (`gameplay.feedback.collector.slotLabel`) inside the 5 bottom avalanche collector bins using `theme.collectorLabelColor`.
+- **Antimagnet Obstacle Rim & Outer Field (`drawObstacles`)**: Rendered `cfg.outerColor` and dashed `cfg.ringColor` from `configs/obstacles.json` on `OBSTACLE_TYPES.ANTIMAGNET` so cushions remain clearly visible between wave pulses.
+- **Puzzle Mode Swap Button State (`UIManager.refresh`)**: Disabled `#btn-swap-ball` whenever `shotsRemaining <= 1` in Puzzle mode to match the hidden secondary ball preview and styled `:disabled` dock buttons.
+- **Forced-Colors Progress & Meter Tracks (`styles/main.css`)**: Added explicit `1px solid ButtonText` borders to `.overcharge-track`, `.star-meter`, `.achievement-progress-track`, `.codex-card`, and `.ammo-card` under `@media (forced-colors: active)`.
+
 ## [1.9.4] - 2026-11-03
 
 ### Fixed

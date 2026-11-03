@@ -262,6 +262,8 @@ export class ParticleSystem {
     item.color = color;
     item.vy = this.cfg.floatingTextVy;
     item.alpha = 1.0;
+    item.age = 0;
+    item.scale = 1.0;
     this.floatingTexts.push(item);
   }
 
@@ -330,6 +332,16 @@ export class ParticleSystem {
       const ft = this.floatingTexts[i];
       ft.prevY = ft.y;
       ft.y += ft.vy;
+      ft.age = (ft.age || 0) + 1;
+      if (!this.reducedMotion && cfg.floatingTextPopFrames > 0 && ft.age <= cfg.floatingTextPopFrames) {
+        const progress = ft.age / cfg.floatingTextPopFrames;
+        ft.scale =
+          cfg.floatingTextPopStartScale
+          + (1 - cfg.floatingTextPopStartScale) * progress
+          + Math.sin(progress * Math.PI) * cfg.floatingTextPopOvershoot;
+      } else {
+        ft.scale = 1.0;
+      }
       ft.alpha -= cfg.floatingTextAlphaDecay;
       if (ft.alpha <= 0) {
         this.removeAt(this.floatingTexts, i, this.textPool);

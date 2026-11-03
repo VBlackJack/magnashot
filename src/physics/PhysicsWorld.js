@@ -1580,16 +1580,17 @@ export class PhysicsWorld {
   /**
    * Appends a point to the aim path, reusing pooled point objects.
    */
-  pushAimPoint(x, y, warpBreak) {
+  pushAimPoint(x, y, warpBreak, isBounce = false) {
     const index = this.aimPoints.length;
     let point = this.aimPointPool[index];
     if (!point) {
-      point = { x: 0, y: 0, warpBreak: false };
+      point = { x: 0, y: 0, warpBreak: false, isBounce: false };
       this.aimPointPool[index] = point;
     }
     point.x = x;
     point.y = y;
     point.warpBreak = warpBreak;
+    point.isBounce = Boolean(isBounce);
     this.aimPoints.push(point);
   }
 
@@ -1745,15 +1746,16 @@ export class PhysicsWorld {
 
       const prevX = state.x;
       const prevY = state.y;
+      const prevBounces = state.bounces;
 
       this.advanceProjectileMotion(state, dt, isAnvil, null, preview);
 
       if (state.warpedThisStep) {
-        this.pushAimPoint(state.warpFromX, state.warpFromY, false);
-        this.pushAimPoint(state.x, state.y, true);
+        this.pushAimPoint(state.warpFromX, state.warpFromY, false, true);
+        this.pushAimPoint(state.x, state.y, true, true);
         traveled += Math.hypot(state.warpFromX - prevX, state.warpFromY - prevY);
       } else {
-        this.pushAimPoint(state.x, state.y, false);
+        this.pushAimPoint(state.x, state.y, false, state.bounces > prevBounces);
         traveled += Math.hypot(state.x - prevX, state.y - prevY);
       }
 

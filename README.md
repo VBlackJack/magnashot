@@ -15,7 +15,7 @@
 
 - **Dynamic Magnetic Physics**: Same-color spheres attract, opposite magnetic poles (`N`/`S`, `+`/`-`, `Ω`/`Φ`) pull, and like poles curve projectile trajectories. Repulsors and attractors bend shots and also make the hanging clusters lean away from or toward them.
 - **Tactical Aiming & Predictive Preview**:
-  - Curved laser sight with wall and bumper ricochet prediction.
+  - Curved neon laser sight with animated dash flow, outer glow, and luminous ricochet nodes on wall, obstacle, and portal bounces.
   - Real-time blast/effect radius preview for all 7 Special Balls (Bomb, Lightning, Prism, Anvil, Cryo, Rocket, Brush).
   - Live **Magnetic Avalanche** prediction highlighting unanchored spheres that will drop when upper bonds are severed.
 - **8 Game Modes (Direct Nav, Clickable HUD Banner & Mode Cards)**:
@@ -33,7 +33,8 @@
   - Level 1 keeps to matching and avalanches: three colors, no special ball, no modifier; the special ball slots appear once there is one to use.
   - A level that teaches a modifier always shows the same number of it, set in its definition.
 - **Game Feel**:
-  - **Avalanche Collector Bins & Second Chance**: Falling avalanche spheres crossing the 5 bottom collector bins grant bonus points (`+35 pts`) and Overcharge (`+4%`). Running out of shots in Campaign or Flux Mode offers a once-per-round **Second Chance** (`+5 shots` for `40 ⬡`).
+  - **Avalanche Collector Bins & Second Chance**: Falling avalanche spheres crossing the 5 bottom collector bins (labelled `+35` on the board) grant bonus points (`+35 pts`) and Overcharge (`+4%`). Running out of shots in Campaign or Flux Mode offers a once-per-round **Second Chance** (`+5 shots` for `40 ⬡`).
+  - **HiDPI Offscreen Sphere Sprites & Arena Atmosphere**: Spheres are pre-rendered into offscreen sprite caches with rim-lighting and dual specular highlights, magnetic bonds pulse with a dual-layer energy halo, floating texts pop in elastically (clamped inside the arena walls), and the static arena layer combines a radial launcher glow, peripheral vignette, grid intersection nodes, and corner brackets.
   - **Danger Line Proximity Glow & Enriched Run Summary**: Spheres entering the danger warning zone emit a pulsing radial warning halo (static in reduced motion), and the Game Over screen reports detailed run metrics (wave/stage reached, max combo, and coins earned) with spoiler-free **Share** support across all 7 non-campaign modes.
   - Every landing sends a swelling wave through the cluster, bond by bond and weaker at each step, with a light screen shake. The wave only changes how spheres are drawn; reduced motion turns both off.
   - The victory score rolls up and the earned stars pop in one after another; both respect reduced motion. The victory screen also shows how many points remain to reach the next star (or confirms 3★), and highlights new personal records across Campaign, Survival, Daily Challenge, and Flux Mode, while Campaign and Flux defeats report how many spheres were left on the board.

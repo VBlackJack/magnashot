@@ -55,6 +55,10 @@ export function buildCodexPane() {
     const badge = document.createElement('div');
     badge.className = 'codex-badge';
     badge.style.borderColor = modSpec.ringColor;
+    badge.style.background = specialIconBackground({
+      highlight: modSpec.ringColor,
+      fill: this.ballsConfig.neutralPalette?.fill || this.gameConfig.theme.launcherBaseColor
+    });
     badge.textContent = modSpec.badge || '';
 
     const info = document.createElement('div');
@@ -79,12 +83,22 @@ export function buildCodexPane() {
 
   const obsGrid = document.createElement('div');
   obsGrid.className = 'codex-grid';
+  const obstacleTypes = this.obstaclesConfig?.types || this.engine?.obstaclesConfig?.types || {};
   for (const obsKey of OBSTACLE_TYPES_ORDER) {
     const card = document.createElement('div');
     card.className = 'codex-card';
 
+    const obsSpec = obstacleTypes[obsKey];
     const badge = document.createElement('div');
     badge.className = 'codex-badge';
+    const badgeColor = obsSpec?.ringColor || obsSpec?.borderColor || obsSpec?.coreColor || obsSpec?.beamColor;
+    if (badgeColor) {
+      badge.style.borderColor = badgeColor;
+      badge.style.background = specialIconBackground({
+        highlight: badgeColor,
+        fill: obsSpec?.fillColor || obsSpec?.outerColor || this.gameConfig.theme.launcherBaseColor
+      });
+    }
     badge.textContent = t(`modals.shop.codex.obstacles.${obsKey}.icon`);
 
     const info = document.createElement('div');
@@ -152,6 +166,12 @@ export function buildCodexPane() {
 
       const badge = document.createElement('div');
       badge.className = 'codex-badge';
+      const mutColor = this.gameConfig.theme.wavePopupColor;
+      badge.style.borderColor = mutColor;
+      badge.style.background = specialIconBackground({
+        highlight: mutColor,
+        fill: this.gameConfig.theme.launcherBaseColor
+      });
       badge.textContent = t(`modals.shop.codex.mutators.${mutKey}.icon`);
 
       const info = document.createElement('div');
