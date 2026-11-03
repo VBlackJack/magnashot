@@ -111,7 +111,8 @@
       },
       "shots": {
         "label": "Shots Left",
-        "waveLabel": "Next Wave"
+        "waveLabel": "Next Wave",
+        "shieldsLabel": "Boss Shields"
       },
       "time": {
         "label": "Time Left",
@@ -488,7 +489,9 @@
         "stock": "In Stock: {{count}}",
         "buy": "+1 ({{cost}} ⬡)",
         "unavailable": "No active run",
-        "unavailableHint": "Start a level, Survival, Daily or Flux run to buy ammo."
+        "unavailableHint": "Start a Campaign, Survival, Daily, Flux, Blitz, Boss Rush or Cascade run to buy ammo.",
+        "puzzleLocked": "Fixed loadout",
+        "puzzleLockedHint": "Puzzle stages use a fixed special-ball loadout."
       },
       "codex": {
         "modifiersTitle": "Cluster Ball Modifiers",
@@ -685,7 +688,9 @@
       },
       "feedback": {
         "upgradePurchased": "{{name}} upgraded to level {{level}} of {{maxLevel}}.",
-        "ammoPurchased": "{{name}} purchased. In stock: {{count}}."
+        "ammoPurchased": "{{name}} purchased. In stock: {{count}}.",
+        "stylePurchased": "{{name}} style unlocked and equipped.",
+        "styleEquipped": "{{name}} style equipped."
       },
       "button": {
         "close": "Close"
@@ -946,6 +951,22 @@
       "header": "MagnaShot - Flux Mode",
       "headerWithSeed": "MagnaShot - Flux Mode (#{{seed}})",
       "stats": "Shape {{stage}} - {{score}} pts"
+    },
+    "puzzle": {
+      "header": "MagnaShot - Puzzle Mode",
+      "stats": "Stage {{stage}} - {{score}} pts"
+    },
+    "blitz": {
+      "header": "MagnaShot - Blitz 90s",
+      "stats": "Wave {{wave}} - {{score}} pts"
+    },
+    "bossRush": {
+      "header": "MagnaShot - Boss Rush",
+      "stats": "Wave {{wave}} - {{score}} pts"
+    },
+    "cascade": {
+      "header": "MagnaShot - Cascade Drop",
+      "stats": "Wave {{wave}} - {{score}} pts"
     },
     "feedback": {
       "shared": "Result shared.",

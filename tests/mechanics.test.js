@@ -615,6 +615,11 @@ test('RescueCore objective clears the round and releases remaining spheres as an
   board.destroyClusterBall(rescue);
   assert.equal(board.rescuedCores, 1, 'Freeing a Rescue Core increments rescuedCores');
   assert.equal(board.isObjectiveCleared(), true, 'Board objective is cleared when no Rescue Core remains');
+  const floatingTexts = board.particleSystem.floatingTexts || [];
+  assert.ok(
+    floatingTexts.every((ft) => !String(ft.text).includes('undefined')),
+    'Rescue Core floating text interpolates points without undefined'
+  );
 
   board.evaluateRoundEnd();
   assert.equal(board.state, 'victory', 'Freeing the last Rescue Core triggers Victory even with other spheres left');

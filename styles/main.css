@@ -974,13 +974,15 @@ body {
 
 .modal-tabs {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
   border-bottom: 1px solid var(--border-subtle);
   padding-bottom: 8px;
 }
 
 .modal-tab {
-  flex: 1;
+  flex: 1 1 auto;
+  min-width: fit-content;
   background: var(--surface-sunken);
   color: var(--text-muted);
   border: 1px solid var(--border-subtle);
@@ -1153,7 +1155,8 @@ body {
   padding-right: 4px;
 }
 
-#shop-grid {
+#shop-grid,
+#shop-styles-grid {
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
   max-height: none;
   overflow-y: visible;
@@ -2449,6 +2452,7 @@ body {
   .tutorial-dismiss-btn,
   .level-chapter,
   .flux-seed-input,
+  .arcade-mode-card,
   .level-card.unlocked {
     border: 1px solid ButtonText;
   }
@@ -2461,6 +2465,7 @@ body {
     border: 1px dashed GrayText;
   }
   .nav-btn.active-mode,
+  .arcade-mode-card.active-mode,
   .modal-tab.active,
   .level-chapter.active,
   .powerup-btn.equipped,

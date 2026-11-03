@@ -212,3 +212,45 @@ test('Flux share text includes seed header and ?flux=<seed> link when seed is pr
   assert.equal(readFluxSeedFromSearch('?flux=1000000', fluxSeedConfig), null);
   assert.equal(readFluxSeedFromSearch('', fluxSeedConfig), null);
 });
+
+test('buildShareText formats shareable results for Puzzle, Blitz, Boss Rush, and Cascade modes in English and French', () => {
+  useLocale('en');
+  assert.deepEqual(
+    buildShareText({ mode: GAME_MODES.PUZZLE, puzzleStage: 3, score: 4200, url: shareConfig.url }, shareConfig).split('\n'),
+    [locales.en.share.puzzle.header, 'Stage 3 - 4,200 pts', shareConfig.url]
+  );
+  assert.deepEqual(
+    buildShareText(
+      { mode: GAME_MODES.BLITZ, wave: 4, score: 9800, waveLog: [WAVE_TYPES.NORMAL, WAVE_TYPES.GOLD_RUSH], url: shareConfig.url },
+      shareConfig
+    ).split('\n'),
+    [
+      locales.en.share.blitz.header,
+      'Wave 4 - 9,800 pts',
+      `${shareConfig.waveEmoji.normal}${shareConfig.waveEmoji.goldRush}`,
+      shareConfig.url
+    ]
+  );
+  assert.deepEqual(
+    buildShareText({ mode: GAME_MODES.BOSS_RUSH, wave: 2, score: 15400, url: shareConfig.url }, shareConfig).split('\n'),
+    [locales.en.share.bossRush.header, 'Wave 2 - 15,400 pts', shareConfig.url]
+  );
+  assert.deepEqual(
+    buildShareText({ mode: GAME_MODES.CASCADE, wave: 6, score: 11250, url: shareConfig.url }, shareConfig).split('\n'),
+    [locales.en.share.cascade.header, 'Wave 6 - 11,250 pts', shareConfig.url]
+  );
+
+  useLocale('fr');
+  assert.deepEqual(
+    buildShareText({ mode: GAME_MODES.PUZZLE, puzzleStage: 3, score: 4200, url: shareConfig.url }, shareConfig).split('\n'),
+    [locales.fr.share.puzzle.header, `Niveau 3 - ${formatFrench(4200)} pts`, shareConfig.url]
+  );
+  assert.deepEqual(
+    buildShareText({ mode: GAME_MODES.BOSS_RUSH, wave: 2, score: 15400, url: shareConfig.url }, shareConfig).split('\n'),
+    [locales.fr.share.bossRush.header, `Vague 2 - ${formatFrench(15400)} pts`, shareConfig.url]
+  );
+  assert.deepEqual(
+    buildShareText({ mode: GAME_MODES.CASCADE, wave: 6, score: 11250, url: shareConfig.url }, shareConfig).split('\n'),
+    [locales.fr.share.cascade.header, `Vague 6 - ${formatFrench(11250)} pts`, shareConfig.url]
+  );
+});

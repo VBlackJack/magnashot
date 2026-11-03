@@ -652,6 +652,15 @@ test('Puzzle mode loads deterministic stages, fixed launcher queues, and blocks 
   assert.equal(engine.shotsRemaining, gameConfig.puzzles[0].shots);
   assert.equal(engine.currentBall.colorId, gameConfig.puzzles[0].queue[0].colorId);
   assert.equal(engine.buySpecialAmmo('bomb'), false, 'Puzzle mode forbids buying extra special ammo');
+
+  engine.shotsRemaining = 0;
+  engine.score = 100;
+  engine.physicsWorld.clear();
+  engine.evaluateRoundEnd();
+  assert.equal(engine.state, 'victory');
+  assert.ok(engine.victorySummary.nextStarTarget > engine.score, '1-star Puzzle clear reports nextStarTarget');
+  assert.equal(engine.victorySummary.nextStarNumber, 2);
+  assert.equal(storage.getPuzzleBestStage(), 2, 'Clearing Puzzle stage 1 unlocks stage 2');
 });
 
 test('Blitz 90s mode counts down timer, auto-fires on hesitation, and triggers timeUp game over at zero', () => {

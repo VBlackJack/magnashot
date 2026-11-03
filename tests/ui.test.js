@@ -960,4 +960,14 @@ test('Arcade modes are accessible from both the main navigation bar and the rich
     assert.match(levelsModal, new RegExp(`id="${id}"[^>]*class="arcade-mode-card"`));
   }
   assert.match(indexHtml, /id="hud-mode-banner"[^>]*role="button"[^>]*tabindex="0"/);
+
+  const ui = Object.create(UIManager.prototype);
+  ui.gameConfig = gameConfig;
+  ui.storageManager = { getPuzzleBestStage: () => 3 };
+  ui.engine = { mode: 'campaign', currentPuzzleStage: 1 };
+  assert.equal(ui.getSuggestedPuzzleStage(), 3, 'Switching into Puzzle mode resumes at the best unlocked stage');
+  ui.engine = { mode: 'puzzle', currentPuzzleStage: 3 };
+  assert.equal(ui.getSuggestedPuzzleStage(), 4, 'Clicking Puzzle while already in Puzzle mode cycles to the next stage');
+  ui.engine = { mode: 'puzzle', currentPuzzleStage: gameConfig.puzzles.length };
+  assert.equal(ui.getSuggestedPuzzleStage(), 1, 'Cycling past the final Puzzle stage wraps back to stage 1');
 });

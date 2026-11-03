@@ -111,7 +111,8 @@
       },
       "shots": {
         "label": "Tirs restants",
-        "waveLabel": "Vague dans"
+        "waveLabel": "Vague dans",
+        "shieldsLabel": "Boucliers Boss"
       },
       "time": {
         "label": "Temps restant",
@@ -488,7 +489,9 @@
         "stock": "En stock : {{count}}",
         "buy": "+1 ({{cost}} ⬡)",
         "unavailable": "Aucune manche en cours",
-        "unavailableHint": "Lancez un niveau, la Survie, le Défi du Jour ou le Mode Flux pour acheter des munitions."
+        "unavailableHint": "Lancez une manche (Campagne, Survie, Défi du Jour, Flux, Blitz, Boss Rush ou Cascade) pour acheter des munitions.",
+        "puzzleLocked": "Dotation fixe",
+        "puzzleLockedHint": "Les niveaux Puzzle utilisent une dotation fixe de billes spéciales."
       },
       "codex": {
         "modifiersTitle": "Modificateurs de l'Amas",
@@ -685,7 +688,9 @@
       },
       "feedback": {
         "upgradePurchased": "{{name}} amélioré au niveau {{level}} sur {{maxLevel}}.",
-        "ammoPurchased": "{{name}} acheté. En stock : {{count}}."
+        "ammoPurchased": "{{name}} acheté. En stock : {{count}}.",
+        "stylePurchased": "Style {{name}} débloqué et équipé.",
+        "styleEquipped": "Style {{name}} équipé."
       },
       "button": {
         "close": "Fermer"
@@ -946,6 +951,22 @@
       "header": "MagnaShot - Mode Flux",
       "headerWithSeed": "MagnaShot - Mode Flux (#{{seed}})",
       "stats": "Forme {{stage}} - {{score}} pts"
+    },
+    "puzzle": {
+      "header": "MagnaShot - Mode Puzzle",
+      "stats": "Niveau {{stage}} - {{score}} pts"
+    },
+    "blitz": {
+      "header": "MagnaShot - Blitz 90s",
+      "stats": "Vague {{wave}} - {{score}} pts"
+    },
+    "bossRush": {
+      "header": "MagnaShot - Boss Rush",
+      "stats": "Vague {{wave}} - {{score}} pts"
+    },
+    "cascade": {
+      "header": "MagnaShot - Cascade",
+      "stats": "Vague {{wave}} - {{score}} pts"
     },
     "feedback": {
       "shared": "Résultat partagé.",

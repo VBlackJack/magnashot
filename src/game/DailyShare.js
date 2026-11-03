@@ -230,6 +230,79 @@ function buildFluxShareText({ stage, score, seed, url }) {
 }
 
 /**
+ * Builds the result of a Puzzle run: mode header, stage reached and score, then the game address.
+ * @param {object} run
+ * @param {number} [run.puzzleStage] - Puzzle stage played.
+ * @param {number} [run.stage] - Fallback stage number when passed via generic `stage`.
+ * @param {number} run.score - Final score.
+ * @param {string} run.url - Game address appended on the last line.
+ * @returns {string}
+ */
+function buildPuzzleShareText({ puzzleStage, stage, score, url }) {
+  const resolvedStage = puzzleStage ?? stage ?? 1;
+  return [
+    t('share.puzzle.header'),
+    t('share.puzzle.stats', { stage: formatNumber(resolvedStage), score: formatNumber(score) }),
+    url
+  ].join(LINE_SEPARATOR);
+}
+
+/**
+ * Builds the result of a Blitz 90s run: mode header, wave and score, wave symbols if any, then the game address.
+ * @param {object} run
+ * @param {number} run.wave - Wave reached.
+ * @param {number} run.score - Final score.
+ * @param {string[]} [run.waveLog] - Kind of each wave passed.
+ * @param {string} run.url - Game address appended on the last line.
+ * @param {object} shareConfig - The `share` section of configs/game.json.
+ * @returns {string}
+ */
+function buildBlitzShareText({ wave, score, waveLog, url }, shareConfig) {
+  const lines = [
+    t('share.blitz.header'),
+    t('share.blitz.stats', { wave: formatNumber(wave), score: formatNumber(score) })
+  ];
+  const waveRow = buildWaveRow(waveLog || [], shareConfig);
+  if (waveRow) {
+    lines.push(waveRow);
+  }
+  lines.push(url);
+  return lines.join(LINE_SEPARATOR);
+}
+
+/**
+ * Builds the result of a Boss Rush run: mode header, boss wave reached and score, then the game address.
+ * @param {object} run
+ * @param {number} run.wave - Boss wave reached.
+ * @param {number} run.score - Final score.
+ * @param {string} run.url - Game address appended on the last line.
+ * @returns {string}
+ */
+function buildBossRushShareText({ wave, score, url }) {
+  return [
+    t('share.bossRush.header'),
+    t('share.bossRush.stats', { wave: formatNumber(wave), score: formatNumber(score) }),
+    url
+  ].join(LINE_SEPARATOR);
+}
+
+/**
+ * Builds the result of a Cascade Drop run: mode header, wave reached and score, then the game address.
+ * @param {object} run
+ * @param {number} run.wave - Cascade wave reached.
+ * @param {number} run.score - Final score.
+ * @param {string} run.url - Game address appended on the last line.
+ * @returns {string}
+ */
+function buildCascadeShareText({ wave, score, url }) {
+  return [
+    t('share.cascade.header'),
+    t('share.cascade.stats', { wave: formatNumber(wave), score: formatNumber(score) }),
+    url
+  ].join(LINE_SEPARATOR);
+}
+
+/**
  * Builds the shareable result of a run in the mode it was played. The campaign never
  * shares, so it is rejected like any unknown mode.
  * @param {object} run - Run summary; `run.mode` is a GAME_MODES value, the other fields
@@ -246,6 +319,14 @@ export function buildShareText(run, shareConfig) {
       return buildSurvivalShareText(run, shareConfig);
     case GAME_MODES.FLUX:
       return buildFluxShareText(run);
+    case GAME_MODES.PUZZLE:
+      return buildPuzzleShareText(run);
+    case GAME_MODES.BLITZ:
+      return buildBlitzShareText(run, shareConfig);
+    case GAME_MODES.BOSS_RUSH:
+      return buildBossRushShareText(run);
+    case GAME_MODES.CASCADE:
+      return buildCascadeShareText(run);
     default:
       throw new RangeError(`No shareable result for game mode "${run.mode}"`);
   }

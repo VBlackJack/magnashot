@@ -253,7 +253,11 @@ export class GameEngine {
     } else if (this.mode === GAME_MODES.CASCADE) {
       this.storageManager.setCascadeHighScore?.(this.score);
     } else if (this.mode === GAME_MODES.PUZZLE) {
-      this.storageManager.setPuzzleRecord?.(this.score, this.currentPuzzleStage);
+      const totalPuzzles = this.gameConfig.puzzles?.length || 1;
+      const reachedStage = this.state === GAME_STATES.VICTORY && this.currentPuzzleStage < totalPuzzles
+        ? this.currentPuzzleStage + 1
+        : this.currentPuzzleStage;
+      this.storageManager.setPuzzleRecord?.(this.score, reachedStage);
     }
   }
 
@@ -2247,7 +2251,10 @@ export class GameEngine {
     this.particleSystem.spawnFloatingText(
       ball.x,
       ball.y + this.gameConfig.canvas.floatingTextOffsetY,
-      t('gameplay.feedback.rescueCore.freed', { coins: rescueSpec.coinsReward }),
+      t('gameplay.feedback.rescueCore.freed', {
+        points: rescueSpec.pointsPerCore,
+        coins: rescueSpec.coinsReward
+      }),
       rescueSpec.highlight
     );
   }
@@ -2957,6 +2964,10 @@ export class GameEngine {
         const stars = this.computeStars(this.score);
         const previousBest = this.storageManager.getPuzzleHighScore?.() || 0;
         const isNewRecord = previousBest > 0 && this.score > previousBest;
+        const thresholds = this.getStarThresholds();
+        const nextStarTarget = thresholds.find((th) => th > this.score) ?? null;
+        const nextStarNumber = nextStarTarget !== null ? stars + 1 : null;
+        const pointsToNextStar = nextStarTarget !== null ? Math.max(1, nextStarTarget - this.score) : 0;
         const earnedCoins = stars * this.gameConfig.scoring.coinsPerVictoryStar;
         this.storageManager.addCoins(earnedCoins);
         this.flushPendingRunCoins();
@@ -2969,9 +2980,9 @@ export class GameEngine {
           stars,
           earnedCoins,
           isNewRecord,
-          nextStarTarget: null,
-          nextStarNumber: null,
-          pointsToNextStar: 0
+          nextStarTarget,
+          nextStarNumber,
+          pointsToNextStar
         };
         this.victoryCelebrationFrames = this.gameConfig.victory.celebrationFrames;
         this.particleSystem.spawnFloatingText(

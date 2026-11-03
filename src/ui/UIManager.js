@@ -1234,7 +1234,7 @@ export class UIManager {
       btn?.addEventListener('click', () => {
         this.requestDestructiveAction(() => {
           this.hideAllModals();
-          this.engine.startPuzzleMode();
+          this.engine.startPuzzleMode(this.getSuggestedPuzzleStage());
         }, () => t('modals.levelSelect.arcade.puzzle'));
       });
     }
@@ -2214,6 +2214,7 @@ export class UIManager {
         score: engine.score,
         waveLog: engine.waveLog,
         stage: engine.fluxStage,
+        puzzleStage: engine.currentPuzzleStage,
         seed: engine.fluxSeed,
         url: shareConfig.url
       },
@@ -2302,6 +2303,19 @@ export class UIManager {
 
   isCampaignRunActive() {
     return this.engine.mode === GAME_MODES.CAMPAIGN && this.isRunActive();
+  }
+
+  /**
+   * Puzzle stage launched from navigation: advances to the next stage when already in
+   * Puzzle mode, otherwise resumes at the highest unlocked stage.
+   */
+  getSuggestedPuzzleStage() {
+    const totalPuzzles = Math.max(1, this.gameConfig?.puzzles?.length || 1);
+    if (this.engine?.mode === GAME_MODES.PUZZLE && this.engine.currentPuzzleStage >= 1) {
+      return (this.engine.currentPuzzleStage % totalPuzzles) + 1;
+    }
+    const bestStage = this.storageManager?.getPuzzleBestStage?.() || 1;
+    return Math.min(totalPuzzles, Math.max(1, bestStage));
   }
 
   /** The level the select dialog puts forward: the one being played, else the furthest unlocked. */
@@ -2703,7 +2717,10 @@ export class UIManager {
         );
       }
       if (this.elements.shotsLabel) {
-        setTextIfChanged(this.elements.shotsLabel, t('hud.stats.shots.waveLabel'));
+        const shotsLabelKey = engine.mode === GAME_MODES.BOSS_RUSH
+          ? 'hud.stats.shots.shieldsLabel'
+          : 'hud.stats.shots.waveLabel';
+        setTextIfChanged(this.elements.shotsLabel, t(shotsLabelKey));
       }
       const waveCountdown =
         engine.mode === GAME_MODES.CASCADE

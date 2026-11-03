@@ -180,8 +180,9 @@ export function renderWorkshopContents() {
   if (this.elements.shopAmmoGrid && this.gameConfig.specialShopCosts) {
     const ammoGrid = this.elements.shopAmmoGrid;
     ammoGrid.replaceChildren();
-    // Ammo is stocked into the current run, so it cannot be bought between runs.
-    const canBuyAmmo = this.isRunActive();
+    // Ammo is stocked into the current run, so it cannot be bought between runs or in Puzzle mode.
+    const isPuzzleRun = this.engine.mode === GAME_MODES.PUZZLE && this.isRunActive();
+    const canBuyAmmo = this.isRunActive() && !isPuzzleRun;
     for (let slotIndex = 0; slotIndex < SPECIAL_TYPES_ORDER.length; slotIndex++) {
       const type = SPECIAL_TYPES_ORDER[slotIndex];
       const spec = this.ballsConfig.specialTypes[type];
@@ -219,6 +220,9 @@ export function renderWorkshopContents() {
       buyAmmoBtn.classList.toggle('unavailable', !canBuyAmmo);
       if (canBuyAmmo) {
         buyAmmoBtn.textContent = t('modals.shop.specialAmmo.buy', { cost: formatNumber(cost) });
+      } else if (isPuzzleRun) {
+        buyAmmoBtn.textContent = t('modals.shop.specialAmmo.puzzleLocked');
+        buyAmmoBtn.title = t('modals.shop.specialAmmo.puzzleLockedHint');
       } else {
         buyAmmoBtn.textContent = t('modals.shop.specialAmmo.unavailable');
         buyAmmoBtn.title = t('modals.shop.specialAmmo.unavailableHint');
@@ -269,9 +273,10 @@ export function renderWorkshopContents() {
         header.textContent = t('modals.shop.styles.cost', { cost: formatNumber(cost) });
       }
 
+      const styleName = t(`modals.shop.styles.items.${styleId}.name`);
       const title = document.createElement('div');
       title.className = 'level-card-title';
-      title.textContent = `${spec.icon || ''} ${t(`modals.shop.styles.items.${styleId}.name`)}`.trim();
+      title.textContent = `${spec.icon || ''} ${styleName}`.trim();
 
       const desc = document.createElement('div');
       desc.className = 'level-card-desc';
@@ -298,6 +303,7 @@ export function renderWorkshopContents() {
           if (this.storageManager.setActiveBallStyle(styleId)) {
             this.renderer?.setBallStyle?.(styleId);
             this.audioManager.playEffect('snap');
+            this.announce(t('modals.shop.feedback.styleEquipped', { name: styleName }));
             this.rerenderShopKeepingFocus(`.style-action-btn[data-style-id="${styleId}"]`, slotIndex);
           }
         });
@@ -309,6 +315,7 @@ export function renderWorkshopContents() {
             this.renderer?.setBallStyle?.(styleId);
             this.audioManager.playEffect('match', 2);
             this.refresh(this.engine, this.lastExtra);
+            this.announce(t('modals.shop.feedback.stylePurchased', { name: styleName }));
             this.rerenderShopKeepingFocus(`.style-action-btn[data-style-id="${styleId}"]`, slotIndex);
           }
         });
