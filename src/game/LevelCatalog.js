@@ -200,8 +200,14 @@ export class LevelCatalog {
       return null;
     }
     if (!this.isGenerated(levelId)) {
-      const { id, nameKey, descriptionKey } = this.authored.find((level) => level.id === levelId);
-      return { id, isGenerated: false, nameKey, descriptionKey };
+      const authored = this.authored.find((level) => level.id === levelId);
+      const { id, nameKey, descriptionKey } = authored;
+      const isLandmark = Boolean(
+        authored.bossBallIndex !== undefined ||
+        authored.minModifierCounts?.bossCore > 0 ||
+        authored.modifierWeights?.bossCore > 0
+      );
+      return { id, isGenerated: false, nameKey, descriptionKey, isLandmark };
     }
     const { chapter, chapterLevel } = placeGeneratedLevel(this.generatedIndex(levelId), this.generated);
     const featuredMechanics = this.featuredMechanicsOf(chapter);

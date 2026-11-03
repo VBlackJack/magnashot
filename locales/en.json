@@ -363,7 +363,13 @@
         "ariaCurrent": "Level {{id}} (Current): {{name}}, {{stars}} of {{maxStars}} stars, {{best}}",
         "bestScore": "Best: {{score}}",
         "starsAria": "Stars: {{stars}} of {{maxStars}}",
-        "current": "Current"
+        "current": "Current",
+        "formatBadge": {
+          "landmark": "Boss",
+          "precision": "Precision",
+          "arsenal": "Arsenal",
+          "twist": "Twist"
+        }
       },
       "button": {
         "close": "Close",
@@ -386,6 +392,12 @@
         "allCompletedInChapter": "All unlocked levels in this chapter already have 3★!",
         "announcedIncomplete": "Filter enabled: unlocked levels with fewer than 3 stars.",
         "announcedAll": "Filter disabled: all levels in chapter."
+      },
+      "fluxSeed": {
+        "placeholder": "Flux #seed",
+        "ariaLabel": "Flux seed code (6 characters)",
+        "launch": "Flux",
+        "invalidHint": "Enter a valid {{length}}-character Flux seed (letters a-z and digits 0-9)."
       }
     },
     "shop": {
@@ -609,6 +621,7 @@
       },
       "button": {
         "nextLevel": "Next Level",
+        "nextIncomplete": "Next < 3★ Level",
         "replay": "Replay",
         "levels": "Level Select",
         "backToLevels": "Back to Levels"

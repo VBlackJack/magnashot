@@ -363,7 +363,13 @@
         "ariaCurrent": "Niveau {{id}} (En cours) : {{name}}, {{stars}} étoiles sur {{maxStars}}, {{best}}",
         "bestScore": "Record : {{score}}",
         "starsAria": "Étoiles : {{stars}} sur {{maxStars}}",
-        "current": "En cours"
+        "current": "En cours",
+        "formatBadge": {
+          "landmark": "Boss",
+          "precision": "Précision",
+          "arsenal": "Arsenal",
+          "twist": "Variante"
+        }
       },
       "button": {
         "close": "Fermer",
@@ -386,6 +392,12 @@
         "allCompletedInChapter": "Tous les niveaux débloqués de ce chapitre ont déjà 3★ !",
         "announcedIncomplete": "Filtre activé : niveaux débloqués à moins de 3 étoiles.",
         "announcedAll": "Filtre désactivé : tous les niveaux du chapitre."
+      },
+      "fluxSeed": {
+        "placeholder": "Graine #flux",
+        "ariaLabel": "Code de graine Flux (6 caractères)",
+        "launch": "Flux",
+        "invalidHint": "Entrez une graine Flux valide de {{length}} caractères (lettres a-z et chiffres 0-9)."
       }
     },
     "shop": {
@@ -609,6 +621,7 @@
       },
       "button": {
         "nextLevel": "Niveau Suivant",
+        "nextIncomplete": "Niveau < 3★ suivant",
         "replay": "Rejouer",
         "levels": "Carte des Niveaux",
         "backToLevels": "Retour aux niveaux"

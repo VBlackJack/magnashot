@@ -376,6 +376,7 @@
       "coins": "coins",
       "upgrades": "upgrades",
       "achievements": "achievements",
+      "achievementRecords": "achievement_records",
       "runSnapshot": "run_snapshot",
       "discoveries": "discoveries"
     },

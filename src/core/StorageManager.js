@@ -312,6 +312,47 @@ export class StorageManager {
     return true;
   }
 
+  /**
+   * Persistent personal-best counters backing the Workshop achievement progress bars.
+   * @returns {{maxCombo: number, endlessWave: number, maxAvalanche: number, bossesDestroyed: number, shotsRemainingOnClear: number}}
+   */
+  getAchievementRecords() {
+    const key = this.storageConfig?.keys?.achievementRecords;
+    const parsed = key ? this.readJsonObject(key) : {};
+    return {
+      maxCombo: StorageManager.toNonNegativeNumber(parsed.maxCombo),
+      endlessWave: StorageManager.toNonNegativeNumber(parsed.endlessWave),
+      maxAvalanche: StorageManager.toNonNegativeNumber(parsed.maxAvalanche),
+      bossesDestroyed: StorageManager.toNonNegativeNumber(parsed.bossesDestroyed),
+      shotsRemainingOnClear: StorageManager.toNonNegativeNumber(parsed.shotsRemainingOnClear)
+    };
+  }
+
+  /**
+   * Updates any achievement progress counter whose new value exceeds the stored best.
+   * @param {Partial<ReturnType<StorageManager['getAchievementRecords']>>} partialRecords
+   */
+  recordAchievementProgress(partialRecords) {
+    const key = this.storageConfig?.keys?.achievementRecords;
+    if (!key || !partialRecords || typeof partialRecords !== 'object') {
+      return;
+    }
+    const current = this.getAchievementRecords();
+    let changed = false;
+    for (const field of Object.keys(current)) {
+      if (Object.prototype.hasOwnProperty.call(partialRecords, field)) {
+        const candidate = StorageManager.toNonNegativeNumber(partialRecords[field]);
+        if (candidate > current[field]) {
+          current[field] = candidate;
+          changed = true;
+        }
+      }
+    }
+    if (changed) {
+      this.safeSetItem(key, JSON.stringify(current));
+    }
+  }
+
   /** True once discoveries have been written, even as an empty set. */
   hasDiscoveries() {
     return this.safeGetItem(this.storageConfig.keys.discoveries) !== null;

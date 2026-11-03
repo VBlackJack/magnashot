@@ -36,13 +36,16 @@ import {
   VICTORY_NEXT_ACTIONS,
   VICTORY_NEXT_LABEL_KEYS,
   resolveModalFocusTarget,
+  resolveNextCampaignTarget,
+  resolveLevelFormatBadgeKey,
   resolveVictoryNextAction,
   revealLiveRegion,
   shouldIgnoreRepeatedKey
 } from '../src/ui/UIManager.js';
 import { applyWorldGeometry } from '../src/core/WorldGeometry.js';
-import { LevelCatalog } from '../src/game/LevelCatalog.js';
-import { stripFluxSeedFromUrl } from '../src/game/DailyShare.js';
+import { StorageManager } from '../src/core/StorageManager.js';
+import { LevelCatalog, LEVEL_FORMATS } from '../src/game/LevelCatalog.js';
+import { parseFluxSeedInput, stripFluxSeedFromUrl } from '../src/game/DailyShare.js';
 
 const loadJson = (p) => JSON.parse(readFileSync(p, 'utf8'));
 const gameConfig = applyWorldGeometry(loadJson('./configs/game.json'));
@@ -473,7 +476,8 @@ test('the star gauge runs from the last star earned to the next one', () => {
   assert.equal(computeStarProgressPct(5000, thresholds, undefined), 100, 'all stars: full gauge');
 });
 
-const uiManagerSource = readFileSync('./src/ui/UIManager.js', 'utf8');
+const UI_MODULE_FILES = ['UIManager.js', 'CodexView.js', 'WorkshopView.js', 'LevelSelectView.js'];
+const uiManagerSource = UI_MODULE_FILES.map((file) => readFileSync(`./src/ui/${file}`, 'utf8')).join('\n');
 const uiManagerCode = uiManagerSource.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
 
 /** Custom property declarations of a CSS block, as a name -> value map. */
@@ -840,5 +844,108 @@ test('Level select incomplete filter, Flux same-seed button, achievement progres
     assert.deepEqual(placeholdersOf(locale.modals.shop.achievements.progress), ['current', 'target']);
     assert.deepEqual(placeholdersOf(locale.modals.gameOver.button.sameSeed), ['seed']);
     assert.deepEqual(placeholdersOf(locale.share.flux.headerWithSeed), ['seed']);
+    assert.ok(locale.modals.victory.button.nextIncomplete);
+    assert.ok(locale.modals.levelSelect.fluxSeed.placeholder);
+    assert.ok(locale.modals.levelSelect.fluxSeed.ariaLabel);
+    assert.ok(locale.modals.levelSelect.fluxSeed.launch);
+    assert.deepEqual(placeholdersOf(locale.modals.levelSelect.fluxSeed.invalidHint), ['length']);
+    for (const badgeKey of ['landmark', 'precision', 'arsenal', 'twist']) {
+      assert.ok(locale.modals.levelSelect.card.formatBadge[badgeKey]);
+    }
   }
+});
+
+test('StorageManager persists all-time best achievement progress records', () => {
+  const storage = new StorageManager();
+  storage.storageConfig = loadJson('./configs/game.json').storage;
+  assert.deepEqual(storage.getAchievementRecords(), {
+    maxCombo: 0,
+    endlessWave: 0,
+    maxAvalanche: 0,
+    bossesDestroyed: 0,
+    shotsRemainingOnClear: 0
+  });
+  storage.recordAchievementProgress({ maxCombo: 3, endlessWave: 6, maxAvalanche: 9 });
+  storage.recordAchievementProgress({ maxCombo: 2, endlessWave: 8, bossesDestroyed: 1, shotsRemainingOnClear: 5 });
+  assert.deepEqual(storage.getAchievementRecords(), {
+    maxCombo: 3,
+    endlessWave: 8,
+    maxAvalanche: 9,
+    bossesDestroyed: 1,
+    shotsRemainingOnClear: 5
+  });
+});
+
+test('resolveNextCampaignTarget finds the next unlocked < 3★ level when filterIncomplete is active', () => {
+  const catalog = new LevelCatalog({
+    levelsConfig: loadJson('./configs/levels.json'),
+    campaignConfig: loadJson('./configs/campaign.json'),
+    fluxConfig: loadJson('./configs/flux.json'),
+    obstaclesConfig: loadJson('./configs/obstacles.json'),
+    ballRadius: loadJson('./configs/physics.json').ball.radius
+  });
+  const stats = {
+    1: { stars: 3 },
+    2: { stars: 2 },
+    3: { stars: 3 },
+    4: { stars: 1 }
+  };
+  assert.deepEqual(
+    resolveNextCampaignTarget(1, catalog, { filterIncomplete: true, unlockedLevel: 5, levelStats: stats, maxStars: 3 }),
+    { action: VICTORY_NEXT_ACTIONS.NEXT_INCOMPLETE, targetLevelId: 2 }
+  );
+  assert.deepEqual(
+    resolveNextCampaignTarget(4, catalog, { filterIncomplete: true, unlockedLevel: 4, levelStats: stats, maxStars: 3 }),
+    { action: VICTORY_NEXT_ACTIONS.NEXT_INCOMPLETE, targetLevelId: 2 },
+    'wraps around to earlier unlocked < 3★ level'
+  );
+  assert.deepEqual(
+    resolveNextCampaignTarget(catalog.lastId, catalog, { filterIncomplete: false }),
+    { action: VICTORY_NEXT_ACTIONS.LEVEL_SELECT, targetLevelId: null },
+    'without filterIncomplete on lastId, opens level select'
+  );
+});
+
+test('parseFluxSeedInput extracts valid 6-char hex seeds from codes, #codes, URLs, and share text', () => {
+  const seedConfig = loadJson('./configs/flux.json').seed;
+  assert.equal(parseFluxSeedInput('4F2A1C', seedConfig), '4f2a1c');
+  assert.equal(parseFluxSeedInput('  #AB12CD ', seedConfig), 'ab12cd');
+  assert.equal(
+    parseFluxSeedInput('https://vblackjack.github.io/flux-spheres/?flux=9E8D7C', seedConfig),
+    '9e8d7c'
+  );
+  assert.equal(
+    parseFluxSeedInput('Flux Spheres - Flux #1A2B3C\nStage 4 - 12,450 pts', seedConfig),
+    '1a2b3c'
+  );
+  assert.equal(parseFluxSeedInput('not-a-seed', seedConfig), null);
+  assert.equal(parseFluxSeedInput('', seedConfig), null);
+});
+
+test('resolveLevelFormatBadgeKey and LevelCatalog.summarize expose landmark and format badges', () => {
+  const catalog = new LevelCatalog({
+    levelsConfig: loadJson('./configs/levels.json'),
+    campaignConfig: loadJson('./configs/campaign.json'),
+    fluxConfig: loadJson('./configs/flux.json'),
+    obstaclesConfig: loadJson('./configs/obstacles.json'),
+    ballRadius: loadJson('./configs/physics.json').ball.radius
+  });
+  const level1 = catalog.summarize(1);
+  const level12 = catalog.summarize(12);
+  assert.equal(level1.isLandmark, false);
+  assert.equal(resolveLevelFormatBadgeKey(level1), null);
+  assert.equal(level12.isLandmark, true, 'authored Boss level is marked as a landmark');
+  assert.equal(resolveLevelFormatBadgeKey(level12), 'modals.levelSelect.card.formatBadge.landmark');
+  assert.equal(
+    resolveLevelFormatBadgeKey({ format: LEVEL_FORMATS.PRECISION, isLandmark: false }),
+    'modals.levelSelect.card.formatBadge.precision'
+  );
+  assert.equal(
+    resolveLevelFormatBadgeKey({ format: LEVEL_FORMATS.ARSENAL, isLandmark: false }),
+    'modals.levelSelect.card.formatBadge.arsenal'
+  );
+  assert.equal(
+    resolveLevelFormatBadgeKey({ format: LEVEL_FORMATS.TWIST, isLandmark: false }),
+    'modals.levelSelect.card.formatBadge.twist'
+  );
 });

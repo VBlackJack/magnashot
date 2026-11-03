@@ -20,19 +20,58 @@ import {
   GAME_STATES,
   INPUT_MODES,
   MATH_CONSTANTS,
-  SPECIAL_TYPES_ORDER,
-  OBSTACLE_TYPES_ORDER
+  SPECIAL_TYPES_ORDER
 } from '../core/Constants.js';
 import { i18n, t, formatNumber } from '../core/I18n.js';
 import { SeededRandom } from '../core/SeededRandom.js';
 import { resolveHintText } from '../game/Discovery.js';
-import { buildShareText, formatDailyCountdown, getMsUntilNextDaily } from '../game/DailyShare.js';
+import {
+  buildShareText,
+  formatDailyCountdown,
+  getMsUntilNextDaily,
+  parseFluxSeedInput
+} from '../game/DailyShare.js';
 import { decodeGeneratedShapeId, isGeneratedShapeId } from '../game/layouts/ShapeGenerator.js';
-import { LEVEL_FORMATS } from '../game/LevelCatalog.js';
+import {
+  SPECIAL_ICON_HIGHLIGHT_POSITION,
+  specialIconBackground,
+  buildCodexPane
+} from './CodexView.js';
+import {
+  FULL_PERCENT,
+  SHOP_TABS,
+  computeAchievementProgress,
+  rerenderWorkshopKeepingFocus,
+  renderWorkshopContents
+} from './WorkshopView.js';
+import {
+  LEVEL_CHAPTER_TAB_ID_PREFIX,
+  LABELLED_LEVEL_FORMATS,
+  LEVEL_FORMAT_BADGE_KEYS,
+  resolveLevelFormatBadgeKey,
+  formatChapterTheme,
+  formatLevelName,
+  formatLevelDescription,
+  formatChapterName,
+  renderLevelChapters,
+  renderLevelCards
+} from './LevelSelectView.js';
+
+export {
+  SPECIAL_ICON_HIGHLIGHT_POSITION,
+  specialIconBackground,
+  FULL_PERCENT,
+  SHOP_TABS,
+  computeAchievementProgress,
+  LEVEL_CHAPTER_TAB_ID_PREFIX,
+  LABELLED_LEVEL_FORMATS,
+  LEVEL_FORMAT_BADGE_KEYS,
+  resolveLevelFormatBadgeKey
+};
 
 /** Elements a modal focus trap may cycle through (inactive tabs use tabindex="-1"). */
 export const MODAL_FOCUSABLE_SELECTOR =
-  'button:not(:disabled):not([tabindex="-1"]), textarea:not([tabindex="-1"]), [href]:not([tabindex="-1"]), [tabindex]:not([tabindex="-1"])';
+  'button:not(:disabled):not([tabindex="-1"]), input:not(:disabled):not([tabindex="-1"]), textarea:not([tabindex="-1"]), [href]:not([tabindex="-1"]), [tabindex]:not([tabindex="-1"])';
 
 /** Ancestors that remove an element from the interactive tree. */
 const NON_INTERACTIVE_ANCESTOR_SELECTOR = '.hidden, [hidden], [inert]';
@@ -79,14 +118,6 @@ const INPUT_MODE_DATASET_KEY = 'input';
 /** Special ball button with no stock left: a click opens the Workshop ammo tab. */
 const EMPTY_POWERUP_CLASS = 'is-empty';
 
-/** Workshop tab names. */
-export const SHOP_TABS = Object.freeze({
-  UPGRADES: 'upgrades',
-  AMMO: 'ammo',
-  ACHIEVEMENTS: 'achievements',
-  CODEX: 'codex'
-});
-
 /** Mode buttons, keyed by the game mode each one starts. */
 const MODE_BUTTON_KEYS = Object.freeze({
   [GAME_MODES.CAMPAIGN]: 'btnLevels',
@@ -105,23 +136,8 @@ const PAUSE_INPUT_HINTS = Object.freeze([
 /** Accessible names that have one wording per input mode (the board's text alternative). */
 export const INPUT_ARIA_HINTS = Object.freeze([{ elementId: 'game-canvas', key: 'hud.canvas.aria.label' }]);
 
-/** Percent scale of the HUD gauges (star progress, overcharge, tutorial offset). */
-const FULL_PERCENT = 100;
-
-/** Where the light catches a special ball icon, as a radial-gradient position. */
-const SPECIAL_ICON_HIGHLIGHT_POSITION = '30% 30%';
-
-/** Id prefix of the level-select chapter tabs; the chapter index completes it. */
-const LEVEL_CHAPTER_TAB_ID_PREFIX = 'levels-chapter-tab-';
-
-/**
- * Background of a special ball icon: lit from the top left, like the ball on the board.
- * @param {{highlight: string, fill: string}} spec - Special ball colors from balls.json.
- * @returns {string} A CSS background value.
- */
-function specialIconBackground(spec) {
-  return `radial-gradient(circle at ${SPECIAL_ICON_HIGHLIGHT_POSITION}, ${spec.highlight}, ${spec.fill})`;
-}
+/** Default star ceiling when no scoring config is passed to resolveNextCampaignTarget. */
+const DEFAULT_MAX_STARS = 3;
 
 /**
  * How far a score has gone from the last star threshold it passed toward the next one.
@@ -141,42 +157,6 @@ export function computeStarProgressPct(score, thresholds, nextThreshold) {
     return 0;
   }
   return Math.round(Math.max(0, Math.min(1, (score - floor) / span)) * FULL_PERCENT);
-}
-
-/**
- * Computes the player's current and target progress for an achievement card.
- * @param {string} achId - Achievement key from config.
- * @param {object} achSpec - Achievement specification from config.
- * @param {boolean} isUnlocked - Whether the achievement is already unlocked.
- * @param {object} [progressContext] - Current progress values.
- * @returns {{ current: number, target: number, pct: number }}
- */
-export function computeAchievementProgress(achId, achSpec, isUnlocked, progressContext = {}) {
-  const threshold = Number.isFinite(achSpec?.threshold) && achSpec.threshold > 0 ? achSpec.threshold : null;
-  let target = threshold ?? 1;
-  let rawCurrent = 0;
-  if (achId === 'comboMaster' || achSpec?.minChain) {
-    target = achSpec?.minChain ?? threshold ?? 1;
-    rawCurrent = progressContext.maxCombo || 0;
-  } else if (achId === 'starCollector' || achSpec?.targetStars) {
-    target = achSpec?.targetStars ?? threshold ?? 1;
-    rawCurrent = progressContext.totalStars || 0;
-  } else if (achId === 'survivorWave10' || achId === 'endlessSurvivor' || achSpec?.targetWave) {
-    target = achSpec?.targetWave ?? threshold ?? 1;
-    rawCurrent = progressContext.endlessWave || 0;
-  } else if (achId === 'bossSlayer') {
-    rawCurrent = progressContext.bossesDestroyed || 0;
-  } else if (achId === 'firstAvalanche') {
-    rawCurrent = progressContext.maxAvalanche || 0;
-  } else if (achId === 'sharpshooter') {
-    rawCurrent = progressContext.shotsRemainingOnClear || 0;
-  } else if (achId === 'campaignComplete') {
-    target = Math.max(1, progressContext.campaignLevelCount || 1);
-    rawCurrent = Math.max(0, (progressContext.unlockedLevel || 1) - 1);
-  }
-  const current = isUnlocked ? target : Math.max(0, Math.min(target, rawCurrent));
-  const pct = target > 0 ? Math.round((current / target) * FULL_PERCENT) : 0;
-  return { current, target, pct };
 }
 
 /**
@@ -237,30 +217,64 @@ export function canOpenDrawer({ isOpen, isDrawerLayout, isModalOpen, isVictoryCe
   return !isOpen && isDrawerLayout && !isModalOpen && !isVictoryCelebrating;
 }
 
-/** Generated level formats whose name and description say what sets them apart. */
-const LABELLED_LEVEL_FORMATS = new Set([LEVEL_FORMATS.TWIST, LEVEL_FORMATS.PRECISION, LEVEL_FORMATS.ARSENAL]);
-
-/** What the victory window's main button does: play the next level, or open the level select. */
+/** What the victory window's main button does: play the next level, jump to the next < 3★ level, or open the level select. */
 export const VICTORY_NEXT_ACTIONS = Object.freeze({
   NEXT_LEVEL: 'nextLevel',
+  NEXT_INCOMPLETE: 'nextIncomplete',
   LEVEL_SELECT: 'levelSelect'
 });
 
 /** Label of the victory window's main button, per action. */
 export const VICTORY_NEXT_LABEL_KEYS = Object.freeze({
   [VICTORY_NEXT_ACTIONS.NEXT_LEVEL]: 'modals.victory.button.nextLevel',
+  [VICTORY_NEXT_ACTIONS.NEXT_INCOMPLETE]: 'modals.victory.button.nextIncomplete',
   [VICTORY_NEXT_ACTIONS.LEVEL_SELECT]: 'modals.victory.button.backToLevels'
 });
 
 /**
- * What the victory window's main button does once a campaign level is won: the next level
- * when there is one, else the level select. A campaign victory never starts Survival.
+ * Resolves the next campaign destination after winning a level. When the < 3★ filter is active,
+ * looks for the next unlocked level that has not yet earned 3 stars before falling back.
  * @param {number} currentLevelId - The level just won.
- * @param {{has: (levelId: number) => boolean}} levelCatalog - The campaign's levels.
+ * @param {{has: (levelId: number) => boolean, firstId?: number, lastId?: number}} levelCatalog - Campaign catalog.
+ * @param {{filterIncomplete?: boolean, unlockedLevel?: number, levelStats?: object, maxStars?: number}} [options]
+ * @returns {{action: string, targetLevelId: number|null}}
+ */
+export function resolveNextCampaignTarget(
+  currentLevelId,
+  levelCatalog,
+  { filterIncomplete = false, unlockedLevel = currentLevelId, levelStats = {}, maxStars = DEFAULT_MAX_STARS } = {}
+) {
+  if (filterIncomplete && Number.isInteger(levelCatalog?.firstId) && Number.isInteger(levelCatalog?.lastId)) {
+    const maxReachable = Math.min(unlockedLevel, levelCatalog.lastId);
+    for (let id = currentLevelId + 1; id <= maxReachable; id++) {
+      if (levelCatalog.has(id) && (levelStats[id]?.stars || 0) < maxStars) {
+        return { action: VICTORY_NEXT_ACTIONS.NEXT_INCOMPLETE, targetLevelId: id };
+      }
+    }
+    const wrapLimit = Math.min(maxReachable, currentLevelId - 1);
+    for (let id = levelCatalog.firstId; id <= wrapLimit; id++) {
+      if (levelCatalog.has(id) && (levelStats[id]?.stars || 0) < maxStars) {
+        return { action: VICTORY_NEXT_ACTIONS.NEXT_INCOMPLETE, targetLevelId: id };
+      }
+    }
+  }
+  if (levelCatalog.has(currentLevelId + 1)) {
+    return { action: VICTORY_NEXT_ACTIONS.NEXT_LEVEL, targetLevelId: currentLevelId + 1 };
+  }
+  return { action: VICTORY_NEXT_ACTIONS.LEVEL_SELECT, targetLevelId: null };
+}
+
+/**
+ * What the victory window's main button does once a campaign level is won: the next level
+ * (or next < 3★ level when filtering) when there is one, else the level select.
+ * A campaign victory never starts Survival.
+ * @param {number} currentLevelId - The level just won.
+ * @param {{has: (levelId: number) => boolean, firstId?: number, lastId?: number}} levelCatalog - The campaign's levels.
+ * @param {{filterIncomplete?: boolean, unlockedLevel?: number, levelStats?: object, maxStars?: number}} [options]
  * @returns {string} One of VICTORY_NEXT_ACTIONS.
  */
-export function resolveVictoryNextAction(currentLevelId, levelCatalog) {
-  return levelCatalog.has(currentLevelId + 1) ? VICTORY_NEXT_ACTIONS.NEXT_LEVEL : VICTORY_NEXT_ACTIONS.LEVEL_SELECT;
+export function resolveVictoryNextAction(currentLevelId, levelCatalog, options = {}) {
+  return resolveNextCampaignTarget(currentLevelId, levelCatalog, options).action;
 }
 
 /** i18n key of the defeat explanation; an unknown reason reads as a crossed line. */
@@ -443,6 +457,8 @@ export class UIManager {
       modalLevels: document.getElementById('modal-levels'),
       levelsStarsSummary: document.getElementById('levels-stars-summary'),
       btnLevelsFilterIncomplete: document.getElementById('btn-levels-filter-incomplete'),
+      inputFluxSeed: document.getElementById('input-flux-seed'),
+      btnFluxSeedGo: document.getElementById('btn-flux-seed-go'),
       levelsChapters: document.getElementById('levels-chapters'),
       levelsChapterHint: document.getElementById('levels-chapter-hint'),
       levelsGrid: document.getElementById('levels-grid'),
@@ -1179,6 +1195,18 @@ export class UIManager {
       );
     });
 
+    this.elements.btnFluxSeedGo?.addEventListener('click', () => {
+      this.submitFluxSeedInput();
+    });
+
+    this.elements.inputFluxSeed?.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        e.stopPropagation();
+        this.submitFluxSeedInput();
+      }
+    });
+
     this.elements.btnCloseShop.addEventListener('click', () => {
       this.closeOverlayModal(this.elements.modalShop);
     });
@@ -1202,9 +1230,13 @@ export class UIManager {
 
     this.elements.btnNextLevel.addEventListener('click', () => {
       this.hideAllModals();
-      const currentLevelId = this.engine.currentLevelId;
-      if (resolveVictoryNextAction(currentLevelId, this.engine.levelCatalog) === VICTORY_NEXT_ACTIONS.NEXT_LEVEL) {
-        this.engine.startCampaignLevel(currentLevelId + 1);
+      const { targetLevelId } = resolveNextCampaignTarget(
+        this.engine.currentLevelId,
+        this.engine.levelCatalog,
+        this.getVictoryTargetOptions()
+      );
+      if (targetLevelId !== null) {
+        this.engine.startCampaignLevel(targetLevelId);
       } else {
         // The last level is behind: the level select opens on its chapter.
         this.openLevelsModal();
@@ -1445,16 +1477,64 @@ export class UIManager {
     }
   }
 
-  /** The victory window's main button names what it does: the next level, or the level select. */
+  getVictoryTargetOptions() {
+    return {
+      filterIncomplete: Boolean(this.levelsFilterIncomplete),
+      unlockedLevel: this.storageManager?.getUnlockedLevel?.() || this.engine.currentLevelId,
+      levelStats: this.storageManager?.getLevelStats?.() || {},
+      maxStars: this.gameConfig?.scoring?.maxStars || DEFAULT_MAX_STARS
+    };
+  }
+
+  /** The victory window's main button names what it does: the next level, the next < 3★ level, or the level select. */
   updateNextLevelButton(engine) {
     const button = this.elements.btnNextLevel;
     if (!button) {
       return;
     }
-    const labelKey = VICTORY_NEXT_LABEL_KEYS[resolveVictoryNextAction(engine.currentLevelId, engine.levelCatalog)];
+    const { action } = resolveNextCampaignTarget(
+      engine.currentLevelId,
+      engine.levelCatalog,
+      this.getVictoryTargetOptions()
+    );
+    const labelKey = VICTORY_NEXT_LABEL_KEYS[action];
     // data-i18n follows, so a language switch keeps the right wording.
     setAttributeIfChanged(button, 'data-i18n', labelKey);
     setTextIfChanged(button, t(labelKey));
+  }
+
+  /**
+   * Parses the Flux seed field in the Level Select toolbar and launches the seeded Flux run,
+   * or reveals an invalid-seed message in the polite hint banner.
+   */
+  submitFluxSeedInput() {
+    const input = this.elements?.inputFluxSeed;
+    if (!input) {
+      return;
+    }
+    const seedConfig = this.engine.fluxConfig?.seed;
+    const seed = parseFluxSeedInput(input.value, seedConfig);
+    if (!seed) {
+      const hintEl = this.elements?.levelsChapterHint;
+      if (hintEl) {
+        revealLiveRegion({
+          region: hintEl,
+          textElement: hintEl,
+          text: t('modals.levelSelect.fluxSeed.invalidHint', { length: seedConfig?.length }),
+          schedule: scheduleNextFrame
+        });
+      }
+      return;
+    }
+    this.elements.levelsChapterHint?.classList.add('hidden');
+    this.requestDestructiveAction(
+      () => {
+        input.value = '';
+        this.hideAllModals();
+        this.engine.startFluxRun(seed);
+      },
+      () => t('app.nav.button.flux')
+    );
   }
 
   saveLastFocusedElement() {
@@ -1651,6 +1731,7 @@ export class UIManager {
         this.elements.modalPause.classList.add('hidden');
       } else if (this.engine.state === GAME_STATES.VICTORY && !this.engine.isVictoryCelebrating()) {
         this.isVictoryModalRevealed = true;
+        this.updateNextLevelButton(this.engine);
         this.elements.modalVictory.classList.remove('hidden');
       } else if (this.engine.state === GAME_STATES.GAME_OVER) {
         this.elements.modalGameOver.classList.remove('hidden');
@@ -1749,8 +1830,7 @@ export class UIManager {
 
   /** Theme of a generated chapter: its featured mechanic, or its pair of them. */
   formatChapterTheme(featuredMechanics) {
-    const [first, second] = featuredMechanics.map((mechanic) => t(`levels.generated.themes.${mechanic}`));
-    return second ? t('levels.generated.themePair', { first, second }) : first;
+    return formatChapterTheme(featuredMechanics);
   }
 
   /**
@@ -1759,38 +1839,12 @@ export class UIManager {
    * @param {object} summary - A level summary from the level catalog.
    */
   formatLevelName(summary) {
-    if (!summary.isGenerated) {
-      return t(summary.nameKey);
-    }
-    const name = t('levels.generated.name', {
-      theme: this.formatChapterTheme(summary.featuredMechanics),
-      index: summary.chapterLevel
-    });
-    if (!LABELLED_LEVEL_FORMATS.has(summary.format)) {
-      return name;
-    }
-    const format = t(`levels.generated.formats.${summary.format}.label`, {
-      mechanic: summary.twistMechanic ? t(`levels.generated.themes.${summary.twistMechanic}`) : ''
-    });
-    return t('levels.generated.formatName', { name, format });
+    return formatLevelName(summary);
   }
 
   /** Description of a campaign level, from its summary in the level catalog. */
   formatLevelDescription(summary) {
-    if (!summary.isGenerated) {
-      return t(summary.descriptionKey);
-    }
-    const params = { chapter: summary.chapter, index: summary.chapterLevel, size: summary.chapterSize };
-    if (summary.isLandmark) {
-      return t('levels.generated.landmarkDescription', params);
-    }
-    if (LABELLED_LEVEL_FORMATS.has(summary.format)) {
-      return t(`levels.generated.formats.${summary.format}.description`, {
-        ...params,
-        mechanic: summary.twistMechanic ? t(`levels.generated.themes.${summary.twistMechanic}`) : ''
-      });
-    }
-    return t('levels.generated.description', params);
+    return formatLevelDescription(summary);
   }
 
   formatStars(stars, maxStars) {
@@ -2136,383 +2190,15 @@ export class UIManager {
    * button just became disabled).
    */
   rerenderShopKeepingFocus(focusSelector, fallbackSlotIndex = 0) {
-    this.renderShopContents();
-    const modal = this.elements.modalShop;
-    const target = modal.querySelector(focusSelector);
-    if (target && !target.disabled) {
-      target.focus();
-      return;
-    }
-    const candidates = filterFocusTrapCandidates(modal.querySelectorAll('.shop-pane button'));
-    const nextAtOrAfter = candidates.find(
-      (btn) => Number.parseInt(btn.dataset?.slotIndex ?? '0', 10) >= fallbackSlotIndex
-    );
-    const fallback =
-      nextAtOrAfter ||
-      candidates[candidates.length - 1] ||
-      this.elements.btnCloseShop;
-    if (fallback) {
-      fallback.focus();
-    }
+    rerenderWorkshopKeepingFocus.call(this, focusSelector, fallbackSlotIndex);
   }
 
   renderShopContents() {
-    const coins = this.storageManager.getCoins();
-    this.elements.shopBalance.textContent = t('modals.shop.balance.label', { coins: formatNumber(coins) });
-    const grid = this.elements.shopGrid;
-    grid.replaceChildren();
-
-    const upgradeEntries = Object.entries(this.gameConfig.upgrades);
-    for (let slotIndex = 0; slotIndex < upgradeEntries.length; slotIndex++) {
-      const [upgradeKey, spec] = upgradeEntries[slotIndex];
-      const currentLevel = this.storageManager.getUpgradeLevel(upgradeKey);
-      const isMaxed = currentLevel >= spec.maxLevel;
-      const cost = this.storageManager.getUpgradeCost(upgradeKey);
-
-      const card = document.createElement('div');
-      card.className = 'level-card';
-
-      const header = document.createElement('div');
-      header.className = 'level-card-header';
-      header.textContent = t('modals.shop.card.level', {
-        level: currentLevel,
-        maxLevel: spec.maxLevel
-      });
-
-      const title = document.createElement('div');
-      title.className = 'level-card-title';
-      title.textContent = t(`modals.shop.upgrades.${upgradeKey}.name`);
-
-      const desc = document.createElement('div');
-      desc.className = 'level-card-desc';
-      desc.textContent = t(`modals.shop.upgrades.${upgradeKey}.description`, {
-        shots: formatNumber(spec.shotsPerLevel || 0)
-      });
-
-      if (isMaxed) {
-        // A finished upgrade shows a status, not a button that only looks pressable.
-        const maxedBadge = document.createElement('span');
-        maxedBadge.className = 'upgrade-maxed-badge';
-        const maxedGlyph = document.createElement('span');
-        maxedGlyph.setAttribute('aria-hidden', 'true');
-        maxedGlyph.textContent = t('modals.shop.card.maxed');
-        const maxedText = document.createElement('span');
-        maxedText.className = 'visually-hidden';
-        maxedText.textContent = t('modals.shop.card.maxedAria');
-        maxedBadge.append(maxedGlyph, maxedText);
-        card.append(header, title, desc, maxedBadge);
-        grid.appendChild(card);
-        continue;
-      }
-
-      const buyBtn = document.createElement('button');
-      buyBtn.type = 'button';
-      buyBtn.className = 'modal-btn primary';
-      buyBtn.dataset.upgradeKey = upgradeKey;
-      buyBtn.dataset.slotIndex = String(slotIndex);
-      buyBtn.disabled = coins < cost;
-      buyBtn.textContent = t('modals.shop.card.buy', { cost: formatNumber(cost) });
-
-      buyBtn.addEventListener('click', () => {
-        if (this.storageManager.purchaseUpgrade(upgradeKey)) {
-          const newLevel = currentLevel + 1;
-          this.audioManager.playEffect('match', newLevel);
-          this.engine.applyUpgradePurchase(upgradeKey);
-          this.refresh(this.engine, this.lastExtra);
-          this.announce(
-            t('modals.shop.feedback.upgradePurchased', {
-              name: title.textContent,
-              level: formatNumber(newLevel),
-              maxLevel: formatNumber(spec.maxLevel)
-            })
-          );
-          this.rerenderShopKeepingFocus(`[data-upgrade-key="${upgradeKey}"]`, slotIndex);
-        }
-      });
-
-      card.append(header, title, desc, buyBtn);
-      grid.appendChild(card);
-    }
-
-    if (this.elements.shopAmmoGrid && this.gameConfig.specialShopCosts) {
-      const ammoGrid = this.elements.shopAmmoGrid;
-      ammoGrid.replaceChildren();
-      // Ammo is stocked into the current run, so it cannot be bought between runs.
-      const canBuyAmmo = this.isRunActive();
-      for (let slotIndex = 0; slotIndex < SPECIAL_TYPES_ORDER.length; slotIndex++) {
-        const type = SPECIAL_TYPES_ORDER[slotIndex];
-        const spec = this.ballsConfig.specialTypes[type];
-        const cost = this.gameConfig.specialShopCosts[type];
-        const count = this.engine.specialInventory[type] || 0;
-
-        const card = document.createElement('div');
-        card.className = 'ammo-card';
-
-        const iconSpan = document.createElement('span');
-        iconSpan.className = 'powerup-icon';
-        iconSpan.style.background = specialIconBackground(spec);
-        iconSpan.textContent = spec.icon;
-        iconSpan.setAttribute('aria-hidden', 'true');
-
-        const titleEl = document.createElement('div');
-        titleEl.className = 'ammo-card-title';
-        titleEl.textContent = t(`hud.powerups.${type}.name`);
-
-        // What the ball does, so a purchase is not a guess on the name alone.
-        const descEl = document.createElement('div');
-        descEl.className = 'ammo-card-desc';
-        descEl.textContent = t(`hud.powerups.${type}.tooltip`);
-
-        const stockEl = document.createElement('div');
-        stockEl.className = 'ammo-card-stock';
-        stockEl.textContent = t('modals.shop.specialAmmo.stock', { count: formatNumber(count) });
-
-        const buyAmmoBtn = document.createElement('button');
-        buyAmmoBtn.type = 'button';
-        buyAmmoBtn.className = 'modal-btn primary ammo-buy-btn';
-        buyAmmoBtn.dataset.specialType = type;
-        buyAmmoBtn.dataset.slotIndex = String(slotIndex);
-        buyAmmoBtn.disabled = !canBuyAmmo || coins < cost;
-        buyAmmoBtn.classList.toggle('unavailable', !canBuyAmmo);
-        if (canBuyAmmo) {
-          buyAmmoBtn.textContent = t('modals.shop.specialAmmo.buy', { cost: formatNumber(cost) });
-        } else {
-          buyAmmoBtn.textContent = t('modals.shop.specialAmmo.unavailable');
-          buyAmmoBtn.title = t('modals.shop.specialAmmo.unavailableHint');
-        }
-
-        buyAmmoBtn.addEventListener('click', () => {
-          if (this.engine.buySpecialAmmo(type)) {
-            const newCount = this.engine.specialInventory[type] || 0;
-            this.announce(
-              t('modals.shop.feedback.ammoPurchased', {
-                name: titleEl.textContent,
-                count: formatNumber(newCount)
-              })
-            );
-            this.rerenderShopKeepingFocus(`.ammo-buy-btn[data-special-type="${type}"]`, slotIndex);
-          }
-        });
-
-        card.append(iconSpan, titleEl, descEl, stockEl, buyAmmoBtn);
-        ammoGrid.appendChild(card);
-      }
-    }
-
-    if (this.elements.achievementsGrid && this.gameConfig.achievements) {
-      const achGrid = this.elements.achievementsGrid;
-      achGrid.replaceChildren();
-      const unlockedMap = this.storageManager.getUnlockedAchievements();
-      const achEntries = Object.entries(this.gameConfig.achievements);
-      const progressContext = {
-        maxCombo: Math.max(
-          this.engine.combo || 0,
-          this.engine.maxComboInRound || 0,
-          this.engine.currentComboChain || 0
-        ),
-        totalStars: this.storageManager.getTotalStars(),
-        endlessWave: this.engine.mode === GAME_MODES.ENDLESS ? this.engine.waveCount || 0 : 0,
-        bossesDestroyed: this.engine.bossesDestroyedInRun || 0,
-        unlockedLevel: this.storageManager.getUnlockedLevel(),
-        campaignLevelCount: this.engine.levelCatalog.count
-      };
-      let unlockedCount = 0;
-
-      for (const [achId, achSpec] of achEntries) {
-        const isUnlocked = Boolean(unlockedMap[achId]);
-        if (isUnlocked) {
-          unlockedCount++;
-        }
-        const { current, target, pct } = computeAchievementProgress(achId, achSpec, isUnlocked, progressContext);
-        const card = document.createElement('div');
-        card.className = `level-card ${isUnlocked ? 'unlocked' : 'locked'}`;
-
-        const header = document.createElement('div');
-        header.className = 'level-card-header';
-        header.textContent = t('modals.shop.achievements.reward', { coins: achSpec.rewardCoins });
-
-        const title = document.createElement('div');
-        title.className = 'level-card-title';
-        title.textContent = t(`modals.shop.achievements.items.${achId}.name`);
-
-        const desc = document.createElement('div');
-        desc.className = 'level-card-desc';
-        desc.textContent = t(`modals.shop.achievements.items.${achId}.description`);
-
-        const progressTrack = document.createElement('div');
-        progressTrack.className = 'achievement-progress-track';
-        progressTrack.setAttribute('aria-hidden', 'true');
-        const progressFill = document.createElement('div');
-        progressFill.className = 'achievement-progress-fill';
-        progressFill.style.width = `${pct}%`;
-        progressTrack.appendChild(progressFill);
-
-        const footer = document.createElement('div');
-        footer.className = 'level-card-footer';
-        const statusEl = document.createElement('span');
-        statusEl.className = isUnlocked ? 'achievement-unlocked-badge' : 'level-locked-badge';
-        statusEl.textContent = isUnlocked
-          ? t('modals.shop.achievements.unlockedBadge')
-          : t('modals.shop.achievements.lockedBadge');
-        footer.appendChild(statusEl);
-        if (!isUnlocked) {
-          const progressText = document.createElement('span');
-          progressText.className = 'achievement-progress-text';
-          progressText.textContent = t('modals.shop.achievements.progress', {
-            current: formatNumber(current),
-            target: formatNumber(target)
-          });
-          footer.appendChild(progressText);
-        }
-
-        card.append(header, title, desc, progressTrack, footer);
-        achGrid.appendChild(card);
-      }
-
-      if (this.elements.tabShopAchievements) {
-        this.elements.tabShopAchievements.textContent = t('modals.shop.tabs.achievements', {
-          unlocked: unlockedCount,
-          total: achEntries.length
-        });
-      }
-    }
+    renderWorkshopContents.call(this);
   }
 
   buildCodexPane() {
-    const pane = this.elements.codexPane;
-    if (!pane) {
-      return;
-    }
-    pane.replaceChildren();
-
-    const modHeading = document.createElement('h3');
-    modHeading.className = 'modal-subtitle';
-    modHeading.textContent = t('modals.shop.codex.modifiersTitle');
-    pane.appendChild(modHeading);
-
-    const modGrid = document.createElement('div');
-    modGrid.className = 'codex-grid';
-    for (const [modKey, modSpec] of Object.entries(this.ballsConfig.clusterModifiers || {})) {
-      const card = document.createElement('div');
-      card.className = 'codex-card';
-
-      const badge = document.createElement('div');
-      badge.className = 'codex-badge';
-      badge.style.borderColor = modSpec.ringColor;
-      badge.textContent = modSpec.badge || '';
-
-      const info = document.createElement('div');
-      info.className = 'codex-info';
-      const title = document.createElement('div');
-      title.className = 'codex-title';
-      title.textContent = t(`modals.shop.codex.modifiers.${modKey}.name`);
-      const desc = document.createElement('div');
-      desc.className = 'codex-desc';
-      desc.textContent = t(`modals.shop.codex.modifiers.${modKey}.description`);
-      info.append(title, desc);
-
-      card.append(badge, info);
-      modGrid.appendChild(card);
-    }
-    pane.appendChild(modGrid);
-
-    const obsHeading = document.createElement('h3');
-    obsHeading.className = 'modal-subtitle';
-    obsHeading.textContent = t('modals.shop.codex.obstaclesTitle');
-    pane.appendChild(obsHeading);
-
-    const obsGrid = document.createElement('div');
-    obsGrid.className = 'codex-grid';
-    for (const obsKey of OBSTACLE_TYPES_ORDER) {
-      const card = document.createElement('div');
-      card.className = 'codex-card';
-
-      const badge = document.createElement('div');
-      badge.className = 'codex-badge';
-      badge.textContent = t(`modals.shop.codex.obstacles.${obsKey}.icon`);
-
-      const info = document.createElement('div');
-      info.className = 'codex-info';
-      const title = document.createElement('div');
-      title.className = 'codex-title';
-      title.textContent = t(`modals.shop.codex.obstacles.${obsKey}.name`);
-      const desc = document.createElement('div');
-      desc.className = 'codex-desc';
-      desc.textContent = t(`modals.shop.codex.obstacles.${obsKey}.description`);
-      info.append(title, desc);
-
-      card.append(badge, info);
-      obsGrid.appendChild(card);
-    }
-    pane.appendChild(obsGrid);
-
-    const specialsHeading = document.createElement('h3');
-    specialsHeading.className = 'modal-subtitle';
-    specialsHeading.textContent = t('modals.shop.codex.specialsTitle');
-    pane.appendChild(specialsHeading);
-
-    const specialsGrid = document.createElement('div');
-    specialsGrid.className = 'codex-grid';
-    for (const type of SPECIAL_TYPES_ORDER) {
-      const spec = this.ballsConfig.specialTypes?.[type];
-      if (!spec) {
-        continue;
-      }
-      const card = document.createElement('div');
-      card.className = 'codex-card';
-
-      const badge = document.createElement('div');
-      badge.className = 'codex-badge';
-      badge.style.background = specialIconBackground(spec);
-      badge.textContent = spec.icon;
-
-      const info = document.createElement('div');
-      info.className = 'codex-info';
-      const title = document.createElement('div');
-      title.className = 'codex-title';
-      title.textContent = t(`hud.powerups.${type}.name`);
-      const desc = document.createElement('div');
-      desc.className = 'codex-desc';
-      desc.textContent = t(`hud.powerups.${type}.tooltip`);
-      info.append(title, desc);
-
-      card.append(badge, info);
-      specialsGrid.appendChild(card);
-    }
-    pane.appendChild(specialsGrid);
-
-    const mutatorKeys = Object.keys(this.gameConfig.daily?.mutators || {});
-    if (mutatorKeys.length > 0) {
-      const mutHeading = document.createElement('h3');
-      mutHeading.className = 'modal-subtitle';
-      mutHeading.textContent = t('modals.shop.codex.mutatorsTitle');
-      pane.appendChild(mutHeading);
-
-      const mutGrid = document.createElement('div');
-      mutGrid.className = 'codex-grid';
-      for (const mutKey of mutatorKeys) {
-        const card = document.createElement('div');
-        card.className = 'codex-card';
-
-        const badge = document.createElement('div');
-        badge.className = 'codex-badge';
-        badge.textContent = t(`modals.shop.codex.mutators.${mutKey}.icon`);
-
-        const info = document.createElement('div');
-        info.className = 'codex-info';
-        const title = document.createElement('div');
-        title.className = 'codex-title';
-        title.textContent = t(`gameplay.mutators.${mutKey}`);
-        const desc = document.createElement('div');
-        desc.className = 'codex-desc';
-        desc.textContent = t(`modals.shop.codex.mutators.${mutKey}.description`);
-        info.append(title, desc);
-
-        card.append(badge, info);
-        mutGrid.appendChild(card);
-      }
-      pane.appendChild(mutGrid);
-    }
+    buildCodexPane.call(this);
   }
 
   isCampaignRunActive() {
@@ -2575,13 +2261,7 @@ export class UIManager {
 
   /** Display name of a chapter of the level select. */
   formatChapterName(chapter) {
-    if (chapter.isTutorial) {
-      return t('modals.levelSelect.chapters.tutorial');
-    }
-    return t('modals.levelSelect.chapters.numbered', {
-      chapter: chapter.index,
-      theme: this.formatChapterTheme(chapter.featuredMechanics)
-    });
+    return formatChapterName(chapter);
   }
 
   /**
@@ -2589,86 +2269,7 @@ export class UIManager {
    * it. A chapter whose first level is still locked cannot be opened.
    */
   renderLevelChapters() {
-    const strip = this.elements.levelsChapters;
-    if (!strip) {
-      return;
-    }
-    const unlocked = this.storageManager.getUnlockedLevel();
-    const stats = this.storageManager.getLevelStats();
-    const maxStarsPerLevel = this.gameConfig.scoring.maxStars;
-    const chapters = this.engine.levelCatalog.listChapters();
-    const openable = chapters.filter((chapter) => chapter.firstId <= unlocked);
-    strip.replaceChildren();
-
-    for (const chapter of chapters) {
-      const isLocked = chapter.firstId > unlocked;
-      const isActive = chapter.index === this.levelsChapterIndex;
-      let stars = 0;
-      for (let id = chapter.firstId; id <= chapter.lastId; id++) {
-        stars += Math.max(0, Math.min(maxStarsPerLevel, stats[id]?.stars || 0));
-      }
-      const maxStars = (chapter.lastId - chapter.firstId + 1) * maxStarsPerLevel;
-      const name = this.formatChapterName(chapter);
-
-      const tab = document.createElement('button');
-      tab.type = 'button';
-      tab.id = `${LEVEL_CHAPTER_TAB_ID_PREFIX}${chapter.index}`;
-      tab.className = `level-chapter${isActive ? ' active' : ''}${isLocked ? ' locked' : ''}`;
-      tab.setAttribute('role', 'tab');
-      tab.setAttribute('aria-selected', String(isActive));
-      tab.setAttribute('aria-controls', 'levels-grid');
-      tab.tabIndex = isActive ? 0 : -1;
-      if (isLocked) {
-        const requiredLevel = Math.max(1, chapter.firstId - 1);
-        tab.setAttribute('aria-disabled', 'true');
-        tab.title = t('modals.levelSelect.chapterLockedHint', { level: requiredLevel });
-      }
-      tab.setAttribute(
-        'aria-label',
-        t(isLocked ? 'modals.levelSelect.chapters.ariaLocked' : 'modals.levelSelect.chapters.aria', {
-          name,
-          first: chapter.firstId,
-          last: chapter.lastId,
-          stars,
-          maxStars
-        })
-      );
-
-      const titleEl = document.createElement('span');
-      titleEl.className = 'level-chapter-title';
-      titleEl.textContent = name;
-      const starsEl = document.createElement('span');
-      starsEl.className = 'level-chapter-stars';
-      starsEl.textContent = isLocked
-        ? t('modals.levelSelect.chapters.locked')
-        : t('modals.levelSelect.chapters.stars', { stars, maxStars });
-      tab.append(titleEl, starsEl);
-
-      tab.addEventListener('click', () => {
-        if (chapter.firstId > this.storageManager.getUnlockedLevel()) {
-          this.showLockedLevelHint(Math.max(1, chapter.firstId - 1), 'modals.levelSelect.chapterLockedHint');
-          return;
-        }
-        this.selectLevelChapter(chapter.index);
-      });
-      tab.addEventListener('keydown', (e) => {
-        if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft') {
-          return;
-        }
-        e.preventDefault();
-        const position = openable.findIndex((entry) => entry.index === this.levelsChapterIndex);
-        const step = e.key === 'ArrowRight' ? 1 : -1;
-        const next = openable[(position + step + openable.length) % openable.length];
-        this.selectLevelChapter(next.index, { focus: true });
-      });
-      strip.appendChild(tab);
-    }
-    // The grid is the panel of the active tab, and is named by it.
-    setAttributeIfChanged(
-      this.elements.levelsGrid,
-      'aria-labelledby',
-      `${LEVEL_CHAPTER_TAB_ID_PREFIX}${this.levelsChapterIndex}`
-    );
+    renderLevelChapters.call(this);
   }
 
   /**
@@ -2728,153 +2329,7 @@ export class UIManager {
    * @returns {HTMLElement|null} The card of the suggested level, when it is in the chapter.
    */
   renderLevelCards(suggestedLevelId) {
-    const catalog = this.engine.levelCatalog;
-    const chapter = catalog.listChapters()[this.levelsChapterIndex];
-    const unlocked = this.storageManager.getUnlockedLevel();
-    const stats = this.storageManager.getLevelStats();
-    const grid = this.elements.levelsGrid;
-    let suggestedCard = null;
-    grid.replaceChildren();
-
-    for (let levelId = chapter.firstId; levelId <= chapter.lastId; levelId++) {
-      const lvl = catalog.summarize(levelId);
-      const isUnlocked = lvl.id <= unlocked;
-      const lvlStat = stats[lvl.id] || { bestScore: 0, stars: 0 };
-      if (this.levelsFilterIncomplete && (!isUnlocked || (lvlStat.stars || 0) >= this.gameConfig.scoring.maxStars)) {
-        continue;
-      }
-
-      const card = document.createElement('div');
-      card.className = `level-card ${isUnlocked ? 'unlocked' : 'locked'}`;
-
-      const header = document.createElement('div');
-      header.className = 'level-card-header';
-      header.textContent = t('modals.levelSelect.card.levelNumber', { id: lvl.id });
-      if (lvl.id === suggestedLevelId) {
-        suggestedCard = card;
-        card.classList.add('current');
-        card.setAttribute('aria-current', 'true');
-        const currentBadge = document.createElement('span');
-        currentBadge.className = 'level-current-badge';
-        currentBadge.textContent = t('modals.levelSelect.card.current');
-        header.append(' ', currentBadge);
-      }
-
-      const title = document.createElement('div');
-      title.className = 'level-card-title';
-      title.textContent = this.formatLevelName(lvl);
-
-      const desc = document.createElement('div');
-      desc.className = 'level-card-desc';
-      const descId = `level-card-desc-${lvl.id}`;
-      desc.id = descId;
-      desc.textContent = this.formatLevelDescription(lvl);
-
-      const footer = document.createElement('div');
-      footer.className = 'level-card-footer';
-
-      if (isUnlocked) {
-        const maxStars = this.gameConfig.scoring.maxStars;
-        const clampedStars = Math.max(0, Math.min(maxStars, lvlStat.stars));
-        const starsEl = document.createElement('span');
-        starsEl.className = 'level-stars';
-        // Star glyphs are decorative; the hidden text states the count.
-        const starsGlyphs = document.createElement('span');
-        starsGlyphs.setAttribute('aria-hidden', 'true');
-        starsGlyphs.textContent = this.formatStars(lvlStat.stars, maxStars);
-        const starsText = document.createElement('span');
-        starsText.className = 'visually-hidden';
-        starsText.textContent = t('modals.levelSelect.card.starsAria', {
-          stars: clampedStars,
-          maxStars
-        });
-        starsEl.append(starsGlyphs, starsText);
-
-        const bestText = t('modals.levelSelect.card.bestScore', { score: formatNumber(lvlStat.bestScore) });
-        const scoreEl = document.createElement('span');
-        scoreEl.className = 'level-best';
-        scoreEl.textContent = bestText;
-
-        footer.append(starsEl, scoreEl);
-        card.setAttribute('role', 'button');
-        card.setAttribute(
-          'aria-label',
-          t(lvl.id === suggestedLevelId ? 'modals.levelSelect.card.ariaCurrent' : 'modals.levelSelect.card.aria', {
-            id: lvl.id,
-            name: title.textContent,
-            stars: clampedStars,
-            maxStars,
-            best: bestText
-          })
-        );
-        card.setAttribute('aria-describedby', descId);
-        card.tabIndex = 0;
-        const selectLevel = () => {
-          const isOtherLevelOrMidRound =
-            lvl.id !== this.engine.currentLevelId ||
-            (this.engine.hasFiredInRound && this.engine.physicsWorld.balls.length > 0);
-          if (isOtherLevelOrMidRound) {
-            this.requestDestructiveAction(
-              () => {
-                this.hideAllModals();
-                this.engine.startCampaignLevel(lvl.id);
-              },
-              () => t('modals.levelSelect.button.play', { level: lvl.id })
-            );
-          } else {
-            this.hideAllModals();
-            this.engine.startCampaignLevel(lvl.id);
-          }
-        };
-        card.addEventListener('click', selectLevel);
-        card.addEventListener('keydown', (e) => {
-          if (e.key === 'Enter' || e.key === ' ') {
-            e.preventDefault();
-            selectLevel();
-          }
-        });
-      } else {
-        const requiredLevel = Math.max(1, lvl.id - 1);
-        const lockText = t('modals.levelSelect.card.locked', { previous: requiredLevel });
-        const lockEl = document.createElement('span');
-        lockEl.className = 'level-locked-badge';
-        lockEl.textContent = lockText;
-        footer.appendChild(lockEl);
-        card.setAttribute('role', 'button');
-        card.setAttribute('aria-disabled', 'true');
-        card.setAttribute(
-          'aria-label',
-          t('modals.levelSelect.card.ariaLocked', {
-            id: lvl.id,
-            name: title.textContent,
-            previous: requiredLevel
-          })
-        );
-        card.setAttribute('aria-describedby', descId);
-        card.tabIndex = 0;
-        card.title = lockText;
-        const showCardLockedHint = () => {
-          this.showLockedLevelHint(requiredLevel, 'modals.levelSelect.cardLockedHint');
-        };
-        card.addEventListener('click', showCardLockedHint);
-        card.addEventListener('keydown', (e) => {
-          if (e.key === 'Enter' || e.key === ' ') {
-            e.preventDefault();
-            showCardLockedHint();
-          }
-        });
-      }
-
-      card.append(header, title, desc, footer);
-      grid.appendChild(card);
-    }
-    if (grid.children.length === 0) {
-      const emptyMsg = document.createElement('p');
-      emptyMsg.className = 'levels-empty-filter';
-      emptyMsg.textContent = t('modals.levelSelect.filter.allCompletedInChapter');
-      grid.appendChild(emptyMsg);
-    }
-    return suggestedCard;
+    return renderLevelCards.call(this, suggestedLevelId);
   }
 
   /** Fills the gauge from the last star earned toward the next one. */

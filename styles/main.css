@@ -1272,6 +1272,73 @@ body {
   flex-wrap: wrap;
 }
 
+.levels-toolbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.flux-seed-entry {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.flux-seed-input {
+  min-height: var(--touch-target);
+  width: 148px;
+  padding: 6px 10px;
+  background: var(--surface-sunken);
+  color: var(--text-main);
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  font: inherit;
+  font-size: var(--caption-font-size);
+}
+
+.flux-seed-input::placeholder {
+  color: var(--text-muted);
+}
+
+.level-format-badge {
+  display: inline-block;
+  margin-left: 4px;
+  padding: 1px 6px;
+  border-radius: 6px;
+  font-size: 0.65rem;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  vertical-align: middle;
+  border: 1px solid var(--border-subtle);
+  background: var(--surface-sunken);
+  color: var(--text-secondary);
+}
+
+.level-format-badge.landmark {
+  border-color: var(--accent-danger);
+  background: var(--accent-danger-alpha-22);
+  color: var(--text-danger-soft);
+}
+
+.level-format-badge.precision {
+  border-color: var(--accent-amber);
+  background: var(--accent-amber-alpha-16);
+  color: var(--text-gold-soft);
+}
+
+.level-format-badge.arsenal {
+  border-color: var(--accent-blue);
+  background: var(--accent-blue-alpha-14);
+  color: var(--text-info-soft);
+}
+
+.level-format-badge.twist {
+  border-color: var(--accent-purple);
+  background: var(--accent-purple-alpha-38);
+  color: var(--text-purple-soft);
+}
+
 .nav-btn.badge-btn.active {
   border-color: var(--accent-blue);
   background: var(--accent-blue-alpha-22);
@@ -2291,6 +2358,7 @@ body {
   .drawer-close-btn,
   .tutorial-dismiss-btn,
   .level-chapter,
+  .flux-seed-input,
   .level-card.unlocked {
     border: 1px solid ButtonText;
   }

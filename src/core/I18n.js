@@ -220,6 +220,13 @@ export class I18nService {
         el.setAttribute('aria-label', this.t(key));
       }
     }
+    const placeholderElements = root.querySelectorAll('[data-i18n-placeholder]');
+    for (const el of placeholderElements) {
+      const key = el.getAttribute('data-i18n-placeholder');
+      if (key) {
+        el.setAttribute('placeholder', this.t(key));
+      }
+    }
   }
 }
 

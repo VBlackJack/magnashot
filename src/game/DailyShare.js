@@ -59,6 +59,38 @@ export function readFluxSeedFromSearch(search, seedConfig) {
 }
 
 /**
+ * Extracts and validates a Flux seed from user input: accepts a raw code ("4F2A1C"),
+ * a hash-prefixed code ("#4F2A1C"), a share URL ("...?flux=4F2A1C"), or full share text.
+ * @param {string|null|undefined} rawInput - Raw user input or pasted share text.
+ * @param {{length: number}} seedConfig - The `seed` section of configs/flux.json.
+ * @returns {string|null} Normalized lowercase seed, or null when invalid.
+ */
+export function parseFluxSeedInput(rawInput, seedConfig) {
+  if (typeof rawInput !== 'string' || !rawInput || !seedConfig || !(seedConfig.length > 0)) {
+    return null;
+  }
+  const queryStart = rawInput.indexOf('?');
+  if (queryStart >= 0) {
+    const hashStart = rawInput.indexOf('#', queryStart);
+    const searchSlice = hashStart >= 0 ? rawInput.slice(queryStart, hashStart) : rawInput.slice(queryStart);
+    const fromQuery = readFluxSeedFromSearch(searchSlice, seedConfig);
+    if (fromQuery) {
+      return fromQuery;
+    }
+  }
+  const trimmed = rawInput.trim();
+  const direct = (trimmed.startsWith('#') ? trimmed.slice(1) : trimmed).trim().toLowerCase();
+  if (direct.length === seedConfig.length && FLUX_SEED_PATTERN.test(direct)) {
+    return direct;
+  }
+  const hashMatch = new RegExp(`#([0-9a-z]{${seedConfig.length}})\\b`, 'i').exec(rawInput);
+  if (hashMatch) {
+    return hashMatch[1].toLowerCase();
+  }
+  return null;
+}
+
+/**
  * Appends the Flux seed query parameter to the base share URL when a seed is present.
  * @param {string} baseUrl - Base game URL.
  * @param {string|null|undefined} seed - Flux run seed.

@@ -152,7 +152,13 @@
       <h2 id="modal-levels-title" class="modal-title" data-i18n="modals.levelSelect.title.main"></h2>
       <div class="levels-toolbar">
         <p id="levels-stars-summary" class="modal-stat-line gold-text"></p>
-        <button id="btn-levels-filter-incomplete" type="button" class="nav-btn badge-btn" aria-pressed="false" data-i18n="modals.levelSelect.filter.incomplete"></button>
+        <div class="levels-toolbar-actions">
+          <button id="btn-levels-filter-incomplete" type="button" class="nav-btn badge-btn" aria-pressed="false" data-i18n="modals.levelSelect.filter.incomplete"></button>
+          <div class="flux-seed-entry">
+            <input id="input-flux-seed" type="text" class="flux-seed-input" autocomplete="off" spellcheck="false" data-i18n-placeholder="modals.levelSelect.fluxSeed.placeholder" data-i18n-aria-label="modals.levelSelect.fluxSeed.ariaLabel">
+            <button id="btn-flux-seed-go" type="button" class="nav-btn badge-btn" data-i18n="modals.levelSelect.fluxSeed.launch"></button>
+          </div>
+        </div>
       </div>
       <div id="levels-chapters" class="level-chapters" role="tablist" data-i18n-aria-label="modals.levelSelect.chapters.label"></div>
       <p id="levels-chapter-hint" class="modal-subtext hidden" role="status" aria-live="polite"></p>

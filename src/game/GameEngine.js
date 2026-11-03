@@ -566,6 +566,7 @@ export class GameEngine {
 
   startEndlessMode() {
     this.initSurvivalRun(GAME_MODES.ENDLESS, null);
+    this.storageManager?.recordAchievementProgress?.({ endlessWave: this.waveCount });
     this.notifyUI();
   }
 
@@ -1674,6 +1675,7 @@ export class GameEngine {
     if (this.combo >= juice.hitStopMinCombo) {
       this.hitStopFrames = juice.hitStopFramesCombo;
     }
+    this.storageManager?.recordAchievementProgress?.({ maxCombo: this.combo });
     if (this.combo >= this.gameConfig.achievements.comboMaster.threshold) {
       this.checkAndUnlockAchievement('comboMaster');
     }
@@ -1905,6 +1907,7 @@ export class GameEngine {
       this.gameConfig.theme.bossPopupColor
     );
     this.bossesDestroyedInRun++;
+    this.storageManager?.recordAchievementProgress?.({ bossesDestroyed: this.bossesDestroyedInRun });
     if (this.bossesDestroyedInRun >= this.gameConfig.achievements.bossSlayer.threshold) {
       this.checkAndUnlockAchievement('bossSlayer');
     }
@@ -2090,6 +2093,7 @@ export class GameEngine {
       );
       this.particleSystem.addScreenShake(juice.avalancheShake, juice.maxShakeOffset);
 
+      this.storageManager?.recordAchievementProgress?.({ maxAvalanche: detached.length });
       if (detached.length >= this.gameConfig.achievements.firstAvalanche.threshold) {
         this.checkAndUnlockAchievement('firstAvalanche');
       }
@@ -2357,6 +2361,9 @@ export class GameEngine {
       }
     }
 
+    if (this.mode === GAME_MODES.ENDLESS) {
+      this.storageManager?.recordAchievementProgress?.({ endlessWave: this.waveCount });
+    }
     if (this.waveCount >= this.gameConfig.achievements.survivorWave10.threshold) {
       this.checkAndUnlockAchievement('survivorWave10');
     }
@@ -2409,6 +2416,7 @@ export class GameEngine {
     if (this.mode === GAME_MODES.CAMPAIGN) {
       if (this.physicsWorld.balls.length === 0) {
         this.outOfShotsGraceFrames = 0;
+        this.storageManager?.recordAchievementProgress?.({ shotsRemainingOnClear: this.shotsRemaining });
         if (this.shotsRemaining >= this.gameConfig.achievements.sharpshooter.threshold) {
           this.checkAndUnlockAchievement('sharpshooter');
         }
