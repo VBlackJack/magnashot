@@ -4,6 +4,13 @@ All notable changes to **FluxSpheres** are documented in this file.
 
 ## [Unreleased]
 
+## [1.7.6] - 2026-11-03
+
+### Fixed
+- **Workshop Achievement Progress Thresholds**: `computeAchievementProgress` and `renderShopContents` now read `achSpec.threshold` across all 6 configured achievements (`firstAvalanche`, `comboMaster`, `bossSlayer`, `sharpshooter`, `survivorWave10`, `starCollector`) and pass live `maxCombo` and `bossesDestroyed` counters from `GameEngine`.
+- **Shared Flux Seed URL Cleanup**: Switching away from a shared `?flux=<seed>` run (or starting a new seed) now removes the `flux` query parameter via `window.history.replaceState` (`stripFluxSeedFromUrl` in `src/game/DailyShare.js`) so subsequent page reloads resume the active run instead of forcing the old shared seed.
+- **Level Select Accessibility & Forced-Colors Polish**: Unified locked chapter and locked card hints on `revealLiveRegion` (`showLockedLevelHint`) to prevent duplicate screen-reader announcements, added keyboard focus and `Enter`/`Space` activation to locked level cards, styled `.level-card.locked` with `GrayText` under `@media (forced-colors: active)`, cleared stale `#levels-chapter-hint` banners when toggling the `< 3★` filter or closing the modal, and merged the duplicate `click` listeners on `#btn-play-level-modal`.
+
 ## [1.7.5] - 2026-11-03
 
 ### Added
