@@ -437,10 +437,14 @@
         "sectionTitle": "Arcade Modes",
         "puzzle": "🎯 Puzzle",
         "puzzleDesc": "5 trick-shot stages • Rescue Cores 💎",
+        "puzzleRecord": "Stage {{stage}}/{{total}} • Best: {{score}}",
+        "puzzleStage": "Puzzle {{stage}}",
+        "puzzleStageLocked": "Clear Puzzle {{previous}} to unlock.",
         "blitz": "⏱ Blitz 90s",
         "blitzDesc": "90s timer • Unlimited shots",
         "bossRush": "👑 Boss Rush",
         "bossRushDesc": "Titan Core • Overcharge -1 shield",
+        "bossRushRecord": "Wave {{wave}} • Best: {{score}}",
         "cascade": "⬇ Cascade",
         "cascadeDesc": "High-gravity well • Platforms"
       }
@@ -730,7 +734,10 @@
         "highScore": "High Score: {{highScore}}",
         "newRecordBadge": "New record!",
         "remainingSpheres": "Spheres left on the board: {{count}}",
-        "fluxStage": "Shape reached: {{stage}} (best: {{best}})"
+        "fluxStage": "Shape reached: {{stage}} (best: {{best}})",
+        "bossRushSummary": "Boss Wave: {{wave}} (best: {{best}}) • Coins: +{{coins}} ⬡",
+        "waveSummary": "Wave reached: {{wave}} • Max Combo: x{{combo}} • Coins: +{{coins}} ⬡",
+        "puzzleSummary": "Puzzle Stage: {{stage}} / {{total}}"
       },
       "button": {
         "continueShots": "+{{shots}} Shots ({{cost}} ⬡)",

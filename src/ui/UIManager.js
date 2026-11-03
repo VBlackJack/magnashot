@@ -471,6 +471,7 @@ export class UIManager {
       arcadeBestBlitz: document.getElementById('arcade-best-blitz'),
       arcadeBestBossRush: document.getElementById('arcade-best-boss-rush'),
       arcadeBestCascade: document.getElementById('arcade-best-cascade'),
+      puzzleStagesStrip: document.getElementById('puzzle-stages-strip'),
       levelsStarsSummary: document.getElementById('levels-stars-summary'),
       btnLevelsFilterIncomplete: document.getElementById('btn-levels-filter-incomplete'),
       inputFluxSeed: document.getElementById('input-flux-seed'),
@@ -2339,9 +2340,18 @@ export class UIManager {
     const suggestedLevelId = this.getSuggestedLevelId();
     this.syncLevelsFilterButton();
 
+    const totalPuzzles = Math.max(1, this.gameConfig.puzzles?.length || 1);
+    const bestPuzzleStage = Math.min(
+      totalPuzzles,
+      Math.max(1, this.storageManager.getPuzzleBestStage?.() || 1)
+    );
     setTextIfChanged(
       this.elements.arcadeBestPuzzle,
-      t('modals.levelSelect.card.bestScore', { score: formatNumber(this.storageManager.getPuzzleHighScore()) })
+      t('modals.levelSelect.arcade.puzzleRecord', {
+        stage: formatNumber(bestPuzzleStage),
+        total: formatNumber(totalPuzzles),
+        score: formatNumber(this.storageManager.getPuzzleHighScore())
+      })
     );
     setTextIfChanged(
       this.elements.arcadeBestBlitz,
@@ -2349,12 +2359,16 @@ export class UIManager {
     );
     setTextIfChanged(
       this.elements.arcadeBestBossRush,
-      t('modals.levelSelect.card.bestScore', { score: formatNumber(this.storageManager.getBossRushHighScore()) })
+      t('modals.levelSelect.arcade.bossRushRecord', {
+        wave: formatNumber(Math.max(1, this.storageManager.getBossRushBestWave?.() || 1)),
+        score: formatNumber(this.storageManager.getBossRushHighScore())
+      })
     );
     setTextIfChanged(
       this.elements.arcadeBestCascade,
       t('modals.levelSelect.card.bestScore', { score: formatNumber(this.storageManager.getCascadeHighScore()) })
     );
+    this.renderPuzzleStagesStrip();
 
     if (this.elements.levelsStarsSummary) {
       const totalStars = this.storageManager.getTotalStars();
@@ -2392,6 +2406,87 @@ export class UIManager {
   /** Display name of a chapter of the level select. */
   formatChapterName(chapter) {
     return formatChapterName(chapter);
+  }
+
+  /** Renders the direct stage-selection buttons (1..N) for Puzzle Mode inside the Levels modal. */
+  renderPuzzleStagesStrip() {
+    const strip = this.elements?.puzzleStagesStrip;
+    if (!strip) {
+      return;
+    }
+    const totalPuzzles = Math.max(1, this.gameConfig?.puzzles?.length || 1);
+    const unlockedStage = Math.min(
+      totalPuzzles,
+      Math.max(1, this.storageManager?.getPuzzleBestStage?.() || 1)
+    );
+    strip.replaceChildren();
+    for (let stageNum = 1; stageNum <= totalPuzzles; stageNum++) {
+      const isUnlocked = stageNum <= unlockedStage;
+      const isCurrent =
+        this.engine?.mode === GAME_MODES.PUZZLE && this.engine.currentPuzzleStage === stageNum;
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = `puzzle-stage-btn${isCurrent ? ' active' : ''}${isUnlocked ? '' : ' locked'}`;
+      btn.dataset.puzzleStage = String(stageNum);
+      const label = t('modals.levelSelect.arcade.puzzleStage', { stage: formatNumber(stageNum) });
+      btn.textContent = label;
+      if (isCurrent) {
+        btn.setAttribute('aria-current', 'true');
+      }
+      if (isUnlocked) {
+        btn.addEventListener('click', () => {
+          this.requestDestructiveAction(
+            () => {
+              this.hideAllModals();
+              this.engine.startPuzzleMode(stageNum);
+            },
+            () => label
+          );
+        });
+      } else {
+        btn.disabled = true;
+        btn.title = t('modals.levelSelect.arcade.puzzleStageLocked', {
+          previous: formatNumber(stageNum - 1)
+        });
+      }
+      strip.appendChild(btn);
+    }
+  }
+
+  /** Formats the mode-specific stage/wave/combo/coins line shown on the Game Over modal. */
+  formatGameOverStageSummary(engine, summary) {
+    if (engine.mode === GAME_MODES.FLUX) {
+      return t('modals.gameOver.stats.fluxStage', {
+        stage: formatNumber(engine.fluxStage),
+        best: formatNumber(Math.max(engine.fluxStage, this.storageManager.getFluxBestStage()))
+      });
+    }
+    if (engine.mode === GAME_MODES.BOSS_RUSH) {
+      return t('modals.gameOver.stats.bossRushSummary', {
+        wave: formatNumber(engine.bossRushWave),
+        best: formatNumber(Math.max(engine.bossRushWave, this.storageManager.getBossRushBestWave?.() || 1)),
+        coins: formatNumber(summary?.earnedCoins || 0)
+      });
+    }
+    if (engine.mode === GAME_MODES.PUZZLE) {
+      return t('modals.gameOver.stats.puzzleSummary', {
+        stage: formatNumber(engine.currentPuzzleStage),
+        total: formatNumber(Math.max(1, this.gameConfig.puzzles?.length || 1))
+      });
+    }
+    if (
+      engine.mode === GAME_MODES.ENDLESS ||
+      engine.mode === GAME_MODES.DAILY ||
+      engine.mode === GAME_MODES.BLITZ ||
+      engine.mode === GAME_MODES.CASCADE
+    ) {
+      return t('modals.gameOver.stats.waveSummary', {
+        wave: formatNumber(engine.waveCount),
+        combo: formatNumber(Math.max(1, summary?.maxCombo || engine.combo || 1)),
+        coins: formatNumber(summary?.earnedCoins || 0)
+      });
+    }
+    return '';
   }
 
   /**
@@ -2971,17 +3066,11 @@ export class UIManager {
         }
       }
       if (this.elements.gameOverStage) {
-        const isFlux = engine.mode === GAME_MODES.FLUX;
-        if (isFlux) {
-          setTextIfChanged(
-            this.elements.gameOverStage,
-            t('modals.gameOver.stats.fluxStage', {
-              stage: engine.fluxStage,
-              best: Math.max(engine.fluxStage, this.storageManager.getFluxBestStage())
-            })
-          );
+        const stageSummaryText = this.formatGameOverStageSummary(engine, summary);
+        if (stageSummaryText) {
+          setTextIfChanged(this.elements.gameOverStage, stageSummaryText);
         }
-        this.elements.gameOverStage.classList.toggle('hidden', !isFlux);
+        this.elements.gameOverStage.classList.toggle('hidden', !stageSummaryText);
       }
       if (this.elements.gameOverDailyNext) {
         const isDaily = engine.mode === GAME_MODES.DAILY;

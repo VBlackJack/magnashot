@@ -963,11 +963,33 @@ test('Arcade modes are accessible from both the main navigation bar and the rich
 
   const ui = Object.create(UIManager.prototype);
   ui.gameConfig = gameConfig;
-  ui.storageManager = { getPuzzleBestStage: () => 3 };
+  ui.storageManager = {
+    getPuzzleBestStage: () => 3,
+    getFluxBestStage: () => 5,
+    getBossRushBestWave: () => 4
+  };
   ui.engine = { mode: 'campaign', currentPuzzleStage: 1 };
   assert.equal(ui.getSuggestedPuzzleStage(), 3, 'Switching into Puzzle mode resumes at the best unlocked stage');
   ui.engine = { mode: 'puzzle', currentPuzzleStage: 3 };
   assert.equal(ui.getSuggestedPuzzleStage(), 4, 'Clicking Puzzle while already in Puzzle mode cycles to the next stage');
   ui.engine = { mode: 'puzzle', currentPuzzleStage: gameConfig.puzzles.length };
   assert.equal(ui.getSuggestedPuzzleStage(), 1, 'Cycling past the final Puzzle stage wraps back to stage 1');
+
+  assert.match(levelsModal, /id="puzzle-stages-strip"[^>]*class="puzzle-stages-strip"/);
+  assert.match(uiManagerCode, /style-preview-orb style-preview-\$\{styleId\}/);
+  i18n.dictionaries.set('fr', JSON.parse(readFileSync('./locales/fr.json', 'utf8')));
+  assert.ok(
+    ui.formatGameOverStageSummary(
+      { mode: 'endless', waveCount: 7, combo: 2 },
+      { maxCombo: 4, earnedCoins: 18 }
+    ).includes('7'),
+    'formatGameOverStageSummary formats Survival wave, max combo, and coins earned'
+  );
+  assert.ok(
+    ui.formatGameOverStageSummary(
+      { mode: 'boss_rush', bossRushWave: 3 },
+      { earnedCoins: 24 }
+    ).includes('3'),
+    'formatGameOverStageSummary formats Boss Rush wave and coins earned'
+  );
 });

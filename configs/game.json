@@ -47,7 +47,10 @@
       "baseRadius": 30,
       "baseBorderWidth": 3,
       "nextBallRingPadding": 5,
-      "nextBallRingWidth": 2
+      "nextBallRingWidth": 2,
+      "autoFireRingOffset": 8,
+      "autoFireRingWidth": 3,
+      "autoFireUrgentRatio": 0.66
     }
   },
   "serviceWorker": {
@@ -603,6 +606,8 @@
     "dangerZoneFill": "rgba(255, 71, 87, 0.08)",
     "dangerZoneWarningFill": "rgba(255, 71, 87, 0.22)",
     "dangerBallRingColor": "#ff4757",
+    "dangerBallGlowAlpha": 0.2,
+    "dangerBallGlowPadding": 10,
     "dangerWarningPulseSpeed": 0.01,
     "avalancheDropHighlightColor": "#38bdf8",
     "avalancheRingPaddingExtra": 2,

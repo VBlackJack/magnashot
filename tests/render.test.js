@@ -610,3 +610,17 @@ test('The Boss Core crack shockwave and the singularity pull wave read their own
   assert.ok(!engineSource.includes('shockwaveRadius * MATH_CONSTANTS.HALF'), 'the crack radius is no longer halved in code');
   assert.ok(!rendererSource.includes('fieldWaveAlpha * MATH_CONSTANTS.HALF'), 'the pull wave alpha is no longer halved in code');
 });
+
+test('Blitz auto-fire countdown ring and danger zone proximity glow render without throwing', () => {
+  const engine = createTestEngine();
+  engine.startBlitzMode();
+  engine.blitzIdleFrames = Math.floor(gameConfig.blitz.autoFireFrames * 0.75);
+  const dangerBall = engine.physicsWorld.balls[0];
+  dangerBall.y = gameConfig.canvas.dangerLineY - gameConfig.canvas.dangerWarningMarginY * 0.5;
+  dangerBall.prevY = dangerBall.y;
+
+  const renderer = createRenderer();
+  assert.doesNotThrow(() => renderer.render(engine, 1.0));
+  engine.setReducedMotion(true);
+  assert.doesNotThrow(() => renderer.render(engine, 1.0));
+});

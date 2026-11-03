@@ -437,10 +437,14 @@
         "sectionTitle": "Modes Arcade",
         "puzzle": "🎯 Puzzle",
         "puzzleDesc": "5 défis à 1-2 tirs • Noyaux 💎",
+        "puzzleRecord": "Niveau {{stage}}/{{total}} • Record : {{score}}",
+        "puzzleStage": "Puzzle {{stage}}",
+        "puzzleStageLocked": "Terminez le Puzzle {{previous}} pour débloquer.",
         "blitz": "⏱ Blitz 90s",
         "blitzDesc": "Chrono 90 s • Tirs illimités",
         "bossRush": "👑 Boss Rush",
         "bossRushDesc": "Titan central • Surcharge -1 bouclier",
+        "bossRushRecord": "Vague {{wave}} • Record : {{score}}",
         "cascade": "⬇ Cascade",
         "cascadeDesc": "Puits haute gravité • Plateformes"
       }
@@ -730,7 +734,10 @@
         "highScore": "Meilleur score : {{highScore}}",
         "newRecordBadge": "Nouveau record !",
         "remainingSpheres": "Sphères restantes sur le plateau : {{count}}",
-        "fluxStage": "Forme atteinte : {{stage}} (record : {{best}})"
+        "fluxStage": "Forme atteinte : {{stage}} (record : {{best}})",
+        "bossRushSummary": "Vague Boss : {{wave}} (record : {{best}}) • Pièces : +{{coins}} ⬡",
+        "waveSummary": "Vague atteinte : {{wave}} • Combo max : x{{combo}} • Pièces : +{{coins}} ⬡",
+        "puzzleSummary": "Niveau Puzzle : {{stage}} / {{total}}"
       },
       "button": {
         "continueShots": "+{{shots}} tirs ({{cost}} ⬡)",

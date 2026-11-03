@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-import { OBSTACLE_TYPES, SPECIAL_TYPES, CLUSTER_MODIFIERS, BALL_STYLES, MATH_CONSTANTS } from '../core/Constants.js';
+import { GAME_MODES, OBSTACLE_TYPES, SPECIAL_TYPES, CLUSTER_MODIFIERS, BALL_STYLES, MATH_CONSTANTS } from '../core/Constants.js';
 import { isChainLink, isTetherLink } from '../physics/PhysicsWorld.js';
 import { Ball } from '../entities/Ball.js';
 import { predictImpact } from './ImpactPreview.js';
@@ -451,14 +451,24 @@ export class Renderer {
 
     if (isWarning) {
       ctx.setLineDash([]);
+      ctx.fillStyle = theme.dangerBallRingColor;
       ctx.strokeStyle = theme.dangerBallRingColor;
       ctx.lineWidth = theme.aimTargetMatchLineWidth;
+      const glowPadding = theme.dangerBallGlowPadding || theme.aimTargetRingPadding;
+      const glowAlpha = (theme.dangerBallGlowAlpha || 0) * pulse;
       for (const b of balls) {
         if (!this.isBallInDangerWarning(b, warningThresholdY, alpha)) {
           continue;
         }
         const bx = this.interpolate(b.prevX, b.x, alpha);
         const by = this.interpolate(b.prevY, b.y, alpha);
+        if (glowAlpha > 0) {
+          ctx.globalAlpha = glowAlpha;
+          ctx.beginPath();
+          ctx.arc(bx, by, b.radius + glowPadding, 0, MATH_CONSTANTS.TWO_PI);
+          ctx.fill();
+        }
+        ctx.globalAlpha = pulse;
         ctx.beginPath();
         ctx.arc(bx, by, b.radius + theme.aimTargetRingPadding, 0, MATH_CONSTANTS.TWO_PI);
         ctx.stroke();
@@ -1539,6 +1549,26 @@ export class Renderer {
     ctx.fill();
     ctx.stroke();
     ctx.restore();
+
+    if (
+      engineState.mode === GAME_MODES.BLITZ &&
+      engineState.blitzIdleFrames > 0 &&
+      !engineState.physicsWorld.projectile
+    ) {
+      const autoFireMax = this.gameConfig.blitz?.autoFireFrames || 0;
+      if (autoFireMax > 0) {
+        const ratio = Math.min(1, engineState.blitzIdleFrames / autoFireMax);
+        const startAngle = -Math.PI * MATH_CONSTANTS.HALF;
+        const endAngle = startAngle + ratio * MATH_CONSTANTS.TWO_PI;
+        ctx.save();
+        ctx.strokeStyle = ratio >= launcherGeom.autoFireUrgentRatio ? theme.dangerLineColor : theme.wavePopupColor;
+        ctx.lineWidth = launcherGeom.autoFireRingWidth;
+        ctx.beginPath();
+        ctx.arc(lx, ly, launcherGeom.baseRadius + launcherGeom.autoFireRingOffset, startAngle, endAngle);
+        ctx.stroke();
+        ctx.restore();
+      }
+    }
 
     if (engineState.currentBall && !engineState.physicsWorld.projectile) {
       this.drawBallAt(ctx, engineState.currentBall, lx, ly, now);

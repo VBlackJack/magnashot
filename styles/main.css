@@ -1067,6 +1067,80 @@ body {
   font-weight: 600;
 }
 
+.puzzle-stages-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.puzzle-stage-btn {
+  padding: 4px 10px;
+  background: var(--surface-raised);
+  color: var(--text-main);
+  border: 1px solid var(--border-subtle);
+  border-radius: 6px;
+  font: inherit;
+  font-size: 0.72rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.puzzle-stage-btn:hover:not(:disabled) {
+  border-color: var(--accent-blue);
+}
+
+.puzzle-stage-btn.active {
+  background: var(--accent-amber-alpha-20);
+  color: var(--text-gold-soft);
+  border-color: var(--accent-amber);
+}
+
+.puzzle-stage-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.style-card-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.style-preview-orb {
+  display: inline-block;
+  flex: 0 0 22px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 1.5px solid var(--border-subtle);
+}
+
+.style-preview-classic {
+  background: radial-gradient(circle at 32% 30%, var(--text-main), var(--accent-blue) 60%, var(--bg-darker));
+}
+
+.style-preview-crystal {
+  background: conic-gradient(
+    from 30deg,
+    var(--accent-blue),
+    var(--accent-purple),
+    var(--text-main),
+    var(--accent-blue)
+  );
+  border-color: var(--text-main);
+}
+
+.style-preview-neon {
+  background: radial-gradient(circle, var(--bg-darker) 52%, var(--accent-blue) 68%, var(--accent-purple));
+  border-color: var(--accent-blue);
+}
+
+.style-preview-metallic {
+  background: linear-gradient(135deg, var(--text-main), var(--text-muted) 48%, var(--bg-darker));
+  border: 2px double var(--text-main);
+}
+
 .levels-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(175px, 1fr));
@@ -2453,6 +2527,7 @@ body {
   .level-chapter,
   .flux-seed-input,
   .arcade-mode-card,
+  .puzzle-stage-btn,
   .level-card.unlocked {
     border: 1px solid ButtonText;
   }
@@ -2466,6 +2541,7 @@ body {
   }
   .nav-btn.active-mode,
   .arcade-mode-card.active-mode,
+  .puzzle-stage-btn.active,
   .modal-tab.active,
   .level-chapter.active,
   .powerup-btn.equipped,

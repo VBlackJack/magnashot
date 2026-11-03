@@ -4,6 +4,21 @@ All notable changes to **MagnaShot** are documented in this file.
 
 ## [Unreleased]
 
+## [1.9.2] - 2026-11-03
+
+### Added
+- **Direct Puzzle Stage Selector & Rich Arcade Records (`#puzzle-stages-strip`)**: Added a row of stage chips (`P1`..`P5`) inside the Levels & Modes modal so players can launch any unlocked Puzzle stage in a single click, and enriched the Puzzle and Boss Rush cards to display both the highest stage/wave reached and the personal best score.
+- **Blitz 90s Auto-Fire Countdown Ring**: Added a radial progress arc around the launcher base in Blitz mode showing the remaining time before the 3-second hesitation auto-fire triggers, shifting to the urgent warning color past 70% elapsed time.
+- **Danger Line Proximity Radial Glow**: Spheres inside the danger warning zone now render a pulsing radial warning halo behind their ring outline (static when `reduced-motion` is active).
+- **Workshop Ball Style Preview Orbs (`.style-preview-orb`)**: Added a live CSS preview orb on each Ball Style card in the Workshop (`Classic`, `Crystal`, `Neon`, `Metallic`).
+- **Enriched Game Over Run Summary (`#gameover-stage`)**: Tracked `maxComboInRound` and `runCoinsEarned` in `GameEngine` and `RunSnapshot`, displaying wave/stage reached, max combo, and coins earned on the Game Over modal across Survival, Daily, Flux, Blitz, Boss Rush, Cascade, and Puzzle modes.
+- **Arcade Mode Result Sharing**: Extended `DailyShare.buildShareText` and `RunSnapshot.snapshotFromEngine` to support spoiler-free result sharing for `puzzle`, `blitz`, `boss_rush`, and `cascade`.
+
+### Fixed
+- **Rescue Core Floating Text Interpolation**: Passed `{ points: rescueSpec.pointsPerCore, coins: rescueSpec.coinsReward }` to `gameplay.feedback.rescueCore.freed` so freeing a Rescue Core displays its point value instead of `+undefined`.
+- **Puzzle Mode Progression & Workshop Ammo State**: Resuming Puzzle mode from navigation now selects the highest unlocked stage (`getSuggestedPuzzleStage`), hides the misleading `3★ target reached!` line on 1★/2★ Puzzle victories, and disables Special Ammo purchases during Puzzle runs with an explicit hint (`puzzleDisabledHint`).
+- **Boss Rush HUD & Workshop Accessibility**: Displayed `Shields` / `Boucliers` on the Boss Rush HUD counter (`hud.stats.shots.shieldsLabel`), announced Ball Style purchases and selections to screen readers, removed the nested scrollbar on `#shop-styles-grid`, added `@media (forced-colors: active)` rules for `.arcade-mode-card` and `.puzzle-stage-btn`, and wrapped `.modal-tabs` cleanly on narrow mobile viewports.
+
 ## [1.9.1] - 2026-11-03
 
 ### Changed

@@ -93,6 +93,8 @@ export class GameEngine {
     this.currentLevelId = 1;
     this.score = 0;
     this.combo = 0;
+    this.maxComboInRound = 0;
+    this.runCoinsEarned = 0;
     this.overcharge = 0;
     this.shotsRemaining = 0;
     this.waveCount = 1;
@@ -291,6 +293,7 @@ export class GameEngine {
     if (amount <= 0) {
       return;
     }
+    this.runCoinsEarned += amount;
     if (isRunSnapshotable(this)) {
       this.storageManager.addCoins(amount);
     } else {
@@ -350,6 +353,8 @@ export class GameEngine {
     this.mode = mode;
     this.score = 0;
     this.combo = 0;
+    this.maxComboInRound = 0;
+    this.runCoinsEarned = 0;
     this.overcharge = 0;
     this.freezeTurnsRemaining = 0;
     this.chainCooldown = 0;
@@ -2058,6 +2063,7 @@ export class GameEngine {
       this.combo + scoring.comboIncrement,
       scoring.maxComboMultiplier
     );
+    this.maxComboInRound = Math.max(this.maxComboInRound, this.combo);
 
     const basePoints = scoring.baseMatchPoints + (cluster.length - minMatch) * scoring.extraBallMultiplier;
     const points = basePoints * destroyedCount * this.combo;
@@ -3060,7 +3066,13 @@ export class GameEngine {
     }
     const isNewRecord = this.mode !== GAME_MODES.CAMPAIGN && previousBestScore > 0 && this.score > previousBestScore;
     const remainingSpheres = this.physicsWorld.balls.length;
-    this.gameOverSummary = { reasonKey, isNewRecord, remainingSpheres };
+    this.gameOverSummary = {
+      reasonKey,
+      isNewRecord,
+      remainingSpheres,
+      maxCombo: this.maxComboInRound,
+      earnedCoins: this.runCoinsEarned
+    };
     this.state = GAME_STATES.GAME_OVER;
     this.persistRunHighScore();
     this.flushPendingRunCoins();

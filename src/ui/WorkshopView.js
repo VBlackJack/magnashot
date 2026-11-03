@@ -274,9 +274,14 @@ export function renderWorkshopContents() {
       }
 
       const styleName = t(`modals.shop.styles.items.${styleId}.name`);
+      const previewOrb = document.createElement('span');
+      previewOrb.className = `style-preview-orb style-preview-${styleId}`;
+      previewOrb.setAttribute('aria-hidden', 'true');
       const title = document.createElement('div');
-      title.className = 'level-card-title';
-      title.textContent = `${spec.icon || ''} ${styleName}`.trim();
+      title.className = 'level-card-title style-card-title';
+      const titleText = document.createElement('span');
+      titleText.textContent = `${spec.icon || ''} ${styleName}`.trim();
+      title.append(previewOrb, titleText);
 
       const desc = document.createElement('div');
       desc.className = 'level-card-desc';

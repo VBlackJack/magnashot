@@ -25,6 +25,8 @@ const ENGINE_SCALAR_FIELDS = [
   'currentLevelId',
   'score',
   'combo',
+  'maxComboInRound',
+  'runCoinsEarned',
   'overcharge',
   'shotsRemaining',
   'waveCount',
