@@ -43,7 +43,17 @@ const ENGINE_SCALAR_FIELDS = [
   'aimAngle',
   'fluxSeed',
   'fluxStage',
-  'fluxPreviousFamily'
+  'fluxPreviousFamily',
+  'currentObjective',
+  'targetCoreCount',
+  'rescuedCores',
+  'currentPuzzleStage',
+  'blitzFramesRemaining',
+  'blitzWaveTimerFrames',
+  'blitzIdleFrames',
+  'bossRushWave',
+  'cascadeWave',
+  'cascadeTurnsUntilDrop'
 ];
 
 /** Ball fields copied verbatim; identity, bonds and the pivot link are handled separately. */
@@ -264,6 +274,14 @@ export function applyRunSnapshot(engine, snapshot) {
     engine.startDailyChallenge(snapshot.dailySeedKey, true);
   } else if (snapshot.mode === GAME_MODES.FLUX) {
     engine.restoreFluxRun(snapshot.engine.fluxSeed, snapshot.engine.fluxStage, snapshot.engine.fluxPreviousFamily);
+  } else if (snapshot.mode === GAME_MODES.PUZZLE) {
+    engine.startPuzzleMode(snapshot.engine.currentPuzzleStage || 1);
+  } else if (snapshot.mode === GAME_MODES.BLITZ) {
+    engine.startBlitzMode();
+  } else if (snapshot.mode === GAME_MODES.BOSS_RUSH) {
+    engine.startBossRushMode(snapshot.engine.bossRushWave || 1);
+  } else if (snapshot.mode === GAME_MODES.CASCADE) {
+    engine.startCascadeMode();
   } else {
     engine.startEndlessMode();
   }

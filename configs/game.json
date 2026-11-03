@@ -295,6 +295,169 @@
       }
     }
   },
+  "blitz": {
+    "durationFrames": 5400,
+    "framesPerSecond": 60,
+    "warningSeconds": 15,
+    "waveIntervalFrames": 360,
+    "autoFireFrames": 180,
+    "minSpheresBeforeWave": 10,
+    "initialRows": 4,
+    "columns": 10,
+    "startY": 95,
+    "rowSpacingY": 40,
+    "descentStepY": 34,
+    "anchorColumns": [2, 5, 8],
+    "initialSpecialCounts": {
+      "bomb": 2,
+      "lightning": 1,
+      "rainbow": 2,
+      "anvil": 0,
+      "freeze": 1,
+      "rocket": 1,
+      "brush": 1
+    }
+  },
+  "bossRush": {
+    "baseBossArmor": 4,
+    "armorStepPerWave": 1,
+    "maxBossArmor": 9,
+    "pivotY": 210,
+    "pivotRadius": 22,
+    "pivotBaseAngularSpeed": 0.009,
+    "innerRingRadiusFactor": 2.2,
+    "outerRingRadiusFactor": 3.5,
+    "innerRingCount": 6,
+    "outerRingCount": 10,
+    "overchargeShieldDamage": 1,
+    "waveClearBonusBase": 600,
+    "waveClearCoinBonus": 12,
+    "initialSpecialCounts": {
+      "bomb": 2,
+      "lightning": 1,
+      "rainbow": 1,
+      "anvil": 1,
+      "freeze": 1,
+      "rocket": 2,
+      "brush": 1
+    }
+  },
+  "cascade": {
+    "gravityMultiplier": 1.65,
+    "overlapRadiusFactor": 1.5,
+    "shotsBeforeDrop": 2,
+    "dropCountPerWave": 3,
+    "initialDropRows": 3,
+    "columns": 7,
+    "startY": 95,
+    "rowSpacingY": 38,
+    "platforms": [
+      { "dx": -95, "y": 290, "width": 110, "height": 16 },
+      { "dx": 95, "y": 290, "width": 110, "height": 16 },
+      { "dx": 0, "y": 395, "width": 135, "height": 16 }
+    ],
+    "antimagnets": [
+      { "dx": 0, "y": 220, "radius": 16, "fieldRadius": 92, "clusterRepelForce": 0.42 }
+    ],
+    "initialSpecialCounts": {
+      "bomb": 2,
+      "lightning": 1,
+      "rainbow": 2,
+      "anvil": 1,
+      "freeze": 1,
+      "rocket": 1,
+      "brush": 1
+    }
+  },
+  "puzzles": [
+    {
+      "id": 1,
+      "shots": 1,
+      "objective": "coreRescue",
+      "queue": [{ "colorId": "crimson", "specialType": null }],
+      "specialInventory": { "bomb": 0, "lightning": 0, "rainbow": 0, "anvil": 0, "freeze": 0, "rocket": 0, "brush": 0 },
+      "starThresholds": [400, 900, 1400],
+      "obstacles": [],
+      "balls": [
+        { "dx": 0, "y": 100, "colorId": "crimson", "isAnchor": true },
+        { "dx": -36, "y": 132, "colorId": "crimson" },
+        { "dx": 36, "y": 132, "colorId": "cobalt" },
+        { "dx": 0, "y": 168, "colorId": "emerald", "clusterModifier": "rescueCore" },
+        { "dx": -36, "y": 204, "colorId": "amber" },
+        { "dx": 36, "y": 204, "colorId": "violet" }
+      ]
+    },
+    {
+      "id": 2,
+      "shots": 1,
+      "objective": "coreRescue",
+      "queue": [{ "colorId": "cobalt", "specialType": null }],
+      "specialInventory": { "bomb": 0, "lightning": 0, "rainbow": 0, "anvil": 0, "freeze": 0, "rocket": 0, "brush": 1 },
+      "starThresholds": [500, 1000, 1600],
+      "obstacles": [],
+      "balls": [
+        { "dx": 0, "y": 100, "colorId": null, "isAnchor": true, "clusterModifier": "neutralAnchor" },
+        { "dx": -38, "y": 136, "colorId": "cobalt" },
+        { "dx": 0, "y": 136, "colorId": null, "clusterModifier": "rust" },
+        { "dx": 38, "y": 136, "colorId": "cobalt" },
+        { "dx": 0, "y": 174, "colorId": "amber", "clusterModifier": "rescueCore" }
+      ]
+    },
+    {
+      "id": 3,
+      "shots": 1,
+      "objective": "clearAll",
+      "queue": [{ "colorId": "emerald", "specialType": null }],
+      "specialInventory": { "bomb": 0, "lightning": 1, "rainbow": 0, "anvil": 0, "freeze": 0, "rocket": 0, "brush": 0 },
+      "starThresholds": [400, 800, 1200],
+      "obstacles": [],
+      "balls": [
+        { "dx": -72, "y": 120, "colorId": "crimson", "isAnchor": true },
+        { "dx": -36, "y": 120, "colorId": "cobalt" },
+        { "dx": 0, "y": 120, "colorId": "emerald" },
+        { "dx": 36, "y": 120, "colorId": "amber" },
+        { "dx": 72, "y": 120, "colorId": "violet", "isAnchor": true }
+      ]
+    },
+    {
+      "id": 4,
+      "shots": 2,
+      "objective": "coreRescue",
+      "queue": [
+        { "colorId": "amber", "specialType": null },
+        { "colorId": "crimson", "specialType": null }
+      ],
+      "specialInventory": { "bomb": 1, "lightning": 0, "rainbow": 0, "anvil": 0, "freeze": 0, "rocket": 0, "brush": 0 },
+      "starThresholds": [600, 1200, 1800],
+      "obstacles": [
+        { "type": "platform", "dx": 0, "y": 240, "width": 120, "height": 16 }
+      ],
+      "balls": [
+        { "dx": -36, "y": 192, "colorId": "amber", "clusterModifier": "armored", "armorHits": 2 },
+        { "dx": 0, "y": 192, "colorId": "crimson", "clusterModifier": "rescueCore" },
+        { "dx": 36, "y": 192, "colorId": "crimson" }
+      ]
+    },
+    {
+      "id": 5,
+      "shots": 2,
+      "objective": "coreRescue",
+      "queue": [
+        { "colorId": "violet", "specialType": null },
+        { "colorId": "violet", "specialType": null }
+      ],
+      "specialInventory": { "bomb": 0, "lightning": 0, "rainbow": 1, "anvil": 0, "freeze": 0, "rocket": 1, "brush": 0 },
+      "starThresholds": [800, 1500, 2200],
+      "obstacles": [],
+      "balls": [
+        { "dx": -76, "y": 105, "colorId": "violet", "isAnchor": true },
+        { "dx": -76, "y": 143, "colorId": "violet" },
+        { "dx": -76, "y": 181, "colorId": "cobalt", "clusterModifier": "rescueCore" },
+        { "dx": 76, "y": 105, "colorId": "crimson", "isAnchor": true },
+        { "dx": 76, "y": 143, "colorId": "emerald", "clusterModifier": "rescueCore" }
+      ]
+    }
+  ],
   "share": {
     "url": "https://vblackjack.github.io/flux-spheres/",
     "epochDateKey": "2026-10-26",
@@ -343,7 +506,7 @@
       "basics", "pivot", "coinCore", "dormantBomb", "bumper", "armored", "repulsor", "chameleon",
       "barrier", "attractor", "bossCore", "portal", "laserLock", "singularity", "neutralAnchor",
       "chained", "bubble", "freezeCore", "lightningCore", "paintCore", "rail", "thruster", "tether", "rust",
-      "platform", "antimagnet"
+      "platform", "antimagnet", "rescueCore"
     ],
     "mechanics": {
       "basics": { "hintKey": "gameplay.tutorial.pendulum" },
@@ -371,7 +534,8 @@
       "tether": { "hintKey": "gameplay.tutorial.tether" },
       "rust": { "hintKey": "gameplay.tutorial.rust" },
       "platform": { "hintKey": "gameplay.tutorial.platform" },
-      "antimagnet": { "hintKey": "gameplay.tutorial.antimagnet" }
+      "antimagnet": { "hintKey": "gameplay.tutorial.antimagnet" },
+      "rescueCore": { "hintKey": "gameplay.tutorial.rescueCore" }
     }
   },
   "storage": {
@@ -388,6 +552,12 @@
       "endlessHighScore": "endless_high_score",
       "fluxHighScore": "flux_high_score",
       "fluxBestStage": "flux_best_stage",
+      "blitzHighScore": "blitz_high_score",
+      "bossRushHighScore": "boss_rush_high_score",
+      "bossRushBestWave": "boss_rush_best_wave",
+      "cascadeHighScore": "cascade_high_score",
+      "puzzleHighScore": "puzzle_high_score",
+      "puzzleBestStage": "puzzle_best_stage",
       "dailyBest": "daily_best",
       "dailyBestDate": "daily_best_date",
       "dailyLastPlayedDate": "daily_last_date",

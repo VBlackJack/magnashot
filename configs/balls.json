@@ -330,6 +330,16 @@
       "id": "rust",
       "ringColor": "#b45309",
       "badge": "⚙"
+    },
+    "rescueCore": {
+      "id": "rescueCore",
+      "ringColor": "#38bdf8",
+      "highlight": "#fde047",
+      "badge": "💎",
+      "pointsPerCore": 450,
+      "coinsReward": 8,
+      "burstCount": 16,
+      "burstSpeed": 6.0
     }
   },
   "rustPalette": {

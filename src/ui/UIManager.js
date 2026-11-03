@@ -123,7 +123,11 @@ const MODE_BUTTON_KEYS = Object.freeze({
   [GAME_MODES.CAMPAIGN]: 'btnLevels',
   [GAME_MODES.ENDLESS]: 'btnEndless',
   [GAME_MODES.DAILY]: 'btnDaily',
-  [GAME_MODES.FLUX]: 'btnFlux'
+  [GAME_MODES.FLUX]: 'btnFlux',
+  [GAME_MODES.PUZZLE]: 'btnModePuzzle',
+  [GAME_MODES.BLITZ]: 'btnModeBlitz',
+  [GAME_MODES.BOSS_RUSH]: 'btnModeBossRush',
+  [GAME_MODES.CASCADE]: 'btnModeCascade'
 });
 
 /** Pause modal hints that have one wording per input mode. */
@@ -455,6 +459,10 @@ export class UIManager {
       specialEquippedBanner: document.getElementById('special-equipped-banner'),
       cancelAimBanner: document.getElementById('cancel-aim-banner'),
       modalLevels: document.getElementById('modal-levels'),
+      btnModePuzzle: document.getElementById('btn-mode-puzzle'),
+      btnModeBlitz: document.getElementById('btn-mode-blitz'),
+      btnModeBossRush: document.getElementById('btn-mode-boss-rush'),
+      btnModeCascade: document.getElementById('btn-mode-cascade'),
       levelsStarsSummary: document.getElementById('levels-stars-summary'),
       btnLevelsFilterIncomplete: document.getElementById('btn-levels-filter-incomplete'),
       inputFluxSeed: document.getElementById('input-flux-seed'),
@@ -1203,6 +1211,34 @@ export class UIManager {
       this.submitFluxSeedInput();
     });
 
+    this.elements.btnModePuzzle?.addEventListener('click', () => {
+      this.requestDestructiveAction(() => {
+        this.hideAllModals();
+        this.engine.startPuzzleMode();
+      }, () => t('modals.levelSelect.arcade.puzzle'));
+    });
+
+    this.elements.btnModeBlitz?.addEventListener('click', () => {
+      this.requestDestructiveAction(() => {
+        this.hideAllModals();
+        this.engine.startBlitzMode();
+      }, () => t('modals.levelSelect.arcade.blitz'));
+    });
+
+    this.elements.btnModeBossRush?.addEventListener('click', () => {
+      this.requestDestructiveAction(() => {
+        this.hideAllModals();
+        this.engine.startBossRushMode();
+      }, () => t('modals.levelSelect.arcade.bossRush'));
+    });
+
+    this.elements.btnModeCascade?.addEventListener('click', () => {
+      this.requestDestructiveAction(() => {
+        this.hideAllModals();
+        this.engine.startCascadeMode();
+      }, () => t('modals.levelSelect.arcade.cascade'));
+    });
+
     this.elements.inputFluxSeed?.addEventListener('keydown', (e) => {
       if (e.key === 'Enter') {
         e.preventDefault();
@@ -1234,6 +1270,15 @@ export class UIManager {
 
     this.elements.btnNextLevel.addEventListener('click', () => {
       this.hideAllModals();
+      if (this.engine.mode === GAME_MODES.PUZZLE) {
+        const totalPuzzles = this.gameConfig.puzzles?.length || 0;
+        if (this.engine.currentPuzzleStage < totalPuzzles) {
+          this.engine.startPuzzleMode(this.engine.currentPuzzleStage + 1);
+        } else {
+          this.openLevelsModal();
+        }
+        return;
+      }
       const { targetLevelId } = resolveNextCampaignTarget(
         this.engine.currentLevelId,
         this.engine.levelCatalog,
@@ -1501,6 +1546,16 @@ export class UIManager {
   updateNextLevelButton(engine) {
     const button = this.elements.btnNextLevel;
     if (!button) {
+      return;
+    }
+    if (engine.mode === GAME_MODES.PUZZLE) {
+      const totalPuzzles = this.gameConfig.puzzles?.length || 0;
+      const action = engine.currentPuzzleStage < totalPuzzles
+        ? VICTORY_NEXT_ACTIONS.NEXT_LEVEL
+        : VICTORY_NEXT_ACTIONS.LEVEL_SELECT;
+      const labelKey = VICTORY_NEXT_LABEL_KEYS[action];
+      setAttributeIfChanged(button, 'data-i18n', labelKey);
+      setTextIfChanged(button, t(labelKey));
       return;
     }
     const { action } = resolveNextCampaignTarget(
@@ -2424,6 +2479,14 @@ export class UIManager {
       bestScore = this.storageManager.getDailyHighScore(engine.dailySeedKey || SeededRandom.getTodayDateKey());
     } else if (engine.mode === GAME_MODES.FLUX) {
       bestScore = this.storageManager.getFluxHighScore();
+    } else if (engine.mode === GAME_MODES.PUZZLE) {
+      bestScore = this.storageManager.getPuzzleHighScore();
+    } else if (engine.mode === GAME_MODES.BLITZ) {
+      bestScore = this.storageManager.getBlitzHighScore();
+    } else if (engine.mode === GAME_MODES.BOSS_RUSH) {
+      bestScore = this.storageManager.getBossRushHighScore();
+    } else if (engine.mode === GAME_MODES.CASCADE) {
+      bestScore = this.storageManager.getCascadeHighScore();
     } else {
       bestScore = this.storageManager.getEndlessHighScore();
     }
@@ -2487,6 +2550,60 @@ export class UIManager {
         );
         this.elements.starProgress.classList.remove('hidden');
       }
+    } else if (engine.mode === GAME_MODES.PUZZLE) {
+      setTextIfChanged(
+        this.elements.modeBanner,
+        t('hud.stats.mode.puzzle', {
+          stage: engine.currentPuzzleStage,
+          total: this.gameConfig.puzzles?.length || 1
+        })
+      );
+      if (this.elements.shotsLabel) {
+        setTextIfChanged(this.elements.shotsLabel, t('hud.stats.shots.label'));
+      }
+      setTextIfChanged(this.elements.shotsValue, formatNumber(engine.shotsRemaining));
+      this.elements.shotsValue.classList.toggle('warning', engine.shotsRemaining <= warningShotsThreshold);
+      if (this.elements.starProgress) {
+        const thresholds = engine.getStarThresholds();
+        const maxStars = this.gameConfig.scoring.maxStars;
+        const currentStars = engine.computeStars(engine.score);
+        const starsStr = this.formatStars(currentStars, maxStars);
+        const nextThreshold = thresholds.find((th) => th > engine.score);
+        this.updateStarMeter(engine.score, thresholds, nextThreshold);
+        setTextIfChanged(this.elements.starGlyphs, starsStr);
+        setTextIfChanged(
+          this.elements.starCount,
+          t('hud.stats.score.starsAria', {
+            stars: formatNumber(Math.max(0, Math.min(maxStars, currentStars))),
+            maxStars: formatNumber(maxStars)
+          })
+        );
+        setTextIfChanged(
+          this.elements.starNext,
+          nextThreshold !== undefined
+            ? t('hud.stats.score.nextThreshold', { next: formatNumber(nextThreshold) })
+            : t('hud.stats.score.maxReached')
+        );
+        this.elements.starProgress.classList.remove('hidden');
+      }
+    } else if (engine.mode === GAME_MODES.BLITZ) {
+      const fps = this.gameConfig.blitz.framesPerSecond;
+      const secondsLeft = Math.max(0, Math.ceil(engine.blitzFramesRemaining / fps));
+      setTextIfChanged(
+        this.elements.modeBanner,
+        t('hud.stats.mode.blitz', { seconds: formatNumber(secondsLeft) })
+      );
+      if (this.elements.shotsLabel) {
+        setTextIfChanged(this.elements.shotsLabel, t('hud.stats.time.label'));
+      }
+      setTextIfChanged(this.elements.shotsValue, t('hud.stats.time.seconds', { seconds: formatNumber(secondsLeft) }));
+      this.elements.shotsValue.classList.toggle(
+        'warning',
+        secondsLeft <= this.gameConfig.blitz.warningSeconds
+      );
+      if (this.elements.starProgress) {
+        this.elements.starProgress.classList.add('hidden');
+      }
     } else if (engine.mode === GAME_MODES.FLUX) {
       setTextIfChanged(
         this.elements.modeBanner,
@@ -2515,6 +2632,22 @@ export class UIManager {
             wave: engine.waveCount
           })
         );
+      } else if (engine.mode === GAME_MODES.BOSS_RUSH) {
+        const shields = engine.getBossBall()?.armorHits || 0;
+        setTextIfChanged(
+          this.elements.modeBanner,
+          t('hud.stats.mode.bossRush', {
+            wave: engine.bossRushWave,
+            shields: formatNumber(shields)
+          })
+        );
+      } else if (engine.mode === GAME_MODES.CASCADE) {
+        setTextIfChanged(
+          this.elements.modeBanner,
+          t('hud.stats.mode.cascade', {
+            wave: engine.waveCount
+          })
+        );
       } else {
         setTextIfChanged(
           this.elements.modeBanner,
@@ -2526,10 +2659,16 @@ export class UIManager {
       if (this.elements.shotsLabel) {
         setTextIfChanged(this.elements.shotsLabel, t('hud.stats.shots.waveLabel'));
       }
-      setTextIfChanged(this.elements.shotsValue, formatNumber(engine.shotsUntilWave));
+      const waveCountdown =
+        engine.mode === GAME_MODES.CASCADE
+          ? engine.cascadeTurnsUntilDrop
+          : engine.mode === GAME_MODES.BOSS_RUSH
+            ? engine.getBossBall()?.armorHits || 0
+            : engine.shotsUntilWave;
+      setTextIfChanged(this.elements.shotsValue, formatNumber(waveCountdown));
       this.elements.shotsValue.classList.toggle(
         'warning',
-        engine.shotsUntilWave <= warningShotsThreshold
+        waveCountdown <= warningShotsThreshold
       );
       if (this.elements.starProgress) {
         this.elements.starProgress.classList.add('hidden');

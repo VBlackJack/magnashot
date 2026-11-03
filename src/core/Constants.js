@@ -41,7 +41,16 @@ export const GAME_MODES = Object.freeze({
   CAMPAIGN: 'campaign',
   ENDLESS: 'endless',
   DAILY: 'daily',
-  FLUX: 'flux'
+  FLUX: 'flux',
+  PUZZLE: 'puzzle',
+  BLITZ: 'blitz',
+  BOSS_RUSH: 'boss_rush',
+  CASCADE: 'cascade'
+});
+
+export const OBJECTIVE_TYPES = Object.freeze({
+  CLEAR_ALL: 'clearAll',
+  CORE_RESCUE: 'coreRescue'
 });
 
 export const DAILY_MUTATORS = Object.freeze({
@@ -69,7 +78,8 @@ export const GAME_STATES = Object.freeze({
 /** Why a run ended in defeat; also the suffix of its `modals.gameOver.reason.*` text. */
 export const GAME_OVER_REASONS = Object.freeze({
   OUT_OF_SHOTS: 'outOfShots',
-  LINE_CROSSED: 'lineCrossed'
+  LINE_CROSSED: 'lineCrossed',
+  TIME_UP: 'timeUp'
 });
 
 /** How the player is currently driving the game; selects touch or mouse/keyboard hints. */
@@ -127,7 +137,8 @@ export const CLUSTER_MODIFIERS = Object.freeze({
   PAINT_CORE: 'paintCore',
   THRUSTER: 'thruster',
   TETHER: 'tether',
-  RUST: 'rust'
+  RUST: 'rust',
+  RESCUE_CORE: 'rescueCore'
 });
 
 export const OBSTACLE_TYPES = Object.freeze({

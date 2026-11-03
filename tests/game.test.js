@@ -640,3 +640,77 @@ test('Avalanche collector bins award bonus score and overcharge when a dropping 
   assert.ok(engine.score >= initialScore + gameConfig.scoring.collector.bonusPointsPerBall);
   assert.ok(engine.overcharge >= initialOvercharge + gameConfig.scoring.collector.overchargePerBall);
 });
+
+test('Puzzle mode loads deterministic stages, fixed launcher queues, and blocks mid-round ammo purchases', () => {
+  const storage = createTestStorage();
+  storage.setCoins(500);
+  const engine = createTestEngine(storage);
+  engine.startPuzzleMode(1);
+
+  assert.equal(engine.mode, 'puzzle');
+  assert.equal(engine.currentPuzzleStage, 1);
+  assert.equal(engine.shotsRemaining, gameConfig.puzzles[0].shots);
+  assert.equal(engine.currentBall.colorId, gameConfig.puzzles[0].queue[0].colorId);
+  assert.equal(engine.buySpecialAmmo('bomb'), false, 'Puzzle mode forbids buying extra special ammo');
+});
+
+test('Blitz 90s mode counts down timer, auto-fires on hesitation, and triggers timeUp game over at zero', () => {
+  const storage = createTestStorage();
+  const engine = createTestEngine(storage);
+  engine.startBlitzMode();
+
+  assert.equal(engine.mode, 'blitz');
+  assert.equal(engine.blitzFramesRemaining, gameConfig.blitz.durationFrames);
+
+  for (let i = 0; i < gameConfig.blitz.autoFireFrames; i++) {
+    engine.update();
+  }
+  assert.equal(engine.hasFiredInRound, true, 'Hesitating for autoFireFrames automatically fires the launcher');
+
+  engine.physicsWorld.projectile = null;
+  engine.blitzFramesRemaining = 1;
+  engine.score = 1850;
+  engine.update();
+
+  assert.equal(engine.state, 'game_over');
+  assert.equal(engine.gameOverSummary.reasonKey, 'timeUp');
+  assert.equal(storage.getBlitzHighScore(), 1850);
+});
+
+test('Boss Rush mode spawns a central Titan Core, damages its shield on Overcharge, and advances waves on kill', () => {
+  const storage = createTestStorage();
+  const engine = createTestEngine(storage);
+  engine.startBossRushMode();
+
+  assert.equal(engine.mode, 'boss_rush');
+  assert.equal(engine.bossRushWave, 1);
+  const boss = engine.getBossBall();
+  assert.ok(boss, 'Wave 1 spawns a Boss Core Titan');
+  const initialShields = boss.armorHits;
+
+  engine.addOvercharge(gameConfig.scoring.overchargeMax);
+  assert.equal(boss.armorHits, initialShields - 1, 'Reaching 100% Overcharge strikes the Titan Core for -1 shield');
+
+  boss.armorHits = 1;
+  engine.destroyClusterBall(boss);
+  engine.handlePostTurnCleanup();
+  assert.equal(engine.bossRushWave, 2, 'Destroying the Titan Core shatters the wave and advances to wave 2');
+  assert.equal(storage.getBossRushBestWave(), 2);
+});
+
+test('Cascade Drop mode builds a platform well with amplified downward cluster gravity', () => {
+  const storage = createTestStorage();
+  const engine = createTestEngine(storage);
+  engine.startCascadeMode();
+
+  assert.equal(engine.mode, 'cascade');
+  assert.equal(
+    engine.physicsWorld.gravityMultiplier,
+    gameConfig.cascade.gravityMultiplier,
+    'Cascade mode amplifies downward cluster gravity'
+  );
+  const platformCount = engine.physicsWorld.obstacles.filter((o) => o.type === 'platform').length;
+  const antimagnetCount = engine.physicsWorld.obstacles.filter((o) => o.type === 'antimagnet').length;
+  assert.ok(platformCount >= 2, 'Cascade well includes support platforms');
+  assert.ok(antimagnetCount >= 1, 'Cascade well includes antimagnet cushions');
+});

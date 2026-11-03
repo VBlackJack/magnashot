@@ -504,6 +504,84 @@ export class StorageManager {
     }
   }
 
+  getBlitzHighScore() {
+    const key = this.storageConfig?.keys?.blitzHighScore;
+    return key ? this.readNonNegativeInt(key) : 0;
+  }
+
+  setBlitzHighScore(score) {
+    const key = this.storageConfig?.keys?.blitzHighScore;
+    if (!key) {
+      return;
+    }
+    const cleanScore = Math.max(0, Math.floor(Number(score) || 0));
+    if (cleanScore > this.getBlitzHighScore()) {
+      this.safeSetItem(key, cleanScore);
+    }
+  }
+
+  getBossRushHighScore() {
+    const key = this.storageConfig?.keys?.bossRushHighScore;
+    return key ? this.readNonNegativeInt(key) : 0;
+  }
+
+  getBossRushBestWave() {
+    const key = this.storageConfig?.keys?.bossRushBestWave;
+    return key ? this.readNonNegativeInt(key) : 0;
+  }
+
+  setBossRushRecord(score, wave) {
+    const scoreKey = this.storageConfig?.keys?.bossRushHighScore;
+    const waveKey = this.storageConfig?.keys?.bossRushBestWave;
+    const cleanScore = Math.max(0, Math.floor(Number(score) || 0));
+    const cleanWave = Math.max(0, Math.floor(Number(wave) || 0));
+    if (scoreKey && cleanScore > this.getBossRushHighScore()) {
+      this.safeSetItem(scoreKey, cleanScore);
+    }
+    if (waveKey && cleanWave > this.getBossRushBestWave()) {
+      this.safeSetItem(waveKey, cleanWave);
+    }
+  }
+
+  getCascadeHighScore() {
+    const key = this.storageConfig?.keys?.cascadeHighScore;
+    return key ? this.readNonNegativeInt(key) : 0;
+  }
+
+  setCascadeHighScore(score) {
+    const key = this.storageConfig?.keys?.cascadeHighScore;
+    if (!key) {
+      return;
+    }
+    const cleanScore = Math.max(0, Math.floor(Number(score) || 0));
+    if (cleanScore > this.getCascadeHighScore()) {
+      this.safeSetItem(key, cleanScore);
+    }
+  }
+
+  getPuzzleHighScore() {
+    const key = this.storageConfig?.keys?.puzzleHighScore;
+    return key ? this.readNonNegativeInt(key) : 0;
+  }
+
+  getPuzzleBestStage() {
+    const key = this.storageConfig?.keys?.puzzleBestStage;
+    return key ? this.readNonNegativeInt(key) : 0;
+  }
+
+  setPuzzleRecord(score, stage) {
+    const scoreKey = this.storageConfig?.keys?.puzzleHighScore;
+    const stageKey = this.storageConfig?.keys?.puzzleBestStage;
+    const cleanScore = Math.max(0, Math.floor(Number(score) || 0));
+    const cleanStage = Math.max(0, Math.floor(Number(stage) || 0));
+    if (scoreKey && cleanScore > this.getPuzzleHighScore()) {
+      this.safeSetItem(scoreKey, cleanScore);
+    }
+    if (stageKey && cleanStage > this.getPuzzleBestStage()) {
+      this.safeSetItem(stageKey, cleanStage);
+    }
+  }
+
   getDailyHighScore(dateKey = SeededRandom.getTodayDateKey()) {
     const savedDate = this.safeGetItem(this.storageConfig.keys.dailyBestDate);
     if (savedDate !== dateKey) {

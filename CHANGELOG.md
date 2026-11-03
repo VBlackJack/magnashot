@@ -4,6 +4,15 @@ All notable changes to **FluxSpheres** are documented in this file.
 
 ## [Unreleased]
 
+## [1.9.0] - 2026-11-03
+
+### Added
+- **Core Rescue Objective (`CLUSTER_MODIFIERS.RESCUE_CORE`, `OBJECTIVE_TYPES.CORE_RESCUE`)**: Added captive Rescue Core spheres (`💎`) that award `+450 pts` and `+8 ⬡` when matched or dropped in an avalanche. In Core Rescue stages, freeing all Rescue Cores on the board immediately shatters the remaining cluster into a celebratory avalanche (`releaseRemainingBoardAsAvalanche`) and triggers Victory.
+- **One-Shot / Puzzle Mode (`GAME_MODES.PUZZLE`, `#btn-mode-puzzle`)**: Added 5 deterministic trick-shot puzzle stages in `configs/game.json` (`puzzles`) with fixed shot counts (`1` or `2`), pre-scripted launcher queues (`puzzleQueue`), and locked special ammo inventory.
+- **Blitz 90s / Time Attack (`GAME_MODES.BLITZ`, `#btn-mode-blitz`)**: Added a 90-second speed-run mode with unlimited shots, rapid automatic wave descent (`waveIntervalFrames: 360`), a 3-second (`autoFireFrames: 180`) hesitation auto-fire cannon, and a `timeUp` Game Over reason.
+- **Boss Rush / Titan Core (`GAME_MODES.BOSS_RUSH`, `#btn-mode-boss-rush`)**: Added an endless Boss Rush mode featuring a central rotor carrying a multi-shield Titan (`BOSS_CORE`) surrounded by concentric rings. Reaching 100% Overcharge (accelerated by Collector Bins) strikes the Titan for `-1` shield in addition to granting a special ball, and destroying the Titan shatters the wave into an avalanche and advances to `bossRushWave + 1`.
+- **Cascade Drop (`GAME_MODES.CASCADE`, `#btn-mode-cascade`)**: Added a high-gravity magnetic well mode (`gravityMultiplier: 1.65`) where spheres cascade from the top onto `PLATFORM` shelves and `ANTIMAGNET` cushions every 2 turns.
+
 ## [1.8.0] - 2026-11-03
 
 ### Added

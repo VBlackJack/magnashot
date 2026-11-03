@@ -102,11 +102,19 @@
         "endless": "Survival Mode • Wave {{wave}}",
         "daily": "Daily Challenge ({{mutator}}) • Wave {{wave}}",
         "flux": "Flux Mode • Shape {{stage}}: {{shape}}",
-        "fluxBoss": "Flux Mode • Shape {{stage}}: {{shape}} (Boss)"
+        "fluxBoss": "Flux Mode • Shape {{stage}}: {{shape}} (Boss)",
+        "puzzle": "Puzzle Mode • Stage {{stage}} / {{total}}",
+        "blitz": "Blitz 90s • {{seconds}}s",
+        "bossRush": "Boss Rush • Wave {{wave}} (👑 {{shields}})",
+        "cascade": "Cascade Drop • Wave {{wave}}"
       },
       "shots": {
         "label": "Shots Left",
         "waveLabel": "Next Wave"
+      },
+      "time": {
+        "label": "Time Left",
+        "seconds": "{{seconds}}s"
       },
       "combo": {
         "label": "Combo x{{count}}"
@@ -252,6 +260,16 @@
       "collector": {
         "bin": "COLLECTOR +{{points}}"
       },
+      "rescueCore": {
+        "freed": "CORE RESCUED! +{{points}}"
+      },
+      "blitz": {
+        "autoFire": "AUTO-FIRE!"
+      },
+      "bossRush": {
+        "overchargeStrike": "OVERCHARGE STRIKE! -1 SHIELD",
+        "waveCleared": "TITAN SHATTERED! +{{points}}"
+      },
       "special": {
         "bomb": "BLAST WAVE!",
         "lightning": "ELECTRIC SURGE!",
@@ -355,7 +373,9 @@
       "tether": "Tether spheres (∿) hold distant spheres with long links that never snap: cut the tether sphere to drop them!",
       "rust": "Rust (⚙) blocks every group: blast it, drop it, or paint it. Rockets (🚀) seek out the hardest targets!",
       "platform": "Support platforms hold hanging spheres from below while letting your shots pass right through!",
-      "antimagnet": "Antimagnet cushions push hanging clusters upward without bending your shots!"
+      "antimagnet": "Antimagnet cushions push hanging clusters upward without bending your shots!",
+      "rescueCore": "Free all Rescue Cores (💎) by matching or dropping them to trigger an instant avalanche victory!",
+      "puzzle": "One-Shot Puzzle: study the angles and clear the objective with your fixed ammo queue!"
     },
     "discovery": {
       "hint": "New: {{icon}} {{name}}. {{description}}"
@@ -410,6 +430,12 @@
         "ariaLabel": "Flux seed code (6 characters)",
         "launch": "Flux",
         "invalidHint": "Enter a valid {{length}}-character Flux seed (letters a-z and digits 0-9)."
+      },
+      "arcade": {
+        "puzzle": "🎯 Puzzle",
+        "blitz": "⏱ Blitz 90s",
+        "bossRush": "👑 Boss Rush",
+        "cascade": "⬇ Cascade"
       }
     },
     "shop": {
@@ -541,6 +567,10 @@
           "rust": {
             "name": "Rusted Sphere",
             "description": "Colorless and inert: it never joins a group. Explosions, rockets, the anvil and avalanches remove it, and a Paint Core scrubs it back to a color."
+          },
+          "rescueCore": {
+            "name": "Rescue Core",
+            "description": "Captive prism core (💎). Free all Rescue Cores on the board to shatter the remaining cluster into an instant avalanche!"
           }
         },
         "obstacles": {
@@ -681,7 +711,8 @@
       },
       "reason": {
         "lineCrossed": "The magnetic cluster crossed the danger threshold.",
-        "outOfShots": "You ran out of magnetic projectiles."
+        "outOfShots": "You ran out of magnetic projectiles.",
+        "timeUp": "Time is up! The 90-second Blitz clock reached zero."
       },
       "stats": {
         "score": "Final Score: {{score}}",

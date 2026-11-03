@@ -598,3 +598,26 @@ test('Antimagnet obstacle repels hanging cluster spheres without deflecting fire
   world.step({});
   assert.equal(shot.vx, 0, 'Antimagnet does not deflect projectile horizontal velocity');
 });
+
+test('RescueCore objective clears the round and releases remaining spheres as an avalanche once all cores are freed', () => {
+  const board = createEmptyBoard();
+  board.currentObjective = 'coreRescue';
+  const anchor = addBall(board, CENTER_X, 90, { colorId: COLOR_B, isAnchor: true });
+  const bystander = addBall(board, CENTER_X - 40, 120, { colorId: COLOR_B });
+  const rescue = addBall(board, CENTER_X + 40, 120, {
+    colorId: COLOR_A,
+    clusterModifier: CLUSTER_MODIFIERS.RESCUE_CORE
+  });
+  board.physicsWorld.createBond(anchor, bystander, false);
+  board.physicsWorld.createBond(anchor, rescue, false);
+  board.targetCoreCount = 1;
+
+  board.destroyClusterBall(rescue);
+  assert.equal(board.rescuedCores, 1, 'Freeing a Rescue Core increments rescuedCores');
+  assert.equal(board.isObjectiveCleared(), true, 'Board objective is cleared when no Rescue Core remains');
+
+  board.evaluateRoundEnd();
+  assert.equal(board.state, 'victory', 'Freeing the last Rescue Core triggers Victory even with other spheres left');
+  assert.equal(board.physicsWorld.balls.length, 0, 'Remaining spheres are released into the victory avalanche');
+  assert.equal(board.physicsWorld.droppingBalls.length, 2, 'Anchor and bystander drop as celebratory avalanche balls');
+});

@@ -102,11 +102,19 @@
         "endless": "Mode Survie • Vague {{wave}}",
         "daily": "Défi du Jour ({{mutator}}) • Vague {{wave}}",
         "flux": "Mode Flux • Forme {{stage}} : {{shape}}",
-        "fluxBoss": "Mode Flux • Forme {{stage}} : {{shape}} (Boss)"
+        "fluxBoss": "Mode Flux • Forme {{stage}} : {{shape}} (Boss)",
+        "puzzle": "Mode Puzzle • Niveau {{stage}} / {{total}}",
+        "blitz": "Blitz 90s • {{seconds}} s",
+        "bossRush": "Boss Rush • Vague {{wave}} (👑 {{shields}})",
+        "cascade": "Cascade • Vague {{wave}}"
       },
       "shots": {
         "label": "Tirs restants",
         "waveLabel": "Vague dans"
+      },
+      "time": {
+        "label": "Temps restant",
+        "seconds": "{{seconds}} s"
       },
       "combo": {
         "label": "Combo x{{count}}"
@@ -252,6 +260,16 @@
       "collector": {
         "bin": "COLLECTEUR +{{points}}"
       },
+      "rescueCore": {
+        "freed": "NOYAU SAUVÉ ! +{{points}}"
+      },
+      "blitz": {
+        "autoFire": "TIR AUTO !"
+      },
+      "bossRush": {
+        "overchargeStrike": "SURCHARGE ! -1 BOUCLIER",
+        "waveCleared": "TITAN BRISÉ ! +{{points}}"
+      },
       "special": {
         "bomb": "EXPLOSION !",
         "lightning": "DÉCHARGE ÉLECTRIQUE !",
@@ -355,7 +373,9 @@
       "tether": "Les sphères amarres (∿) retiennent des sphères éloignées par de longs liens incassables : coupez la sphère amarre pour les faire tomber !",
       "rust": "La rouille (⚙) bloque tous les groupes : faites-la sauter, tomber, ou repeignez-la. Les fusées (🚀) visent les cibles les plus coriaces !",
       "platform": "Les plateformes soutiennent les sphères par en dessous tout en laissant passer vos tirs !",
-      "antimagnet": "Les coussins antimagnétiques repoussent l'amas suspendu sans dévier vos projectiles !"
+      "antimagnet": "Les coussins antimagnétiques repoussent l'amas suspendu sans dévier vos projectiles !",
+      "rescueCore": "Libérez tous les Noyaux Captifs (💎) par un groupe ou une avalanche pour remporter aussitôt le niveau !",
+      "puzzle": "Puzzle : étudiez les rebonds et remplissez l'objectif avec votre réserve fixe de tirs !"
     },
     "discovery": {
       "hint": "Nouveau : {{icon}} {{name}}. {{description}}"
@@ -410,6 +430,12 @@
         "ariaLabel": "Code de graine Flux (6 caractères)",
         "launch": "Flux",
         "invalidHint": "Entrez une graine Flux valide de {{length}} caractères (lettres a-z et chiffres 0-9)."
+      },
+      "arcade": {
+        "puzzle": "🎯 Puzzle",
+        "blitz": "⏱ Blitz 90s",
+        "bossRush": "👑 Boss Rush",
+        "cascade": "⬇ Cascade"
       }
     },
     "shop": {
@@ -541,6 +567,10 @@
           "rust": {
             "name": "Sphère Rouillée",
             "description": "Sans couleur et inerte : elle ne rejoint aucun groupe. Explosions, fusées, enclume et avalanches l'enlèvent, et un Coeur de Peinture lui rend une couleur."
+          },
+          "rescueCore": {
+            "name": "Noyau Captif",
+            "description": "Coeur prismatique captif (💎). Libérez tous les Noyaux Captifs du plateau pour déclencher une avalanche totale immédiate !"
           }
         },
         "obstacles": {
@@ -681,7 +711,8 @@
       },
       "reason": {
         "lineCrossed": "L'amas magnétique a franchi la ligne critique.",
-        "outOfShots": "Vous n'avez plus de billes disponibles."
+        "outOfShots": "Vous n'avez plus de billes disponibles.",
+        "timeUp": "Temps écoulé ! Le chronomètre Blitz de 90 secondes a atteint zéro."
       },
       "stats": {
         "score": "Score atteint : {{score}}",

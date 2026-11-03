@@ -16,6 +16,7 @@
 
 import {
   GAME_MODES,
+  OBJECTIVE_TYPES,
   GAME_STATES,
   OBSTACLE_TYPES,
   SPECIAL_TYPES,
@@ -131,6 +132,17 @@ export class GameEngine {
     this.fluxIsBossStage = false;
     this.stageTransitionFrames = 0;
     this.stageIntroFrames = 0;
+    this.currentObjective = OBJECTIVE_TYPES.CLEAR_ALL;
+    this.targetCoreCount = 0;
+    this.rescuedCores = 0;
+    this.currentPuzzleStage = 1;
+    this.puzzleQueue = [];
+    this.blitzFramesRemaining = 0;
+    this.blitzWaveTimerFrames = 0;
+    this.blitzIdleFrames = 0;
+    this.bossRushWave = 1;
+    this.cascadeWave = 1;
+    this.cascadeTurnsUntilDrop = 0;
 
     this.activePalette = [];
     this.specialInventory = {};
@@ -157,9 +169,13 @@ export class GameEngine {
     return this.mode === GAME_MODES.ENDLESS || this.mode === GAME_MODES.DAILY;
   }
 
-  /** True for modes where every shot spends a limited reserve (Campaign and Flux). */
+  /** True for modes where every shot spends a limited reserve (Campaign, Flux and Puzzle). */
   usesShotBudget() {
-    return this.mode === GAME_MODES.CAMPAIGN || this.mode === GAME_MODES.FLUX;
+    return (
+      this.mode === GAME_MODES.CAMPAIGN
+      || this.mode === GAME_MODES.FLUX
+      || this.mode === GAME_MODES.PUZZLE
+    );
   }
 
   /**
@@ -230,6 +246,14 @@ export class GameEngine {
       this.storageManager.setDailyHighScore(this.score, this.dailySeedKey);
     } else if (this.mode === GAME_MODES.FLUX) {
       this.storageManager.setFluxRecord(this.score, this.fluxStage);
+    } else if (this.mode === GAME_MODES.BLITZ) {
+      this.storageManager.setBlitzHighScore?.(this.score);
+    } else if (this.mode === GAME_MODES.BOSS_RUSH) {
+      this.storageManager.setBossRushRecord?.(this.score, this.bossRushWave);
+    } else if (this.mode === GAME_MODES.CASCADE) {
+      this.storageManager.setCascadeHighScore?.(this.score);
+    } else if (this.mode === GAME_MODES.PUZZLE) {
+      this.storageManager.setPuzzleRecord?.(this.score, this.currentPuzzleStage);
     }
   }
 
@@ -357,6 +381,20 @@ export class GameEngine {
     this.fluxIsBossStage = false;
     this.stageTransitionFrames = 0;
     this.stageIntroFrames = 0;
+    this.currentObjective = OBJECTIVE_TYPES.CLEAR_ALL;
+    this.targetCoreCount = 0;
+    this.rescuedCores = 0;
+    this.currentPuzzleStage = 1;
+    this.puzzleQueue = [];
+    this.blitzFramesRemaining = 0;
+    this.blitzWaveTimerFrames = 0;
+    this.blitzIdleFrames = 0;
+    this.bossRushWave = 1;
+    this.cascadeWave = 1;
+    this.cascadeTurnsUntilDrop = 0;
+    this.physicsWorld.gravityMultiplier = 1.0;
+    this.physicsWorld.magnetismMultiplier = 1.0;
+    this.physicsWorld.rotorSpeedMultiplier = 1.0;
   }
 
   checkAndUnlockAchievement(achievementId) {
@@ -555,6 +593,12 @@ export class GameEngine {
     }
     this.physicsWorld.rebuildInitialBonds();
     this.levelStartBallCount = this.physicsWorld.balls.length;
+    this.targetCoreCount = this.physicsWorld.balls.filter(
+      (b) => b.clusterModifier === CLUSTER_MODIFIERS.RESCUE_CORE
+    ).length;
+    if (levelDef.objective === OBJECTIVE_TYPES.CORE_RESCUE || this.targetCoreCount > 0) {
+      this.currentObjective = OBJECTIVE_TYPES.CORE_RESCUE;
+    }
 
     this.currentBall = this.createRandomLauncherBall();
     this.nextBall = this.createRandomLauncherBall();
@@ -570,6 +614,310 @@ export class GameEngine {
     this.initSurvivalRun(GAME_MODES.ENDLESS, null);
     this.storageManager?.recordAchievementProgress?.({ endlessWave: this.waveCount });
     this.notifyUI();
+  }
+
+  /**
+   * Starts a deterministic One-Shot / Puzzle challenge stage from configs/game.json.
+   * @param {number} [stageIndex=1] - 1-based puzzle stage index.
+   */
+  startPuzzleMode(stageIndex = 1) {
+    const puzzles = this.gameConfig.puzzles || [];
+    if (puzzles.length === 0) {
+      this.startCampaignLevel(1);
+      return;
+    }
+    const cleanStage = Math.max(1, Math.floor(Number(stageIndex) || 1));
+    const puzzleDef = puzzles[(cleanStage - 1) % puzzles.length];
+
+    this.resetRunState(GAME_MODES.PUZZLE);
+    this.currentPuzzleStage = cleanStage;
+    this.currentObjective = puzzleDef.objective || OBJECTIVE_TYPES.CLEAR_ALL;
+    this.shotsRemaining = puzzleDef.shots;
+    this.specialInventory = { ...puzzleDef.specialInventory };
+
+    const centerX = this.gameConfig.canvas.logicalWidth * MATH_CONSTANTS.HALF;
+    const r = this.physicsConfig.ball.radius;
+    this.audioManager.stopAll();
+    this.physicsWorld.clear();
+    this.particleSystem.clear();
+
+    for (const obsDef of puzzleDef.obstacles || []) {
+      const obs = new Obstacle(
+        {
+          ...obsDef,
+          x: obsDef.x !== undefined ? obsDef.x : centerX + (obsDef.dx || 0)
+        },
+        this.obstaclesConfig
+      );
+      this.physicsWorld.obstacles.push(obs);
+    }
+
+    const paletteIds = new Set();
+    for (const bSpec of puzzleDef.balls || []) {
+      if (bSpec.colorId) {
+        paletteIds.add(bSpec.colorId);
+      }
+    }
+    for (const qItem of puzzleDef.queue || []) {
+      if (qItem.colorId) {
+        paletteIds.add(qItem.colorId);
+      }
+    }
+    this.activePalette = paletteIds.size > 0
+      ? [...paletteIds]
+      : this.ballsConfig.standardColors.slice(0, this.gameConfig.defaults.matchMinCount).map((c) => c.id);
+
+    for (const bSpec of puzzleDef.balls || []) {
+      const mod = bSpec.clusterModifier || null;
+      const ball = new Ball({
+        x: bSpec.x !== undefined ? bSpec.x : centerX + (bSpec.dx || 0),
+        y: bSpec.y,
+        radius: r,
+        colorId: this.isColorlessModifier(mod) ? null : bSpec.colorId,
+        clusterModifier: mod,
+        armorHits: bSpec.armorHits !== undefined ? bSpec.armorHits : this.getInitialArmor(mod),
+        isAnchor: Boolean(bSpec.isAnchor)
+      });
+      this.physicsWorld.addBall(ball);
+    }
+
+    this.physicsWorld.rebuildInitialBonds();
+    this.levelStartBallCount = this.physicsWorld.balls.length;
+    this.targetCoreCount = this.physicsWorld.balls.filter(
+      (b) => b.clusterModifier === CLUSTER_MODIFIERS.RESCUE_CORE
+    ).length;
+
+    const queueSpecs = puzzleDef.queue?.length > 0
+      ? puzzleDef.queue.map((item) => ({ ...item }))
+      : [{ colorId: this.activePalette[0], specialType: null }];
+    const firstSpec = queueSpecs.shift();
+    const secondSpec = queueSpecs.shift() || { ...firstSpec };
+    this.puzzleQueue = queueSpecs;
+    this.currentBall = this.createRandomLauncherBall(firstSpec.specialType || null, firstSpec.colorId);
+    this.nextBall = this.createRandomLauncherBall(secondSpec.specialType || null, secondSpec.colorId);
+    this.upcomingColorIds = this.puzzleQueue.map((item) => item.colorId || this.activePalette[0]);
+
+    this.state = GAME_STATES.PLAYING;
+    const canvasCfg = this.gameConfig.canvas;
+    this.updateAim(canvasCfg.launcherX, canvasCfg.launcherY + canvasCfg.initialAimOffsetY);
+    this.refreshDiscovery();
+    this.notifyUI();
+  }
+
+  /**
+   * Starts Blitz 90s (Time Attack) mode: unlimited shots, 90-second timer, rapid wave
+   * descent, and automatic cannon firing if the player hesitates.
+   */
+  startBlitzMode() {
+    const blitzCfg = this.gameConfig.blitz;
+    this.resetRunState(GAME_MODES.BLITZ);
+    this.waveCount = 1;
+    this.endlessRowParity = 0;
+    this.blitzFramesRemaining = blitzCfg.durationFrames;
+    this.blitzWaveTimerFrames = blitzCfg.waveIntervalFrames;
+    this.blitzIdleFrames = 0;
+    this.specialInventory = { ...blitzCfg.initialSpecialCounts };
+    this.activePalette = this.ballsConfig.standardColors
+      .slice(0, this.gameConfig.endless.paletteCount)
+      .map((c) => c.id);
+
+    this.audioManager.stopAll();
+    this.physicsWorld.clear();
+    this.particleSystem.clear();
+
+    for (let row = 0; row < blitzCfg.initialRows; row++) {
+      const y = blitzCfg.startY + row * blitzCfg.rowSpacingY;
+      this.spawnEndlessRow(y, row % 2, row === 0, () => this.rollEndlessModifier());
+    }
+    this.physicsWorld.rebuildInitialBonds();
+    this.currentBall = this.createRandomLauncherBall();
+    this.nextBall = this.createRandomLauncherBall();
+    this.fillUpcomingColors();
+    this.state = GAME_STATES.PLAYING;
+    const canvasCfg = this.gameConfig.canvas;
+    this.updateAim(canvasCfg.launcherX, canvasCfg.launcherY + canvasCfg.initialAimOffsetY);
+    this.refreshDiscovery();
+    this.notifyUI();
+  }
+
+  /**
+   * Starts Boss Rush (Titan Core) mode: a central rotor boss surrounded by protective rings
+   * where overcharge bursts crack boss shields and defeating the Titan advances to the next wave.
+   * @param {number} [wave=1] - Starting boss wave.
+   */
+  startBossRushMode(wave = 1) {
+    const bossRushCfg = this.gameConfig.bossRush;
+    this.resetRunState(GAME_MODES.BOSS_RUSH);
+    this.bossRushWave = Math.max(1, Math.floor(Number(wave) || 1));
+    this.waveCount = this.bossRushWave;
+    this.specialInventory = { ...bossRushCfg.initialSpecialCounts };
+    this.activePalette = this.ballsConfig.standardColors
+      .slice(0, this.gameConfig.endless.paletteCount)
+      .map((c) => c.id);
+
+    this.audioManager.stopAll();
+    this.physicsWorld.clear();
+    this.particleSystem.clear();
+
+    this.spawnBossRushWave();
+    this.currentBall = this.createRandomLauncherBall();
+    this.nextBall = this.createRandomLauncherBall();
+    this.fillUpcomingColors();
+    this.state = GAME_STATES.PLAYING;
+    const canvasCfg = this.gameConfig.canvas;
+    this.updateAim(canvasCfg.launcherX, canvasCfg.launcherY + canvasCfg.initialAimOffsetY);
+    this.refreshDiscovery();
+    this.notifyUI();
+  }
+
+  spawnBossRushWave() {
+    const bossRushCfg = this.gameConfig.bossRush;
+    const centerX = this.gameConfig.canvas.logicalWidth * MATH_CONSTANTS.HALF;
+    const pivotY = bossRushCfg.pivotY;
+    const r = this.physicsConfig.ball.radius;
+
+    this.physicsWorld.clear();
+    const centralPivot = new Obstacle(
+      {
+        type: OBSTACLE_TYPES.PIVOT,
+        x: centerX,
+        y: pivotY,
+        radius: bossRushCfg.pivotRadius,
+        angularSpeed: bossRushCfg.pivotBaseAngularSpeed
+      },
+      this.obstaclesConfig
+    );
+    this.physicsWorld.obstacles.push(centralPivot);
+
+    const armor = Math.min(
+      bossRushCfg.maxBossArmor,
+      bossRushCfg.baseBossArmor + (this.bossRushWave - 1) * bossRushCfg.armorStepPerWave
+    );
+    const bossBall = new Ball({
+      x: centerX,
+      y: pivotY,
+      radius: r,
+      colorId: this.pickPaletteColor(),
+      clusterModifier: CLUSTER_MODIFIERS.BOSS_CORE,
+      armorHits: armor,
+      isAnchor: true
+    });
+    this.physicsWorld.addBall(bossBall);
+
+    const rings = [
+      { radius: r * bossRushCfg.innerRingRadiusFactor, count: bossRushCfg.innerRingCount },
+      { radius: r * bossRushCfg.outerRingRadiusFactor, count: bossRushCfg.outerRingCount }
+    ];
+    this.spawnConcentricRings(centerX, pivotY, rings, centralPivot, this.gameConfig.endless.modifierWeights);
+    for (const ball of this.physicsWorld.balls) {
+      if (ball.id !== bossBall.id && Math.hypot(ball.x - bossBall.x, ball.y - bossBall.y) <= r * bossRushCfg.innerRingRadiusFactor + r) {
+        this.physicsWorld.createBond(bossBall, ball, false);
+      }
+    }
+    this.physicsWorld.rebuildInitialBonds();
+  }
+
+  getBossBall() {
+    return this.physicsWorld.balls.find((b) => b.clusterModifier === CLUSTER_MODIFIERS.BOSS_CORE) || null;
+  }
+
+  /**
+   * Starts Cascade Drop mode: downward cluster gravity into a magnetic well with Platform
+   * shelves and Antimagnet cushions.
+   */
+  startCascadeMode() {
+    const cascadeCfg = this.gameConfig.cascade;
+    const centerX = this.gameConfig.canvas.logicalWidth * MATH_CONSTANTS.HALF;
+    this.resetRunState(GAME_MODES.CASCADE);
+    this.cascadeWave = 1;
+    this.waveCount = 1;
+    this.cascadeTurnsUntilDrop = cascadeCfg.shotsBeforeDrop;
+    this.specialInventory = { ...cascadeCfg.initialSpecialCounts };
+    this.activePalette = this.ballsConfig.standardColors
+      .slice(0, this.gameConfig.endless.paletteCount)
+      .map((c) => c.id);
+
+    this.audioManager.stopAll();
+    this.physicsWorld.clear();
+    this.particleSystem.clear();
+    this.physicsWorld.gravityMultiplier = cascadeCfg.gravityMultiplier;
+
+    for (const platDef of cascadeCfg.platforms || []) {
+      this.physicsWorld.obstacles.push(
+        new Obstacle(
+          {
+            type: OBSTACLE_TYPES.PLATFORM,
+            x: centerX + (platDef.dx || 0),
+            y: platDef.y,
+            width: platDef.width,
+            height: platDef.height
+          },
+          this.obstaclesConfig
+        )
+      );
+    }
+    for (const antiDef of cascadeCfg.antimagnets || []) {
+      this.physicsWorld.obstacles.push(
+        new Obstacle(
+          {
+            type: OBSTACLE_TYPES.ANTIMAGNET,
+            x: centerX + (antiDef.dx || 0),
+            y: antiDef.y,
+            radius: antiDef.radius,
+            fieldRadius: antiDef.fieldRadius,
+            clusterRepelForce: antiDef.clusterRepelForce
+          },
+          this.obstaclesConfig
+        )
+      );
+    }
+
+    for (let row = 0; row < cascadeCfg.initialDropRows; row++) {
+      this.spawnCascadeDropWave(row);
+    }
+    this.physicsWorld.rebuildInitialBonds();
+    this.currentBall = this.createRandomLauncherBall();
+    this.nextBall = this.createRandomLauncherBall();
+    this.fillUpcomingColors();
+    this.state = GAME_STATES.PLAYING;
+    const canvasCfg = this.gameConfig.canvas;
+    this.updateAim(canvasCfg.launcherX, canvasCfg.launcherY + canvasCfg.initialAimOffsetY);
+    this.refreshDiscovery();
+    this.notifyUI();
+  }
+
+  spawnCascadeDropWave(rowIndex = 0) {
+    const cascadeCfg = this.gameConfig.cascade;
+    const centerX = this.gameConfig.canvas.logicalWidth * MATH_CONSTANTS.HALF;
+    const r = this.physicsConfig.ball.radius;
+    const restDist = r * this.physicsConfig.simulation.bondRestDistanceFactor;
+    const newBalls = [];
+    for (const platSpec of cascadeCfg.platforms || []) {
+      const platX = centerX + (platSpec.dx || 0);
+      const baseTopY = platSpec.y - platSpec.height * MATH_CONSTANTS.HALF - r;
+      const spawnY = baseTopY - rowIndex * restDist;
+      for (const offsetIndex of [-1, 0, 1]) {
+        const spawnX = platX + offsetIndex * restDist;
+        const alreadyOccupied = this.physicsWorld.balls.some(
+          (b) => Math.hypot(b.x - spawnX, b.y - spawnY) < r * cascadeCfg.overlapRadiusFactor
+        );
+        if (alreadyOccupied) {
+          continue;
+        }
+        const ball = this.createClusterBall({
+          x: spawnX,
+          y: spawnY,
+          radius: r,
+          colorId: this.pickPaletteColor(),
+          clusterModifier: this.rollEndlessModifier(),
+          isAnchor: false
+        });
+        this.physicsWorld.addBall(ball);
+        newBalls.push(ball);
+      }
+    }
+    this.physicsWorld.rebuildInitialBonds();
+    return newBalls;
   }
 
   /**
@@ -1205,6 +1553,9 @@ export class GameEngine {
     if (this.state !== GAME_STATES.PLAYING && this.state !== GAME_STATES.PAUSED) {
       return false;
     }
+    if (this.mode === GAME_MODES.PUZZLE) {
+      return false;
+    }
     const cost = this.gameConfig.specialShopCosts?.[specialType];
     if (!Number.isFinite(cost) || cost <= 0) {
       return false;
@@ -1534,6 +1885,7 @@ export class GameEngine {
       this.shotsRemaining = Math.max(0, this.shotsRemaining - 1);
     }
 
+    this.blitzIdleFrames = 0;
     this.hasFiredInRound = true;
     this.physicsWorld.allowTensionBreak = true;
     this.audioManager.playEffect('shoot');
@@ -1616,11 +1968,38 @@ export class GameEngine {
 
       if (this.outOfShotsGraceFrames > 0) {
         this.outOfShotsGraceFrames--;
-        if (this.physicsWorld.balls.length === 0) {
+        if (this.isObjectiveCleared()) {
           this.outOfShotsGraceFrames = 0;
           this.evaluateRoundEnd();
         } else if (this.outOfShotsGraceFrames === 0) {
           this.triggerGameOver(GAME_OVER_REASONS.OUT_OF_SHOTS);
+        }
+      }
+    }
+
+    if (this.mode === GAME_MODES.BLITZ && this.isRunPlaying()) {
+      const blitzCfg = this.gameConfig.blitz;
+      this.blitzFramesRemaining = Math.max(0, this.blitzFramesRemaining - 1);
+      if (this.blitzFramesRemaining <= 0) {
+        this.particleSystem.update(juice.shakeDecay);
+        this.triggerGameOver(GAME_OVER_REASONS.TIME_UP);
+        return;
+      }
+      if (this.blitzFramesRemaining % blitzCfg.framesPerSecond === 0) {
+        this.notifyUI();
+      }
+      this.blitzWaveTimerFrames--;
+      if (this.blitzWaveTimerFrames <= 0 || this.physicsWorld.balls.length < blitzCfg.minSpheresBeforeWave) {
+        this.blitzWaveTimerFrames = blitzCfg.waveIntervalFrames;
+        this.spawnEndlessWave();
+        this.refreshStaleLauncherColors();
+        this.notifyUI();
+      }
+      if (!this.physicsWorld.projectile && this.physicsWorld.droppingBalls.length === 0) {
+        this.blitzIdleFrames++;
+        if (this.blitzIdleFrames >= blitzCfg.autoFireFrames) {
+          this.blitzIdleFrames = 0;
+          this.shoot();
         }
       }
     }
@@ -1852,9 +2231,52 @@ export class GameEngine {
       const paintSpec = this.ballsConfig.clusterModifiers.paintCore;
       const paintResult = this.specialController.triggerPaint(ball, paintSpec, this.physicsWorld, this.particleSystem, this.audioManager);
       this.addScore(paintResult.scoreDelta);
+    } else if (ball.clusterModifier === CLUSTER_MODIFIERS.RESCUE_CORE) {
+      this.rewardRescueCore(ball);
     }
 
     return true;
+  }
+
+  rewardRescueCore(ball) {
+    const rescueSpec = this.ballsConfig.clusterModifiers.rescueCore;
+    this.rescuedCores++;
+    this.awardRunCoins(rescueSpec.coinsReward);
+    this.addScore(rescueSpec.pointsPerCore);
+    this.particleSystem.spawnBurst(ball.x, ball.y, rescueSpec.highlight, rescueSpec.burstCount, rescueSpec.burstSpeed);
+    this.particleSystem.spawnFloatingText(
+      ball.x,
+      ball.y + this.gameConfig.canvas.floatingTextOffsetY,
+      t('gameplay.feedback.rescueCore.freed', { coins: rescueSpec.coinsReward }),
+      rescueSpec.highlight
+    );
+  }
+
+  isObjectiveCleared() {
+    if (this.currentObjective === OBJECTIVE_TYPES.CORE_RESCUE && this.targetCoreCount > 0) {
+      return !this.physicsWorld.balls.some((b) => b.clusterModifier === CLUSTER_MODIFIERS.RESCUE_CORE);
+    }
+    return this.physicsWorld.balls.length === 0;
+  }
+
+  releaseRemainingBoardAsAvalanche() {
+    const remaining = [...this.physicsWorld.balls];
+    if (remaining.length === 0) {
+      return;
+    }
+    const sim = this.physicsConfig.simulation;
+    this.physicsWorld.balls.length = 0;
+    for (const ball of remaining) {
+      this.physicsWorld.releaseBall(ball);
+      ball.isAnchor = false;
+      ball.pivotRef = null;
+      ball.isDropping = true;
+      ball.vx += (this.random() - MATH_CONSTANTS.HALF) * sim.dropHorizontalSpread;
+      ball.vy = Math.max(ball.vy, sim.dropMinVerticalSpeed);
+      this.physicsWorld.droppingBalls.push(ball);
+    }
+    const dropPoints = remaining.length * this.gameConfig.scoring.droppedBallPoints;
+    this.addScore(dropPoints);
   }
 
   /**
@@ -2109,6 +2531,8 @@ export class GameEngine {
       for (const d of detached) {
         if (d.clusterModifier === CLUSTER_MODIFIERS.BOSS_CORE) {
           this.rewardBossCore(d);
+        } else if (d.clusterModifier === CLUSTER_MODIFIERS.RESCUE_CORE) {
+          this.rewardRescueCore(d);
         }
       }
       if (detached.some((d) => d.clusterModifier === CLUSTER_MODIFIERS.LASER_LOCK)) {
@@ -2196,6 +2620,16 @@ export class GameEngine {
     while (this.overcharge >= max) {
       this.overcharge -= max;
       this.grantRandomSpecialBall();
+      if (this.mode === GAME_MODES.BOSS_RUSH) {
+        const bossBall = this.physicsWorld.balls.find((b) => b.clusterModifier === CLUSTER_MODIFIERS.BOSS_CORE);
+        if (bossBall) {
+          const bossSpec = this.ballsConfig.clusterModifiers.bossCore;
+          const destroyed = this.destroyClusterBall(bossBall, bossSpec.ringColor, false);
+          if (destroyed) {
+            this.evaluateRoundEnd();
+          }
+        }
+      }
     }
   }
 
@@ -2204,6 +2638,9 @@ export class GameEngine {
    * a run starts, never while drawing, so seeded runs draw the same colors every time.
    */
   fillUpcomingColors() {
+    if (this.mode === GAME_MODES.PUZZLE) {
+      return;
+    }
     const length = this.gameConfig.canvas.launcherPreviewCount;
     this.upcomingColorIds.length = Math.min(this.upcomingColorIds.length, length);
     while (this.upcomingColorIds.length < length) {
@@ -2213,6 +2650,10 @@ export class GameEngine {
 
   /** Color of the next ball to load from the queue; the queue is topped up behind it. */
   takeUpcomingColor() {
+    if (this.mode === GAME_MODES.PUZZLE) {
+      const nextSpec = this.puzzleQueue.shift();
+      return nextSpec?.colorId || this.upcomingColorIds.shift() || this.activePalette[0];
+    }
     const color = this.upcomingColorIds.shift() || this.pickLauncherColor();
     this.fillUpcomingColors();
     return color;
@@ -2225,6 +2666,9 @@ export class GameEngine {
    * cleared color.
    */
   refreshStaleLauncherColors() {
+    if (this.mode === GAME_MODES.PUZZLE) {
+      return;
+    }
     const boardColors = new Set(this.physicsWorld.balls.map((b) => b.colorId).filter(Boolean));
     const activeColors = boardColors.size > 0 ? boardColors : new Set(this.activePalette);
     if (activeColors.size === 0) {
@@ -2269,6 +2713,15 @@ export class GameEngine {
         // color is still present and this second pass draws nothing from the seeded random.
         this.refreshStaleLauncherColors();
         this.shotsUntilWave = this.gameConfig.endless.shotsBeforeWave;
+      }
+    } else if (this.mode === GAME_MODES.CASCADE && !wasFrozen) {
+      this.cascadeTurnsUntilDrop--;
+      if (this.cascadeTurnsUntilDrop <= 0) {
+        this.cascadeWave++;
+        this.waveCount = this.cascadeWave;
+        this.spawnCascadeDropWave(1);
+        this.refreshStaleLauncherColors();
+        this.cascadeTurnsUntilDrop = this.gameConfig.cascade.shotsBeforeDrop;
       }
     }
 
@@ -2445,8 +2898,9 @@ export class GameEngine {
       return;
     }
     if (this.mode === GAME_MODES.CAMPAIGN) {
-      if (this.physicsWorld.balls.length === 0) {
+      if (this.isObjectiveCleared()) {
         this.outOfShotsGraceFrames = 0;
+        this.releaseRemainingBoardAsAvalanche();
         this.storageManager?.recordAchievementProgress?.({ shotsRemainingOnClear: this.shotsRemaining });
         if (this.shotsRemaining >= this.gameConfig.achievements.sharpshooter.threshold) {
           this.checkAndUnlockAchievement('sharpshooter');
@@ -2494,6 +2948,42 @@ export class GameEngine {
       }
 
       this.startOutOfShotsGraceIfNeeded();
+    } else if (this.mode === GAME_MODES.PUZZLE) {
+      if (this.isObjectiveCleared()) {
+        this.outOfShotsGraceFrames = 0;
+        this.releaseRemainingBoardAsAvalanche();
+        const bonus = this.shotsRemaining * this.gameConfig.scoring.remainingShotBonus;
+        this.addScore(bonus);
+        const stars = this.computeStars(this.score);
+        const previousBest = this.storageManager.getPuzzleHighScore?.() || 0;
+        const isNewRecord = previousBest > 0 && this.score > previousBest;
+        const earnedCoins = stars * this.gameConfig.scoring.coinsPerVictoryStar;
+        this.storageManager.addCoins(earnedCoins);
+        this.flushPendingRunCoins();
+        this.state = GAME_STATES.VICTORY;
+        this.persistRunHighScore();
+        this.storageManager.clearRunSnapshot();
+        this.audioManager.playEffect('victory');
+        this.victorySummary = {
+          victoryBonus: bonus,
+          stars,
+          earnedCoins,
+          isNewRecord,
+          nextStarTarget: null,
+          nextStarNumber: null,
+          pointsToNextStar: 0
+        };
+        this.victoryCelebrationFrames = this.gameConfig.victory.celebrationFrames;
+        this.particleSystem.spawnFloatingText(
+          this.gameConfig.canvas.logicalWidth * MATH_CONSTANTS.HALF,
+          this.gameConfig.canvas.logicalHeight * MATH_CONSTANTS.HALF,
+          t('gameplay.feedback.victory.cleared'),
+          this.gameConfig.theme.victoryPopupColor
+        );
+        this.notifyUI(this.victorySummary);
+        return;
+      }
+      this.startOutOfShotsGraceIfNeeded();
     } else if (this.mode === GAME_MODES.FLUX) {
       if (this.physicsWorld.balls.length === 0) {
         this.outOfShotsGraceFrames = 0;
@@ -2501,7 +2991,28 @@ export class GameEngine {
         return;
       }
       this.startOutOfShotsGraceIfNeeded();
-    } else if (this.isSurvivalMode() && this.physicsWorld.balls.length === 0) {
+    } else if (this.mode === GAME_MODES.BOSS_RUSH) {
+      const hasBoss = this.physicsWorld.balls.some((b) => b.clusterModifier === CLUSTER_MODIFIERS.BOSS_CORE);
+      if (!hasBoss) {
+        const bossRushCfg = this.gameConfig.bossRush;
+        this.releaseRemainingBoardAsAvalanche();
+        const waveBonus = bossRushCfg.waveClearBonusBase * this.bossRushWave;
+        this.addScore(waveBonus);
+        this.awardRunCoins(bossRushCfg.waveClearCoinBonus);
+        this.bossRushWave++;
+        this.waveCount = this.bossRushWave;
+        this.persistRunHighScore();
+        this.spawnBossRushWave();
+        this.refreshStaleLauncherColors();
+      }
+    } else if (this.mode === GAME_MODES.CASCADE) {
+      if (this.physicsWorld.balls.length === 0) {
+        this.cascadeWave++;
+        this.waveCount = this.cascadeWave;
+        this.spawnCascadeDropWave(0);
+        this.refreshStaleLauncherColors();
+      }
+    } else if ((this.isSurvivalMode() || this.mode === GAME_MODES.BLITZ) && this.physicsWorld.balls.length === 0) {
       this.spawnEndlessWave();
     }
   }
@@ -2527,6 +3038,14 @@ export class GameEngine {
       previousBestScore = this.storageManager.getDailyHighScore(this.dailySeedKey || SeededRandom.getTodayDateKey());
     } else if (this.mode === GAME_MODES.FLUX) {
       previousBestScore = this.storageManager.getFluxHighScore();
+    } else if (this.mode === GAME_MODES.BLITZ) {
+      previousBestScore = this.storageManager.getBlitzHighScore?.() || 0;
+    } else if (this.mode === GAME_MODES.BOSS_RUSH) {
+      previousBestScore = this.storageManager.getBossRushHighScore?.() || 0;
+    } else if (this.mode === GAME_MODES.CASCADE) {
+      previousBestScore = this.storageManager.getCascadeHighScore?.() || 0;
+    } else if (this.mode === GAME_MODES.PUZZLE) {
+      previousBestScore = this.storageManager.getPuzzleHighScore?.() || 0;
     }
     const isNewRecord = this.mode !== GAME_MODES.CAMPAIGN && previousBestScore > 0 && this.score > previousBestScore;
     const remainingSpheres = this.physicsWorld.balls.length;
@@ -2587,6 +3106,13 @@ export class GameEngine {
    * before its thresholds are tuned.
    */
   getStarThresholds() {
+    if (this.mode === GAME_MODES.PUZZLE) {
+      const puzzles = this.gameConfig.puzzles || [];
+      const puzzleDef = puzzles[(this.currentPuzzleStage - 1) % Math.max(1, puzzles.length)];
+      if (puzzleDef?.starThresholds) {
+        return puzzleDef.starThresholds;
+      }
+    }
     const levelDef = this.levelCatalog.get(this.currentLevelId);
     if (levelDef?.starThresholds) {
       return levelDef.starThresholds;
@@ -2642,6 +3168,14 @@ export class GameEngine {
       this.startDailyChallenge(this.dailySeedKey, true);
     } else if (this.mode === GAME_MODES.FLUX) {
       this.startFluxRun();
+    } else if (this.mode === GAME_MODES.PUZZLE) {
+      this.startPuzzleMode(this.currentPuzzleStage);
+    } else if (this.mode === GAME_MODES.BLITZ) {
+      this.startBlitzMode();
+    } else if (this.mode === GAME_MODES.BOSS_RUSH) {
+      this.startBossRushMode(1);
+    } else if (this.mode === GAME_MODES.CASCADE) {
+      this.startCascadeMode();
     } else {
       this.startEndlessMode();
     }
