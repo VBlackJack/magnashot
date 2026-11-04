@@ -254,6 +254,7 @@ export function captureRunSnapshot(engine, version) {
     engine: pickFields(engine, ENGINE_SCALAR_FIELDS),
     specialInventory: { ...engine.specialInventory },
     waveLog: [...engine.waveLog],
+    discoveryShownIds: [...engine.discoveryShownIds],
     fluxPerks: { ...engine.fluxPerks },
     fluxPerkOffer: engine.fluxPerkOffer ? [...engine.fluxPerkOffer] : null,
     currentBall: { colorId: engine.currentBall.colorId, specialType: engine.currentBall.specialType },
@@ -386,6 +387,12 @@ export function applyRunSnapshot(engine, snapshot) {
   restoreFields(engine, snapshot.engine, ENGINE_SCALAR_FIELDS);
   engine.specialInventory = { ...snapshot.specialInventory };
   engine.waveLog = restoreWaveLog(engine, snapshot.waveLog);
+  // Optional: a run saved before hints could run out holds none, and a damaged list is dropped.
+  engine.discoveryShownIds = new Set(
+    Array.isArray(snapshot.discoveryShownIds)
+      ? snapshot.discoveryShownIds.filter((id) => typeof id === 'string')
+      : []
+  );
   // Set after the mode restart above, which wipes both; runs saved before perks existed hold neither.
   if (snapshot.mode === GAME_MODES.FLUX) {
     engine.fluxPerks = restoreFluxPerks(engine, snapshot.fluxPerks);

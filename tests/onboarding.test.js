@@ -21,8 +21,10 @@ import fs from 'node:fs';
 import { configRegistry } from '../src/core/ConfigRegistry.js';
 import { StorageManager } from '../src/core/StorageManager.js';
 import { GameEngine } from '../src/game/GameEngine.js';
-import { BOARD_MECHANICS, CLUSTER_MODIFIERS, OBSTACLE_TYPES } from '../src/core/Constants.js';
+import { BOARD_MECHANICS, CLUSTER_MODIFIERS, INPUT_MODES, OBSTACLE_TYPES, SPECIAL_TYPES } from '../src/core/Constants.js';
 import {
+  POLARITY_MECHANIC_ID,
+  toSpecialMechanicId,
   listBoardMechanics,
   listLevelMechanics,
   listMechanicsSharingHint,
@@ -61,7 +63,9 @@ const FIRST_LEVEL_MAX_COLORS = 3;
 const ALL_MECHANICS = [
   ...Object.values(CLUSTER_MODIFIERS),
   ...Object.values(OBSTACLE_TYPES),
-  ...Object.values(BOARD_MECHANICS)
+  ...Object.values(BOARD_MECHANICS),
+  POLARITY_MECHANIC_ID,
+  ...Object.values(SPECIAL_TYPES).map(toSpecialMechanicId)
 ].sort();
 
 const lookup = (dict, key) => key.split('.').reduce((node, part) => node?.[part], dict);
@@ -112,9 +116,11 @@ test('Every mechanic has a discovery entry and a place in the discovery order', 
 test('Every mechanic resolves a hint text in both languages', () => {
   for (const lang of Object.keys(locales)) {
     const translate = strictTranslator(lang);
-    for (const id of ALL_MECHANICS) {
-      const text = resolveHintText(id, onboarding, ballsConfig, translate);
-      assert.ok(text.trim().length > 0, `${lang}: ${id} has a hint`);
+    for (const inputMode of Object.values(INPUT_MODES)) {
+      for (const id of ALL_MECHANICS) {
+        const text = resolveHintText(id, onboarding, ballsConfig, translate, inputMode);
+        assert.ok(text.trim().length > 0, `${lang}: ${id} has a hint in ${inputMode} mode`);
+      }
     }
   }
 });
@@ -132,7 +138,7 @@ test('Mechanics that share a tutorial are discovered together', () => {
 });
 
 test('A level tutorial teaches a known mechanic, and the level guarantees it', () => {
-  for (const level of levels.filter((lvl) => lvl.tutorialKey)) {
+  for (const level of levels.filter((lvl) => lvl.tutorialKey && !onboarding.techniqueTips.includes(lvl.tutorialKey))) {
     const taught = Object.keys(onboarding.mechanics).filter(
       (id) => onboarding.mechanics[id].hintKey === level.tutorialKey
     );
@@ -146,7 +152,7 @@ test('A level tutorial teaches a known mechanic, and the level guarantees it', (
 
 test('A level teaching a modifier sets its exact count: a minimum and no random weight', () => {
   const modifierIds = new Set(Object.values(CLUSTER_MODIFIERS));
-  for (const level of levels.filter((lvl) => lvl.tutorialKey)) {
+  for (const level of levels.filter((lvl) => lvl.tutorialKey && !onboarding.techniqueTips.includes(lvl.tutorialKey))) {
     // Mechanics the layout or the obstacles provide on their own need no count.
     const fromLayout = listLevelMechanics({ ...level, modifierWeights: {}, minModifierCounts: {} });
     const taught = Object.keys(onboarding.mechanics).filter(
@@ -234,28 +240,42 @@ test('A board lists the basics, its modifiers, its obstacles and its rail anchor
   ].sort());
 });
 
-test('A new player sees the basics hint once, never again on a retry', () => {
+test('A new player sees the basics hint until it is dismissed, never again after', () => {
   const engine = createTestEngine();
   engine.startCampaignLevel(1);
   assert.equal(engine.activeDiscoveryId, BOARD_MECHANICS.BASICS);
-  assert.equal(engine.storageManager.getDiscoveries()[BOARD_MECHANICS.BASICS], true);
+  assert.equal(engine.storageManager.getDiscoveries()[BOARD_MECHANICS.BASICS], undefined, 'showing is not learning');
 
   engine.dismissDiscovery();
   assert.equal(engine.activeDiscoveryId, null);
+  assert.equal(engine.storageManager.getDiscoveries()[BOARD_MECHANICS.BASICS], true, 'dismissing is learning');
   engine.startCampaignLevel(1);
   assert.equal(engine.activeDiscoveryId, null, 'a retry does not show the hint again');
   assert.equal(engine.levelTutorialKey, levels[0].tutorialKey, 'the Pause tip keeps the level tutorial');
 });
 
-test('A hint left open gives way to the next one after the configured number of turns', () => {
+test('A hint that runs out gives way to the next one without counting as learned', () => {
   const engine = createTestEngine();
   engine.startCampaignLevel(2);
   assert.equal(engine.activeDiscoveryId, BOARD_MECHANICS.BASICS);
+  // A turn without a match: the basics hint asks for one, so nothing is learned.
   for (let i = 0; i < onboarding.hintShotLimit; i++) {
-    playTurn(engine);
+    engine.hasFiredInRound = true;
+    engine.handlePostTurnCleanup(false);
   }
   assert.equal(engine.activeDiscoveryId, OBSTACLE_TYPES.PIVOT, 'the rotor hint follows the basics');
-  assert.equal(engine.storageManager.getDiscoveries()[OBSTACLE_TYPES.PIVOT], true);
+  assert.equal(engine.storageManager.getDiscoveries()[BOARD_MECHANICS.BASICS], undefined, 'basics is not learned');
+  assert.equal(engine.storageManager.getDiscoveries()[OBSTACLE_TYPES.PIVOT], undefined, 'pivot is only shown');
+  assert.ok(engine.discoveryShownIds.has(BOARD_MECHANICS.BASICS));
+
+  // The same run never brings the basics hint back, but the next run does.
+  for (let i = 0; i < onboarding.hintShotLimit; i++) {
+    engine.hasFiredInRound = true;
+    engine.handlePostTurnCleanup(false);
+  }
+  assert.notEqual(engine.activeDiscoveryId, BOARD_MECHANICS.BASICS);
+  engine.startCampaignLevel(2);
+  assert.equal(engine.activeDiscoveryId, BOARD_MECHANICS.BASICS, 'an unlearned hint returns in the next run');
 });
 
 test('A dismissed hint lets the next one in at the end of the following turn', () => {
@@ -339,5 +359,5 @@ test('Showing the hints again forgets every discovery and explains the board at 
 
   engine.resetDiscoveries();
   assert.equal(engine.activeDiscoveryId, BOARD_MECHANICS.BASICS);
-  assert.deepEqual(engine.storageManager.getDiscoveries(), { [BOARD_MECHANICS.BASICS]: true });
+  assert.deepEqual(engine.storageManager.getDiscoveries(), {}, 'a shown hint is not yet learned');
 });

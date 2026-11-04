@@ -40,11 +40,19 @@ import { generateFluxStage } from './layouts/FluxStageGenerator.js';
 import { LevelCatalog } from './LevelCatalog.js';
 import { shiftObstacleDefsX, shiftSpecX } from '../core/WorldGeometry.js';
 import {
+  DISCOVERY_INTERACTIONS,
+  POLARITY_MECHANIC_ID,
+  isProjectileNearMechanic,
   listBoardMechanics,
   listLevelMechanics,
   listMechanicsSharingHint,
-  pickNextDiscovery
+  pickNextDiscovery,
+  resolvePulseTarget,
+  toSpecialMechanicId
 } from './Discovery.js';
+
+/** Version of the discovery list that predates versioning: its seeding is never redone. */
+const LEGACY_DISCOVERIES_VERSION = 1;
 
 /** Flux perk ids; the specs (step, maxStacks, icon) live in configs/flux.json. */
 export const FLUX_PERK_IDS = Object.freeze({
@@ -144,6 +152,19 @@ export class GameEngine {
     this.bossesDestroyedInRun = 0;
     this.activeDiscoveryId = null;
     this.discoveryTurnCount = 0;
+    // Run-scoped and tolerant in snapshots: hints shown without being learned, the hint
+    // being replayed from the HUD, and the first-play banner of a campaign level.
+    this.discoveryShownIds = new Set();
+    this.isActiveHintLearned = false;
+    this.isHintShownThisTurn = false;
+    this.hintReplayQueue = [];
+    this.isReplayingHints = false;
+    this.levelIntro = null;
+    /** Mechanics sharing the hint on screen, kept while that hint stays (read every flight step). */
+    this.proximityGroupHintId = null;
+    this.proximityGroup = null;
+    // Levels whose banner already showed in this session, so a retry after a defeat is quiet.
+    this.introducedLevelIds = new Set();
     this.levelTutorialKey = null;
     this.isAimCancelled = false;
     this.isAimLocked = false;
@@ -398,6 +419,10 @@ export class GameEngine {
       this.storageManager.clearRunSnapshot();
       return false;
     }
+    this.levelIntro = null;
+    this.isActiveHintLearned = Boolean(
+      this.activeDiscoveryId && this.storageManager.getDiscoveries()[this.activeDiscoveryId]
+    );
     this.refreshDiscovery();
     this.saveRunSnapshot({ force: true });
     this.notifyUI();
@@ -448,6 +473,12 @@ export class GameEngine {
     this.bossesDestroyedInRun = 0;
     this.activeDiscoveryId = null;
     this.discoveryTurnCount = 0;
+    this.discoveryShownIds = new Set();
+    this.isActiveHintLearned = false;
+    this.isHintShownThisTurn = false;
+    this.hintReplayQueue = [];
+    this.isReplayingHints = false;
+    this.levelIntro = null;
     this.levelTutorialKey = null;
     this.isAimCancelled = false;
     this.isAimLocked = false;
@@ -709,7 +740,47 @@ export class GameEngine {
     const canvasCfg = this.gameConfig.canvas;
     this.updateAim(canvasCfg.launcherX, canvasCfg.launcherY + canvasCfg.initialAimOffsetY);
     this.refreshDiscovery();
+    // One banner at a time: a hint already up at the start of the level takes the place.
+    this.levelIntro = this.isRestoringRun || this.activeDiscoveryId ? null : this.buildLevelIntro(levelDef);
     this.notifyUI();
+  }
+
+  /**
+   * The first-play banner of a campaign level: null when the level was played before
+   * (a stored result, or an earlier attempt in this session).
+   * @param {Object} levelDef - Level being started.
+   * @returns {?{levelId: number, summary: Object, maxShots: number, featuredMechanicId: ?string}} The
+   *   summary is the level catalog's, which the interface turns into the display name (generated
+   *   levels have no name key of their own).
+   */
+  buildLevelIntro(levelDef) {
+    if (this.storageManager.getLevelStats()[levelDef.id] || this.introducedLevelIds.has(levelDef.id)) {
+      return null;
+    }
+    this.introducedLevelIds.add(levelDef.id);
+    const onboarding = this.gameConfig.onboarding;
+    const featured =
+      pickNextDiscovery(
+        listLevelMechanics(levelDef, { guaranteedOnly: true }),
+        this.storageManager.getDiscoveries(),
+        onboarding.order
+      ) ||
+      onboarding.order.find((id) => levelDef.tutorialKey && onboarding.mechanics[id]?.hintKey === levelDef.tutorialKey) ||
+      null;
+    return {
+      levelId: levelDef.id,
+      summary: this.levelCatalog.summarize(levelDef.id),
+      maxShots: this.shotsRemaining,
+      featuredMechanicId: featured
+    };
+  }
+
+  /** Closes the first-play banner; the first shot closes it too. */
+  dismissLevelIntro() {
+    if (this.levelIntro) {
+      this.levelIntro = null;
+      this.notifyUI();
+    }
   }
 
   startEndlessMode() {
@@ -1644,25 +1715,39 @@ export class GameEngine {
   }
 
   /**
-   * Closes the open discovery hint. The next unknown mechanic on the board, if any, is
-   * shown at the end of the following turn rather than at once.
+   * Closes the open discovery hint and counts it as learned. The next unknown mechanic on
+   * the board, if any, is shown at the end of the following turn rather than at once; a
+   * hint replay moves on to its next hint at once.
    */
   dismissDiscovery() {
-    if (this.activeDiscoveryId) {
-      this.activeDiscoveryId = null;
-      this.discoveryTurnCount = 0;
-      if (this.hasFiredInRound || this.storageManager.loadRunSnapshot() !== null) {
-        this.saveRunSnapshot({ force: true });
-      }
-      this.notifyUI();
+    if (!this.activeDiscoveryId) {
+      return;
     }
+    if (this.isReplayingHints) {
+      this.showNextReplayedHint();
+      this.notifyUI();
+      return;
+    }
+    this.markMechanicLearned(this.activeDiscoveryId);
+    this.activeDiscoveryId = null;
+    this.discoveryTurnCount = 0;
+    if (this.hasFiredInRound || this.storageManager.loadRunSnapshot() !== null) {
+      this.saveRunSnapshot({ force: true });
+    }
+    this.notifyUI();
   }
 
   /** Forgets every discovered mechanic; the board's own hints come back right away. */
   resetDiscoveries() {
     this.storageManager.resetDiscoveries();
+    this.storageManager.setDiscoveriesVersion(this.gameConfig.onboarding.discoveriesVersion);
     this.activeDiscoveryId = null;
     this.discoveryTurnCount = 0;
+    this.discoveryShownIds = new Set();
+    this.isActiveHintLearned = false;
+    this.isHintShownThisTurn = false;
+    this.hintReplayQueue = [];
+    this.isReplayingHints = false;
     if (this.state === GAME_STATES.PLAYING || this.state === GAME_STATES.PAUSED) {
       this.refreshDiscovery();
     }
@@ -1677,30 +1762,206 @@ export class GameEngine {
   }
 
   /**
+   * Records a mechanic, and every one explained by the same text, as learned.
+   * @param {string} mechanicId - Mechanic the player now knows.
+   */
+  markMechanicLearned(mechanicId) {
+    const group = listMechanicsSharingHint(mechanicId, this.gameConfig.onboarding.mechanics);
+    this.storageManager.markDiscovered(group);
+    if (this.activeDiscoveryId && group.includes(this.activeDiscoveryId)) {
+      this.isActiveHintLearned = true;
+    }
+  }
+
+  /**
+   * Counts something the player did as learning the mechanic it concerns. Pressing the
+   * polarity button and firing a special ball teach their own mechanic whether or not its
+   * hint was up; the other interactions count for the hint on screen when it asks for
+   * exactly that, and not while hints are being replayed (a replay is a reminder, not a lesson).
+   * @param {string} interaction - One of DISCOVERY_INTERACTIONS.
+   * @param {?string} [specialType] - Special ball type fired, for the USE interaction.
+   */
+  recordDiscoveryInteraction(interaction, specialType = null) {
+    if (this.isRestoringRun) {
+      return;
+    }
+    const mechanics = this.gameConfig.onboarding.mechanics;
+    if (interaction === DISCOVERY_INTERACTIONS.TOGGLE) {
+      this.markMechanicLearned(POLARITY_MECHANIC_ID);
+    } else if (interaction === DISCOVERY_INTERACTIONS.USE) {
+      const mechanicId = toSpecialMechanicId(specialType);
+      if (mechanics[mechanicId]) {
+        this.markMechanicLearned(mechanicId);
+      }
+    } else if (
+      this.activeDiscoveryId &&
+      !this.isReplayingHints &&
+      !this.isActiveHintLearned &&
+      mechanics[this.activeDiscoveryId]?.interaction === interaction
+    ) {
+      this.markMechanicLearned(this.activeDiscoveryId);
+    }
+  }
+
+  /**
+   * Learns an obstacle, modifier or rail from a shot that flew through or next to it. Runs
+   * every step while a shot is in flight, so it only looks at the hint on screen.
+   * @param {{x: number, y: number, radius: number}} projectile - Shot in flight.
+   */
+  trackDiscoveryProximity(projectile) {
+    const hintId = this.activeDiscoveryId;
+    if (!hintId || this.isActiveHintLearned || this.isReplayingHints) {
+      return;
+    }
+    const mechanics = this.gameConfig.onboarding.mechanics;
+    const interaction = mechanics[hintId]?.interaction || DISCOVERY_INTERACTIONS.PROXIMITY;
+    if (interaction !== DISCOVERY_INTERACTIONS.PROXIMITY) {
+      return;
+    }
+    if (this.proximityGroupHintId !== hintId) {
+      this.proximityGroupHintId = hintId;
+      this.proximityGroup = listMechanicsSharingHint(hintId, mechanics);
+    }
+    if (
+      isProjectileNearMechanic(
+        this.proximityGroup,
+        projectile,
+        this.physicsWorld.balls,
+        this.physicsWorld.obstacles,
+        this.gameConfig.onboarding.interactionMargin
+      )
+    ) {
+      this.markMechanicLearned(hintId);
+    }
+  }
+
+  /**
+   * What the interface should pulse while the open hint is up: 'polarity' (the button),
+   * 'special:<type>' (that special ball's slot), or null. Stops once the player did it.
+   * @returns {?string} Pulse target.
+   */
+  getDiscoveryPulseTarget() {
+    if (!this.activeDiscoveryId || this.isActiveHintLearned) {
+      return null;
+    }
+    return resolvePulseTarget(this.activeDiscoveryId, this.gameConfig.onboarding.mechanics);
+  }
+
+  /**
+   * Mechanics on the board, plus the ones the campaign level declares: the polarity flip
+   * has no object on the board.
+   * @returns {Set<string>} Mechanic ids.
+   */
+  listPresentMechanics() {
+    const present = listBoardMechanics(this.physicsWorld.balls, this.physicsWorld.obstacles, this.specialInventory);
+    if (this.mode === GAME_MODES.CAMPAIGN) {
+      const levelDef = this.levelCatalog.get(this.currentLevelId);
+      for (const mechanicId of levelDef?.teachesMechanics || []) {
+        present.add(mechanicId);
+      }
+    }
+    return present;
+  }
+
+  /**
    * Shows the first unknown mechanic on the board, unless a hint is still open within its
-   * turn allowance. A mechanic counts as discovered as soon as its hint shows, together
-   * with the mechanics explained by the same text. Does nothing while a saved run is being
-   * rebuilt: that board is replaced before the player sees it.
+   * turn allowance. A hint stays up until the player closes it, interacts with what it
+   * explains, or lets the turn allowance run out; only the first two count the mechanic as
+   * learned. A hint that ran out is not shown again in the same run. At most one hint comes
+   * up per turn. Does nothing while a saved run is being rebuilt: that board is replaced
+   * before the player sees it.
    */
   refreshDiscovery() {
     if (this.isRestoringRun) {
       return;
     }
     const onboarding = this.gameConfig.onboarding;
-    if (this.activeDiscoveryId && this.discoveryTurnCount < onboarding.hintShotLimit) {
+    const isHolding =
+      this.activeDiscoveryId && !this.isActiveHintLearned && this.discoveryTurnCount < onboarding.hintShotLimit;
+    if (this.isReplayingHints) {
+      if (!isHolding) {
+        this.showNextReplayedHint();
+      }
       return;
     }
-    const present = listBoardMechanics(this.physicsWorld.balls, this.physicsWorld.obstacles);
+    if (isHolding || this.isHintShownThisTurn) {
+      return;
+    }
     const next = pickNextDiscovery(
-      present,
+      this.listPresentMechanics(),
       this.storageManager.getDiscoveries(),
       onboarding.order,
-      this.listCurrentLevelMechanics()
+      this.listCurrentLevelMechanics(),
+      this.discoveryShownIds
     );
     this.activeDiscoveryId = next;
     this.discoveryTurnCount = 0;
+    this.isActiveHintLearned = false;
     if (next) {
-      this.storageManager.markDiscovered(listMechanicsSharingHint(next, onboarding.mechanics));
+      this.isHintShownThisTurn = true;
+      for (const id of listMechanicsSharingHint(next, onboarding.mechanics)) {
+        this.discoveryShownIds.add(id);
+      }
+    }
+  }
+
+  /** True while a run is on and its board shows something a hint can explain again. */
+  hasLevelHints() {
+    return (
+      this.isRunPlaying() &&
+      this.listReplayableHints().some((mechanicId) => mechanicId !== BOARD_MECHANICS.BASICS)
+    );
+  }
+
+  /**
+   * Shows the hints of the mechanics on the current board again, one at a time, in
+   * discovery order. Closing one, or letting it run out, brings the next. Learned state
+   * is left alone.
+   * @returns {boolean} True when a replay started.
+   */
+  replayLevelHints() {
+    if (!this.isRunPlaying()) {
+      return false;
+    }
+    const queue = this.listReplayableHints();
+    if (queue.length === 0) {
+      return false;
+    }
+    if (this.activeDiscoveryId && !this.isReplayingHints && !this.isActiveHintLearned) {
+      // The interrupted hint was not learned: let it come back once the replay is over.
+      this.discoveryShownIds.delete(this.activeDiscoveryId);
+    }
+    this.hintReplayQueue = queue;
+    this.isReplayingHints = true;
+    this.showNextReplayedHint();
+    this.notifyUI();
+    return true;
+  }
+
+  /** One mechanic id per distinct hint text among the mechanics present, in discovery order. */
+  listReplayableHints() {
+    const onboarding = this.gameConfig.onboarding;
+    const present = this.listPresentMechanics();
+    const covered = new Set();
+    const queue = [];
+    for (const id of onboarding.order) {
+      if (present.has(id) && !covered.has(id)) {
+        queue.push(id);
+        for (const sharing of listMechanicsSharingHint(id, onboarding.mechanics)) {
+          covered.add(sharing);
+        }
+      }
+    }
+    return queue;
+  }
+
+  /** Moves a hint replay to its next hint, or ends it when none is left. */
+  showNextReplayedHint() {
+    this.activeDiscoveryId = this.hintReplayQueue.shift() || null;
+    this.discoveryTurnCount = 0;
+    this.isActiveHintLearned = false;
+    if (!this.activeDiscoveryId) {
+      this.isReplayingHints = false;
     }
   }
 
@@ -1718,35 +1979,69 @@ export class GameEngine {
   }
 
   /**
-   * Gives a player who already played before discoveries existed credit for the mechanics
-   * of the levels behind them, so they are not shown hints for what they already know.
-   * Runs once: a new player gets an empty set and starts from the basics.
+   * Mechanics a player's progress shows they already met: the basics and everything the
+   * authored levels behind their unlocked level show (obstacles, modifiers, the special
+   * balls those levels hand out, the polarity lesson), plus every special ball once a
+   * survival mode was played, since those modes start with a stock of each.
+   * @returns {Set<string>} Mechanic ids; empty for a player who has not played yet.
    */
-  seedDiscoveriesFromProgress() {
-    if (this.storageManager.hasDiscoveries()) {
-      return;
-    }
+  listMechanicsKnownFromProgress() {
     const unlockedLevel = this.storageManager.getUnlockedLevel();
-    const hasPlayedBefore =
-      unlockedLevel > this.gameConfig.defaults.initialUnlockedLevel ||
-      this.storageManager.getEndlessHighScore() > 0 ||
-      this.storageManager.getFluxHighScore() > 0;
+    const hasPlayedSurvival =
+      this.storageManager.getEndlessHighScore() > 0 || this.storageManager.getFluxHighScore() > 0;
+    const hasPlayedBefore = unlockedLevel > this.gameConfig.defaults.initialUnlockedLevel || hasPlayedSurvival;
     const known = new Set();
-    if (hasPlayedBefore) {
-      known.add(BOARD_MECHANICS.BASICS);
-      // Authored levels only: they teach every mechanic, and building the generated levels
-      // behind a far-advanced player would cost hundreds of boards for nothing new.
-      for (const level of this.levelsConfig.levels.filter((lvl) => lvl.id < unlockedLevel)) {
-        for (const mechanicId of listLevelMechanics(level)) {
-          known.add(mechanicId);
-        }
+    if (!hasPlayedBefore) {
+      return known;
+    }
+    known.add(BOARD_MECHANICS.BASICS);
+    // Authored levels only: they teach every mechanic, and building the generated levels
+    // behind a far-advanced player would cost hundreds of boards for nothing new.
+    for (const level of this.levelsConfig.levels.filter((lvl) => lvl.id < unlockedLevel)) {
+      for (const mechanicId of listLevelMechanics(level)) {
+        known.add(mechanicId);
       }
     }
-    if (known.size > 0) {
-      this.storageManager.markDiscovered([...known]);
-    } else {
-      this.storageManager.resetDiscoveries();
+    if (hasPlayedSurvival) {
+      for (const specialType of Object.values(SPECIAL_TYPES)) {
+        known.add(toSpecialMechanicId(specialType));
+      }
     }
+    return known;
+  }
+
+  /**
+   * Gives a player who already played before discoveries existed credit for the mechanics
+   * of the levels behind them, so they are not shown hints for what they already know.
+   * Versioned: when the list of mechanics grows (onboarding.discoveriesVersion), the new
+   * ones (`since` in their entry) are credited the same way, once, and nothing already
+   * stored is touched. A new player gets an empty set and starts from the basics.
+   */
+  seedDiscoveriesFromProgress() {
+    const currentVersion = this.gameConfig.onboarding.discoveriesVersion;
+    const storage = this.storageManager;
+    if (!storage.hasDiscoveries()) {
+      const known = this.listMechanicsKnownFromProgress();
+      if (known.size > 0) {
+        storage.markDiscovered([...known]);
+      } else {
+        storage.resetDiscoveries();
+      }
+      storage.setDiscoveriesVersion(currentVersion);
+      return;
+    }
+    const storedVersion = Math.max(storage.getDiscoveriesVersion(), LEGACY_DISCOVERIES_VERSION);
+    if (storedVersion >= currentVersion) {
+      return;
+    }
+    const mechanics = this.gameConfig.onboarding.mechanics;
+    const added = [...this.listMechanicsKnownFromProgress()].filter(
+      (id) => (mechanics[id]?.since || 0) > storedVersion
+    );
+    if (added.length > 0) {
+      storage.markDiscovered(added);
+    }
+    storage.setDiscoveriesVersion(currentVersion);
   }
 
   /**
@@ -1870,6 +2165,7 @@ export class GameEngine {
       return;
     }
     this.isPolarityFlipped = !this.isPolarityFlipped;
+    this.recordDiscoveryInteraction(DISCOVERY_INTERACTIONS.TOGGLE);
     this.audioManager.playEffect('snap');
     this.updateAimFromAngle(this.aimAngle);
     this.saveRunSnapshot({ force: true });
@@ -2177,6 +2473,12 @@ export class GameEngine {
     }
     const ballCfg = this.physicsConfig.ball;
     const projectile = this.currentBall;
+    this.levelIntro = null;
+    this.isHintShownThisTurn = false;
+    this.recordDiscoveryInteraction(DISCOVERY_INTERACTIONS.SHOT);
+    if (projectile.specialType) {
+      this.recordDiscoveryInteraction(DISCOVERY_INTERACTIONS.USE, projectile.specialType);
+    }
     projectile.isProjectile = true;
     projectile.isPolarityFlipped = this.isPolarityFlipped;
     projectile.x = this.gameConfig.canvas.launcherX;
@@ -2251,6 +2553,7 @@ export class GameEngine {
     }
 
     if (this.physicsWorld.projectile) {
+      this.trackDiscoveryProximity(this.physicsWorld.projectile);
       this.trailFrameCounter++;
       if (this.trailFrameCounter >= juice.trailSpawnInterval) {
         this.trailFrameCounter = 0;
@@ -3144,6 +3447,10 @@ export class GameEngine {
 
     this.evaluateRoundEnd();
     this.updateAimFromAngle(this.aimAngle);
+    if (madeMatch) {
+      this.recordDiscoveryInteraction(DISCOVERY_INTERACTIONS.MATCH);
+    }
+    this.isHintShownThisTurn = false;
     this.countDiscoveryTurn();
     this.refreshDiscovery();
     this.saveRunSnapshot();

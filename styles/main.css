@@ -683,6 +683,76 @@ body {
   transition: opacity var(--tutorial-fade) ease;
 }
 
+/*
+ * Objective banner of a level played for the first time. It sits where the tutorial banner
+ * does (never over the cluster) and never shows together with a hint, so they cannot overlap.
+ */
+.level-intro-banner {
+  position: absolute;
+  bottom: calc(var(--tutorial-bottom) + 8px);
+  left: 14px;
+  right: 14px;
+  z-index: 2;
+  pointer-events: none;
+  background: var(--surface-sunken-alpha-86);
+  color: var(--text-soft);
+  border: 1px solid var(--accent-blue-alpha-55);
+  border-radius: 10px;
+  padding: 7px 10px 7px 12px;
+  font-size: 0.76rem;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  box-shadow: 0 4px 14px var(--shadow-alpha-45);
+}
+
+.level-intro-banner.hidden {
+  display: none;
+}
+
+/* The mode banner and the "?" button share one row, so the button never makes the HUD taller. */
+.hud-mode-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.hud-mode-row .hud-mode-banner {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.hud-hint-btn {
+  flex: none;
+  font-weight: 800;
+  border-color: var(--accent-blue);
+}
+
+.hud-hint-btn.hidden {
+  display: none;
+}
+
+/* A control a hint points at: pulsing glow, plus an outline that still reads without motion. */
+.discovery-pulse {
+  outline: 3px solid var(--accent-blue);
+  outline-offset: 2px;
+  animation: discovery-pulse-glow 1.2s ease-in-out infinite;
+}
+
+@keyframes discovery-pulse-glow {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 var(--accent-blue-alpha-45);
+  }
+  50% {
+    box-shadow: 0 0 14px 4px var(--accent-blue-alpha-45);
+  }
+}
+
 .tutorial-dismiss-btn {
   background: var(--border-subtle-alpha-70);
   color: var(--text-secondary);
@@ -1991,6 +2061,9 @@ body {
   .canvas-wrapper:has(> #game-canvas:active) .tutorial-banner {
     opacity: 0;
   }
+  .canvas-wrapper:has(> #game-canvas:active) .level-intro-banner {
+    opacity: 0;
+  }
   /* The control row has no room for a sentence; the empty slots speak for themselves. */
   .powerups-empty {
     display: none;
@@ -2145,7 +2218,9 @@ body {
     font-size: 0.52rem;
     font-weight: 600;
     letter-spacing: -0.02em;
-    line-height: 1.1;
+    /* Tall enough for a capital accent (Échanger): overflow hidden would clip it otherwise. */
+    line-height: 1.3;
+    padding-top: 0.1em;
     text-align: center;
     white-space: nowrap;
     overflow: hidden;
@@ -2277,6 +2352,7 @@ body {
     );
   }
   .tutorial-banner,
+  .level-intro-banner,
   .special-equipped-banner {
     position: fixed;
     left: max(var(--shell-pad-x), env(safe-area-inset-left));
@@ -2291,7 +2367,8 @@ body {
     text-overflow: clip;
     border-radius: 10px;
   }
-  .tutorial-banner {
+  .tutorial-banner,
+  .level-intro-banner {
     bottom: calc(max(var(--shell-pad-y), env(safe-area-inset-bottom)) + var(--landscape-overlay-stack));
   }
   .nav-modes {

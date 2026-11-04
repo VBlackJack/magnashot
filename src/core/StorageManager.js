@@ -485,6 +485,19 @@ export class StorageManager {
     this.safeSetItem(this.storageConfig.keys.discoveries, JSON.stringify({}));
   }
 
+  /**
+   * Version of the mechanic list the stored discoveries were seeded against; 0 when none
+   * was recorded (discoveries written before versioning count as the first list).
+   */
+  getDiscoveriesVersion() {
+    return this.readNonNegativeInt(this.storageConfig.keys.discoveriesVersion);
+  }
+
+  /** @param {number} version - Version of the mechanic list the discoveries now cover. */
+  setDiscoveriesVersion(version) {
+    this.safeSetItem(this.storageConfig.keys.discoveriesVersion, Math.max(0, Math.floor(Number(version) || 0)));
+  }
+
   getEndlessHighScore() {
     return this.readNonNegativeInt(this.storageConfig.keys.endlessHighScore);
   }

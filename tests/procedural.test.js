@@ -62,8 +62,8 @@ const NEAR_LAST_BALL_OFFSET = 30;
 /** Ball and anchor counts of every campaign level, frozen when layouts moved to the registry. */
 const CAMPAIGN_LAYOUT_COUNTS = {
   1: 42,
-  2: 34,
-  3: 57,
+  2: 30,
+  3: 35,
   4: 50,
   5: 57,
   6: 34,

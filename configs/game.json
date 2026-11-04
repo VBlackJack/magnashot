@@ -569,15 +569,20 @@
   },
   "onboarding": {
     "hintShotLimit": 3,
+    "discoveriesVersion": 2,
+    "interactionMargin": 16,
+    "techniqueTips": ["gameplay.tutorial.bankShot"],
     "order": [
-      "basics", "pivot", "coinCore", "dormantBomb", "bumper", "armored", "repulsor", "chameleon",
+      "basics", "polarity", "pivot", "coinCore", "dormantBomb", "bumper", "armored", "repulsor", "chameleon",
       "barrier", "attractor", "bossCore", "portal", "laserLock", "singularity", "neutralAnchor",
       "chained", "bubble", "freezeCore", "lightningCore", "paintCore", "rail", "thruster", "tether", "rust",
-      "platform", "antimagnet", "rescueCore"
+      "platform", "antimagnet", "rescueCore",
+      "special:bomb", "special:lightning", "special:rainbow", "special:anvil",
+      "special:freeze", "special:rocket", "special:brush"
     ],
     "mechanics": {
-      "basics": { "hintKey": "gameplay.tutorial.pendulum" },
-      "pivot": { "hintKey": "gameplay.tutorial.rotor" },
+      "basics": { "hintKey": "gameplay.tutorial.pendulum", "interaction": "match" },
+      "pivot": { "hintKey": "gameplay.tutorial.rotor", "interaction": "shot" },
       "coinCore": {},
       "dormantBomb": {},
       "bumper": {},
@@ -602,7 +607,31 @@
       "rust": { "hintKey": "gameplay.tutorial.rust" },
       "platform": { "hintKey": "gameplay.tutorial.platform" },
       "antimagnet": { "hintKey": "gameplay.tutorial.antimagnet" },
-      "rescueCore": { "hintKey": "gameplay.tutorial.rescueCore" }
+      "rescueCore": { "hintKey": "gameplay.tutorial.rescueCore" },
+      "polarity": {
+        "hintKey": "gameplay.tutorial.polarity", "inputAware": true, "pulseTarget": "polarity", "interaction": "toggle", "since": 2
+      },
+      "special:bomb": {
+        "hintKey": "gameplay.tutorial.specials.bomb", "pulseTarget": "special:bomb", "interaction": "use", "since": 2
+      },
+      "special:lightning": {
+        "hintKey": "gameplay.tutorial.specials.lightning", "pulseTarget": "special:lightning", "interaction": "use", "since": 2
+      },
+      "special:rainbow": {
+        "hintKey": "gameplay.tutorial.specials.rainbow", "pulseTarget": "special:rainbow", "interaction": "use", "since": 2
+      },
+      "special:anvil": {
+        "hintKey": "gameplay.tutorial.specials.anvil", "pulseTarget": "special:anvil", "interaction": "use", "since": 2
+      },
+      "special:freeze": {
+        "hintKey": "gameplay.tutorial.specials.freeze", "pulseTarget": "special:freeze", "interaction": "use", "since": 2
+      },
+      "special:rocket": {
+        "hintKey": "gameplay.tutorial.specials.rocket", "pulseTarget": "special:rocket", "interaction": "use", "since": 2
+      },
+      "special:brush": {
+        "hintKey": "gameplay.tutorial.specials.brush", "pulseTarget": "special:brush", "interaction": "use", "since": 2
+      }
     }
   },
   "storage": {
@@ -637,6 +666,7 @@
       "achievementRecords": "achievement_records",
       "runSnapshot": "run_snapshot",
       "discoveries": "discoveries",
+      "discoveriesVersion": "discoveries_version",
       "unlockedBallStyles": "ball_styles",
       "activeBallStyle": "ball_style"
     },

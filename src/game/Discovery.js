@@ -27,14 +27,59 @@ const OBSTACLE_IDS = new Set(Object.values(OBSTACLE_TYPES));
 /** Locale template for a mechanic explained by its Codex entry. */
 const CODEX_HINT_KEY = 'gameplay.discovery.hint';
 
+/** Mechanic id of the polarity flip, taught by the level that declares it. */
+export const POLARITY_MECHANIC_ID = 'polarity';
+
+/** Prefix of the mechanic id of a special ball type: `special:<type>`. */
+export const SPECIAL_MECHANIC_PREFIX = 'special:';
+
+/**
+ * What the player must do for a hint to count as learned, set per mechanic in
+ * onboarding.mechanics.<id>.interaction. A mechanic without one is learned by sending a
+ * shot close to it (PROXIMITY).
+ */
+export const DISCOVERY_INTERACTIONS = Object.freeze({
+  /** Any shot is fired while the hint is shown. */
+  SHOT: 'shot',
+  /** A shot that cleared at least one ball. */
+  MATCH: 'match',
+  /** A shot flew through or next to the mechanic. */
+  PROXIMITY: 'proximity',
+  /** The polarity button was pressed. */
+  TOGGLE: 'toggle',
+  /** A special ball of the hinted type was fired. */
+  USE: 'use'
+});
+
+/**
+ * @param {string} specialType - Special ball type.
+ * @returns {string} Mechanic id of that special ball.
+ */
+export function toSpecialMechanicId(specialType) {
+  return `${SPECIAL_MECHANIC_PREFIX}${specialType}`;
+}
+
+/**
+ * Mechanic ids of the special balls held in stock.
+ * @param {Object<string, number>} [specialInventory] - Stock per special type.
+ * @returns {string[]} Mechanic ids, one per type with a positive stock.
+ */
+export function listStockedSpecialMechanics(specialInventory = {}) {
+  return Object.entries(specialInventory)
+    .filter(([, count]) => count > 0)
+    .map(([specialType]) => toSpecialMechanicId(specialType));
+}
+
 /**
  * Mechanics visible on a board. The basic rules are always part of it.
  * @param {Array<{clusterModifier: ?string, railMinX: ?number}>} balls - Board balls.
  * @param {Array<{type: string}>} obstacles - Board obstacles.
+ * @param {Object<string, number>} [specialInventory] - Special balls in stock; each type held
+ *   is a mechanic of its own.
  * @returns {Set<string>} Mechanic ids.
  */
-export function listBoardMechanics(balls, obstacles) {
-  const present = new Set([BOARD_MECHANICS.BASICS]);
+export function listBoardMechanics(balls, obstacles, specialInventory = {}) {
+  const present = new Set([BOARD_MECHANICS.BASICS, ...listStockedSpecialMechanics(specialInventory)]);
   for (const ball of balls) {
     if (ball.clusterModifier) {
       present.add(ball.clusterModifier);
@@ -54,7 +99,8 @@ export function listBoardMechanics(balls, obstacles) {
  * rails in `layout.anchors`; a generated level carries a ready layout spec instead, whose
  * balls flag them with `isNeutral` and `railHalfWidth` (see GameEngine.materializeLayout).
  * Both are read, so a generated level's neutral anchors and rails count as guaranteed and
- * order its first-encounter hints like an authored level's.
+ * order its first-encounter hints like an authored level's. The special balls a level hands
+ * out and the mechanics it declares in `teachesMechanics` (the polarity flip) count too.
  * @param {Object} levelDef - Level definition from configs/levels.json, or a generated one
  *   from the LevelCatalog.
  * @param {{guaranteedOnly?: boolean}} [options] - With guaranteedOnly, leaves out the
@@ -62,7 +108,11 @@ export function listBoardMechanics(balls, obstacles) {
  * @returns {Set<string>} Mechanic ids.
  */
 export function listLevelMechanics(levelDef, { guaranteedOnly = false } = {}) {
-  const present = new Set([BOARD_MECHANICS.BASICS]);
+  const present = new Set([
+    BOARD_MECHANICS.BASICS,
+    ...listStockedSpecialMechanics(levelDef.specialInventory),
+    ...(levelDef.teachesMechanics || [])
+  ]);
   for (const obstacle of levelDef.obstacles || []) {
     present.add(obstacle.type);
   }
@@ -104,10 +154,12 @@ export function listLevelMechanics(levelDef, { guaranteedOnly = false } = {}) {
  * @param {Object<string, boolean>} seen - Mechanics already discovered.
  * @param {string[]} order - Discovery priority.
  * @param {Set<string>} [prioritized] - Mechanics to explain first, still in discovery order.
+ * @param {Set<string>} [shownThisRun] - Mechanics whose hint already showed in this run
+ *   without being learned: they wait for the next run instead of coming back at once.
  * @returns {?string} Mechanic id, or null when everything present is known.
  */
-export function pickNextDiscovery(present, seen, order, prioritized = new Set()) {
-  const isNew = (id) => present.has(id) && !seen[id];
+export function pickNextDiscovery(present, seen, order, prioritized = new Set(), shownThisRun = new Set()) {
+  const isNew = (id) => present.has(id) && !seen[id] && !shownThisRun.has(id);
   return order.find((id) => prioritized.has(id) && isNew(id)) || order.find(isNew) || null;
 }
 
@@ -127,17 +179,66 @@ export function listMechanicsSharingHint(mechanicId, mechanics) {
 }
 
 /**
+ * What the interface should pulse while a mechanic's hint is shown.
+ * @param {?string} mechanicId - Mechanic being explained.
+ * @param {Object<string, {pulseTarget?: string}>} mechanics - onboarding.mechanics.
+ * @returns {?string} 'polarity', 'special:<type>', or null when nothing should pulse.
+ */
+export function resolvePulseTarget(mechanicId, mechanics) {
+  return (mechanicId && mechanics[mechanicId]?.pulseTarget) || null;
+}
+
+/**
+ * True when a projectile is close enough to one of the mechanics to have met it: inside an
+ * obstacle's body or field, or next to a ball carrying the modifier or the rail.
+ * @param {Iterable<string>} mechanicIds - Mechanics sharing the hint being shown.
+ * @param {{x: number, y: number, radius: number}} projectile - Shot in flight.
+ * @param {Array<Object>} balls - Board balls.
+ * @param {Array<Object>} obstacles - Board obstacles.
+ * @param {number} margin - Extra distance that still counts as meeting it.
+ * @returns {boolean} True when the projectile met one of them.
+ */
+export function isProjectileNearMechanic(mechanicIds, projectile, balls, obstacles, margin) {
+  const ids = new Set(mechanicIds);
+  const isNear = (x, y, reach) => Math.hypot(x - projectile.x, y - projectile.y) <= reach + projectile.radius + margin;
+  for (const obstacle of obstacles) {
+    if (!ids.has(obstacle.type)) {
+      continue;
+    }
+    const reach = Math.max(
+      obstacle.radius || 0,
+      obstacle.fieldRadius || 0,
+      obstacle.pullRadius || 0,
+      (obstacle.width || 0) / 2,
+      (obstacle.height || 0) / 2
+    );
+    if (isNear(obstacle.x, obstacle.y, reach)) {
+      return true;
+    }
+  }
+  const wantsRail = ids.has(BOARD_MECHANICS.RAIL);
+  for (const ball of balls) {
+    const isRail = wantsRail && ball.railMinX !== null && ball.railMinX !== undefined;
+    if ((isRail || ids.has(ball.clusterModifier)) && isNear(ball.x, ball.y, ball.radius || 0)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/**
  * Text of a mechanic's hint: its tutorial when it has one, else its Codex entry.
  * @param {string} mechanicId - Mechanic to explain.
  * @param {{mechanics: Object}} onboardingConfig - onboarding section of configs/game.json.
  * @param {{clusterModifiers: Object}} ballsConfig - Balls configuration (Codex badges).
  * @param {function(string, Object=): string} translate - Translation function.
+ * @param {string} [inputMode] - 'pointer' or 'touch', for hints with one wording per input mode.
  * @returns {string} Hint text, empty for an unknown mechanic.
  */
-export function resolveHintText(mechanicId, onboardingConfig, ballsConfig, translate) {
-  const hintKey = onboardingConfig.mechanics[mechanicId]?.hintKey;
-  if (hintKey) {
-    return translate(hintKey);
+export function resolveHintText(mechanicId, onboardingConfig, ballsConfig, translate, inputMode = '') {
+  const entry = onboardingConfig.mechanics[mechanicId];
+  if (entry?.hintKey) {
+    return translate(entry.inputAware && inputMode ? `${entry.hintKey}.${inputMode}` : entry.hintKey);
   }
   if (MODIFIER_IDS.has(mechanicId)) {
     const codexKey = `modals.shop.codex.modifiers.${mechanicId}`;

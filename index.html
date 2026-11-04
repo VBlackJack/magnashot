@@ -93,7 +93,10 @@
         <span id="hud-star-progress" class="hud-subvalue gold-text"><span id="hud-star-glyphs" class="hud-subvalue-part" aria-hidden="true"></span><span id="hud-star-count" class="visually-hidden"></span> <span id="hud-star-next" class="hud-subvalue-part"></span><span id="hud-star-meter" class="star-meter" role="progressbar" aria-valuemin="0" aria-valuemax="100" data-i18n-aria-label="hud.stats.score.progressAria"><span id="hud-star-meter-fill" class="star-meter-fill"></span></span></span>
       </div>
       <div class="hud-center-info">
-        <div id="hud-mode-banner" class="hud-mode-banner" role="button" tabindex="0" aria-haspopup="dialog" data-i18n-title="hud.stats.mode.switchHint"></div>
+        <div class="hud-mode-row">
+          <div id="hud-mode-banner" class="hud-mode-banner" role="button" tabindex="0" aria-haspopup="dialog"></div>
+          <button id="btn-hint-replay" type="button" class="hud-menu-btn hud-hint-btn hidden" data-i18n-aria-label="hud.hints.replayAria" data-i18n-title="hud.hints.replayAria"><span aria-hidden="true">?</span></button>
+        </div>
         <div class="hud-badges-row">
           <span id="hud-combo-badge" class="hud-badge combo hidden"></span>
           <span id="hud-frozen-badge" class="hud-badge frozen hidden"></span>
@@ -124,6 +127,10 @@
             <div id="tutorial-banner" class="tutorial-banner hidden" aria-live="polite">
               <span id="tutorial-banner-text"></span>
               <button id="btn-dismiss-tutorial" type="button" class="tutorial-dismiss-btn"><span aria-hidden="true">✕</span></button>
+            </div>
+            <div id="level-intro-banner" class="level-intro-banner hidden">
+              <span id="level-intro-text"></span>
+              <button id="btn-dismiss-level-intro" type="button" class="tutorial-dismiss-btn" data-i18n-aria-label="hud.levelIntro.dismiss"><span aria-hidden="true">✕</span></button>
             </div>
             <div id="special-equipped-banner" class="special-equipped-banner hidden" aria-live="polite"></div>
             <div id="cancel-aim-banner" class="cancel-aim-banner hidden" data-i18n="hud.launcher.cancel.hint"></div>
