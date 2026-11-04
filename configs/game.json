@@ -63,6 +63,7 @@
     "extraBallMultiplier": 45,
     "droppedBallPoints": 180,
     "remainingShotBonus": 250,
+    "nearMissMaxGapRatio": 0.5,
     "comboIncrement": 1,
     "maxComboMultiplier": 10,
     "starThresholds": [0, 5000, 8500],
@@ -333,6 +334,8 @@
     "firstPlayBonusCoins": 30,
     "streakStepCoins": 15,
     "maxStreakBonusCoins": 90,
+    "streakGraceDays": 1,
+    "streakGraceWindowDays": 7,
     "countdownRefreshMs": 60000,
     "singularityMarginRadiusFactor": 4,
     "singularityOffsetAboveDangerFactor": 5,
@@ -538,33 +541,174 @@
   "achievements": {
     "firstAvalanche": {
       "id": "firstAvalanche",
+      "tierOf": "firstAvalanche",
+      "tier": "bronze",
       "threshold": 6,
       "rewardCoins": 40
     },
+    "firstAvalancheSilver": {
+      "id": "firstAvalancheSilver",
+      "tierOf": "firstAvalanche",
+      "tier": "silver",
+      "threshold": 10,
+      "rewardCoins": 80
+    },
+    "firstAvalancheGold": {
+      "id": "firstAvalancheGold",
+      "tierOf": "firstAvalanche",
+      "tier": "gold",
+      "threshold": 15,
+      "rewardCoins": 150
+    },
     "comboMaster": {
       "id": "comboMaster",
+      "tierOf": "comboMaster",
+      "tier": "bronze",
       "threshold": 4,
       "rewardCoins": 50
     },
+    "comboMasterSilver": {
+      "id": "comboMasterSilver",
+      "tierOf": "comboMaster",
+      "tier": "silver",
+      "threshold": 7,
+      "rewardCoins": 90
+    },
+    "comboMasterGold": {
+      "id": "comboMasterGold",
+      "tierOf": "comboMaster",
+      "tier": "gold",
+      "threshold": 10,
+      "rewardCoins": 160
+    },
     "bossSlayer": {
       "id": "bossSlayer",
+      "tierOf": "bossSlayer",
+      "tier": "bronze",
       "threshold": 1,
       "rewardCoins": 60
     },
+    "bossSlayerSilver": {
+      "id": "bossSlayerSilver",
+      "tierOf": "bossSlayer",
+      "tier": "silver",
+      "threshold": 3,
+      "rewardCoins": 110
+    },
+    "bossSlayerGold": {
+      "id": "bossSlayerGold",
+      "tierOf": "bossSlayer",
+      "tier": "gold",
+      "threshold": 6,
+      "rewardCoins": 200
+    },
     "sharpshooter": {
       "id": "sharpshooter",
+      "tierOf": "sharpshooter",
+      "tier": "bronze",
       "threshold": 12,
       "rewardCoins": 50
     },
+    "sharpshooterSilver": {
+      "id": "sharpshooterSilver",
+      "tierOf": "sharpshooter",
+      "tier": "silver",
+      "threshold": 15,
+      "rewardCoins": 90
+    },
+    "sharpshooterGold": {
+      "id": "sharpshooterGold",
+      "tierOf": "sharpshooter",
+      "tier": "gold",
+      "threshold": 18,
+      "rewardCoins": 150
+    },
     "survivorWave10": {
       "id": "survivorWave10",
+      "tierOf": "survivorWave10",
+      "tier": "bronze",
       "threshold": 10,
       "rewardCoins": 75
     },
+    "survivorWave10Silver": {
+      "id": "survivorWave10Silver",
+      "tierOf": "survivorWave10",
+      "tier": "silver",
+      "threshold": 20,
+      "rewardCoins": 130
+    },
+    "survivorWave10Gold": {
+      "id": "survivorWave10Gold",
+      "tierOf": "survivorWave10",
+      "tier": "gold",
+      "threshold": 35,
+      "rewardCoins": 220
+    },
     "starCollector": {
       "id": "starCollector",
+      "cumulative": true,
+      "tierOf": "starCollector",
+      "tier": "bronze",
       "threshold": 18,
       "rewardCoins": 100
+    },
+    "starCollectorSilver": {
+      "id": "starCollectorSilver",
+      "cumulative": true,
+      "tierOf": "starCollector",
+      "tier": "silver",
+      "threshold": 60,
+      "rewardCoins": 180
+    },
+    "starCollectorGold": {
+      "id": "starCollectorGold",
+      "cumulative": true,
+      "tierOf": "starCollector",
+      "tier": "gold",
+      "threshold": 120,
+      "rewardCoins": 300
+    },
+    "fluxShapes": {
+      "id": "fluxShapes",
+      "tierOf": "fluxShapes",
+      "tier": "bronze",
+      "threshold": 5,
+      "rewardCoins": 60
+    },
+    "fluxShapesSilver": {
+      "id": "fluxShapesSilver",
+      "tierOf": "fluxShapes",
+      "tier": "silver",
+      "threshold": 10,
+      "rewardCoins": 120
+    },
+    "fluxShapesGold": {
+      "id": "fluxShapesGold",
+      "tierOf": "fluxShapes",
+      "tier": "gold",
+      "threshold": 20,
+      "rewardCoins": 220
+    },
+    "bossRushWaves": {
+      "id": "bossRushWaves",
+      "tierOf": "bossRushWaves",
+      "tier": "bronze",
+      "threshold": 3,
+      "rewardCoins": 60
+    },
+    "bossRushWavesSilver": {
+      "id": "bossRushWavesSilver",
+      "tierOf": "bossRushWaves",
+      "tier": "silver",
+      "threshold": 6,
+      "rewardCoins": 120
+    },
+    "bossRushWavesGold": {
+      "id": "bossRushWavesGold",
+      "tierOf": "bossRushWaves",
+      "tier": "gold",
+      "threshold": 10,
+      "rewardCoins": 220
     }
   },
   "onboarding": {
@@ -660,6 +804,7 @@
       "dailyLastPlayedDate": "daily_last_date",
       "dailyStreak": "daily_streak",
       "dailyStreakDate": "daily_streak_date",
+      "dailyStreakGraceDate": "daily_streak_grace_date",
       "coins": "coins",
       "upgrades": "upgrades",
       "achievements": "achievements",

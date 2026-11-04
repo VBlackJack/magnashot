@@ -138,6 +138,10 @@
       "compactLine": "{{mode}} • {{coins}} • Record {{best}}",
       "perks": {
         "label": "Atouts"
+      },
+      "bestRun": {
+        "stage": "Record : forme {{best}}",
+        "wave": "Record : vague {{best}}"
       }
     },
     "launcher": {
@@ -221,10 +225,12 @@
     },
     "announcer": {
       "achievement": {
-        "unlocked": "Succès débloqué : {{name}}, plus {{coins}} pièces."
+        "unlocked": "Succès débloqué : {{name}}, plus {{coins}} pièces.",
+        "unlockedMany": "Succès débloqués : {{name}}, plus {{coins}} pièces."
       },
       "round": {
         "victory": "Niveau terminé. Score : {{score}}. Étoiles : {{stars}} sur {{maxStars}}.",
+        "withNearMiss": "{{result}} {{nearMiss}}.",
         "gameOver": "Partie terminée. {{reason}} Score : {{score}}.",
         "fluxStageCleared": "Forme {{stage}} vidée. La forme suivante arrive."
       },
@@ -285,7 +291,9 @@
         "absorbed": "VORTEX +{{points}}"
       },
       "achievement": {
-        "unlocked": "SUCCÈS : {{name}} (+{{coins}} ⬡)"
+        "unlocked": "SUCCÈS : {{name}} (+{{coins}} ⬡)",
+        "unlockedMany": "SUCCÈS : {{name}} (+{{coins}} ⬡)",
+        "listSeparator": ", "
       },
       "dailyBonus": {
         "claimed": "BONUS DU JOUR ! +{{coins}} ⬡",
@@ -739,29 +747,109 @@
         "items": {
           "firstAvalanche": {
             "name": "Maître de l'Avalanche",
-            "description": "Faire tomber au moins 6 sphères en une seule avalanche."
+            "description": "Faire tomber au moins {{target}} sphères en une seule avalanche."
           },
           "comboMaster": {
             "name": "Résonance en Chaîne",
-            "description": "Atteindre un multiplicateur de Combo x4 ou supérieur."
+            "description": "Atteindre un multiplicateur de Combo x{{target}} ou supérieur."
           },
           "bossSlayer": {
             "name": "Briseur de Couronne",
-            "description": "Détruire un Noyau Boss (👑) en Campagne, Survie, Mode Flux ou Boss Rush."
+            "description": "Détruire des Noyaux Boss (👑) en une seule partie (objectif : {{target}})."
           },
           "sharpshooter": {
             "name": "Tir de Précision",
-            "description": "Terminer un niveau de campagne avec au moins 12 tirs restants."
+            "description": "Terminer un niveau de campagne avec au moins {{target}} tirs restants."
           },
           "survivorWave10": {
             "name": "Gardien Magnétique",
-            "description": "Atteindre la Vague 10 en Mode Survie."
+            "description": "Atteindre la Vague {{target}} en Mode Survie."
           },
           "starCollector": {
             "name": "Constellation Magnétique",
-            "description": "Obtenir un total de 18 étoiles en mode Campagne."
+            "description": "Obtenir un total de {{target}} étoiles en mode Campagne."
+          },
+          "firstAvalancheSilver": {
+            "name": "Maître de l'Avalanche II",
+            "description": "Faire tomber au moins {{target}} sphères en une seule avalanche."
+          },
+          "firstAvalancheGold": {
+            "name": "Maître de l'Avalanche III",
+            "description": "Faire tomber au moins {{target}} sphères en une seule avalanche."
+          },
+          "comboMasterSilver": {
+            "name": "Résonance en Chaîne II",
+            "description": "Atteindre un multiplicateur de Combo x{{target}} ou supérieur."
+          },
+          "comboMasterGold": {
+            "name": "Résonance en Chaîne III",
+            "description": "Atteindre un multiplicateur de Combo x{{target}} ou supérieur."
+          },
+          "bossSlayerSilver": {
+            "name": "Briseur de Couronne II",
+            "description": "Détruire des Noyaux Boss (👑) en une seule partie (objectif : {{target}})."
+          },
+          "bossSlayerGold": {
+            "name": "Briseur de Couronne III",
+            "description": "Détruire des Noyaux Boss (👑) en une seule partie (objectif : {{target}})."
+          },
+          "sharpshooterSilver": {
+            "name": "Tir de Précision II",
+            "description": "Terminer un niveau de campagne avec au moins {{target}} tirs restants."
+          },
+          "sharpshooterGold": {
+            "name": "Tir de Précision III",
+            "description": "Terminer un niveau de campagne avec au moins {{target}} tirs restants."
+          },
+          "survivorWave10Silver": {
+            "name": "Gardien Magnétique II",
+            "description": "Atteindre la Vague {{target}} en Mode Survie."
+          },
+          "survivorWave10Gold": {
+            "name": "Gardien Magnétique III",
+            "description": "Atteindre la Vague {{target}} en Mode Survie."
+          },
+          "starCollectorSilver": {
+            "name": "Constellation Magnétique II",
+            "description": "Obtenir un total de {{target}} étoiles en mode Campagne."
+          },
+          "starCollectorGold": {
+            "name": "Constellation Magnétique III",
+            "description": "Obtenir un total de {{target}} étoiles en mode Campagne."
+          },
+          "fluxShapes": {
+            "name": "Marcheur de Formes",
+            "description": "Atteindre la forme {{target}} en Mode Flux."
+          },
+          "fluxShapesSilver": {
+            "name": "Marcheur de Formes II",
+            "description": "Atteindre la forme {{target}} en Mode Flux."
+          },
+          "fluxShapesGold": {
+            "name": "Marcheur de Formes III",
+            "description": "Atteindre la forme {{target}} en Mode Flux."
+          },
+          "bossRushWaves": {
+            "name": "Coureur de l'Épreuve",
+            "description": "Atteindre la Vague Boss {{target}} en Boss Rush."
+          },
+          "bossRushWavesSilver": {
+            "name": "Coureur de l'Épreuve II",
+            "description": "Atteindre la Vague Boss {{target}} en Boss Rush."
+          },
+          "bossRushWavesGold": {
+            "name": "Coureur de l'Épreuve III",
+            "description": "Atteindre la Vague Boss {{target}} en Boss Rush."
           }
-        }
+        },
+        "tier": {
+          "bronze": "Bronze",
+          "silver": "Argent",
+          "gold": "Or"
+        },
+        "tierUnlockedAria": "Palier {{tier}} débloqué (objectif : {{target}})",
+        "tierLockedAria": "Palier {{tier}} en cours (objectif : {{target}})",
+        "reachAgain": "À refaire en une partie"
       },
       "card": {
         "level": "Niv. {{level}} / {{maxLevel}}",
@@ -851,7 +939,24 @@
       },
       "daily": {
         "streak": "Série : {{streak}} j",
-        "nextIn": "Prochain défi dans {{hours}} h {{minutes}} min"
+        "nextIn": "Prochain défi dans {{hours}} h {{minutes}} min",
+        "graceAvailable": "Un jour manqué est pardonné",
+        "graceUsed": "Jour de grâce utilisé, votre série tient",
+        "graceReturns": "Jour de grâce de retour dans {{days}} j"
+      },
+      "nearMiss": {
+        "stage": {
+          "one": "{{count}} forme de moins que votre record",
+          "other": "{{count}} formes de moins que votre record"
+        },
+        "wave": {
+          "one": "{{count}} vague de moins que votre record",
+          "other": "{{count}} vagues de moins que votre record"
+        },
+        "score": {
+          "one": "{{count}} point de moins que votre record",
+          "other": "{{count}} points de moins que votre record"
+        }
       }
     },
     "pause": {

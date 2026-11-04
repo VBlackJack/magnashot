@@ -138,6 +138,10 @@
       "compactLine": "{{mode}} • {{coins}} • Best {{best}}",
       "perks": {
         "label": "Perks"
+      },
+      "bestRun": {
+        "stage": "Best: shape {{best}}",
+        "wave": "Best: wave {{best}}"
       }
     },
     "launcher": {
@@ -221,10 +225,12 @@
     },
     "announcer": {
       "achievement": {
-        "unlocked": "Achievement unlocked: {{name}}, plus {{coins}} coins."
+        "unlocked": "Achievement unlocked: {{name}}, plus {{coins}} coins.",
+        "unlockedMany": "Achievements unlocked: {{name}}, plus {{coins}} coins."
       },
       "round": {
         "victory": "Level cleared. Score: {{score}}. Stars: {{stars}} of {{maxStars}}.",
+        "withNearMiss": "{{result}} {{nearMiss}}.",
         "gameOver": "Game over. {{reason}} Score: {{score}}.",
         "fluxStageCleared": "Shape {{stage}} cleared. The next shape is coming."
       },
@@ -285,7 +291,9 @@
         "absorbed": "VORTEX +{{points}}"
       },
       "achievement": {
-        "unlocked": "ACHIEVEMENT: {{name}} (+{{coins}} ⬡)"
+        "unlocked": "ACHIEVEMENT: {{name}} (+{{coins}} ⬡)",
+        "unlockedMany": "ACHIEVEMENTS: {{name}} (+{{coins}} ⬡)",
+        "listSeparator": ", "
       },
       "dailyBonus": {
         "claimed": "DAILY BONUS! +{{coins}} ⬡",
@@ -739,29 +747,109 @@
         "items": {
           "firstAvalanche": {
             "name": "Avalanche Master",
-            "description": "Drop at least 6 unanchored spheres in a single avalanche."
+            "description": "Drop at least {{target}} unanchored spheres in a single avalanche."
           },
           "comboMaster": {
             "name": "Chain Resonance",
-            "description": "Reach a x4 or higher Combo multiplier."
+            "description": "Reach a x{{target}} or higher Combo multiplier."
           },
           "bossSlayer": {
             "name": "Crown Breaker",
-            "description": "Destroy a Boss Core (👑) in Campaign, Survival, Flux Mode or Boss Rush."
+            "description": "Destroy Boss Cores (👑) in a single run (goal: {{target}})."
           },
           "sharpshooter": {
             "name": "Sharpshooter",
-            "description": "Clear any campaign level with at least 12 shots remaining."
+            "description": "Clear any campaign level with at least {{target}} shots remaining."
           },
           "survivorWave10": {
             "name": "Magnetic Vanguard",
-            "description": "Reach Wave 10 in Survival Mode."
+            "description": "Reach Wave {{target}} in Survival Mode."
           },
           "starCollector": {
             "name": "Magnetic Constellation",
-            "description": "Earn a total of 18 stars across Campaign levels."
+            "description": "Earn a total of {{target}} stars across Campaign levels."
+          },
+          "firstAvalancheSilver": {
+            "name": "Avalanche Master II",
+            "description": "Drop at least {{target}} unanchored spheres in a single avalanche."
+          },
+          "firstAvalancheGold": {
+            "name": "Avalanche Master III",
+            "description": "Drop at least {{target}} unanchored spheres in a single avalanche."
+          },
+          "comboMasterSilver": {
+            "name": "Chain Resonance II",
+            "description": "Reach a x{{target}} or higher Combo multiplier."
+          },
+          "comboMasterGold": {
+            "name": "Chain Resonance III",
+            "description": "Reach a x{{target}} or higher Combo multiplier."
+          },
+          "bossSlayerSilver": {
+            "name": "Crown Breaker II",
+            "description": "Destroy Boss Cores (👑) in a single run (goal: {{target}})."
+          },
+          "bossSlayerGold": {
+            "name": "Crown Breaker III",
+            "description": "Destroy Boss Cores (👑) in a single run (goal: {{target}})."
+          },
+          "sharpshooterSilver": {
+            "name": "Sharpshooter II",
+            "description": "Clear any campaign level with at least {{target}} shots remaining."
+          },
+          "sharpshooterGold": {
+            "name": "Sharpshooter III",
+            "description": "Clear any campaign level with at least {{target}} shots remaining."
+          },
+          "survivorWave10Silver": {
+            "name": "Magnetic Vanguard II",
+            "description": "Reach Wave {{target}} in Survival Mode."
+          },
+          "survivorWave10Gold": {
+            "name": "Magnetic Vanguard III",
+            "description": "Reach Wave {{target}} in Survival Mode."
+          },
+          "starCollectorSilver": {
+            "name": "Magnetic Constellation II",
+            "description": "Earn a total of {{target}} stars across Campaign levels."
+          },
+          "starCollectorGold": {
+            "name": "Magnetic Constellation III",
+            "description": "Earn a total of {{target}} stars across Campaign levels."
+          },
+          "fluxShapes": {
+            "name": "Shape Walker",
+            "description": "Reach shape {{target}} in Flux Mode."
+          },
+          "fluxShapesSilver": {
+            "name": "Shape Walker II",
+            "description": "Reach shape {{target}} in Flux Mode."
+          },
+          "fluxShapesGold": {
+            "name": "Shape Walker III",
+            "description": "Reach shape {{target}} in Flux Mode."
+          },
+          "bossRushWaves": {
+            "name": "Gauntlet Runner",
+            "description": "Reach Boss Wave {{target}} in Boss Rush."
+          },
+          "bossRushWavesSilver": {
+            "name": "Gauntlet Runner II",
+            "description": "Reach Boss Wave {{target}} in Boss Rush."
+          },
+          "bossRushWavesGold": {
+            "name": "Gauntlet Runner III",
+            "description": "Reach Boss Wave {{target}} in Boss Rush."
           }
-        }
+        },
+        "tier": {
+          "bronze": "Bronze",
+          "silver": "Silver",
+          "gold": "Gold"
+        },
+        "tierUnlockedAria": "{{tier}} tier unlocked (goal: {{target}})",
+        "tierLockedAria": "{{tier}} tier in progress (goal: {{target}})",
+        "reachAgain": "Reach it again in a run"
       },
       "card": {
         "level": "Lv. {{level}} / {{maxLevel}}",
@@ -851,7 +939,24 @@
       },
       "daily": {
         "streak": "Streak: {{streak}} d",
-        "nextIn": "Next challenge in {{hours}} h {{minutes}} min"
+        "nextIn": "Next challenge in {{hours}} h {{minutes}} min",
+        "graceAvailable": "One missed day is forgiven",
+        "graceUsed": "Grace day used, your streak held",
+        "graceReturns": "Grace day back in {{days}} d"
+      },
+      "nearMiss": {
+        "stage": {
+          "one": "{{count}} shape short of your best",
+          "other": "{{count}} shapes short of your best"
+        },
+        "wave": {
+          "one": "{{count}} wave short of your best",
+          "other": "{{count}} waves short of your best"
+        },
+        "score": {
+          "one": "{{count}} point short of your best",
+          "other": "{{count}} points short of your best"
+        }
       }
     },
     "pause": {

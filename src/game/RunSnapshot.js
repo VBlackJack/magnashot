@@ -257,6 +257,8 @@ export function captureRunSnapshot(engine, version) {
     discoveryShownIds: [...engine.discoveryShownIds],
     fluxPerks: { ...engine.fluxPerks },
     fluxPerkOffer: engine.fluxPerkOffer ? [...engine.fluxPerkOffer] : null,
+    // The record the run started against, so a reloaded run does not compare with itself.
+    runBestBaseline: engine.getRunBestBaseline?.() ?? null,
     currentBall: { colorId: engine.currentBall.colorId, specialType: engine.currentBall.specialType },
     nextBall: { colorId: engine.nextBall.colorId, specialType: engine.nextBall.specialType },
     allowTensionBreak: world.allowTensionBreak,
@@ -398,6 +400,8 @@ export function applyRunSnapshot(engine, snapshot) {
     engine.fluxPerks = restoreFluxPerks(engine, snapshot.fluxPerks);
     engine.fluxPerkOffer = restoreFluxPerkOffer(engine, snapshot.fluxPerkOffer);
   }
+  // Optional: a run saved before the baseline existed (or a damaged one) re-reads the record.
+  engine.restoreRunBestBaseline(snapshot.runBestBaseline);
   if (engine.seededRng && Number.isFinite(snapshot.rngState)) {
     engine.seededRng.state = snapshot.rngState;
   }

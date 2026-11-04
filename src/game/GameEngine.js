@@ -53,6 +53,14 @@ import {
 
 /** Version of the discovery list that predates versioning: its seeding is never redone. */
 const LEGACY_DISCOVERIES_VERSION = 1;
+const ACHIEVEMENT_TIER_ORDER = Object.freeze(['bronze', 'silver', 'gold']);
+
+/** What a run is measured by when it is compared with the mode's record. */
+export const RUN_BEST_METRICS = Object.freeze({
+  STAGE: 'stage',
+  WAVE: 'wave',
+  SCORE: 'score'
+});
 
 /** Flux perk ids; the specs (step, maxStacks, icon) live in configs/flux.json. */
 export const FLUX_PERK_IDS = Object.freeze({
@@ -136,6 +144,7 @@ export class GameEngine {
     this.victoryCelebrationFrames = 0;
     this.victorySummary = null;
     this.gameOverSummary = null;
+    this.runBestBaseline = null;
     this.hitStopFrames = 0;
     this.specialSlowMoFrames = 0;
     this.specialSlowMoTotalFrames = 0;
@@ -321,10 +330,117 @@ export class GameEngine {
   }
 
   /**
+   * The metric the current mode's record is kept in, with the value reached so far.
+   * @returns {{metric: string, current: number}|null} null for modes without a record.
+   */
+  getRunBestMetric() {
+    switch (this.mode) {
+      case GAME_MODES.FLUX:
+        return { metric: RUN_BEST_METRICS.STAGE, current: this.fluxStage };
+      case GAME_MODES.BOSS_RUSH:
+        return { metric: RUN_BEST_METRICS.WAVE, current: this.bossRushWave };
+      case GAME_MODES.ENDLESS:
+      case GAME_MODES.DAILY:
+      case GAME_MODES.CASCADE:
+      case GAME_MODES.BLITZ:
+        return { metric: RUN_BEST_METRICS.SCORE, current: this.score };
+      default:
+        return null;
+    }
+  }
+
+  /**
+   * The mode's record as it stood when the run started (captured once, before the run
+   * first writes its own progress to storage).
+   * @returns {{metric: string, best: number}|null}
+   */
+  getRunBestBaseline() {
+    if (this.runBestBaseline) {
+      return this.runBestBaseline;
+    }
+    const measured = this.getRunBestMetric();
+    if (!measured) {
+      return null;
+    }
+    const storage = this.storageManager;
+    let best = 0;
+    if (this.mode === GAME_MODES.FLUX) {
+      best = storage.getFluxBestStage?.() || 0;
+    } else if (this.mode === GAME_MODES.BOSS_RUSH) {
+      best = storage.getBossRushBestWave?.() || 0;
+    } else if (this.mode === GAME_MODES.ENDLESS) {
+      best = storage.getEndlessHighScore?.() || 0;
+    } else if (this.mode === GAME_MODES.DAILY) {
+      best = storage.getDailyHighScore?.(this.dailySeedKey || SeededRandom.getTodayDateKey()) || 0;
+    } else if (this.mode === GAME_MODES.CASCADE) {
+      best = storage.getCascadeHighScore?.() || 0;
+    } else if (this.mode === GAME_MODES.BLITZ) {
+      best = storage.getBlitzHighScore?.() || 0;
+    }
+    this.runBestBaseline = { metric: measured.metric, best };
+    return this.runBestBaseline;
+  }
+
+  /**
+   * Puts back the record a stored run started against. Ignored when it is damaged or was
+   * measured in another metric than this mode's.
+   * @param {{metric?: string, best?: number}|null|undefined} saved - Baseline from a run snapshot.
+   */
+  restoreRunBestBaseline(saved) {
+    const measured = this.getRunBestMetric();
+    if (
+      measured
+      && saved
+      && saved.metric === measured.metric
+      && Number.isFinite(saved.best)
+      && saved.best >= 0
+    ) {
+      this.runBestBaseline = { metric: saved.metric, best: saved.best };
+    }
+  }
+
+  /**
+   * Best-run marker for the HUD during a run.
+   * @returns {{metric: string, best: number, current: number}|null} null without a record to beat.
+   */
+  getRunBestMarker() {
+    const measured = this.getRunBestMetric();
+    const baseline = measured ? this.getRunBestBaseline() : null;
+    if (!measured || !baseline || baseline.best <= 0) {
+      return null;
+    }
+    return { metric: measured.metric, best: baseline.best, current: measured.current };
+  }
+
+  /**
+   * How far a finished run fell short of the record. Informational only.
+   * @returns {{metric: string, current: number, best: number, gap: number}|null}
+   */
+  computeNearMiss() {
+    const marker = this.getRunBestMarker();
+    if (!marker || marker.current >= marker.best) {
+      return null;
+    }
+    // A run far below the record is not a near miss: the line would read as a taunt.
+    const maxGapRatio = this.gameConfig.scoring.nearMissMaxGapRatio;
+    if ((marker.best - marker.current) / marker.best > maxGapRatio) {
+      return null;
+    }
+    return {
+      metric: marker.metric,
+      current: marker.current,
+      best: marker.best,
+      gap: marker.best - marker.current
+    };
+  }
+
+  /**
    * Persists the current survival run score as a high score when it beats the stored one.
    * Called when a run ends or is left, never on every score event.
    */
   persistRunHighScore() {
+    // The record in storage moves with the run: keep the one the run started against.
+    this.getRunBestBaseline();
     if (this.mode === GAME_MODES.ENDLESS) {
       this.storageManager.setEndlessHighScore(this.score);
     } else if (this.mode === GAME_MODES.DAILY) {
@@ -438,6 +554,7 @@ export class GameEngine {
     this.flushPendingRunCoins();
     this.storageManager.clearRunSnapshot();
     this.mode = mode;
+    this.runBestBaseline = null;
     // clear() keeps the tilt: a run must not start leaning from the previous run's last reading.
     this.physicsWorld.tiltFactor = 0;
     this.score = 0;
@@ -515,19 +632,74 @@ export class GameEngine {
     this.physicsWorld.rotorSpeedMultiplier = 1.0;
   }
 
+  /**
+   * Unlocks every tier of an achievement family whose threshold the value reaches, lowest
+   * first, and announces the tiers unlocked by this call once (one popup, one announcement).
+   *
+   * What counts depends on the family:
+   * - Per-run record families (combo, avalanche, boss slayer, sharpshooter, survivor waves,
+   *   flux shapes, Boss Rush waves) only count from play: the caller passes the value the
+   *   run just reached, so a record stored before the update never pays anything.
+   * - Cumulative families (`cumulative: true` in the achievement config, e.g. stars) measure
+   *   earned progress, so the caller passes the running total. A veteran whose total already
+   *   passes a tier gets it on the next call, once, as an intended catch-up.
+   * @param {string} baseId - Id of the family's base (bronze) achievement.
+   * @param {number} value - Value reached in play just now, or the running total for a
+   *   cumulative family.
+   */
+  unlockAchievementTiers(baseId, value) {
+    const rank = (tier) => ACHIEVEMENT_TIER_ORDER.indexOf(tier);
+    const tiers = Object.values(this.gameConfig.achievements || {})
+      .filter((spec) => spec.tierOf === baseId)
+      .sort((a, b) => rank(a.tier) - rank(b.tier));
+    const unlockedIds = [];
+    for (const spec of tiers) {
+      if (value >= spec.threshold && this.unlockAchievementSilently(spec.id)) {
+        unlockedIds.push(spec.id);
+      }
+    }
+    this.announceAchievementUnlocks(unlockedIds);
+  }
+
+  /**
+   * Stores an achievement as unlocked (and pays its reward) without announcing it.
+   * @param {string} achievementId - Achievement to unlock.
+   * @returns {boolean} True when it was newly unlocked.
+   */
+  unlockAchievementSilently(achievementId) {
+    return Boolean(this.storageManager.unlockAchievement(achievementId));
+  }
+
+  /**
+   * One popup, one sound and one screen-reader announcement for the achievements unlocked
+   * together.
+   * @param {string[]} achievementIds - Ids just unlocked, lowest tier first.
+   */
+  announceAchievementUnlocks(achievementIds) {
+    if (achievementIds.length === 0) {
+      return;
+    }
+    const names = achievementIds.map((id) => t(`modals.shop.achievements.items.${id}.name`));
+    const rewardCoins = achievementIds.reduce(
+      (sum, id) => sum + (this.gameConfig.achievements?.[id]?.rewardCoins || 0),
+      0
+    );
+    const popupKey = achievementIds.length === 1
+      ? 'gameplay.feedback.achievement.unlocked'
+      : 'gameplay.feedback.achievement.unlockedMany';
+    this.audioManager.playEffect('achievement');
+    this.particleSystem.spawnFloatingText(
+      this.gameConfig.canvas.logicalWidth * MATH_CONSTANTS.HALF,
+      this.gameConfig.canvas.launcherY + this.gameConfig.canvas.anvilPopupOffsetY,
+      t(popupKey, { name: names.join(t('gameplay.feedback.achievement.listSeparator')), coins: rewardCoins }),
+      this.gameConfig.theme.coinPopupColor
+    );
+    this.notifyUI({ unlockedAchievementIds: [...achievementIds] });
+  }
+
   checkAndUnlockAchievement(achievementId) {
-    if (this.storageManager.unlockAchievement(achievementId)) {
-      const spec = this.gameConfig.achievements?.[achievementId];
-      const rewardCoins = spec?.rewardCoins || 0;
-      const achName = t(`modals.shop.achievements.items.${achievementId}.name`);
-      this.audioManager.playEffect('achievement');
-      this.particleSystem.spawnFloatingText(
-        this.gameConfig.canvas.logicalWidth * MATH_CONSTANTS.HALF,
-        this.gameConfig.canvas.launcherY + this.gameConfig.canvas.anvilPopupOffsetY,
-        t('gameplay.feedback.achievement.unlocked', { name: achName, coins: rewardCoins }),
-        this.gameConfig.theme.coinPopupColor
-      );
-      this.notifyUI({ unlockedAchievementId: achievementId });
+    if (this.unlockAchievementSilently(achievementId)) {
+      this.announceAchievementUnlocks([achievementId]);
     }
   }
 
@@ -1284,6 +1456,7 @@ export class GameEngine {
     );
     this.fluxPreviousFamily = this.fluxFamily;
     this.fluxStage = clearedStage + 1;
+    this.unlockAchievementTiers('fluxShapes', this.fluxStage);
     this.notifyUI({ fluxStageCleared: clearedStage });
   }
 
@@ -2745,9 +2918,7 @@ export class GameEngine {
       this.hitStopFrames = juice.hitStopFramesCombo;
     }
     this.storageManager?.recordAchievementProgress?.({ maxCombo: this.combo });
-    if (this.combo >= this.gameConfig.achievements.comboMaster.threshold) {
-      this.checkAndUnlockAchievement('comboMaster');
-    }
+    this.unlockAchievementTiers('comboMaster', this.combo);
     return destroyedCount;
   }
 
@@ -3048,9 +3219,7 @@ export class GameEngine {
     );
     this.bossesDestroyedInRun++;
     this.storageManager?.recordAchievementProgress?.({ bossesDestroyed: this.bossesDestroyedInRun });
-    if (this.bossesDestroyedInRun >= this.gameConfig.achievements.bossSlayer.threshold) {
-      this.checkAndUnlockAchievement('bossSlayer');
-    }
+    this.unlockAchievementTiers('bossSlayer', this.bossesDestroyedInRun);
   }
 
   /**
@@ -3246,9 +3415,7 @@ export class GameEngine {
       this.particleSystem.addScreenShake(juice.avalancheShake, juice.maxShakeOffset);
 
       this.storageManager?.recordAchievementProgress?.({ maxAvalanche: detached.length });
-      if (detached.length >= this.gameConfig.achievements.firstAvalanche.threshold) {
-        this.checkAndUnlockAchievement('firstAvalanche');
-      }
+      this.unlockAchievementTiers('firstAvalanche', detached.length);
 
       if (this.isSurvivalMode() && this.random() < scoring.specialDropChanceEndless) {
         this.grantRandomSpecialBall();
@@ -3575,8 +3742,8 @@ export class GameEngine {
     if (this.mode === GAME_MODES.ENDLESS) {
       this.storageManager?.recordAchievementProgress?.({ endlessWave: this.waveCount });
     }
-    if (this.isSurvivalMode() && this.waveCount >= this.gameConfig.achievements.survivorWave10.threshold) {
-      this.checkAndUnlockAchievement('survivorWave10');
+    if (this.isSurvivalMode()) {
+      this.unlockAchievementTiers('survivorWave10', this.waveCount);
     }
 
     let waveBannerKey = 'gameplay.feedback.wave.incoming';
@@ -3630,9 +3797,7 @@ export class GameEngine {
         this.outOfShotsGraceFrames = 0;
         this.releaseRemainingBoardAsAvalanche();
         this.storageManager?.recordAchievementProgress?.({ shotsRemainingOnClear: this.shotsRemaining });
-        if (this.shotsRemaining >= this.gameConfig.achievements.sharpshooter.threshold) {
-          this.checkAndUnlockAchievement('sharpshooter');
-        }
+        this.unlockAchievementTiers('sharpshooter', this.shotsRemaining);
         const bonus = this.shotsRemaining * this.gameConfig.scoring.remainingShotBonus;
         this.addScore(bonus);
         const stars = this.computeStars(this.score);
@@ -3648,9 +3813,7 @@ export class GameEngine {
         this.storageManager.addCoins(earnedCoins);
         this.flushPendingRunCoins();
         this.storageManager.unlockLevel(Math.min(this.currentLevelId + 1, this.levelCatalog.lastId));
-        if (this.storageManager.getTotalStars() >= this.gameConfig.achievements.starCollector.threshold) {
-          this.checkAndUnlockAchievement('starCollector');
-        }
+        this.unlockAchievementTiers('starCollector', this.storageManager.getTotalStars());
         this.state = GAME_STATES.VICTORY;
         this.persistRunHighScore();
         this.storageManager.clearRunSnapshot();
@@ -3748,6 +3911,7 @@ export class GameEngine {
         );
         this.bossRushWave++;
         this.waveCount = this.bossRushWave;
+        this.unlockAchievementTiers('bossRushWaves', this.bossRushWave);
         this.persistRunHighScore();
         this.spawnBossRushWave();
         this.refreshStaleLauncherColors();
@@ -3834,7 +3998,8 @@ export class GameEngine {
       isNewRecord,
       remainingSpheres,
       maxCombo: this.maxComboInRound,
-      earnedCoins: this.runCoinsEarned
+      earnedCoins: this.runCoinsEarned,
+      nearMiss: this.computeNearMiss()
     };
     this.state = GAME_STATES.GAME_OVER;
     this.persistRunHighScore();

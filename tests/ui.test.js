@@ -31,6 +31,9 @@ import {
   computeStarProgressPct,
   filterFocusTrapCandidates,
   buildLevelIntroText,
+  formatBestRunMarker,
+  formatNearMissText,
+  formatStreakGraceText,
   gameOverReasonKey,
   isBrowserShortcut,
   isDocumentFullscreen,
@@ -53,6 +56,7 @@ import { applyWorldGeometry } from '../src/core/WorldGeometry.js';
 import { StorageManager } from '../src/core/StorageManager.js';
 import { LevelCatalog, LEVEL_FORMATS } from '../src/game/LevelCatalog.js';
 import { t } from '../src/core/I18n.js';
+import { formatAchievementDescription, groupAchievementTiers } from '../src/ui/WorkshopView.js';
 import { syncFluxPerkModal } from '../src/ui/FluxPerkView.js';
 import { parseFluxSeedInput, stripFluxSeedFromUrl } from '../src/game/DailyShare.js';
 
@@ -584,7 +588,7 @@ test('the level grid is labelled by the active chapter tab', () => {
 });
 
 test('a cleared Flux stage is announced once, not again on a refresh with the last extras', () => {
-  assert.match(uiManagerCode, /const \{[^}]*\bunlockedAchievementId\b[^}]*\bfluxStageCleared\b[^}]*\.\.\.persistentExtra \} = extra;/);
+  assert.match(uiManagerCode, /const \{[^}]*\bunlockedAchievementIds\b[^}]*\bfluxStageCleared\b[^}]*\.\.\.persistentExtra \} = extra;/);
   assert.doesNotMatch(uiManagerCode, /extra\.fluxStageCleared/);
 });
 
@@ -1808,11 +1812,15 @@ test('refresh keeps the one-shot extras out of lastExtra', () => {
   const { oneShot, persistentExtra } = splitRefreshExtra({
     fluxPerkChosen: 'blast',
     fluxStageCleared: 3,
-    unlockedAchievementId: 'a1',
+    unlockedAchievementIds: ['a1', 'a2'],
     gameOverReason: 'x'
   });
   assert.deepEqual(persistentExtra, { gameOverReason: 'x' });
-  assert.deepEqual(oneShot, { unlockedAchievementId: 'a1', fluxStageCleared: 3, fluxPerkChosen: 'blast' });
+  assert.deepEqual(oneShot, {
+    unlockedAchievementIds: ['a1', 'a2'],
+    fluxStageCleared: 3,
+    fluxPerkChosen: 'blast'
+  });
 });
 
 test('Flux perk helpers map keys, values and held perks', async () => {
@@ -2289,5 +2297,170 @@ test('hint copy names the 🧲 button, covers every special and tells the truth 
     }
     const codex = data.modals.shop.codex.mechanics.polarity.description;
     assert.doesNotMatch(codex, /attractors repel|attracteurs repoussent/i);
+  }
+});
+
+test('near-miss, best-run marker and streak grace texts are informational and localized', () => {
+  const TODAY_KEY = '2026-11-05';
+  const previous = i18n.currentLocale;
+  try {
+    for (const locale of ['en', 'fr']) {
+      i18n.dictionaries.set(locale, loadJson(`./locales/${locale}.json`));
+      i18n.currentLocale = locale;
+      assert.equal(formatNearMissText(null), '');
+      assert.equal(formatNearMissText({ metric: 'stage', current: 5, best: 5, gap: 0 }), '');
+      assert.equal(formatNearMissText({ metric: 'unknown', gap: 3 }), '');
+      assert.ok(formatNearMissText({ metric: 'stage', gap: 2 }).includes('2'));
+      assert.ok(formatNearMissText({ metric: 'wave', gap: 1 }).includes('1'));
+      assert.ok(formatNearMissText({ metric: 'score', gap: 1200 }).includes(i18n.formatNumber(1200)));
+      assert.notEqual(
+        formatNearMissText({ metric: 'wave', gap: 1 }),
+        formatNearMissText({ metric: 'wave', gap: 2 }).replace('2', '1'),
+        'singular and plural forms differ'
+      );
+      assert.equal(formatBestRunMarker(null), '');
+      assert.equal(formatBestRunMarker({ metric: 'wave', best: 0 }), '');
+      assert.ok(formatBestRunMarker({ metric: 'stage', best: 12 }).includes('12'));
+      assert.equal(formatBestRunMarker({ metric: 'score', best: 5000 }), '', 'score modes already show it');
+      assert.equal(formatStreakGraceText(0, { available: true }, TODAY_KEY), '');
+      assert.equal(formatStreakGraceText(3, undefined, TODAY_KEY), '');
+      const available = formatStreakGraceText(3, { available: true, usedOn: null }, TODAY_KEY);
+      const usedToday = formatStreakGraceText(3, { available: false, usedOn: TODAY_KEY }, TODAY_KEY);
+      const returning = formatStreakGraceText(
+        3,
+        { available: false, usedOn: '2026-11-01', daysUntilAvailable: 3 },
+        TODAY_KEY
+      );
+      assert.notEqual(available, '');
+      assert.notEqual(usedToday, '');
+      assert.notEqual(usedToday, available);
+      assert.ok(returning.includes('3'), 'says when the grace comes back');
+      assert.notEqual(returning, usedToday, 'a grace used on an earlier day is not "used" news today');
+      assert.equal(formatStreakGraceText(3, { available: false, usedOn: null, daysUntilAvailable: 0 }, TODAY_KEY), '');
+    }
+    i18n.currentLocale = 'en';
+    assert.equal(formatNearMissText({ metric: 'stage', gap: 2 }), '2 shapes short of your best');
+    assert.equal(formatNearMissText({ metric: 'score', gap: 1200 }), '1,200 points short of your best');
+  } finally {
+    i18n.currentLocale = previous;
+  }
+});
+
+test('the near-miss line sits with the stats, away from the continue and coin buttons', () => {
+  const modal = elementMarkup(indexHtml, 'modal-gameover');
+  const nearMissAt = modal.indexOf('id="gameover-near-miss"');
+  const stageAt = modal.indexOf('id="gameover-stage"');
+  const actionsStart = modal.indexOf('id="btn-continue-gameover"');
+  assert.ok(nearMissAt > stageAt, 'follows the stage summary');
+  assert.ok(nearMissAt < actionsStart, 'comes before every action button');
+  const continueButton = elementMarkup(modal, 'btn-continue-gameover');
+  assert.doesNotMatch(continueButton, /near-miss/);
+  assert.match(uiManagerCode, /formatNearMissText\(summary\?\.nearMiss\)/);
+  assert.doesNotMatch(uiManagerCode, /continueShots[^;]*nearMiss/);
+  assert.match(
+    uiManagerCode,
+    /t\('hud\.announcer\.round\.withNearMiss', \{ result: roundResult, nearMiss: nearMissText \}\)/,
+    'the near miss is announced with the round result'
+  );
+});
+
+test('the HUD best-run marker is wired once, in the badges row, without overflowing', () => {
+  assert.match(indexHtml, /id="hud-best-run" class="hud-badge best-run hidden"/);
+  assert.match(uiManagerCode, /formatBestRunMarker\(engine\.getRunBestMarker\?\.\(\)\)/);
+  assert.doesNotMatch(uiManagerCode, /\$\{bestRunText\}/, 'the phone compact line does not repeat it');
+  const css = readFileSync('./styles/main.css', 'utf8');
+  assert.match(css, /\.hud-badge\.best-run \{[^}]*overflow: hidden;[^}]*text-overflow: ellipsis;/);
+  assert.doesNotMatch(css, /\.hud-badge\.best-run,/, 'the badge stays visible in the phone HUD');
+});
+
+test('achievements group into tier families and tiers read the family record', () => {
+  const groups = groupAchievementTiers(Object.entries(gameConfig.achievements));
+  const avalanche = groups.find((group) => group.familyId === 'firstAvalanche');
+  assert.deepEqual(avalanche.tiers.map((tier) => tier.tier), ['bronze', 'silver', 'gold']);
+  assert.equal(avalanche.tiers[0].id, 'firstAvalanche', 'the original id is the bronze tier');
+  const total = groups.reduce((sum, group) => sum + group.tiers.length, 0);
+  assert.equal(total, Object.keys(gameConfig.achievements).length, 'every achievement is in one family');
+  const shuffled = groupAchievementTiers([
+    ['xGold', { tierOf: 'x', tier: 'gold' }],
+    ['solo', {}],
+    ['x', { tierOf: 'x', tier: 'bronze' }]
+  ]);
+  assert.deepEqual(shuffled.map((group) => group.familyId), ['x', 'solo']);
+  assert.deepEqual(shuffled[0].tiers.map((tier) => tier.id), ['x', 'xGold']);
+  assert.deepEqual(
+    computeAchievementProgress('comboMasterSilver', gameConfig.achievements.comboMasterSilver, false, { maxCombo: 5 }),
+    { current: 5, target: gameConfig.achievements.comboMasterSilver.threshold, pct: 71 }
+  );
+  assert.equal(
+    computeAchievementProgress('fluxShapesSilver', gameConfig.achievements.fluxShapesSilver, false, { fluxStage: 7 }).current,
+    7
+  );
+  assert.equal(
+    computeAchievementProgress('bossRushWaves', gameConfig.achievements.bossRushWaves, false, { bossRushWave: 2 }).current,
+    2
+  );
+});
+
+test('every achievement id has an English and French name and description, and tier labels exist', () => {
+  for (const locale of ['en', 'fr']) {
+    const data = loadJson(`./locales/${locale}.json`);
+    const { items, tier } = data.modals.shop.achievements;
+    for (const id of Object.keys(gameConfig.achievements)) {
+      assert.ok(items[id]?.name && items[id]?.description, `${locale}: ${id} has a name and description`);
+    }
+    assert.deepEqual(Object.keys(tier), ['bronze', 'silver', 'gold']);
+  }
+});
+
+const workshopViewCode = readFileSync('./src/ui/WorkshopView.js', 'utf8');
+
+test('every achievement description takes its goal from {{target}} and holds no other number', () => {
+  for (const locale of ['en', 'fr']) {
+    const { items } = loadJson(`./locales/${locale}.json`).modals.shop.achievements;
+    for (const id of Object.keys(gameConfig.achievements)) {
+      const { description } = items[id];
+      assert.ok(description.includes('{{target}}'), `${locale}: ${id} uses {{target}}`);
+      assert.doesNotMatch(description.replace('{{target}}', ''), /\d/, `${locale}: ${id} has no literal number`);
+    }
+  }
+});
+
+test('achievement descriptions render the configured threshold', () => {
+  const previous = i18n.currentLocale;
+  try {
+    i18n.dictionaries.set('en', loadJson('./locales/en.json'));
+    i18n.currentLocale = 'en';
+    const spec = gameConfig.achievements.comboMasterSilver;
+    assert.equal(
+      formatAchievementDescription('comboMasterSilver', spec),
+      `Reach a x${spec.threshold} or higher Combo multiplier.`
+    );
+    assert.match(
+      formatAchievementDescription('bossSlayerSilver', gameConfig.achievements.bossSlayerSilver),
+      /in a single run/
+    );
+  } finally {
+    i18n.currentLocale = previous;
+  }
+  assert.match(workshopViewCode, /formatAchievementDescription\(shown\.id, shown\.spec\)/);
+});
+
+test('a locked tier whose record is already past it asks for a new run, and the tier list needs 2+ tiers', () => {
+  assert.match(workshopViewCode, /const isRecordPastTarget = !isComplete && !shown\.spec\.cumulative && current >= target;/);
+  assert.match(workshopViewCode, /t\('modals\.shop\.achievements\.reachAgain'\)/);
+  assert.match(workshopViewCode, /if \(tiers\.length > 1\) \{\s*tierRow = document\.createElement\('div'\);/);
+  for (const locale of ['en', 'fr']) {
+    assert.ok(loadJson(`./locales/${locale}.json`).modals.shop.achievements.reachAgain);
+  }
+  assert.equal(loadJson('./locales/fr.json').modals.shop.achievements.reachAgain, 'À refaire en une partie');
+});
+
+test('tier colors are defined in every contrast theme', () => {
+  const css = readFileSync('./styles/main.css', 'utf8');
+  const highContrast = css.slice(css.indexOf(':root.high-contrast {'));
+  const moreContrast = css.slice(css.indexOf('@media (prefers-contrast: more)'));
+  for (const token of ['--tier-bronze', '--tier-silver']) {
+    assert.match(highContrast.slice(0, highContrast.indexOf('}')), new RegExp(token));
+    assert.match(moreContrast.slice(0, moreContrast.indexOf('\n  }')), new RegExp(token));
   }
 });

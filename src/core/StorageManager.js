@@ -31,6 +31,7 @@ export class StorageManager {
     this.defaultsConfig = null;
     this.upgradesConfig = null;
     this.achievementsConfig = null;
+    this.dailyConfig = null;
     this.maxCampaignLevel = null;
     this.memoryFallback = new Map();
     this.upgradesCache = null;
@@ -45,6 +46,7 @@ export class StorageManager {
     this.defaultsConfig = gameConfig.defaults;
     this.upgradesConfig = gameConfig.upgrades;
     this.achievementsConfig = gameConfig.achievements || {};
+    this.dailyConfig = gameConfig.daily || {};
     this.maxCampaignLevel = countCampaignLevels(levelsConfig, campaignConfig);
     this.upgradesCache = null;
     this.bindCrossTabSync();
@@ -259,15 +261,6 @@ export class StorageManager {
     );
   }
 
-  static isPreviousUtcDay(previousDateKey, currentDateKey) {
-    const prevMs = StorageManager.parseUtcDateKeyMs(previousDateKey);
-    const currMs = StorageManager.parseUtcDateKeyMs(currentDateKey);
-    if (!Number.isFinite(prevMs) || !Number.isFinite(currMs)) {
-      return false;
-    }
-    return currMs - prevMs === MS_PER_UTC_DAY;
-  }
-
   getDailyStreak(referenceDateKey = SeededRandom.getTodayDateKey()) {
     const streakKey = this.storageConfig?.keys?.dailyStreak;
     const dateKeyProp = this.storageConfig?.keys?.dailyStreakDate;
@@ -280,13 +273,61 @@ export class StorageManager {
     if (storedStreak <= 0 || !storedDate) {
       return 0;
     }
-    if (
-      storedDate === referenceDateKey
-      || StorageManager.isPreviousUtcDay(storedDate, referenceDateKey)
-    ) {
-      return storedStreak;
+    return this.resolveDailyStreakContinuity(storedDate, referenceDateKey).alive ? storedStreak : 0;
+  }
+
+  /** Whole UTC days from one date key to another, or NaN when either key is invalid. */
+  static utcDaysBetween(fromDateKey, toDateKey) {
+    const fromMs = StorageManager.parseUtcDateKeyMs(fromDateKey);
+    const toMs = StorageManager.parseUtcDateKeyMs(toDateKey);
+    if (!Number.isFinite(fromMs) || !Number.isFinite(toMs)) {
+      return Number.NaN;
     }
-    return 0;
+    return Math.round((toMs - fromMs) / MS_PER_UTC_DAY);
+  }
+
+  /**
+   * Whether a missed day can be forgiven on referenceDateKey: grace is configured and
+   * has not been used within the configured window.
+   * @returns {{available: boolean, usedOn: string|null, daysUntilAvailable: number}}
+   *   daysUntilAvailable is 0 when the grace is available or switched off.
+   */
+  getDailyStreakGrace(referenceDateKey = SeededRandom.getTodayDateKey()) {
+    const graceKey = this.storageConfig?.keys?.dailyStreakGraceDate;
+    const stored = graceKey ? this.safeGetItem(graceKey) : null;
+    const usedOn = Number.isFinite(StorageManager.parseUtcDateKeyMs(stored)) ? stored : null;
+    const graceDays = Math.floor(StorageManager.toNonNegativeNumber(this.dailyConfig?.streakGraceDays));
+    const windowDays = Math.floor(StorageManager.toNonNegativeNumber(this.dailyConfig?.streakGraceWindowDays));
+    if (graceDays <= 0) {
+      return { available: false, usedOn, daysUntilAvailable: 0 };
+    }
+    if (!usedOn) {
+      return { available: true, usedOn: null, daysUntilAvailable: 0 };
+    }
+    const sinceUse = StorageManager.utcDaysBetween(usedOn, referenceDateKey);
+    const isAvailable = !(sinceUse < windowDays);
+    return { available: isAvailable, usedOn, daysUntilAvailable: isAvailable ? 0 : windowDays - sinceUse };
+  }
+
+  /**
+   * How the streak stands from lastDateKey to referenceDateKey.
+   * @returns {{alive: boolean, usesGrace: boolean}} usesGrace is true when only the
+   *   forgiveness of missed days keeps it alive.
+   */
+  resolveDailyStreakContinuity(lastDateKey, referenceDateKey) {
+    const gap = StorageManager.utcDaysBetween(lastDateKey, referenceDateKey);
+    if (!Number.isFinite(gap) || gap < 0) {
+      return { alive: false, usesGrace: false };
+    }
+    if (gap <= 1) {
+      return { alive: true, usesGrace: false };
+    }
+    const graceDays = Math.floor(StorageManager.toNonNegativeNumber(this.dailyConfig?.streakGraceDays));
+    const missedDays = gap - 1;
+    if (missedDays <= graceDays && this.getDailyStreakGrace(referenceDateKey).available) {
+      return { alive: true, usesGrace: true };
+    }
+    return { alive: false, usesGrace: false };
   }
 
   computeDailyStreakBonus(streak, streakOptions = null) {
@@ -310,9 +351,14 @@ export class StorageManager {
     const prevDate = (streakDateKey && this.safeGetItem(streakDateKey))
       || this.safeGetItem(this.storageConfig.keys.dailyLastPlayedDate);
     const prevStreak = streakKey ? this.readNonNegativeInt(streakKey) : 0;
-    const nextStreak = prevDate && StorageManager.isPreviousUtcDay(prevDate, dateKey)
-      ? Math.max(1, prevStreak) + 1
-      : 1;
+    const continuity = prevDate
+      ? this.resolveDailyStreakContinuity(prevDate, dateKey)
+      : { alive: false, usesGrace: false };
+    const nextStreak = continuity.alive ? Math.max(1, prevStreak) + 1 : 1;
+    const graceKey = this.storageConfig?.keys?.dailyStreakGraceDate;
+    if (continuity.usesGrace && graceKey) {
+      this.safeSetItem(graceKey, dateKey);
+    }
 
     this.safeSetItem(this.storageConfig.keys.dailyLastPlayedDate, dateKey);
     if (streakDateKey) {

@@ -23,6 +23,44 @@ import { filterFocusTrapCandidates } from './UIManager.js';
 const FULL_PERCENT = 100;
 export { FULL_PERCENT };
 
+/** Achievement tiers, lowest first. */
+export const ACHIEVEMENT_TIERS = Object.freeze(['bronze', 'silver', 'gold']);
+
+/**
+ * Groups achievement entries by family (`tierOf`, or the id itself when untiered) and
+ * orders each family by tier. Families keep the order of their first appearance.
+ * @param {Array<[string, object]>} entries - Achievement config entries.
+ * @returns {Array<{ familyId: string, tiers: Array<{ id: string, spec: object, tier: string }> }>}
+ */
+export function groupAchievementTiers(entries) {
+  const families = new Map();
+  for (const [id, spec] of entries) {
+    const familyId = typeof spec?.tierOf === 'string' && spec.tierOf ? spec.tierOf : id;
+    const tier = ACHIEVEMENT_TIERS.includes(spec?.tier) ? spec.tier : ACHIEVEMENT_TIERS[0];
+    if (!families.has(familyId)) {
+      families.set(familyId, { familyId, tiers: [] });
+    }
+    families.get(familyId).tiers.push({ id, spec, tier });
+  }
+  for (const family of families.values()) {
+    family.tiers.sort((a, b) => ACHIEVEMENT_TIERS.indexOf(a.tier) - ACHIEVEMENT_TIERS.indexOf(b.tier));
+  }
+  return [...families.values()];
+}
+
+/**
+ * Description of an achievement with its goal filled in from the config, so the number
+ * the player reads is always the one the engine unlocks on.
+ * @param {string} achId - Achievement id.
+ * @param {{ threshold?: number }} achSpec - Achievement config entry.
+ * @returns {string}
+ */
+export function formatAchievementDescription(achId, achSpec) {
+  return t(`modals.shop.achievements.items.${achId}.description`, {
+    target: formatNumber(achSpec?.threshold || 1)
+  });
+}
+
 /** Workshop tab names. */
 export const SHOP_TABS = Object.freeze({
   UPGRADES: 'upgrades',
@@ -41,25 +79,31 @@ export const SHOP_TABS = Object.freeze({
  * @returns {{ current: number, target: number, pct: number }}
  */
 export function computeAchievementProgress(achId, achSpec, isUnlocked, progressContext = {}) {
+  // A higher tier reads the same record as its family's base achievement.
+  const familyId = typeof achSpec?.tierOf === 'string' && achSpec.tierOf ? achSpec.tierOf : achId;
   const threshold = Number.isFinite(achSpec?.threshold) && achSpec.threshold > 0 ? achSpec.threshold : null;
   let target = threshold ?? 1;
   let rawCurrent = 0;
-  if (achId === 'comboMaster' || achSpec?.minChain) {
+  if (familyId === 'comboMaster' || achSpec?.minChain) {
     target = achSpec?.minChain ?? threshold ?? 1;
     rawCurrent = progressContext.maxCombo || 0;
-  } else if (achId === 'starCollector' || achSpec?.targetStars) {
+  } else if (familyId === 'starCollector' || achSpec?.targetStars) {
     target = achSpec?.targetStars ?? threshold ?? 1;
     rawCurrent = progressContext.totalStars || 0;
-  } else if (achId === 'survivorWave10' || achId === 'endlessSurvivor' || achSpec?.targetWave) {
+  } else if (familyId === 'survivorWave10' || familyId === 'endlessSurvivor' || achSpec?.targetWave) {
     target = achSpec?.targetWave ?? threshold ?? 1;
     rawCurrent = progressContext.endlessWave || 0;
-  } else if (achId === 'bossSlayer') {
+  } else if (familyId === 'bossSlayer') {
     rawCurrent = progressContext.bossesDestroyed || 0;
-  } else if (achId === 'firstAvalanche') {
+  } else if (familyId === 'firstAvalanche') {
     rawCurrent = progressContext.maxAvalanche || 0;
-  } else if (achId === 'sharpshooter') {
+  } else if (familyId === 'sharpshooter') {
     rawCurrent = progressContext.shotsRemainingOnClear || 0;
-  } else if (achId === 'campaignComplete') {
+  } else if (familyId === 'fluxShapes') {
+    rawCurrent = progressContext.fluxStage || 0;
+  } else if (familyId === 'bossRushWaves') {
+    rawCurrent = progressContext.bossRushWave || 0;
+  } else if (familyId === 'campaignComplete') {
     target = Math.max(1, progressContext.campaignLevelCount || 1);
     rawCurrent = Math.max(0, (progressContext.unlockedLevel || 1) - 1);
   }
@@ -373,31 +417,63 @@ export function renderWorkshopContents() {
         this.engine.bossesDestroyedInRun || 0
       ),
       shotsRemainingOnClear: persistedRecords.shotsRemainingOnClear || 0,
+      fluxStage: this.storageManager.getFluxBestStage?.() || 0,
+      bossRushWave: this.storageManager.getBossRushBestWave?.() || 0,
       unlockedLevel: this.storageManager.getUnlockedLevel(),
       campaignLevelCount: this.engine.levelCatalog.count
     };
     let unlockedCount = 0;
 
-    for (const [achId, achSpec] of achEntries) {
-      const isUnlocked = Boolean(unlockedMap[achId]);
-      if (isUnlocked) {
-        unlockedCount++;
-      }
-      const { current, target, pct } = computeAchievementProgress(achId, achSpec, isUnlocked, progressContext);
+    for (const family of groupAchievementTiers(achEntries)) {
+      const { tiers } = family;
+      const unlockedTiers = tiers.filter(({ id }) => Boolean(unlockedMap[id]));
+      unlockedCount += unlockedTiers.length;
+      const nextTier = tiers.find(({ id }) => !unlockedMap[id]) || null;
+      const shown = nextTier || tiers[tiers.length - 1];
+      const isComplete = nextTier === null;
+      const baseTier = tiers[0];
+      const progress = computeAchievementProgress(shown.id, shown.spec, isComplete, progressContext);
+      const { current, target } = progress;
+      // A per-run record already past a locked tier was set before the tier existed (or
+      // before it was reachable): it does not count, so say so instead of showing a full bar.
+      // Cumulative families (stars) keep their bar: the next victory pays them.
+      const isRecordPastTarget = !isComplete && !shown.spec.cumulative && current >= target;
+      const pct = isRecordPastTarget ? 0 : progress.pct;
       const card = document.createElement('div');
-      card.className = `level-card ${isUnlocked ? 'unlocked' : 'locked'}`;
+      card.className = `level-card achievement-family ${isComplete ? 'unlocked' : 'locked'}`;
+      card.dataset.family = family.familyId;
 
       const header = document.createElement('div');
       header.className = 'level-card-header';
-      header.textContent = t('modals.shop.achievements.reward', { coins: achSpec.rewardCoins });
+      header.textContent = t('modals.shop.achievements.reward', { coins: shown.spec.rewardCoins });
 
       const title = document.createElement('div');
       title.className = 'level-card-title';
-      title.textContent = t(`modals.shop.achievements.items.${achId}.name`);
+      title.textContent = t(`modals.shop.achievements.items.${baseTier.id}.name`);
+
+      let tierRow = null;
+      if (tiers.length > 1) {
+        tierRow = document.createElement('div');
+        tierRow.className = 'achievement-tiers';
+        tierRow.setAttribute('role', 'list');
+        for (const { id, spec, tier } of tiers) {
+          const isTierUnlocked = Boolean(unlockedMap[id]);
+          const badge = document.createElement('span');
+          badge.className = `achievement-tier-badge tier-${tier} ${isTierUnlocked ? 'is-unlocked' : 'is-locked'}`;
+          badge.setAttribute('role', 'listitem');
+          badge.textContent = t(`modals.shop.achievements.tier.${tier}`);
+          badge.title = t(
+            isTierUnlocked ? 'modals.shop.achievements.tierUnlockedAria' : 'modals.shop.achievements.tierLockedAria',
+            { tier: t(`modals.shop.achievements.tier.${tier}`), target: formatNumber(spec.threshold || 1) }
+          );
+          badge.setAttribute('aria-label', badge.title);
+          tierRow.appendChild(badge);
+        }
+      }
 
       const desc = document.createElement('div');
       desc.className = 'level-card-desc';
-      desc.textContent = t(`modals.shop.achievements.items.${achId}.description`);
+      desc.textContent = formatAchievementDescription(shown.id, shown.spec);
 
       const progressTrack = document.createElement('div');
       progressTrack.className = 'achievement-progress-track';
@@ -410,22 +486,28 @@ export function renderWorkshopContents() {
       const footer = document.createElement('div');
       footer.className = 'level-card-footer';
       const statusEl = document.createElement('span');
-      statusEl.className = isUnlocked ? 'achievement-unlocked-badge' : 'level-locked-badge';
-      statusEl.textContent = isUnlocked
+      statusEl.className = isComplete ? 'achievement-unlocked-badge' : 'level-locked-badge';
+      statusEl.textContent = isComplete
         ? t('modals.shop.achievements.unlockedBadge')
         : t('modals.shop.achievements.lockedBadge');
       footer.appendChild(statusEl);
-      if (!isUnlocked) {
+      if (!isComplete) {
         const progressText = document.createElement('span');
         progressText.className = 'achievement-progress-text';
-        progressText.textContent = t('modals.shop.achievements.progress', {
-          current: formatNumber(current),
-          target: formatNumber(target)
-        });
+        progressText.textContent = isRecordPastTarget
+          ? t('modals.shop.achievements.reachAgain')
+          : t('modals.shop.achievements.progress', {
+            current: formatNumber(current),
+            target: formatNumber(target)
+          });
         footer.appendChild(progressText);
       }
 
-      card.append(header, title, desc, progressTrack, footer);
+      card.append(header, title);
+      if (tierRow) {
+        card.appendChild(tierRow);
+      }
+      card.append(desc, progressTrack, footer);
       achGrid.appendChild(card);
     }
 
