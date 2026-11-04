@@ -4,6 +4,25 @@ All notable changes to **MagnaShot** are documented in this file.
 
 ## [Unreleased]
 
+### Fixed
+- **Boss Rush Freeze on Overcharge Strike (`GameEngine.addOvercharge`, `PhysicsWorld.stepDroppingBalls`)**: An Overcharge strike that destroyed the Titan from inside a physics step (falling balls reaching the collector bin or a singularity, or an anvil crush) respawned the wave while the dropping-ball loop was still running, which threw and stopped the game loop. The wave change is now deferred until the step ends, `PhysicsWorld` stops iterating once the world is cleared, and the new wave refreshes its discovery hints.
+- **Shared Flux Links Keep Saved Runs (`main.js`, `UIManager.requestDestructiveAction`)**: Opening a `?flux=` link while another run was saved erased that run without asking. The saved run is now restored and a confirmation is required before the shared seed replaces it.
+- **Menu and Dialogs (`UIManager.handleKeyDown`, `closeOverlayModal`, `dismissConfirm`)**: Gameplay shortcuts are ignored while the menu is open, Escape closes a dialog before the menu behind it, and closing a dialog over the menu no longer resumes the run.
+- **Service Worker Cache Cleanup (`sw.js`)**: Activation now deletes only this game's own caches instead of every cache on the shared origin, and runtime entries are stored without their query string.
+- **Fullscreen in the Installed App (`UIManager.setupFullscreenControl`)**: The fullscreen controls are hidden when the app already runs in `display-mode: fullscreen`.
+- **Animation Speed (`GameEngine`, `UIManager.updateAnimSpeedButton`)**: Slower animation speeds no longer lengthen special-ball slow motion, so Blitz timing is the same at every speed, and the speed label follows the locale number format (`1,5x` in French).
+- **Run Snapshot After Falling Balls (`GameEngine.update`)**: The run is saved again once the last falling ball is gone, so collector and singularity rewards survive a reload.
+- **Storage Guards (`StorageManager`)**: Non-finite coin amounts are ignored instead of resetting the balance, and the Endless high score can no longer read back negative.
+- **Menu Star Progress for Screen Readers (`UIManager.syncDrawerStats`)**: The star glyphs are hidden from assistive technology and the star count is announced instead.
+
+### Changed
+- **Effect Caps (`ParticleSystem`, `configs/game.json`)**: Particles, shattering spheres and explosion puffs are capped (`juice.particles.maxParticles`, `maxShatteringBalls`, `maxExplosions`) to keep large avalanches smooth on mobile, and pooled effects reuse their crack and ray arrays.
+- **Renderer (`Renderer.js`)**: Cached the slow-motion vignette and shatter core gradients, removed per-frame allocations, and dropped literal fallbacks that disagreed with the configuration.
+- **Security and CI (`index.html`, `.github/workflows/ci.yml`, `.github/dependabot.yml`)**: Removed `'unsafe-inline'` from the style CSP, pinned GitHub Actions to commit SHAs with Dependabot updates, and added an `npm audit` step.
+
+### Removed
+- Unused configuration keys (`bossRush.overchargeShieldDamage`, `defaults.reducedMotionMediaQuery`, `defaults.drawerMediaQuery`), the dead drawer breakpoint branch, the `resolveVictoryNextAction` wrapper, `MATH_CONSTANTS.DEG_TO_RAD` and the unused `.pointer-only` selector.
+
 ## [1.12.0] - 2026-11-04
 
 ### Added
@@ -17,7 +36,7 @@ All notable changes to **MagnaShot** are documented in this file.
 ## [1.10.1] - 2026-11-04
 
 ### Fixed
-- **Drawer Star Progress Text (`UIManager.syncDrawerStats`)**: Built `#drawer-star-progress` from `#hud-star-glyphs` and `#hud-star-next` instead of `#hud-star-progress.textContent` so the `.visually-hidden` `#hud-star-count` screen-reader string is never concatenated onto the visible star glyphs (`★☆☆ • Prochain : 6 900`).
+- **Drawer Star Progress Text (`UIManager.syncDrawerStats`)**: Built `#drawer-star-progress` from `#hud-star-glyphs` and `#hud-star-next` instead of `#hud-star-progress.textContent` so the `.visually-hidden` `#hud-star-count` screen-reader string is never concatenated onto the visible star glyphs (`★☆☆ • Next: 6,900`).
 - **Desktop HUD Column Layout & Drawer Stats Scoping (`styles/main.css`)**: Placed `#btn-menu` (`☰`) and `#hud-mode-banner` side by side on the top row of the desktop HUD card while keeping equal `50%` columns for the 4 stat boxes and `align-self: start` on `.hud-bar`, scoped `.drawer-stats` to portrait phones (`max-width: 680px`) where the compact HUD hides those stats, hid `.hud-badges-row` when empty, and balanced mode button wrapping (`text-wrap: balance`, `--drawer-width: min(340px, 86vw)`).
 
 ## [1.10.0] - 2026-11-04
@@ -203,7 +222,7 @@ All notable changes to **MagnaShot** are documented in this file.
 - **CI Permissions**: Added explicit `permissions: contents: read` and job `timeout-minutes` limits to `.github/workflows/ci.yml`.
 
 ### Fixed
-- **Local Lint with Agent Worktrees**: `eslint.config.js`, `tests/typography.test.js` and `.gitignore` now ignore local agent directories (`.claude/`, `.codex/`, `.gemini/`, `.agent/`) so `npm run lint` no longer lints nested worktrees without browser globals.
+- **Local Lint with Nested Worktrees**: `eslint.config.js`, `tests/typography.test.js` and `.gitignore` now ignore local tool directories so `npm run lint` no longer lints nested worktrees without browser globals.
 
 ### Changed
 - **Repository Guards and Config Uniformity**: Expanded the `t()` literal key test in `tests/ui.test.js` to scan every `.js` file under `src/` alongside `index.html`, added `"rocket": 0` to `specialInventory` on authored levels 1 to 20 in `configs/levels.json` to match levels 21 to 24, and updated `README.md` and `README.fr.md`.
