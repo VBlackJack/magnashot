@@ -486,9 +486,7 @@ export class StorageManager {
   }
 
   getEndlessHighScore() {
-    const raw = this.safeGetItem(this.storageConfig.keys.endlessHighScore);
-    const parsed = Number.parseInt(raw, 10);
-    return Number.isFinite(parsed) ? parsed : 0;
+    return this.readNonNegativeInt(this.storageConfig.keys.endlessHighScore);
   }
 
   setEndlessHighScore(score) {
@@ -635,10 +633,16 @@ export class StorageManager {
   }
 
   setCoins(amount) {
+    if (!Number.isFinite(amount)) {
+      return;
+    }
     this.safeSetItem(this.storageConfig.keys.coins, Math.max(0, Math.floor(amount)));
   }
 
   addCoins(delta) {
+    if (!Number.isFinite(delta)) {
+      return this.getCoins();
+    }
     const updated = this.getCoins() + delta;
     this.setCoins(updated);
     return updated;

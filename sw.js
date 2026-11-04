@@ -14,13 +14,16 @@
  * limitations under the License.
  */
 
-const APP_VERSION = '1.12.0';
+const APP_VERSION = '1.12.1';
 const CACHE_NAME = `magnashot-cache-v${APP_VERSION}`;
 
 // The service worker cannot read configs/*.json before it has a cache, so its
 // tuning lives here as named constants.
 const NETWORK_TIMEOUT_MS = 4000;
 const NAVIGATION_FALLBACK_URL = './index.html';
+// Only caches created by this app (current and legacy names) are cleaned up: the
+// origin is shared with other apps whose Cache Storage must stay untouched.
+const OWN_CACHE_PREFIXES = Object.freeze(['magnashot-cache-', 'flux-spheres-cache-', 'magnet-balls-cache-']);
 const CACHE_MATCH_OPTIONS = Object.freeze({ ignoreSearch: true });
 const HTTP_STATUS_OK = 200;
 // The host lets browsers reuse files for minutes without asking (GitHub Pages sends
@@ -94,7 +97,7 @@ self.addEventListener('activate', (event) => {
     caches.keys().then((keys) =>
       Promise.all(
         keys
-          .filter((key) => key !== CACHE_NAME)
+          .filter((key) => key !== CACHE_NAME && OWN_CACHE_PREFIXES.some((prefix) => key.startsWith(prefix)))
           .map((key) => caches.delete(key))
       )
     )
@@ -157,7 +160,10 @@ self.addEventListener('fetch', (event) => {
         return undefined;
       }
       const copy = response.clone();
-      return caches.open(CACHE_NAME).then((cache) => cache.put(request, copy));
+      // Reads use ignoreSearch, so store one entry per path instead of one per query string.
+      const cacheKey = new URL(request.url);
+      cacheKey.search = '';
+      return caches.open(CACHE_NAME).then((cache) => cache.put(cacheKey.href, copy));
     })
     .catch(() => undefined);
   event.waitUntil(cacheUpdate);

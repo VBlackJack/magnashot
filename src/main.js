@@ -15,12 +15,12 @@
  */
 
 import { configRegistry } from './core/ConfigRegistry.js';
-import { i18n, resolveInitialLocale } from './core/I18n.js';
+import { i18n, t, resolveInitialLocale } from './core/I18n.js';
 import { StorageManager } from './core/StorageManager.js';
 import { AudioManager } from './core/AudioManager.js';
 import { Renderer } from './game/Renderer.js';
 import { GameEngine } from './game/GameEngine.js';
-import { UIManager } from './ui/UIManager.js';
+import { UIManager, isSharedFluxOverSavedRun } from './ui/UIManager.js';
 import { createGameLoop } from './game/GameLoop.js';
 import { readFluxSeedFromSearch, stripFluxSeedFromUrl } from './game/DailyShare.js';
 import { GAME_MODES } from './core/Constants.js';
@@ -112,12 +112,22 @@ class Application {
       const sharedFluxSeed = readFluxSeedFromSearch(window.location?.search, fluxConfig.seed);
       const savedSnapshot = storageManager.loadRunSnapshot();
       const canRestoreSaved = !sharedFluxSeed || savedSnapshot?.engine?.fluxSeed === sharedFluxSeed;
-      if (!canRestoreSaved || !engine.restoreSavedRun()) {
+      if (isSharedFluxOverSavedRun(sharedFluxSeed, savedSnapshot) && engine.restoreSavedRun()) {
+        // A shared link must not silently erase a saved run: the player confirms first.
+        uiManager.requestDestructiveAction(
+          () => {
+            uiManager.hideAllModals();
+            engine.startFluxRun(sharedFluxSeed);
+          },
+          () => t('app.nav.button.flux'),
+          { always: true }
+        );
+      } else if (!canRestoreSaved || !engine.restoreSavedRun()) {
         if (sharedFluxSeed) {
           engine.startFluxRun(sharedFluxSeed);
         } else {
           engine.startCampaignLevel(storageManager.getUnlockedLevel());
-      }
+        }
       }
 
       const gameLoop = createGameLoop({

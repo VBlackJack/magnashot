@@ -24,6 +24,9 @@ import { applyWorldGeometry } from './WorldGeometry.js';
 const POSITIVE_SETTINGS = Object.freeze([
   ['game', 'scoring.overchargeMax'],
   ['game', 'juice.slowMotion.timeScale'],
+  ['game', 'juice.particles.maxParticles'],
+  ['game', 'juice.particles.maxShatteringBalls'],
+  ['game', 'juice.particles.maxExplosions'],
   ['physics', 'simulation.fixedStepMs'],
   ['physics', 'simulation.maxAccumulatedMs']
 ]);

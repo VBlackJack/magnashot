@@ -23,6 +23,7 @@ import { StorageManager } from '../src/core/StorageManager.js';
 import { AudioManager } from '../src/core/AudioManager.js';
 import { GameEngine } from '../src/game/GameEngine.js';
 import { Renderer, buildResolutionQuery } from '../src/game/Renderer.js';
+import { ParticleSystem } from '../src/entities/ParticleSystem.js';
 import { createGameLoop } from '../src/game/GameLoop.js';
 import { GAME_STATES } from '../src/core/Constants.js';
 import { applyWorldGeometry } from '../src/core/WorldGeometry.js';
@@ -891,4 +892,73 @@ test('Animation speed setting scales explosion, shattering sphere, shockwave, an
   assert.equal(engine.specialSlowMoFrames, 10);
   engine.update();
   assert.equal(engine.specialSlowMoFrames, 8, 'specialSlowMoFrames decrements by animationSpeed (2) per step');
+});
+
+test('particle spawns never exceed the configured caps and the core explosion is kept', () => {
+  const caps = gameConfig.juice.particles;
+  const system = new ParticleSystem(gameConfig.juice);
+  const overshoot = 5;
+  for (let i = 0; i < caps.maxParticles * overshoot; i++) {
+    system.spawnBurst(10, 10, '#ffffff', 40, 3);
+  }
+  assert.equal(system.particles.length, caps.maxParticles);
+
+  for (let i = 0; i < caps.maxShatteringBalls * overshoot; i++) {
+    system.spawnShatterBall({ x: 5, y: 5, radius: 12, colorId: 'red' }, '#ff0000');
+  }
+  assert.equal(system.shatteringBalls.length, caps.maxShatteringBalls);
+
+  for (let i = 0; i < caps.maxExplosions * overshoot; i++) {
+    system.spawnExplosion(20, 20, 50);
+  }
+  assert.ok(system.explosions.some((ex) => ex.kind === 'core'), 'the core explosion is kept at the cap');
+  assert.ok(system.explosions.filter((ex) => ex.kind === 'puff').length <= caps.maxExplosions);
+  assert.ok(system.explosions.length <= caps.maxExplosions + caps.maxExplosions * overshoot, 'cores are not capped');
+
+  const capped = new ParticleSystem(gameConfig.juice);
+  for (let i = 0; i < caps.maxExplosions; i++) {
+    capped.spawnExplosion(0, 0, 50);
+  }
+  const before = capped.explosions.filter((ex) => ex.kind === 'puff').length;
+  capped.spawnExplosion(0, 0, 50);
+  assert.equal(capped.explosions.filter((ex) => ex.kind === 'puff').length, before, 'no puff beyond the cap');
+  assert.equal(capped.explosions.filter((ex) => ex.kind === 'core').length, caps.maxExplosions + 1);
+});
+
+test('pooled shatter balls and explosions reuse their cracks and rays arrays', () => {
+  const system = new ParticleSystem(gameConfig.juice);
+  system.spawnShatterBall({ x: 1, y: 1, radius: 10, colorId: 'red' }, '#ff0000');
+  const first = system.shatteringBalls[0];
+  const cracks = first.cracks;
+  const firstPoint = cracks[0][1];
+  system.removeAt(system.shatteringBalls, 0, system.shatterPool);
+  system.spawnShatterBall({ x: 2, y: 2, radius: 10, colorId: 'red' }, '#ff0000');
+  assert.equal(system.shatteringBalls[0].cracks, cracks);
+  assert.equal(system.shatteringBalls[0].cracks[0][1], firstPoint);
+  assert.equal(cracks.length, gameConfig.juice.particles.shatterCrackCount);
+  assert.equal(cracks[0].length, gameConfig.juice.particles.shatterCrackSegments + 1);
+});
+
+test('renderer config values that replaced literal fallbacks are finite numbers', () => {
+  const theme = gameConfig.theme;
+  const slow = gameConfig.juice.slowMotion;
+  const render = ballsConfig.render;
+  const values = {
+    'theme.horizonGlowRadiusFactor': theme.horizonGlowRadiusFactor,
+    'theme.vignetteInnerRadiusFactor': theme.vignetteInnerRadiusFactor,
+    'theme.vignetteOuterRadiusFactor': theme.vignetteOuterRadiusFactor,
+    'theme.aimBounceNodeAlpha': theme.aimBounceNodeAlpha,
+    'slowMotion.vignetteMaxAlpha': slow.vignetteMaxAlpha,
+    'slowMotion.vignetteInnerRadiusFactor': slow.vignetteInnerRadiusFactor,
+    'slowMotion.vignetteOuterRadiusFactor': slow.vignetteOuterRadiusFactor,
+    'render.rimLightInset': render.rimLightInset,
+    'render.rimLightStartAngle': render.rimLightStartAngle,
+    'render.rimLightEndAngle': render.rimLightEndAngle,
+    'render.secondaryShineAlpha': render.secondaryShineAlpha,
+    'render.secondaryShineOffsetFactor': render.secondaryShineOffsetFactor,
+    'render.spritePadding': render.spritePadding
+  };
+  for (const [name, value] of Object.entries(values)) {
+    assert.ok(Number.isFinite(value), `${name} must be a finite number, got ${value}`);
+  }
 });

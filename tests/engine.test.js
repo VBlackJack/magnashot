@@ -21,6 +21,7 @@ import fs from 'node:fs';
 import { configRegistry } from '../src/core/ConfigRegistry.js';
 import { StorageManager } from '../src/core/StorageManager.js';
 import { Ball } from '../src/entities/Ball.js';
+import { Obstacle } from '../src/entities/Obstacle.js';
 import { GameEngine } from '../src/game/GameEngine.js';
 import { GAME_MODES, GAME_STATES, SPECIAL_TYPES, CLUSTER_MODIFIERS, OBSTACLE_TYPES, WAVE_TYPES } from '../src/core/Constants.js';
 import { applyWorldGeometry } from '../src/core/WorldGeometry.js';
@@ -986,6 +987,138 @@ test('Boss Rush Overcharge strikes the Titan and wave clear persists a snapshot'
   const snapshot = engine.storageManager.loadRunSnapshot();
   assert.ok(snapshot, 'Boss Rush wave clear force-saves a run snapshot');
   assert.equal(snapshot.engine.bossRushWave, 2);
+});
+
+const OVERCHARGE_STRIKE_MARGIN = 0.000001;
+const DROPPING_BALL_COUNT = 3;
+const SLOW_MO_TEST_FRAMES = 9;
+
+/** Boss Rush wave 1 with the Titan one shield from death and Overcharge just under full. */
+const createBossRushNearStrike = () => {
+  const engine = createTestEngine();
+  engine.startBossRushMode(1);
+  const boss = engine.physicsWorld.balls.find((b) => b.clusterModifier === CLUSTER_MODIFIERS.BOSS_CORE);
+  boss.armorHits = 1;
+  engine.overcharge = gameConfig.scoring.overchargeMax - OVERCHARGE_STRIKE_MARGIN;
+  return { engine, boss };
+};
+
+const makeDroppingBall = (x, y) => {
+  const ball = makeBoardBall(x, y, { isDropping: true });
+  ball.vy = 1;
+  return ball;
+};
+
+const assertBossRushAdvancedCleanly = (engine) => {
+  assert.equal(engine.bossRushWave, 2, 'the strike on the Titan advances to wave 2');
+  assert.ok(engine.physicsWorld.droppingBalls.every(Boolean), 'no hole is left in the dropping balls');
+  assert.equal(engine.storageManager.loadRunSnapshot().engine.bossRushWave, 2, 'the forced snapshot holds wave 2');
+};
+
+test('Boss Rush: dropping balls reaching the collector bin can strike the Titan without breaking the step', () => {
+  const { engine } = createBossRushNearStrike();
+  const canvasCfg = gameConfig.canvas;
+  const binY = canvasCfg.logicalHeight - gameConfig.scoring.collector.zoneHeight;
+  for (let i = 0; i < DROPPING_BALL_COUNT; i++) {
+    engine.physicsWorld.droppingBalls.push(makeDroppingBall(FAR_POSITION + i * OTHER_POSITION / DROPPING_BALL_COUNT, binY));
+  }
+
+  assert.doesNotThrow(() => engine.update());
+  assertBossRushAdvancedCleanly(engine);
+});
+
+test('Boss Rush: dropping balls captured by a singularity can strike the Titan without breaking the step', () => {
+  const { engine } = createBossRushNearStrike();
+  const singularity = new Obstacle(
+    { type: OBSTACLE_TYPES.SINGULARITY, x: OTHER_POSITION, y: OTHER_POSITION },
+    obstaclesConfig
+  );
+  engine.physicsWorld.obstacles.push(singularity);
+  for (let i = 0; i < DROPPING_BALL_COUNT; i++) {
+    engine.physicsWorld.droppingBalls.push(makeDroppingBall(OTHER_POSITION, OTHER_POSITION));
+  }
+  assert.doesNotThrow(() => engine.update());
+  assertBossRushAdvancedCleanly(engine);
+});
+
+test('Boss Rush: an anvil crush that fills Overcharge defers the wave change and still runs the post-turn cleanup', () => {
+  const { engine, boss } = createBossRushNearStrike();
+  const world = engine.physicsWorld;
+  const anvilCfg = ballsConfig.specialTypes.anvil;
+  const minWallY = gameConfig.canvas.wallMargin + physicsConfig.ball.radius;
+  const targetX = boss.x < gameConfig.canvas.logicalWidth / 2 ? gameConfig.canvas.logicalWidth - OTHER_POSITION : OTHER_POSITION;
+  const target = makeBoardBall(targetX, minWallY);
+  world.addBall(target);
+  assert.ok(
+    Math.hypot(target.x - boss.x, target.y - boss.y) > physicsConfig.ball.radius * anvilCfg.pierceRadiusFactor,
+    'the crushed sphere is not the Titan itself'
+  );
+  const anvil = new Ball({
+    x: target.x,
+    y: minWallY,
+    radius: physicsConfig.ball.radius,
+    colorId: null,
+    specialType: SPECIAL_TYPES.ANVIL,
+    isProjectile: true
+  });
+  anvil.vy = -physicsConfig.ball.anvilSpeed;
+  world.projectile = anvil;
+  let cleanups = 0;
+  const originalCleanup = engine.handlePostTurnCleanup.bind(engine);
+  engine.handlePostTurnCleanup = (...args) => {
+    cleanups++;
+    originalCleanup(...args);
+  };
+
+  assert.doesNotThrow(() => engine.update());
+  assert.equal(world.projectile, null, 'the anvil left the board');
+  assert.equal(cleanups, 1, 'the post-turn cleanup ran once');
+  assert.equal(engine.anvilCrushCount, 1);
+  assertBossRushAdvancedCleanly(engine);
+  assert.equal(engine.pendingRoundEnd, false);
+});
+
+test('Boss Rush: a strike outside a physics step still ends the round at once', () => {
+  const { engine } = createBossRushNearStrike();
+  engine.addOvercharge(gameConfig.scoring.overchargeMax);
+  assert.equal(engine.bossRushWave, 2);
+  assert.equal(engine.pendingRoundEnd, false);
+});
+
+test('Special slow motion never runs slower than one frame per step at 0.5x animation speed', () => {
+  const engine = createTestEngine();
+  engine.startEndlessMode();
+  engine.animationSpeed = 0.5;
+  const startFrames = SLOW_MO_TEST_FRAMES;
+  engine.specialSlowMoFrames = startFrames;
+  engine.specialSlowMoTotalFrames = startFrames;
+
+  engine.update();
+
+  assert.equal(engine.specialSlowMoFrames, startFrames - 1);
+});
+
+test('The run is stored again once the last falling ball is gone', () => {
+  const engine = createTestEngine();
+  engine.startEndlessMode();
+  engine.hasFiredInRound = true;
+  let saves = 0;
+  const originalSave = engine.saveRunSnapshot.bind(engine);
+  engine.saveRunSnapshot = (...args) => {
+    saves++;
+    return originalSave(...args);
+  };
+  engine.physicsWorld.droppingBalls.push(makeDroppingBall(FAR_POSITION, FAR_POSITION));
+
+  engine.update();
+  const savesWhileFalling = saves;
+  engine.physicsWorld.droppingBalls.length = 0;
+  engine.update();
+  const savesOnLanding = saves;
+  engine.update();
+
+  assert.equal(savesOnLanding - savesWhileFalling, 1, 'one snapshot on the transition to no falling ball');
+  assert.equal(saves, savesOnLanding, 'no further snapshot while the board stays quiet');
 });
 
 test('Cascade Drop waves stack on platforms without detached floating spheres and refill on board clear', () => {

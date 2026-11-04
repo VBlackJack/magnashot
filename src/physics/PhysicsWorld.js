@@ -50,6 +50,8 @@ export class PhysicsWorld {
     }
     this.balls = [];
     this.droppingBalls = [];
+    // Bumped by clear() so a step in progress can tell a callback emptied the world.
+    this.clearEpoch = 0;
     this.obstacles = [];
     this.projectile = null;
     this.activeFlightBall = null;
@@ -179,6 +181,7 @@ export class PhysicsWorld {
   }
 
   clear() {
+    this.clearEpoch++;
     this.balls.length = 0;
     this.droppingBalls.length = 0;
     this.obstacles.length = 0;
@@ -1177,6 +1180,10 @@ export class PhysicsWorld {
           }
           if (callbacks?.onAnvilCrush) {
             callbacks.onAnvilCrush(target);
+            // The crush can end the round and clear the world: stop walking stale balls.
+            if (this.projectile !== p) {
+              return true;
+            }
           }
         }
       }
@@ -1396,6 +1403,7 @@ export class PhysicsWorld {
     const restitution = this.physicsConfig.ball.restitution;
     const gravity = sim.dropGravity;
     const maxY = canvasCfg.logicalHeight + sim.dropOutMarginY;
+    const startEpoch = this.clearEpoch;
 
     for (let i = this.droppingBalls.length - 1; i >= 0; i--) {
       const b = this.droppingBalls[i];
@@ -1429,6 +1437,9 @@ export class PhysicsWorld {
         capturedByObstacle.triggerHitPulse();
         if (callbacks?.onSingularityCapture) {
           callbacks.onSingularityCapture(b, capturedByObstacle);
+          if (this.clearEpoch !== startEpoch) {
+            return;
+          }
         }
         continue;
       }
@@ -1445,6 +1456,9 @@ export class PhysicsWorld {
         b.collectedByBin = true;
         if (callbacks?.onCollectorBinPass) {
           callbacks.onCollectorBinPass(b);
+          if (this.clearEpoch !== startEpoch) {
+            return;
+          }
         }
       }
 
@@ -1466,6 +1480,9 @@ export class PhysicsWorld {
         this.droppingBalls.pop();
         if (callbacks?.onBallDroppedOut) {
           callbacks.onBallDroppedOut(b);
+          if (this.clearEpoch !== startEpoch) {
+            return;
+          }
         }
       }
     }

@@ -29,6 +29,8 @@ const BOND_STYLE = Object.freeze({
 });
 const BOND_STYLE_COUNT = 5;
 const SEGMENT_STRIDE = 4;
+/** Shared empty dash pattern that resets a line to solid without allocating. */
+const EMPTY_DASH = Object.freeze([]);
 
 /** Color-blind patterns a standard color may declare in configs/balls.json. */
 const PATTERNS = Object.freeze({
@@ -118,12 +120,41 @@ export class Renderer {
     };
     this.aimPreviewComputeCount = 0;
 
+    // Per-frame inputs of drawMagneticFieldPair, kept as fields so the callback is allocated once.
+    this.magneticPairCtx = null;
+    this.magneticPairAlpha = 1;
+    this.magneticPairMaxDistSq = 0;
+    this.drawMagneticFieldPair = (a, b) => {
+      if (!a.colorId || a.colorId !== b.colorId || a.bonds.has(b.id)) {
+        return;
+      }
+      const alpha = this.magneticPairAlpha;
+      const ax = this.interpolate(a.prevX, a.x, alpha);
+      const ay = this.interpolate(a.prevY, a.y, alpha);
+      const bx = this.interpolate(b.prevX, b.x, alpha);
+      const by = this.interpolate(b.prevY, b.y, alpha);
+      const dx = bx - ax;
+      const dy = by - ay;
+      if (dx * dx + dy * dy <= this.magneticPairMaxDistSq) {
+        this.magneticPairCtx.moveTo(ax, ay);
+        this.magneticPairCtx.lineTo(bx, by);
+      }
+    };
+    // Slow-motion vignette gradient, rebuilt only when the canvas size or tint changes.
+    this.slowMoVignetteGradient = null;
+    this.slowMoVignetteKey = '';
+    this.slowMoVignetteCtx = null;
+    // Unit-radius shatter core gradients by burst colour; scaled to the ball radius at draw time.
+    this.shatterCoreGradients = new Map();
+    this.shatterCoreGradientCtx = null;
     this.ballGradientCache = new Map();
     this.ballSpriteCache = new Map();
     this.highContrast = false;
     this.colorPatterns = false;
     this.isReducedMotion = false;
     this.activeBallStyle = gameConfig.defaults?.ballStyle || BALL_STYLES.CLASSIC;
+    this.ballSpriteKeySuffix = '';
+    this.refreshBallSpriteKeySuffix();
     this.bindResolutionListeners();
     this.updateCanvasResolution();
   }
@@ -234,7 +265,7 @@ export class Renderer {
     layerCtx.fillRect(0, 0, width, height);
     if (theme.horizonGlowColor && typeof layerCtx.createRadialGradient === 'function') {
       const launcherY = this.gameConfig.canvas.launcherY ?? (height - (this.gameConfig.canvas.launcherBottomOffset || 0));
-      const glowRadius = width * (theme.horizonGlowRadiusFactor || 0.72);
+      const glowRadius = width * (theme.horizonGlowRadiusFactor);
       const horizonGrad = layerCtx.createRadialGradient(
         width * MATH_CONSTANTS.HALF,
         launcherY,
@@ -252,8 +283,8 @@ export class Renderer {
     if (theme.vignetteColor && typeof layerCtx.createRadialGradient === 'function') {
       const cx = width * MATH_CONSTANTS.HALF;
       const cy = height * MATH_CONSTANTS.HALF;
-      const innerR = width * (theme.vignetteInnerRadiusFactor || 0.35);
-      const outerR = height * (theme.vignetteOuterRadiusFactor || 0.78);
+      const innerR = width * (theme.vignetteInnerRadiusFactor);
+      const outerR = height * (theme.vignetteOuterRadiusFactor);
       const vignetteGrad = layerCtx.createRadialGradient(cx, cy, innerR, cx, cy, outerR);
       vignetteGrad.addColorStop(0, 'rgba(0, 0, 0, 0)');
       vignetteGrad.addColorStop(1, theme.vignetteColor);
@@ -264,10 +295,17 @@ export class Renderer {
     this.staticLayerDirty = false;
   }
 
+  /** Rebuilds the style/pattern/contrast part of the sprite key; call whenever one of them changes. */
+  refreshBallSpriteKeySuffix() {
+    const styleKey = this.activeBallStyle || BALL_STYLES.CLASSIC;
+    this.ballSpriteKeySuffix = `${styleKey}_${this.colorPatterns ? 1 : 0}_${this.highContrast ? 1 : 0}`;
+  }
+
   setColorPatterns(enabled) {
     const next = Boolean(enabled);
     if (this.colorPatterns !== next) {
       this.colorPatterns = next;
+      this.refreshBallSpriteKeySuffix();
       this.ballSpriteCache?.clear();
     }
   }
@@ -276,6 +314,7 @@ export class Renderer {
     const next = Boolean(enabled);
     if (this.highContrast !== next) {
       this.highContrast = next;
+      this.refreshBallSpriteKeySuffix();
       this.ballSpriteCache?.clear();
     }
   }
@@ -283,6 +322,7 @@ export class Renderer {
   setBallStyle(styleId) {
     if (styleId && typeof styleId === 'string') {
       this.activeBallStyle = styleId;
+      this.refreshBallSpriteKeySuffix();
       this.ballGradientCache.clear();
       this.ballSpriteCache?.clear();
     }
@@ -470,16 +510,23 @@ export class Renderer {
       if (timeScale < 1) {
         const slowCfg = this.gameConfig.juice.slowMotion;
         const pCfg = this.gameConfig.juice.particles;
-        const edgeAlpha = (1 - timeScale) * (slowCfg.vignetteMaxAlpha ?? 0.34);
+        const edgeAlpha = (1 - timeScale) * (slowCfg.vignetteMaxAlpha);
         if (edgeAlpha > 0) {
           const cx = width * MATH_CONSTANTS.HALF;
           const cy = height * MATH_CONSTANTS.HALF;
-          const innerR = width * (slowCfg.vignetteInnerRadiusFactor ?? 0.36);
-          const outerR = height * (slowCfg.vignetteOuterRadiusFactor ?? 0.85);
+          const innerR = width * (slowCfg.vignetteInnerRadiusFactor);
+          const outerR = height * (slowCfg.vignetteOuterRadiusFactor);
           const color = engineState.specialSlowMoColor || slowCfg.vignetteDefaultColor;
-          const grad = ctx.createRadialGradient(cx, cy, innerR, cx, cy, outerR);
-          grad.addColorStop(0, pCfg.flashEdgeColor);
-          grad.addColorStop(1, color);
+          const vignetteKey = `${cx}_${cy}_${innerR}_${outerR}_${color}`;
+          if (this.slowMoVignetteKey !== vignetteKey || this.slowMoVignetteCtx !== ctx) {
+            const built = ctx.createRadialGradient(cx, cy, innerR, cx, cy, outerR);
+            built.addColorStop(0, pCfg.flashEdgeColor);
+            built.addColorStop(1, color);
+            this.slowMoVignetteGradient = built;
+            this.slowMoVignetteKey = vignetteKey;
+            this.slowMoVignetteCtx = ctx;
+          }
+          const grad = this.slowMoVignetteGradient;
           ctx.save();
           ctx.fillStyle = grad;
           ctx.globalAlpha = edgeAlpha;
@@ -554,7 +601,7 @@ export class Renderer {
     ctx.stroke();
 
     if (isWarning) {
-      ctx.setLineDash([]);
+      ctx.setLineDash(EMPTY_DASH);
       ctx.fillStyle = theme.dangerBallRingColor;
       ctx.strokeStyle = theme.dangerBallRingColor;
       ctx.lineWidth = theme.aimTargetMatchLineWidth;
@@ -631,23 +678,13 @@ export class Renderer {
     ctx.setLineDash(theme.magneticFieldDash);
     ctx.strokeStyle = `rgba(${theme.magneticSameColorBase}, ${theme.magneticFieldAlpha * pulse})`;
     ctx.beginPath();
-    physicsWorld.spatialGrid.forEachNeighborPair(physicsWorld.balls, (a, b) => {
-      if (!a.colorId || a.colorId !== b.colorId || a.bonds.has(b.id)) {
-        return;
-      }
-      const ax = this.interpolate(a.prevX, a.x, alpha);
-      const ay = this.interpolate(a.prevY, a.y, alpha);
-      const bx = this.interpolate(b.prevX, b.x, alpha);
-      const by = this.interpolate(b.prevY, b.y, alpha);
-      const dx = bx - ax;
-      const dy = by - ay;
-      if (dx * dx + dy * dy <= fieldMaxDistSq) {
-        ctx.moveTo(ax, ay);
-        ctx.lineTo(bx, by);
-      }
-    });
+    this.magneticPairCtx = ctx;
+    this.magneticPairAlpha = alpha;
+    this.magneticPairMaxDistSq = fieldMaxDistSq;
+    physicsWorld.spatialGrid.forEachNeighborPair(physicsWorld.balls, this.drawMagneticFieldPair);
+    this.magneticPairCtx = null;
     ctx.stroke();
-    ctx.setLineDash([]);
+    ctx.setLineDash(EMPTY_DASH);
 
     ctx.lineWidth = theme.magneticBondLineWidth;
     const segments = this.bondSegments;
@@ -727,7 +764,7 @@ export class Renderer {
       ctx.lineWidth = chainSpec.linkWidth;
       ctx.setLineDash(chainSpec.linkDash);
       this.strokeSegments(ctx, segments[BOND_STYLE.CHAIN], chainSpec.linkColor);
-      ctx.setLineDash([]);
+      ctx.setLineDash(EMPTY_DASH);
     }
     ctx.restore();
   }
@@ -824,7 +861,7 @@ export class Renderer {
         ctx.beginPath();
         ctx.arc(0, 0, obs.radius - cfg.ringInset, 0, MATH_CONSTANTS.TWO_PI);
         ctx.stroke();
-        ctx.setLineDash([]);
+        ctx.setLineDash(EMPTY_DASH);
 
         ctx.strokeStyle = cfg.coreColor;
         ctx.lineWidth = obsDefaults.lineWidth;
@@ -869,7 +906,7 @@ export class Renderer {
         ctx.beginPath();
         ctx.arc(0, 0, obs.radius - cfg.ringInset, 0, MATH_CONSTANTS.TWO_PI);
         ctx.stroke();
-        ctx.setLineDash([]);
+        ctx.setLineDash(EMPTY_DASH);
 
         ctx.fillStyle = cfg.coreColor;
         ctx.beginPath();
@@ -1035,9 +1072,9 @@ export class Renderer {
       ctx.arc(
         0,
         0,
-        Math.max(1, r - (renderCfg.rimLightInset || 1.5)),
-        renderCfg.rimLightStartAngle ?? 0.35,
-        renderCfg.rimLightEndAngle ?? 1.95
+        Math.max(1, r - (renderCfg.rimLightInset)),
+        renderCfg.rimLightStartAngle,
+        renderCfg.rimLightEndAngle
       );
       ctx.stroke();
       ctx.restore();
@@ -1059,8 +1096,8 @@ export class Renderer {
     if (renderCfg.secondaryShineRadiusFactor) {
       ctx.save();
       ctx.fillStyle = renderCfg.shineColor;
-      ctx.globalAlpha = renderCfg.secondaryShineAlpha || 1.0;
-      const secOffset = r * (renderCfg.secondaryShineOffsetFactor || -0.14);
+      ctx.globalAlpha = renderCfg.secondaryShineAlpha;
+      const secOffset = r * (renderCfg.secondaryShineOffsetFactor);
       ctx.beginPath();
       ctx.arc(secOffset, secOffset, r * renderCfg.secondaryShineRadiusFactor, 0, MATH_CONSTANTS.TWO_PI);
       ctx.fill();
@@ -1076,15 +1113,14 @@ export class Renderer {
     if (!this.ballSpriteCache) {
       return null;
     }
-    const styleKey = this.activeBallStyle || BALL_STYLES.CLASSIC;
-    const key = `${palette.id}_${radius}_${styleKey}_${this.colorPatterns ? 1 : 0}_${this.highContrast ? 1 : 0}`;
+    const key = `${palette.id}_${radius}_${this.ballSpriteKeySuffix}`;
     let entry = this.ballSpriteCache.get(key);
     if (!entry) {
       const spriteCanvas = this.createLayerCanvas();
       if (!spriteCanvas) {
         return null;
       }
-      const pad = this.ballsConfig.render.spritePadding || 4;
+      const pad = this.ballsConfig.render.spritePadding;
       const halfLogical = radius + pad;
       const logicalSize = halfLogical * 2;
       const scaleX = this.scaleX || 1;
@@ -1173,7 +1209,7 @@ export class Renderer {
       ctx.beginPath();
       ctx.arc(0, 0, r - renderCfg.modifierRingInset, 0, MATH_CONSTANTS.TWO_PI);
       ctx.stroke();
-      ctx.setLineDash([]);
+      ctx.setLineDash(EMPTY_DASH);
     }
 
     const primaryLabel = palette.icon || palette.symbol;
@@ -1670,7 +1706,7 @@ export class Renderer {
       ctx.strokeStyle = palette.fill;
       ctx.lineWidth = theme.aimGlowWidth;
       ctx.globalAlpha = theme.aimGlowAlpha;
-      ctx.setLineDash([]);
+      ctx.setLineDash(EMPTY_DASH);
       ctx.stroke();
     }
     ctx.globalAlpha = 1.0;
@@ -1679,12 +1715,12 @@ export class Renderer {
     ctx.setLineDash(theme.aimLineDash);
     ctx.lineDashOffset = dashOffset;
     ctx.stroke();
-    ctx.setLineDash([]);
+    ctx.setLineDash(EMPTY_DASH);
     ctx.lineDashOffset = 0;
 
     if (theme.aimBounceNodeRadius) {
       ctx.fillStyle = palette.highlight;
-      ctx.globalAlpha = theme.aimBounceNodeAlpha || 1.0;
+      ctx.globalAlpha = theme.aimBounceNodeAlpha;
       for (let i = 1; i < points.length - 1; i++) {
         if (points[i].isBounce) {
           ctx.beginPath();
@@ -1936,15 +1972,27 @@ export class Renderer {
       ctx.globalCompositeOperation = 'lighter';
       const coreAlpha = sbAlpha * progress * pCfg.shatterCoreFlashAlpha;
       if (coreAlpha > 0) {
-        const grad = ctx.createRadialGradient(0, 0, 0, 0, 0, sb.radius);
-        grad.addColorStop(0, pCfg.flashCoreColor);
-        grad.addColorStop(pCfg.flashMidStop, sb.burstColor);
-        grad.addColorStop(1, pCfg.flashEdgeColor);
+        let grad = this.shatterCoreGradients.get(sb.burstColor);
+        if (!grad || this.shatterCoreGradientCtx !== ctx) {
+          if (this.shatterCoreGradientCtx !== ctx) {
+            this.shatterCoreGradients.clear();
+            this.shatterCoreGradientCtx = ctx;
+          }
+          grad = ctx.createRadialGradient(0, 0, 0, 0, 0, 1);
+          grad.addColorStop(0, pCfg.flashCoreColor);
+          grad.addColorStop(pCfg.flashMidStop, sb.burstColor);
+          grad.addColorStop(1, pCfg.flashEdgeColor);
+          this.shatterCoreGradients.set(sb.burstColor, grad);
+        }
+        // The shared gradient has unit radius: scale it to the ball inside its own save/restore.
+        ctx.save();
+        ctx.scale(sb.radius, sb.radius);
         ctx.fillStyle = grad;
         ctx.globalAlpha = coreAlpha;
         ctx.beginPath();
-        ctx.arc(0, 0, sb.radius, 0, MATH_CONSTANTS.TWO_PI);
+        ctx.arc(0, 0, 1, 0, MATH_CONSTANTS.TWO_PI);
         ctx.fill();
+        ctx.restore();
       }
 
       if (sb.cracks) {

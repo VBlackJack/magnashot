@@ -106,7 +106,6 @@
 }
 
 /* Hints written for one input mode only (the root carries data-input). */
-:root[data-input='touch'] .pointer-only,
 :root[data-input='touch'] .powerup-key {
   display: none;
 }

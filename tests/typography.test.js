@@ -101,7 +101,7 @@ function collectFiles(directory) {
   return files;
 }
 
-test('ESLint and typography guard ignore agent worktree directories', () => {
+test('ESLint and typography guard ignore local tool directories', () => {
   const ignores = eslintConfig[0]?.ignores || [];
   for (const dir of ['.claude/', '.codex/', '.gemini/', '.agent/']) {
     assert.ok(ignores.includes(dir), `eslint.config.js must ignore ${dir}`);
