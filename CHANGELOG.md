@@ -4,6 +4,12 @@ All notable changes to **MagnaShot** are documented in this file.
 
 ## [Unreleased]
 
+## [1.10.1] - 2026-11-04
+
+### Fixed
+- **Drawer Star Progress Text (`UIManager.syncDrawerStats`)**: Built `#drawer-star-progress` from `#hud-star-glyphs` and `#hud-star-next` instead of `#hud-star-progress.textContent` so the `.visually-hidden` `#hud-star-count` screen-reader string is never concatenated onto the visible star glyphs (`★☆☆ • Prochain : 6 900`).
+- **Desktop HUD Column Layout & Drawer Stats Scoping (`styles/main.css`)**: Placed `#btn-menu` (`☰`) and `#hud-mode-banner` side by side on the top row of the desktop HUD card while keeping equal `50%` columns for the 4 stat boxes and `align-self: start` on `.hud-bar`, scoped `.drawer-stats` to portrait phones (`max-width: 680px`) where the compact HUD hides those stats, hid `.hud-badges-row` when empty, and balanced mode button wrapping (`text-wrap: balance`, `--drawer-width: min(340px, 86vw)`).
+
 ## [1.10.0] - 2026-11-04
 
 ### Changed

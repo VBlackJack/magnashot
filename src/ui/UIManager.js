@@ -893,9 +893,18 @@ export class UIManager {
 
   /** Copies the HUD values the compact layout hides into the menu. */
   syncDrawerStats() {
+    if (this.elements.starProgress && this.elements.drawerStarProgress) {
+      const glyphs = this.elements.starGlyphs?.textContent?.trim() || '';
+      const next = this.elements.starNext?.textContent?.trim() || '';
+      const visibleStarText = glyphs && next ? `${glyphs} ${next}` : `${glyphs}${next}`;
+      setTextIfChanged(this.elements.drawerStarProgress, visibleStarText);
+      this.elements.drawerStarProgress.classList.toggle(
+        'hidden',
+        this.elements.starProgress.classList.contains('hidden')
+      );
+    }
     const mirrors = [
       [this.elements.modeBanner, this.elements.drawerMode],
-      [this.elements.starProgress, this.elements.drawerStarProgress],
       [this.elements.coinsValue, this.elements.drawerCoins],
       [this.elements.highScoreValue, this.elements.drawerBest],
       [this.elements.overchargePct, this.elements.drawerOvercharge]

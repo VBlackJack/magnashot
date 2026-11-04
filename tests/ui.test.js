@@ -502,6 +502,17 @@ test('the HUD stars are read as a count, not as glyphs', () => {
     const score = loadJson(`./locales/${lang}.json`).hud.stats.score;
     assert.deepEqual(placeholdersOf(score.starsAria), ['maxStars', 'stars']);
   }
+  const mockClassList = { contains: () => false, toggle: () => {} };
+  const drawerStarProgress = { textContent: '', classList: mockClassList };
+  UIManager.prototype.syncDrawerStats.call({
+    elements: {
+      starProgress: { textContent: '★☆☆Étoiles : 1 sur 3 • Prochain : 6 900', classList: mockClassList },
+      starGlyphs: { textContent: '★☆☆' },
+      starNext: { textContent: '• Prochain : 6 900' },
+      drawerStarProgress
+    }
+  });
+  assert.equal(drawerStarProgress.textContent, '★☆☆ • Prochain : 6 900');
 });
 
 test('the level grid is labelled by the active chapter tab', () => {
