@@ -54,6 +54,7 @@
         "tiltOnAria": "Tilt control: On",
         "tiltOffAria": "Tilt control: Off",
         "tiltAria": "Tilt control",
+        "tiltLockedAria": "Tilt control: Off in this run",
         "fullscreenOn": "⛶",
         "fullscreenOff": "⛶",
         "fullscreenOnAria": "Fullscreen: On",
@@ -540,7 +541,13 @@
         "unavailable": "No active run",
         "unavailableHint": "Start a Campaign, Survival, Daily, Flux, Blitz, Boss Rush or Cascade run to buy ammo.",
         "puzzleLocked": "Fixed loadout",
-        "puzzleLockedHint": "Puzzle stages use a fixed special-ball loadout."
+        "puzzleLockedHint": "Puzzle stages use a fixed special-ball loadout.",
+        "blockedLabel": "Not now",
+        "blocked": {
+          "shotInFlight": "Wait for the shot to land to buy special ammo.",
+          "stageChanging": "Wait for the next shape to appear to buy special ammo.",
+          "perkChoice": "Pick a perk to buy special ammo."
+        }
       },
       "codex": {
         "modifiersTitle": "Cluster Ball Modifiers",

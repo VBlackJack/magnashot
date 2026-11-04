@@ -909,7 +909,6 @@ test('Level select incomplete filter, Flux same-seed button, achievement progres
   );
   const gameOverModal = elementMarkup(indexHtml, 'modal-gameover');
   assert.match(gameOverModal, /id="btn-same-seed-gameover"[^>]*class="modal-btn hidden"/);
-  assert.match(uiManagerCode, /this\.engine\.startFluxRun\(this\.engine\.fluxSeed\)/);
   assert.match(uiManagerCode, /achievement-progress-track/);
   assert.match(uiManagerCode, /achievement-progress-fill/);
   assert.match(uiManagerCode, /levels-empty-filter/);
@@ -1989,4 +1988,167 @@ test('the Flux perk dialog is shown, hidden by the pause and restored with focus
   } finally {
     globalThis.document = prevDoc;
   }
+});
+
+test('special ammo is held with a reason while the engine refuses a purchase', () => {
+  const ui = Object.create(UIManager.prototype);
+  ui.isRunActive = () => true;
+  ui.engine = { mode: 'campaign', canBuySpecialAmmo: () => false, getSpecialAmmoBlockReason: () => 'shotInFlight' };
+  assert.equal(ui.canBuySpecialAmmo(), false);
+  assert.equal(ui.getSpecialAmmoBlockReasonKey(), 'modals.shop.specialAmmo.blocked.shotInFlight');
+  ui.engine.getSpecialAmmoBlockReason = () => 'stageChanging';
+  assert.equal(ui.getSpecialAmmoBlockReasonKey(), 'modals.shop.specialAmmo.blocked.stageChanging');
+  ui.engine = { mode: 'campaign', canBuySpecialAmmo: () => true, getSpecialAmmoBlockReason: () => null };
+  assert.equal(ui.canBuySpecialAmmo(), true, 'buy buttons re-enable as soon as the state allows');
+  assert.equal(ui.getSpecialAmmoBlockReasonKey(), null);
+  for (const lang of ['en', 'fr']) {
+    const specialAmmo = loadJson(`./locales/${lang}.json`).modals.shop.specialAmmo;
+    assert.ok(specialAmmo.blockedLabel && specialAmmo.blocked.shotInFlight && specialAmmo.blocked.stageChanging, lang);
+  }
+});
+
+test('NumpadEnter shoots like Enter and keeps the repeat guard', () => {
+  assert.equal(shouldIgnoreRepeatedKey('NumpadEnter', true), true);
+  const ui = Object.create(UIManager.prototype);
+  let shots = 0;
+  ui.setInputMode = () => {};
+  ui.isAnyModalOpen = () => false;
+  ui.elements = {};
+  ui.updateAimState = () => {};
+  ui.engine = { state: 'playing', shoot: () => { shots += 1; } };
+  const prevDoc = globalThis.document;
+  globalThis.document = { activeElement: null, body: {}, documentElement: {} };
+  try {
+    ui.handleKeyDown({ code: 'NumpadEnter', repeat: false, preventDefault() {} });
+    ui.handleKeyDown({ code: 'NumpadEnter', repeat: true, preventDefault() {} });
+    assert.equal(shots, 1, 'a held NumpadEnter fires once');
+  } finally {
+    globalThis.document = prevDoc;
+  }
+});
+
+test('tilt toggle is disabled with a reason while the engine locks tilt', () => {
+  const makeBtn = () => ({
+    id: 'btn-tilt',
+    attrs: {},
+    disabled: false,
+    textContent: '',
+    setAttribute(k, v) { this.attrs[k] = v; },
+    getAttribute(k) { return this.attrs[k] ?? null; }
+  });
+  const ui = Object.create(UIManager.prototype);
+  const btn = makeBtn();
+  ui.elements = { btnTilt: btn };
+  ui.isTiltActive = true;
+  ui.engine = { isTiltLocked: () => true };
+  const prevDoc = globalThis.document;
+  globalThis.document = { querySelector: () => null };
+  try {
+    ui.updateTiltButton();
+    assert.equal(btn.disabled, true);
+    assert.equal(btn.attrs['aria-disabled'], 'true');
+    assert.equal(btn.title, t('app.nav.button.tiltLockedAria'));
+    assert.equal(ui.isTiltActive, true, 'the preference is untouched');
+    ui.engine.isTiltLocked = () => false;
+    ui.updateTiltButton();
+    assert.equal(btn.disabled, false);
+  } finally {
+    globalThis.document = prevDoc;
+  }
+});
+
+test('the same-seed retry button restarts the run with its shared status', () => {
+  const calls = [];
+  const ui = Object.create(UIManager.prototype);
+  ui.hideAllModals = () => calls.push('hide');
+  ui.engine = { fluxSeed: 'ab12cd', isSharedFluxRun: true, startFluxRun: (...args) => calls.push(args) };
+  ui.retrySameFluxSeed();
+  assert.deepEqual(calls, ['hide', ['ab12cd', { isShared: true }]]);
+
+  calls.length = 0;
+  ui.engine.isSharedFluxRun = false;
+  ui.retrySameFluxSeed();
+  assert.deepEqual(calls[1], ['ab12cd', { isShared: false }]);
+
+  calls.length = 0;
+  ui.engine.fluxSeed = null;
+  ui.retrySameFluxSeed();
+  assert.deepEqual(calls, [], 'no seed, no restart');
+});
+
+test('a typed Flux seed starts a shared run', () => {
+  const started = [];
+  const ui = Object.create(UIManager.prototype);
+  ui.elements = { inputFluxSeed: { value: '#AB12CD' } };
+  ui.engine = {
+    fluxConfig: loadJson('./configs/flux.json'),
+    startFluxRun: (...args) => started.push(args)
+  };
+  ui.hideAllModals = () => {};
+  ui.requestDestructiveAction = (action) => action();
+  ui.submitFluxSeedInput();
+  assert.deepEqual(started, [['ab12cd', { isShared: true }]]);
+  assert.equal(ui.elements.inputFluxSeed.value, '');
+});
+
+const makeFakePowerupButton = (type) => {
+  const attrs = {};
+  const classes = new Set();
+  return {
+    dataset: { specialType: type },
+    disabled: false,
+    attrs,
+    classList: {
+      toggle: (name, force) => (force ? classes.add(name) : classes.delete(name)),
+      contains: (name) => classes.has(name)
+    },
+    setAttribute: (k, v) => {
+      attrs[k] = String(v);
+    },
+    getAttribute: (k) => attrs[k] ?? null,
+    removeAttribute: (k) => {
+      delete attrs[k];
+    }
+  };
+};
+
+const refreshPowerupsWith = ({ engineState, isRunActive = true }) => {
+  const type = SPECIAL_TYPES_ORDER[0];
+  const btn = makeFakePowerupButton(type);
+  const ui = Object.create(UIManager.prototype);
+  ui.isRunActive = () => isRunActive;
+  ui.elements = { powerupsContainer: { querySelectorAll: () => [btn] } };
+  ui.engine = {
+    mode: 'campaign',
+    specialInventory: { [type]: 0 },
+    currentBall: null,
+    canBuySpecialAmmo: () => engineState.canBuy,
+    getSpecialAmmoBlockReason: () => engineState.reason
+  };
+  const prevDoc = globalThis.document;
+  globalThis.document = { getElementById: () => null };
+  try {
+    ui.updatePowerupButtons(ui.engine);
+  } finally {
+    globalThis.document = prevDoc;
+  }
+  return { btn, type };
+};
+
+test('power-up tooltips survive a refresh, and a held slot keeps the empty look without flicker', () => {
+  const free = refreshPowerupsWith({ engineState: { canBuy: true, reason: null } });
+  assert.equal(free.btn.attrs.title, t(`hud.powerups.${free.type}.tooltip`), 'the tooltip is restored');
+  assert.equal(free.btn.attrs['aria-disabled'], 'false');
+  assert.equal(free.btn.classList.contains('is-empty'), true);
+
+  const held = refreshPowerupsWith({ engineState: { canBuy: false, reason: 'shotInFlight' } });
+  assert.equal(held.btn.classList.contains('is-empty'), true, 'the empty look does not flicker with the shot');
+  assert.equal(held.btn.disabled, false, 'the button stays focusable');
+  assert.equal(held.btn.attrs['aria-disabled'], 'true');
+  assert.equal(held.btn.attrs.title, t('modals.shop.specialAmmo.blocked.shotInFlight'));
+  assert.ok(held.btn.attrs['aria-label'].endsWith(t('modals.shop.specialAmmo.blocked.shotInFlight')));
+
+  const idle = refreshPowerupsWith({ engineState: { canBuy: false, reason: null }, isRunActive: false });
+  assert.equal(idle.btn.disabled, true, 'between runs an empty button stays inert');
+  assert.equal(idle.btn.attrs.title, t(`hud.powerups.${idle.type}.tooltip`));
 });

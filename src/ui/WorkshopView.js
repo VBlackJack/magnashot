@@ -153,10 +153,24 @@ export function renderWorkshopContents() {
     buyBtn.className = 'modal-btn primary';
     buyBtn.dataset.upgradeKey = upgradeKey;
     buyBtn.dataset.slotIndex = String(slotIndex);
-    buyBtn.disabled = coins < cost;
-    buyBtn.textContent = t('modals.shop.card.buy', { cost: formatNumber(cost) });
+    // A bonus that changes the run waits until the run can be stored with its debit.
+    const upgradeBlocked = this.engine.canBuyUpgrade?.(upgradeKey) === false;
+    const upgradeBlockKey = upgradeBlocked ? this.getSpecialAmmoBlockReasonKey?.() : null;
+    buyBtn.disabled = coins < cost || upgradeBlocked;
+    if (upgradeBlocked) {
+      buyBtn.textContent = t('modals.shop.specialAmmo.blockedLabel');
+      if (upgradeBlockKey) {
+        buyBtn.title = t(upgradeBlockKey);
+        buyBtn.setAttribute('aria-label', `${t('modals.shop.specialAmmo.blockedLabel')}. ${t(upgradeBlockKey)}`);
+      }
+    } else {
+      buyBtn.textContent = t('modals.shop.card.buy', { cost: formatNumber(cost) });
+    }
 
     buyBtn.addEventListener('click', () => {
+      if (this.engine.canBuyUpgrade?.(upgradeKey) === false) {
+        return;
+      }
       if (this.storageManager.purchaseUpgrade(upgradeKey)) {
         const newLevel = currentLevel + 1;
         this.audioManager.playEffect('match', newLevel);
@@ -184,6 +198,7 @@ export function renderWorkshopContents() {
     const isPuzzleRun = this.engine.mode === GAME_MODES.PUZZLE && this.isRunActive();
     const canBuyAmmo =
       typeof this.canBuySpecialAmmo === 'function' ? this.canBuySpecialAmmo() : this.isRunActive() && !isPuzzleRun;
+    const blockKey = typeof this.getSpecialAmmoBlockReasonKey === 'function' ? this.getSpecialAmmoBlockReasonKey() : null;
     for (let slotIndex = 0; slotIndex < SPECIAL_TYPES_ORDER.length; slotIndex++) {
       const type = SPECIAL_TYPES_ORDER[slotIndex];
       const spec = this.ballsConfig.specialTypes[type];
@@ -221,6 +236,10 @@ export function renderWorkshopContents() {
       buyAmmoBtn.classList.toggle('unavailable', !canBuyAmmo);
       if (canBuyAmmo) {
         buyAmmoBtn.textContent = t('modals.shop.specialAmmo.buy', { cost: formatNumber(cost) });
+      } else if (blockKey) {
+        buyAmmoBtn.textContent = t('modals.shop.specialAmmo.blockedLabel');
+        buyAmmoBtn.title = t(blockKey);
+        buyAmmoBtn.setAttribute('aria-label', `${t('modals.shop.specialAmmo.blockedLabel')}. ${t(blockKey)}`);
       } else if (isPuzzleRun) {
         buyAmmoBtn.textContent = t('modals.shop.specialAmmo.puzzleLocked');
         buyAmmoBtn.title = t('modals.shop.specialAmmo.puzzleLockedHint');

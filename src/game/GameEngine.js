@@ -118,6 +118,10 @@ export class GameEngine {
     this.freezeTurnsRemaining = 0;
     this.chainCooldown = 0;
     this.pendingRunCoins = 0;
+    // A Boss Rush wave clear waiting for the shot in flight to land.
+    this.pendingBossRushWave = false;
+    // True for a Flux run started from a shared seed link.
+    this.isSharedFluxRun = false;
     this.anvilCrushCount = 0;
     this.isCoreFreezeApplied = false;
     this.outOfShotsGraceFrames = 0;
@@ -409,6 +413,8 @@ export class GameEngine {
     this.flushPendingRunCoins();
     this.storageManager.clearRunSnapshot();
     this.mode = mode;
+    // clear() keeps the tilt: a run must not start leaning from the previous run's last reading.
+    this.physicsWorld.tiltFactor = 0;
     this.score = 0;
     this.combo = 0;
     this.maxComboInRound = 0;
@@ -417,6 +423,10 @@ export class GameEngine {
     this.freezeTurnsRemaining = 0;
     this.chainCooldown = 0;
     this.pendingRunCoins = 0;
+    // A Boss Rush wave clear waiting for the shot in flight to land.
+    this.pendingBossRushWave = false;
+    // True for a Flux run started from a shared seed link.
+    this.isSharedFluxRun = false;
     this.anvilCrushCount = 0;
     this.isCoreFreezeApplied = false;
     this.outOfShotsGraceFrames = 0;
@@ -542,6 +552,20 @@ export class GameEngine {
       }
     }
     this.updateAimFromAngle(this.aimAngle);
+  }
+
+  /**
+   * True when a Workshop purchase can be applied to the active run and stored with its debit.
+   * Only the startingShots bonus changes a run; it waits for a capturable run, like special ammo.
+   * @param {string} upgradeKey - Upgrade identifier.
+   */
+  canBuyUpgrade(upgradeKey) {
+    const affectsRun =
+      upgradeKey === 'startingShots' &&
+      this.usesShotBudget() &&
+      this.mode !== GAME_MODES.PUZZLE &&
+      (this.state === GAME_STATES.PLAYING || this.state === GAME_STATES.PAUSED);
+    return !affectsRun || this.canBuySpecialAmmo();
   }
 
   /** Shield hits a ball starts with for its modifier (0 when it has no armor). */
@@ -855,7 +879,8 @@ export class GameEngine {
     const pivotY = bossRushCfg.pivotY;
     const r = this.physicsConfig.ball.radius;
 
-    this.physicsWorld.clear();
+    // Falling balls still pay score and overcharge when they land: the new wave keeps them.
+    this.physicsWorld.clear({ keepDroppingBalls: true });
     const centralPivot = new Obstacle(
       {
         type: OBSTACLE_TYPES.PIVOT,
@@ -1051,9 +1076,12 @@ export class GameEngine {
   /**
    * Starts a Flux run: an endless chain of generated shapes sharing one shot reserve.
    * @param {string|null} seed - Run seed; a fresh random seed when omitted.
+   * @param {{isShared?: boolean}} [options] - isShared marks a run started from a shared
+   *   seed link, which locks the device tilt so every player gets the same physics.
    */
-  startFluxRun(seed = null) {
+  startFluxRun(seed = null, { isShared = false } = {}) {
     this.initFluxRun(seed || this.createFluxSeed());
+    this.isSharedFluxRun = Boolean(isShared);
     this.buildFluxStage({ persist: false });
     this.currentBall = this.createRandomLauncherBall();
     this.nextBall = this.createRandomLauncherBall();
@@ -1737,13 +1765,42 @@ export class GameEngine {
   }
 
   /**
+   * True when a special ball can be bought now: the run is active and can be captured, so
+   * the purchase is stored with its debit (no shot in flight, no Flux shape change or perk
+   * choice pending).
+   */
+  canBuySpecialAmmo() {
+    return isRunSnapshotable(this) && !this.isStageChanging() && !this.isAwaitingPerk();
+  }
+
+  /**
+   * Why a special ball cannot be bought right now, for the shop to explain.
+   * @returns {'shotInFlight'|'stageChanging'|'perkChoice'|null} Null when it can, or when no run is active.
+   */
+  getSpecialAmmoBlockReason() {
+    if (this.state !== GAME_STATES.PLAYING && this.state !== GAME_STATES.PAUSED) {
+      return null;
+    }
+    if (this.physicsWorld.projectile || this.pendingBossRushWave) {
+      return 'shotInFlight';
+    }
+    if (this.isAwaitingPerk()) {
+      return 'perkChoice';
+    }
+    if (!this.canBuySpecialAmmo()) {
+      return 'stageChanging';
+    }
+    return null;
+  }
+
+  /**
    * Buys one special ball for the active run.
    * @param {string} specialType - Special ball type to buy.
    * @returns {boolean} True when coins were debited and the ball added; false when no run is
    *   active (only PLAYING or PAUSED runs accept purchases), the item is not for sale, or coins are short.
    */
   buySpecialAmmo(specialType) {
-    if (this.state !== GAME_STATES.PLAYING && this.state !== GAME_STATES.PAUSED) {
+    if (!this.canBuySpecialAmmo()) {
       return false;
     }
     if (this.mode === GAME_MODES.PUZZLE) {
@@ -2074,12 +2131,21 @@ export class GameEngine {
     }
   }
 
+  /** True when the device tilt is ignored: Daily and shared-seed Flux runs share one physics. */
+  isTiltLocked() {
+    return this.mode === GAME_MODES.DAILY || (this.mode === GAME_MODES.FLUX && this.isSharedFluxRun);
+  }
+
   /**
    * Tilts gravity sideways from the device orientation: a share of the cluster gravity,
    * clamped to tilt.maxGravityShare, pushes the hanging spheres left or right.
    * @param {number} share - Signed share of gravity, positive to the right.
    */
   setTilt(share) {
+    if (this.isTiltLocked()) {
+      this.physicsWorld.tiltFactor = 0;
+      return;
+    }
     const maxShare = this.gameConfig.tilt.maxGravityShare;
     this.physicsWorld.tiltFactor = Math.max(-maxShare, Math.min(maxShare, Number(share) || 0));
   }
@@ -2209,7 +2275,7 @@ export class GameEngine {
     } finally {
       this.isSteppingPhysics = false;
     }
-    if (this.pendingRoundEnd) {
+    if (this.pendingRoundEnd || (this.pendingBossRushWave && !this.physicsWorld.projectile)) {
       this.evaluateRoundEnd();
     }
 
@@ -2944,11 +3010,14 @@ export class GameEngine {
       return;
     }
     const max = this.gameConfig.scoring.overchargeMax;
+    // A strike can clear the wave: later iterations still grant their special ball but
+    // must not hit the next wave's boss.
+    const startWave = this.bossRushWave;
     this.overcharge += rawAmount * this.getOverchargeMultiplier();
     while (this.overcharge >= max) {
       this.overcharge -= max;
       this.grantRandomSpecialBall();
-      if (this.mode === GAME_MODES.BOSS_RUSH) {
+      if (this.mode === GAME_MODES.BOSS_RUSH && this.bossRushWave === startWave) {
         const bossBall = this.physicsWorld.balls.find((b) => b.clusterModifier === CLUSTER_MODIFIERS.BOSS_CORE);
         if (bossBall) {
           const bossSpec = this.ballsConfig.clusterModifiers.bossCore;
@@ -3350,6 +3419,14 @@ export class GameEngine {
     } else if (this.mode === GAME_MODES.BOSS_RUSH) {
       const bossBall = this.getBossBall();
       if (!bossBall) {
+        if (this.physicsWorld.projectile) {
+          // The next wave would wipe the shot in flight: wait for it to land (update() and
+          // the post-turn cleanup both come back here). The run is not capturable meanwhile
+          // (see isRunSnapshotable), so this flag is never saved.
+          this.pendingBossRushWave = true;
+          return;
+        }
+        this.pendingBossRushWave = false;
         const bossRushCfg = this.gameConfig.bossRush;
         const canvasCfg = this.gameConfig.canvas;
         this.releaseRemainingBoardAsAvalanche();

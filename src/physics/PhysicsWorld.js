@@ -180,10 +180,17 @@ export class PhysicsWorld {
     return null;
   }
 
-  clear() {
+  /**
+   * Empties the world. The clearEpoch still advances so a step in progress notices.
+   * @param {{keepDroppingBalls?: boolean}} [options] - keepDroppingBalls leaves the falling
+   *   balls in place, for a board swap that must not cancel what they still pay.
+   */
+  clear({ keepDroppingBalls = false } = {}) {
     this.clearEpoch++;
     this.balls.length = 0;
-    this.droppingBalls.length = 0;
+    if (!keepDroppingBalls) {
+      this.droppingBalls.length = 0;
+    }
     this.obstacles.length = 0;
     this.projectile = null;
     this.activeFlightBall = null;

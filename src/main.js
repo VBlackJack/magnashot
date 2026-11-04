@@ -117,14 +117,14 @@ class Application {
         uiManager.requestDestructiveAction(
           () => {
             uiManager.hideAllModals();
-            engine.startFluxRun(sharedFluxSeed);
+            engine.startFluxRun(sharedFluxSeed, { isShared: true });
           },
           () => t('app.nav.button.flux'),
           { always: true }
         );
       } else if (!canRestoreSaved || !engine.restoreSavedRun()) {
         if (sharedFluxSeed) {
-          engine.startFluxRun(sharedFluxSeed);
+          engine.startFluxRun(sharedFluxSeed, { isShared: true });
         } else {
           engine.startCampaignLevel(storageManager.getUnlockedLevel());
         }

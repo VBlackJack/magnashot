@@ -214,6 +214,13 @@ export function inputModeForPointerType(pointerType) {
   return TOUCH_POINTER_TYPES.has(pointerType) ? INPUT_MODES.TOUCH : INPUT_MODES.POINTER;
 }
 
+/** Engine special-ammo block reasons mapped to their explanation. */
+const SPECIAL_AMMO_BLOCK_REASON_KEYS = Object.freeze({
+  shotInFlight: 'modals.shop.specialAmmo.blocked.shotInFlight',
+  stageChanging: 'modals.shop.specialAmmo.blocked.stageChanging',
+  perkChoice: 'modals.shop.specialAmmo.blocked.perkChoice'
+});
+
 /** Keys whose action is a one-shot toggle or trigger; auto-repeat must not re-fire them. */
 const REPEAT_SENSITIVE_KEY_CODES = new Set(['Space', 'KeyF', 'Enter', 'NumpadEnter', 'Escape']);
 const SPECIAL_BALL_KEY_PATTERN = /^Digit\d$/;
@@ -822,6 +829,10 @@ export class UIManager {
 
       btn.append(keyBadge, iconSpan, labelSpan, countSpan);
       btn.addEventListener('click', () => {
+        // A slot held by a shot or a stage change stays focusable but ignores the click.
+        if (btn.getAttribute('aria-disabled') === 'true') {
+          return;
+        }
         // An empty stock leads to where more can be bought.
         if (btn.classList.contains(EMPTY_POWERUP_CLASS)) {
           this.openShopModal(SHOP_TABS.AMMO);
@@ -832,6 +843,45 @@ export class UIManager {
 
       container.appendChild(btn);
     });
+  }
+
+  /**
+   * Refreshes each special-ball button: stock, the empty look, and the hold applied while a shot
+   * or a stage change keeps ammo from being bought.
+   * @param {import('../game/GameEngine.js').GameEngine} engine
+   */
+  updatePowerupButtons(engine) {
+    const buttons = this.elements.powerupsContainer.querySelectorAll('.powerup-btn');
+    const isOpenToAmmo = this.isRunOpenToAmmo();
+    const canBuyAmmo = this.canBuySpecialAmmo();
+    const ammoBlockKey = this.getSpecialAmmoBlockReasonKey();
+    const holdReason = ammoBlockKey ? t(ammoBlockKey) : '';
+    for (const btn of buttons) {
+      const type = btn.dataset.specialType;
+      const count = engine.specialInventory[type] || 0;
+      const isEquipped = Boolean(engine.currentBall && engine.currentBall.specialType === type);
+      const isEmpty = count <= 0 && !isEquipped;
+      const countEl = document.getElementById(`powerup-count-${type}`);
+      // The empty look follows the run, not the shot: it must not flicker on every shot.
+      const isEmptyForSale = isEmpty && isOpenToAmmo;
+      const isHeld = isEmptyForSale && !canBuyAmmo;
+      setTextIfChanged(countEl, isEmptyForSale ? t('hud.powerups.button.emptyMark') : String(count));
+      let label = isEmptyForSale
+        ? t('hud.powerups.button.buyAria', { name: t(`hud.powerups.${type}.name`) })
+        : this.getPowerupAriaLabel(type, count);
+      if (isHeld && holdReason) {
+        label = `${label}. ${holdReason}`;
+      }
+      setAttributeIfChanged(btn, 'aria-label', label);
+      setAttributeIfChanged(btn, 'title', isHeld && holdReason ? holdReason : t(`hud.powerups.${type}.tooltip`));
+      btn.classList.toggle('equipped', isEquipped);
+      btn.classList.toggle(EMPTY_POWERUP_CLASS, isEmptyForSale);
+      setAttributeIfChanged(btn, 'aria-pressed', String(isEquipped));
+      // Held by a shot or a stage change: still focusable, the click is rejected instead.
+      setAttributeIfChanged(btn, 'aria-disabled', String(isHeld));
+      // Ammo is only sold during a round, so between rounds an empty button stays inert.
+      btn.disabled = isEmpty && !isOpenToAmmo;
+    }
   }
 
   getPowerupAriaLabel(type, count) {
@@ -1389,12 +1439,7 @@ export class UIManager {
       this.engine.restartCurrent();
     });
 
-    this.elements.btnSameSeedGameOver?.addEventListener('click', () => {
-      if (this.engine.fluxSeed) {
-        this.hideAllModals();
-        this.engine.startFluxRun(this.engine.fluxSeed);
-      }
-    });
+    this.elements.btnSameSeedGameOver?.addEventListener('click', () => this.retrySameFluxSeed());
 
     this.elements.btnLevelsGameOver.addEventListener('click', () => {
       this.hideAllModals();
@@ -1546,7 +1591,7 @@ export class UIManager {
       const dir = e.code === 'ArrowLeft' ? -1 : 1;
       this.engine.adjustAimByDelta(dir * step);
       this.updateAimState(this.engine);
-    } else if (e.code === 'Enter') {
+    } else if (e.code === 'Enter' || e.code === 'NumpadEnter') {
       if (isKeyboardInteractiveFocused) {
         return;
       }
@@ -1683,6 +1728,14 @@ export class UIManager {
     setTextIfChanged(button, t(labelKey));
   }
 
+  /** Restarts the Flux run that just ended on its own seed, keeping its shared (tilt-locked) status. */
+  retrySameFluxSeed() {
+    if (this.engine.fluxSeed) {
+      this.hideAllModals();
+      this.engine.startFluxRun(this.engine.fluxSeed, { isShared: this.engine.isSharedFluxRun });
+    }
+  }
+
   /**
    * Parses the Flux seed field in the Level Select toolbar and launches the seeded Flux run,
    * or reveals an invalid-seed message in the polite hint banner.
@@ -1711,7 +1764,7 @@ export class UIManager {
       () => {
         input.value = '';
         this.hideAllModals();
-        this.engine.startFluxRun(seed);
+        this.engine.startFluxRun(seed, { isShared: true });
       },
       () => t('app.nav.button.flux')
     );
@@ -2146,6 +2199,9 @@ export class UIManager {
       this.requestTiltOnFirstTap();
     }
     const toggleTilt = async () => {
+      if (this.engine.isTiltLocked?.()) {
+        return;
+      }
       const next = !this.isTiltActive;
       if (next && needsPermission) {
         const answer = await window.DeviceOrientationEvent.requestPermission().catch(() => 'denied');
@@ -2191,12 +2247,19 @@ export class UIManager {
 
   updateTiltButton() {
     const isOn = Boolean(this.isTiltActive);
+    const isLocked = Boolean(this.engine?.isTiltLocked?.());
     this.applyToggleState([this.elements.btnTilt], {
-      label: t(isOn ? 'app.nav.button.tiltOn' : 'app.nav.button.tiltOff'),
+      label: t(isOn && !isLocked ? 'app.nav.button.tiltOn' : 'app.nav.button.tiltOff'),
       ariaLabel: t('app.nav.button.tiltAria'),
-      tooltip: t(isOn ? 'app.nav.button.tiltOnAria' : 'app.nav.button.tiltOffAria'),
-      pressed: isOn
+      tooltip: t(isLocked ? 'app.nav.button.tiltLockedAria' : isOn ? 'app.nav.button.tiltOnAria' : 'app.nav.button.tiltOffAria'),
+      pressed: isOn && !isLocked
     });
+    // Locked runs ignore the tilt; the stored preference stays untouched for other runs.
+    const btn = this.elements.btnTilt;
+    if (btn) {
+      btn.disabled = isLocked;
+      setAttributeIfChanged(btn, 'aria-disabled', String(isLocked));
+    }
   }
 
   updateMotionButton() {
@@ -2518,7 +2581,37 @@ export class UIManager {
 
   /** True when the current run accepts special-ammo refills from the Workshop. */
   canBuySpecialAmmo() {
+    // The engine refuses a purchase while the run cannot be saved (shot in flight, stage change).
+    return this.isRunOpenToAmmo() && this.engine.canBuySpecialAmmo?.() !== false;
+  }
+
+  /** True when the run sells special ammo at all (active, not Puzzle), whatever its state right now. */
+  isRunOpenToAmmo() {
     return this.isRunActive() && this.engine.mode !== GAME_MODES.PUZZLE;
+  }
+
+  /**
+   * i18n key explaining why special ammo cannot be bought right now, or null when the run is
+   * simply not open to ammo (no run, Puzzle) or the purchase is allowed.
+   */
+  getSpecialAmmoBlockReasonKey() {
+    if (!this.isRunActive() || this.engine.mode === GAME_MODES.PUZZLE) {
+      return null;
+    }
+    const reason = this.engine.getSpecialAmmoBlockReason?.();
+    return reason ? SPECIAL_AMMO_BLOCK_REASON_KEYS[reason] || null : null;
+  }
+
+  /** Re-renders the open Workshop when the ammo purchase state changed since the last render. */
+  syncShopAmmoAvailability() {
+    const signature = `${this.canBuySpecialAmmo()}:${this.getSpecialAmmoBlockReasonKey()}`;
+    if (signature === this.lastAmmoAvailability) {
+      return;
+    }
+    this.lastAmmoAvailability = signature;
+    if (this.elements.modalShop && !this.elements.modalShop.classList.contains('hidden')) {
+      this.renderShopContents();
+    }
   }
 
   /**
@@ -3167,26 +3260,9 @@ export class UIManager {
     // The panel keeps its place in the layout, so it says why it is empty.
     this.elements.powerupsEmpty?.classList.toggle('hidden', offersSpecialBalls);
 
-    const buttons = this.elements.powerupsContainer.querySelectorAll('.powerup-btn');
-    const canBuyAmmo = this.canBuySpecialAmmo();
-    for (const btn of buttons) {
-      const type = btn.dataset.specialType;
-      const count = engine.specialInventory[type] || 0;
-      const isEquipped = Boolean(engine.currentBall && engine.currentBall.specialType === type);
-      const isEmpty = count <= 0 && !isEquipped;
-      const countEl = document.getElementById(`powerup-count-${type}`);
-      setTextIfChanged(countEl, isEmpty && canBuyAmmo ? t('hud.powerups.button.emptyMark') : String(count));
-      const label =
-        isEmpty && canBuyAmmo
-          ? t('hud.powerups.button.buyAria', { name: t(`hud.powerups.${type}.name`) })
-          : this.getPowerupAriaLabel(type, count);
-      setAttributeIfChanged(btn, 'aria-label', label);
-      btn.classList.toggle('equipped', isEquipped);
-      btn.classList.toggle(EMPTY_POWERUP_CLASS, isEmpty && canBuyAmmo);
-      setAttributeIfChanged(btn, 'aria-pressed', String(isEquipped));
-      // Ammo is only sold during a round, so between rounds an empty button stays inert.
-      btn.disabled = isEmpty && !canBuyAmmo;
-    }
+    this.syncShopAmmoAvailability();
+    this.updateTiltButton();
+    this.updatePowerupButtons(engine);
 
     const transitionedState = this.prevEngineState !== engine.state;
     this.prevEngineState = engine.state;

@@ -54,6 +54,7 @@
         "tiltOnAria": "Contrôle par inclinaison : Activé",
         "tiltOffAria": "Contrôle par inclinaison : Désactivé",
         "tiltAria": "Contrôle par inclinaison",
+        "tiltLockedAria": "Contrôle par inclinaison : désactivé dans cette partie",
         "fullscreenOn": "⛶",
         "fullscreenOff": "⛶",
         "fullscreenOnAria": "Plein écran : Activé",
@@ -540,7 +541,13 @@
         "unavailable": "Aucune manche en cours",
         "unavailableHint": "Lancez une manche (Campagne, Survie, Défi du Jour, Flux, Blitz, Boss Rush ou Cascade) pour acheter des munitions.",
         "puzzleLocked": "Dotation fixe",
-        "puzzleLockedHint": "Les niveaux Puzzle utilisent une dotation fixe de billes spéciales."
+        "puzzleLockedHint": "Les niveaux Puzzle utilisent une dotation fixe de billes spéciales.",
+        "blockedLabel": "Pas maintenant",
+        "blocked": {
+          "shotInFlight": "Attendez la fin du tir pour acheter des munitions spéciales.",
+          "stageChanging": "Attendez l'apparition de la prochaine forme pour acheter des munitions spéciales.",
+          "perkChoice": "Choisissez un atout pour acheter des munitions spéciales."
+        }
       },
       "codex": {
         "modifiersTitle": "Modificateurs de l'Amas",
