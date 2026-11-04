@@ -104,7 +104,7 @@
         "flux": "Mode Flux • Forme {{stage}} : {{shape}}",
         "fluxBoss": "Mode Flux • Forme {{stage}} : {{shape}} (Boss)",
         "puzzle": "Mode Puzzle • Niveau {{stage}} / {{total}}",
-        "blitz": "Blitz 90s • {{seconds}} s",
+        "blitz": "Blitz 90s • Vague {{wave}}",
         "bossRush": "Boss Rush • Vague {{wave}} (👑 {{shields}})",
         "cascade": "Cascade • Vague {{wave}}",
         "coreRescueProgress": "💎 {{rescued}}/{{total}}",
@@ -504,6 +504,24 @@
         "obstaclesTitle": "Anomalies & Obstacles Magnétiques",
         "specialsTitle": "Billes Spéciales (Arsenal)",
         "mutatorsTitle": "Mutateurs du Défi du Jour",
+        "mechanicsTitle": "Mécaniques du Plateau & Lanceur",
+        "mechanics": {
+          "polarity": {
+            "icon": "🧲",
+            "name": "Inversion de Polarité",
+            "description": "Inverse la charge de votre projectile (touche F ou bouton 🧲) : les pôles attracteurs repoussent alors votre tir et les coeurs répulsifs l'attirent."
+          },
+          "collectors": {
+            "icon": "⚡",
+            "name": "Collecteurs Magnétiques",
+            "description": "Les 5 réceptacles au bas du plateau captent chaque sphère tombée en avalanche et octroient un bonus de points et de Surcharge."
+          },
+          "overcharge": {
+            "icon": "🔋",
+            "name": "Jauge de Surcharge",
+            "description": "Se remplit à chaque groupe détruit et sphère collectée. Une fois pleine, elle forge automatiquement une bille spéciale gratuite."
+          }
+        },
         "mutators": {
           "hyperGravity": {
             "icon": "🪐",
@@ -777,7 +795,10 @@
           "pointer": "Annuler un tir : relâchez le clic sous le lanceur",
           "touch": "Annuler un tir : ramenez le doigt sous le lanceur avant de relâcher"
         },
-        "keyboard": "Clavier : Flèches pour affiner la visée (Maj : plus vite), Entrée pour tirer, F pour inverser la polarité, 1-7 pour les billes spéciales",
+        "keyboard": {
+          "pointer": "Clavier & Arsenal : Flèches pour affiner la visée (Maj : plus vite), Entrée pour tirer, F (ou 🧲) pour inverser la polarité, 1-7 pour les billes spéciales",
+          "touch": "Polarité & Arsenal : touchez 🧲 pour inverser l'attraction/répulsion magnétique, ou sélectionnez une bille spéciale chargée par la Surcharge"
+        },
         "physics": "Astuce : Détachez les ancres ou déséquilibrez les rotors pour créer des réactions en chaîne !"
       },
       "button": {

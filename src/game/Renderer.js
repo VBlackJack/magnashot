@@ -122,6 +122,7 @@ export class Renderer {
     this.ballSpriteCache = new Map();
     this.highContrast = false;
     this.colorPatterns = false;
+    this.isReducedMotion = false;
     this.activeBallStyle = gameConfig.defaults?.ballStyle || BALL_STYLES.CLASSIC;
     this.bindResolutionListeners();
     this.updateCanvasResolution();
@@ -375,7 +376,8 @@ export class Renderer {
     const theme = this.gameConfig.theme;
     // Every pulse, glow and field wave is a function of this clock: holding it still under
     // reduced motion freezes them all, while the physics keeps moving the board.
-    const now = engineState.isReducedMotion ? REDUCED_MOTION_CLOCK_MS : performance.now();
+    this.isReducedMotion = Boolean(engineState.isReducedMotion);
+    const now = this.isReducedMotion ? REDUCED_MOTION_CLOCK_MS : performance.now();
 
     ctx.setTransform(this.scaleX, 0, 0, this.scaleY, 0, 0);
     ctx.save();
@@ -1607,7 +1609,7 @@ export class Renderer {
     const palette = this.getBallPalette(currentBall);
 
     ctx.save();
-    const dashOffset = this.reducedMotion || !theme.aimDashSpeed ? 0 : -(now * theme.aimDashSpeed);
+    const dashOffset = this.isReducedMotion || !theme.aimDashSpeed ? 0 : -(now * theme.aimDashSpeed);
     ctx.beginPath();
     ctx.moveTo(points[0].x, points[0].y);
     for (let i = 1; i < points.length; i++) {

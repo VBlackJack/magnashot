@@ -4,6 +4,18 @@ All notable changes to **MagnaShot** are documented in this file.
 
 ## [Unreleased]
 
+## [1.9.6] - 2026-11-04
+
+### Added
+- **Board & Launcher Mechanics in Workshop Codex (`CodexView.js`, `CODEX_MECHANICS_ORDER`)**: Added a dedicated *Board & Launcher Mechanics* section to the Workshop Codex documenting *Polarity Inversion* (`🧲` / `F`), *Magnetic Collector Bins* (`+35 pts` and Overcharge), and the *Overcharge Gauge*.
+- **Touch-Aware Polarity & Arsenal Pause Instructions (`PAUSE_INPUT_HINTS`)**: Adapted `#pause-instruction-keyboard` in `#modal-pause` for both pointer/keyboard and touch modalities so touch players see how to invert magnetic polarity (`🧲`) and equip Overcharge special balls.
+
+### Fixed
+- **Puzzle Stage Selection & Locked Stage Feedback (`getSuggestedPuzzleStage`, `renderPuzzleStagesStrip`)**: Kept the active unlocked stage when clicking the Puzzle mode button during a Puzzle run instead of cycling or wrapping back to Stage 1, and replaced `disabled = true` on locked Puzzle stage chips with `aria-disabled="true"` and polite `#levels-chapter-hint` feedback (`showLockedLevelHint`) for touch and keyboard users.
+- **Blitz 90s HUD Wave Banner (`UIManager.refresh`)**: Displayed the current Blitz wave (`Blitz 90s • Wave {{wave}}`) in `#hud-mode-banner` while keeping the 90-second countdown timer in `#hud-shots-value`, eliminating the duplicate countdown display.
+- **HUD Mode Banner Dialog Accessibility & Level Select Initial Focus (`index.html`, `UIManager.js`)**: Added `aria-haspopup="dialog"` and a dynamic `aria-label` (combining the current mode/level and `hud.stats.mode.switchHint`) to `#hud-mode-banner`, and routed initial focus in `#modal-levels` (`getLevelsModalInitialFocus`) to the active Arcade card or `#btn-close-levels` when opened during a non-Campaign run.
+- **Aim Trajectory Reduced-Motion Flag (`Renderer.js`)**: Synchronized `this.isReducedMotion` on `Renderer` during `render()` and referenced `this.isReducedMotion` in `drawAimTrajectory()`.
+
 ## [1.9.5] - 2026-11-03
 
 ### Added

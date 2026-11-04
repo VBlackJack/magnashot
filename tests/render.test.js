@@ -766,4 +766,19 @@ test('Aim trajectory marks wall bounce vertices with isBounce and renders glow, 
   );
   assert.ok(dashOffsets.some((offset) => offset < 0), 'aim laser animates lineDashOffset when reducedMotion is false');
   assert.ok(arcCount >= 2, 'aim laser draws both the landing ghost circle and bounce node circles');
+
+  dashOffsets.length = 0;
+  renderer.isReducedMotion = true;
+  renderer.drawAimTrajectory(
+    renderer.ctx,
+    engine.aimPoints,
+    engine.currentBall,
+    engine.physicsWorld,
+    gameConfig.theme,
+    200,
+    engine.getBlastRadiusMultiplier(),
+    engine.aimAngle,
+    1.0
+  );
+  assert.ok(dashOffsets.every((offset) => offset === 0), 'aim laser freezes lineDashOffset at 0 when isReducedMotion is true');
 });

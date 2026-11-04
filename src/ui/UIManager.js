@@ -135,7 +135,8 @@ const MODE_BUTTON_KEYS = Object.freeze({
 const PAUSE_INPUT_HINTS = Object.freeze([
   { elementId: 'pause-instruction-aim', key: 'modals.pause.instructions.aim' },
   { elementId: 'pause-instruction-swap', key: 'modals.pause.instructions.swap' },
-  { elementId: 'pause-instruction-cancel', key: 'modals.pause.instructions.cancel' }
+  { elementId: 'pause-instruction-cancel', key: 'modals.pause.instructions.cancel' },
+  { elementId: 'pause-instruction-keyboard', key: 'modals.pause.instructions.keyboard' }
 ]);
 
 /** Accessible names that have one wording per input mode (the board's text alternative). */
@@ -2313,7 +2314,7 @@ export class UIManager {
   }
 
   /**
-   * Puzzle stage launched from navigation: advances to the next stage when already in
+   * Puzzle stage launched from navigation: keeps the active stage when already in
    * Puzzle mode, otherwise resumes at the highest unlocked stage.
    */
   getSuggestedPuzzleStage() {
@@ -2321,9 +2322,37 @@ export class UIManager {
     const bestStage = this.storageManager?.getPuzzleBestStage?.() || 1;
     const unlockedStage = Math.min(totalPuzzles, Math.max(1, bestStage));
     if (this.engine?.mode === GAME_MODES.PUZZLE && this.engine.currentPuzzleStage >= 1) {
-      return (Math.min(this.engine.currentPuzzleStage, unlockedStage) % unlockedStage) + 1;
+      return Math.min(this.engine.currentPuzzleStage, unlockedStage);
     }
     return unlockedStage;
+  }
+
+  /**
+   * Initial focus target in the Modes & Level Select dialog: the active Arcade control or
+   * Close button during an active non-Campaign run, otherwise the Campaign play/resume CTA.
+   */
+  getLevelsModalInitialFocus(playButton) {
+    if (!this.isRunActive?.() || this.isCampaignRunActive()) {
+      return playButton;
+    }
+    if (this.engine?.mode === GAME_MODES.PUZZLE) {
+      return (
+        this.elements?.puzzleStagesStrip?.querySelector?.('.puzzle-stage-btn.active') ||
+        this.elements?.btnModePuzzle ||
+        this.elements?.btnCloseLevels ||
+        playButton
+      );
+    }
+    if (this.engine?.mode === GAME_MODES.BLITZ) {
+      return this.elements?.btnModeBlitz || this.elements?.btnCloseLevels || playButton;
+    }
+    if (this.engine?.mode === GAME_MODES.BOSS_RUSH) {
+      return this.elements?.btnModeBossRush || this.elements?.btnCloseLevels || playButton;
+    }
+    if (this.engine?.mode === GAME_MODES.CASCADE) {
+      return this.elements?.btnModeCascade || this.elements?.btnCloseLevels || playButton;
+    }
+    return this.elements?.btnCloseLevels || playButton;
   }
 
   /** The level the select dialog puts forward: the one being played, else the furthest unlocked. */
@@ -2400,7 +2429,7 @@ export class UIManager {
         level: suggestedLevelId
       })
     );
-    this.openOverlayModal(this.elements.modalLevels, playButton);
+    this.openOverlayModal(this.elements.modalLevels, this.getLevelsModalInitialFocus(playButton));
     this.centerActiveChapter();
     if (suggestedCard) {
       // Only the grid scrolls: scrollIntoView would also move the dialog inside its backdrop.
@@ -2451,9 +2480,15 @@ export class UIManager {
           );
         });
       } else {
-        btn.disabled = true;
-        btn.title = t('modals.levelSelect.arcade.puzzleStageLocked', {
-          previous: formatNumber(stageNum - 1)
+        const requiredStage = Math.max(1, stageNum - 1);
+        const lockText = t('modals.levelSelect.arcade.puzzleStageLocked', {
+          previous: formatNumber(requiredStage)
+        });
+        btn.setAttribute('aria-disabled', 'true');
+        btn.title = lockText;
+        btn.setAttribute('aria-label', `${label} - ${lockText}`);
+        btn.addEventListener('click', () => {
+          this.showLockedLevelHint(requiredStage, 'modals.levelSelect.arcade.puzzleStageLocked');
         });
       }
       strip.appendChild(btn);
@@ -2517,7 +2552,7 @@ export class UIManager {
     revealLiveRegion({
       region: hintEl,
       textElement: hintEl,
-      text: t(hintKey, { level: requiredLevel }),
+      text: t(hintKey, { level: requiredLevel, previous: requiredLevel }),
       schedule: scheduleNextFrame
     });
   }
@@ -2766,7 +2801,7 @@ export class UIManager {
       const secondsLeft = Math.max(0, Math.ceil(engine.blitzFramesRemaining / fps));
       setTextIfChanged(
         this.elements.modeBanner,
-        t('hud.stats.mode.blitz', { seconds: formatNumber(secondsLeft) })
+        t('hud.stats.mode.blitz', { wave: formatNumber(engine.waveCount) })
       );
       if (this.elements.shotsLabel) {
         setTextIfChanged(this.elements.shotsLabel, t('hud.stats.time.label'));
@@ -2851,6 +2886,14 @@ export class UIManager {
       if (this.elements.starProgress) {
         this.elements.starProgress.classList.add('hidden');
       }
+    }
+
+    if (this.elements.modeBanner) {
+      setAttributeIfChanged(
+        this.elements.modeBanner,
+        'aria-label',
+        `${this.elements.modeBanner.textContent} (${t('hud.stats.mode.switchHint')})`
+      );
     }
 
     if (engine.combo > 1) {

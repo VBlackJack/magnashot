@@ -20,6 +20,9 @@ import { t } from '../core/I18n.js';
 /** Where the light catches a special ball icon, as a radial-gradient position. */
 export const SPECIAL_ICON_HIGHLIGHT_POSITION = '30% 30%';
 
+/** Core board and launcher mechanics documented in the Workshop Codex. */
+export const CODEX_MECHANICS_ORDER = Object.freeze(['polarity', 'collectors', 'overcharge']);
+
 /**
  * Background of a special ball icon: lit from the top left, like the ball on the board.
  * @param {{highlight: string, fill: string}} spec - Special ball colors from balls.json.
@@ -189,4 +192,40 @@ export function buildCodexPane() {
     }
     pane.appendChild(mutGrid);
   }
+
+  const mechHeading = document.createElement('h3');
+  mechHeading.className = 'modal-subtitle';
+  mechHeading.textContent = t('modals.shop.codex.mechanicsTitle');
+  pane.appendChild(mechHeading);
+
+  const mechGrid = document.createElement('div');
+  mechGrid.className = 'codex-grid';
+  for (const mechKey of CODEX_MECHANICS_ORDER) {
+    const card = document.createElement('div');
+    card.className = 'codex-card';
+
+    const badge = document.createElement('div');
+    badge.className = 'codex-badge';
+    const mechColor = this.gameConfig.theme.collectorLabelColor || this.gameConfig.theme.wavePopupColor;
+    badge.style.borderColor = mechColor;
+    badge.style.background = specialIconBackground({
+      highlight: mechColor,
+      fill: this.gameConfig.theme.launcherBaseColor
+    });
+    badge.textContent = t(`modals.shop.codex.mechanics.${mechKey}.icon`);
+
+    const info = document.createElement('div');
+    info.className = 'codex-info';
+    const title = document.createElement('div');
+    title.className = 'codex-title';
+    title.textContent = t(`modals.shop.codex.mechanics.${mechKey}.name`);
+    const desc = document.createElement('div');
+    desc.className = 'codex-desc';
+    desc.textContent = t(`modals.shop.codex.mechanics.${mechKey}.description`);
+    info.append(title, desc);
+
+    card.append(badge, info);
+    mechGrid.appendChild(card);
+  }
+  pane.appendChild(mechGrid);
 }

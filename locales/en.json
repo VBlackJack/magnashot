@@ -104,7 +104,7 @@
         "flux": "Flux Mode • Shape {{stage}}: {{shape}}",
         "fluxBoss": "Flux Mode • Shape {{stage}}: {{shape}} (Boss)",
         "puzzle": "Puzzle Mode • Stage {{stage}} / {{total}}",
-        "blitz": "Blitz 90s • {{seconds}}s",
+        "blitz": "Blitz 90s • Wave {{wave}}",
         "bossRush": "Boss Rush • Wave {{wave}} (👑 {{shields}})",
         "cascade": "Cascade Drop • Wave {{wave}}",
         "coreRescueProgress": "💎 {{rescued}}/{{total}}",
@@ -504,6 +504,24 @@
         "obstaclesTitle": "Magnetic Anomalies & Obstacles",
         "specialsTitle": "Special Balls (Arsenal)",
         "mutatorsTitle": "Daily Challenge Mutators",
+        "mechanicsTitle": "Board & Launcher Mechanics",
+        "mechanics": {
+          "polarity": {
+            "icon": "🧲",
+            "name": "Polarity Inversion",
+            "description": "Flips your projectile's magnetic charge (F key or 🧲 button): attractors repel your shot while repulsor cores pull it in."
+          },
+          "collectors": {
+            "icon": "⚡",
+            "name": "Magnetic Collector Bins",
+            "description": "The 5 energized slots at the bottom of the board catch every falling avalanche sphere for bonus points and Overcharge."
+          },
+          "overcharge": {
+            "icon": "🔋",
+            "name": "Overcharge Gauge",
+            "description": "Fills with every cleared group and collected sphere. When full, it automatically forges a free Special Ball."
+          }
+        },
         "mutators": {
           "hyperGravity": {
             "icon": "🪐",
@@ -777,7 +795,10 @@
           "pointer": "Cancel a shot: release the click below the launcher",
           "touch": "Cancel a shot: drag back below the launcher before releasing"
         },
-        "keyboard": "Keyboard: Left/Right to Fine-Tune Aim (Shift: Faster), Enter to Shoot, F to Flip Polarity, 1-7 for Special Balls",
+        "keyboard": {
+          "pointer": "Keyboard & Arsenal: Left/Right to fine-tune aim (Shift: faster), Enter to shoot, F (or 🧲) to invert polarity, 1-7 for Special Balls",
+          "touch": "Polarity & Arsenal: tap 🧲 to invert magnetic attraction/repulsion, or tap a Special Ball charged by Overcharge"
+        },
         "physics": "Tip: Sever anchor links or unbalance rotors to trigger chain reactions!"
       },
       "button": {

@@ -1095,7 +1095,7 @@ body {
   transition: border-color 0.15s ease, background 0.15s ease;
 }
 
-.puzzle-stage-btn:hover:not(:disabled) {
+.puzzle-stage-btn:hover:not(:disabled):not(.locked) {
   border-color: var(--accent-blue);
 }
 
@@ -1105,7 +1105,8 @@ body {
   border-color: var(--accent-amber);
 }
 
-.puzzle-stage-btn:disabled {
+.puzzle-stage-btn:disabled,
+.puzzle-stage-btn.locked {
   opacity: 0.5;
   cursor: not-allowed;
 }

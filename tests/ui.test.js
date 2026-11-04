@@ -968,7 +968,10 @@ test('Arcade modes are accessible from both the main navigation bar and the rich
   for (const id of ['btn-mode-puzzle', 'btn-mode-blitz', 'btn-mode-boss-rush', 'btn-mode-cascade']) {
     assert.match(levelsModal, new RegExp(`id="${id}"[^>]*class="arcade-mode-card"`));
   }
-  assert.match(indexHtml, /id="hud-mode-banner"[^>]*role="button"[^>]*tabindex="0"/);
+  assert.match(
+    indexHtml,
+    /id="hud-mode-banner"[^>]*role="button"[^>]*tabindex="0"[^>]*aria-haspopup="dialog"/
+  );
 
   const ui = Object.create(UIManager.prototype);
   ui.gameConfig = gameConfig;
@@ -980,9 +983,9 @@ test('Arcade modes are accessible from both the main navigation bar and the rich
   ui.engine = { mode: 'campaign', currentPuzzleStage: 1 };
   assert.equal(ui.getSuggestedPuzzleStage(), 3, 'Switching into Puzzle mode resumes at the best unlocked stage');
   ui.engine = { mode: 'puzzle', currentPuzzleStage: 2 };
-  assert.equal(ui.getSuggestedPuzzleStage(), 3, 'Clicking Puzzle while already in Puzzle mode cycles to the next unlocked stage');
+  assert.equal(ui.getSuggestedPuzzleStage(), 2, 'Clicking Puzzle while already in Puzzle mode keeps the active stage');
   ui.engine = { mode: 'puzzle', currentPuzzleStage: 3 };
-  assert.equal(ui.getSuggestedPuzzleStage(), 1, 'Cycling past the highest unlocked Puzzle stage wraps back to stage 1');
+  assert.equal(ui.getSuggestedPuzzleStage(), 3, 'Clicking Puzzle on the highest unlocked stage stays on stage 3');
 
   assert.match(levelsModal, /id="puzzle-stages-strip"[^>]*class="puzzle-stages-strip"/);
   assert.match(uiManagerCode, /style-preview-orb style-preview-\$\{styleId\}/);
@@ -1031,4 +1034,64 @@ test('Graphical audit guards: collector labels, floating-text clamping, Antimagn
     /box-shadow:\s*inset 0 2px 4px var\(--highlight-alpha-40\),\s*0 2px 6px var\(--shadow-alpha-45\);/,
     '.codex-badge has 3D orb inner highlight and drop shadow'
   );
+});
+
+test('UX audit guards: Blitz HUD wave banner, locked Puzzle aria-disabled hint, touch Pause polarity/arsenal instruction, Codex mechanics, and Level Select initial focus', () => {
+  assert.match(
+    uiManagerCode,
+    /t\('hud\.stats\.mode\.blitz',\s*\{\s*wave:\s*formatNumber\(engine\.waveCount\)\s*\}\)/,
+    'Blitz HUD mode banner shows the current wave while the shots box shows the countdown timer'
+  );
+  assert.match(
+    uiManagerCode,
+    /btn\.setAttribute\('aria-disabled',\s*'true'\)/,
+    'Locked Puzzle stage buttons use aria-disabled="true" so keyboard and touch users receive a hint'
+  );
+  assert.match(
+    uiManagerCode,
+    /this\.showLockedLevelHint\(requiredStage,\s*'modals\.levelSelect\.arcade\.puzzleStageLocked'\)/,
+    'Clicking a locked Puzzle stage reveals the polite hint banner'
+  );
+  assert.match(
+    uiManagerCode,
+    /setAttributeIfChanged\(\s*this\.elements\.modeBanner,\s*'aria-label'/,
+    '#hud-mode-banner updates its aria-label with the switchHint action'
+  );
+  assert.match(
+    uiManagerCode,
+    /modals\.shop\.codex\.mechanicsTitle/,
+    'Codex renders the Board & Launcher Mechanics section'
+  );
+
+  for (const lang of SUPPORTED) {
+    const locale = loadJson(`./locales/${lang}.json`);
+    assert.deepEqual(placeholdersOf(locale.hud.stats.mode.blitz), ['wave']);
+    assert.ok(locale.modals.pause.instructions.keyboard.pointer);
+    assert.ok(locale.modals.pause.instructions.keyboard.touch);
+    assert.notEqual(
+      locale.modals.pause.instructions.keyboard.pointer,
+      locale.modals.pause.instructions.keyboard.touch
+    );
+    for (const mechKey of ['polarity', 'collectors', 'overcharge']) {
+      assert.ok(locale.modals.shop.codex.mechanics[mechKey]?.icon);
+      assert.ok(locale.modals.shop.codex.mechanics[mechKey]?.name);
+      assert.ok(locale.modals.shop.codex.mechanics[mechKey]?.description);
+    }
+  }
+
+  const ui = Object.create(UIManager.prototype);
+  const playBtn = { id: 'btn-play-level-modal' };
+  const closeBtn = { id: 'btn-close-levels' };
+  const blitzBtn = { id: 'btn-mode-blitz' };
+  ui.elements = {
+    btnCloseLevels: closeBtn,
+    btnModeBlitz: blitzBtn
+  };
+  ui.isRunActive = () => true;
+  ui.engine = { mode: 'campaign' };
+  assert.equal(ui.getLevelsModalInitialFocus(playBtn), playBtn, 'Campaign run focuses the Campaign play/resume CTA');
+  ui.engine = { mode: 'blitz' };
+  assert.equal(ui.getLevelsModalInitialFocus(playBtn), blitzBtn, 'Blitz run focuses the Blitz Arcade card instead of Campaign play');
+  ui.engine = { mode: 'endless' };
+  assert.equal(ui.getLevelsModalInitialFocus(playBtn), closeBtn, 'Survival run focuses Close instead of Campaign play');
 });
