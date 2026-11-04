@@ -19,7 +19,7 @@ import assert from 'node:assert/strict';
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { GAME_OVER_REASONS, INPUT_MODES } from '../src/core/Constants.js';
+import { GAME_OVER_REASONS, INPUT_MODES, SPECIAL_TYPES_ORDER } from '../src/core/Constants.js';
 import { I18nService, i18n, resolveInitialLocale } from '../src/core/I18n.js';
 import {
   HIGH_CONTRAST_CLASS,
@@ -34,13 +34,13 @@ import {
   isDocumentFullscreen,
   isFullscreenSupported,
   isIosBrowserTab,
+  isSharedFluxOverSavedRun,
   UIManager,
   VICTORY_NEXT_ACTIONS,
   VICTORY_NEXT_LABEL_KEYS,
   resolveModalFocusTarget,
   resolveNextCampaignTarget,
   resolveLevelFormatBadgeKey,
-  resolveVictoryNextAction,
   revealLiveRegion,
   shouldIgnoreRepeatedKey
 } from '../src/ui/UIManager.js';
@@ -421,8 +421,8 @@ test('a campaign victory leads to the next level, and to the level select after 
     ballRadius: loadJson('./configs/physics.json').ball.radius
   });
   const middleId = Math.floor((catalog.firstId + catalog.lastId) / 2);
-  assert.equal(resolveVictoryNextAction(middleId, catalog), VICTORY_NEXT_ACTIONS.NEXT_LEVEL);
-  assert.equal(resolveVictoryNextAction(catalog.lastId, catalog), VICTORY_NEXT_ACTIONS.LEVEL_SELECT);
+  assert.equal(resolveNextCampaignTarget(middleId, catalog).action, VICTORY_NEXT_ACTIONS.NEXT_LEVEL);
+  assert.equal(resolveNextCampaignTarget(catalog.lastId, catalog).action, VICTORY_NEXT_ACTIONS.LEVEL_SELECT);
 
   const en = flattenStrings(loadJson('./locales/en.json'));
   const fr = flattenStrings(loadJson('./locales/fr.json'));
@@ -430,12 +430,19 @@ test('a campaign victory leads to the next level, and to the level select after 
     const key = VICTORY_NEXT_LABEL_KEYS[action];
     assert.ok(en.has(key) && fr.has(key), `${action}: label ${key} in both locales`);
   }
-  const uiSource = readFileSync('./src/ui/UIManager.js', 'utf8');
-  const handler = uiSource.slice(
-    uiSource.indexOf('btnNextLevel.addEventListener'),
-    uiSource.indexOf('btnReplayVictory.addEventListener')
+  assert.ok(
+    !Object.values(VICTORY_NEXT_ACTIONS).some((action) => /endless|survival/i.test(action)),
+    'a campaign victory never offers Survival'
   );
-  assert.ok(handler.length > 0 && !handler.includes('startEndlessMode'), 'Next Level never starts Survival');
+
+  const { ui, el, calls } = bindEventsHarness({
+    engine: { mode: 'campaign', state: 'victory', currentLevelId: middleId, levelCatalog: catalog }
+  });
+  ui.getVictoryTargetOptions = () => ({});
+  ui.hideAllModals = () => {};
+  el('btnNextLevel').click();
+  assert.deepEqual(calls.startCampaignLevel, [middleId + 1], 'Next Level starts the next campaign level');
+  assert.equal(calls.startEndlessMode.length, 0, 'Next Level never starts Survival');
 });
 
 test('a share tap while a share is under way is ignored, and the next one goes through', async () => {
@@ -460,15 +467,6 @@ test('a share tap while a share is under way is ignored, and the next one goes t
   release.resolve();
   await next;
   assert.equal(attempts, 2);
-});
-
-/** The breakpoint opens the drawer layout in styles/main.css and switches its styles. */
-const MIN_DRAWER_QUERY_USES = 2;
-
-test('the drawer breakpoint of configs/game.json is the one styles/main.css uses', () => {
-  const query = gameConfig.defaults.drawerMediaQuery;
-  const uses = mainCss.split(query).length - 1;
-  assert.ok(uses >= MIN_DRAWER_QUERY_USES, `${query} appears ${uses} times in styles/main.css`);
 });
 
 test('the install hint is for iOS browser tabs only, not for the installed app', () => {
@@ -513,17 +511,51 @@ test('the HUD stars are read as a count, not as glyphs', () => {
     const score = loadJson(`./locales/${lang}.json`).hud.stats.score;
     assert.deepEqual(placeholdersOf(score.starsAria), ['maxStars', 'stars']);
   }
-  const mockClassList = { contains: () => false, toggle: () => {} };
-  const drawerStarProgress = { textContent: '', classList: mockClassList };
-  UIManager.prototype.syncDrawerStats.call({
-    elements: {
-      starProgress: { textContent: '★☆☆Étoiles : 1 sur 3 • Prochain : 6 900', classList: mockClassList },
-      starGlyphs: { textContent: '★☆☆' },
-      starNext: { textContent: '• Prochain : 6 900' },
-      drawerStarProgress
+});
+
+test('the menu star progress is built once: hidden glyphs, a spoken count, then the next target', () => {
+  const makeNode = () => ({
+    textContent: '',
+    attributes: {},
+    children: [],
+    className: '',
+    setAttribute(k, v) {
+      this.attributes[k] = v;
+    },
+    append(...nodes) {
+      this.children.push(...nodes);
     }
   });
-  assert.equal(drawerStarProgress.textContent, '★☆☆ • Prochain : 6 900');
+  const prevDoc = globalThis.document;
+  globalThis.document = { createElement: makeNode };
+  try {
+    const classList = { contains: () => false, toggle: () => {} };
+    const host = makeNode();
+    host.classList = classList;
+    const ui = Object.create(UIManager.prototype);
+    ui.elements = {
+      starProgress: { classList },
+      starGlyphs: { textContent: '★☆☆' },
+      starCount: { textContent: 'Étoiles : 1 sur 3' },
+      starNext: { textContent: '• Prochain : 6 900' },
+      drawerStarProgress: host
+    };
+    ui.syncDrawerStats();
+    const [glyphs, count, , next] = host.children;
+    assert.equal(glyphs.textContent, '★☆☆');
+    assert.equal(glyphs.attributes['aria-hidden'], 'true', 'glyphs are hidden from screen readers');
+    assert.equal(count.className, 'visually-hidden');
+    assert.equal(count.textContent, 'Étoiles : 1 sur 3');
+    assert.equal(next.textContent, '• Prochain : 6 900');
+
+    ui.elements.starGlyphs.textContent = '★★☆';
+    ui.syncDrawerStats();
+    assert.equal(host.children.length, 4, 'the spans are created once');
+    assert.equal(host.children[0], glyphs);
+    assert.equal(glyphs.textContent, '★★☆', 'later syncs only update the text');
+  } finally {
+    globalThis.document = prevDoc;
+  }
 });
 
 test('the level grid is labelled by the active chapter tab', () => {
@@ -609,11 +641,20 @@ test('the drawer duration is written once', () => {
   assert.match(mainCss, /visibility 0s linear var\(--drawer-duration\)/);
 });
 
-test('btnPlayLevelModal asks for destructive confirmation when switching from an active non-campaign run', () => {
-  assert.match(
-    uiManagerCode,
-    /this\.elements\.btnPlayLevelModal\.addEventListener\('click',\s*\(\)\s*=>\s*\{\s*if \(this\.isCampaignRunActive\(\)\) \{\s*this\.closeOverlayModal\(this\.elements\.modalLevels\);\s*if \(this\.engine\.state === GAME_STATES\.PAUSED\) \{\s*this\.engine\.togglePause\(\);\s*\}\s*return;\s*\}\s*this\.requestDestructiveAction\(/
-  );
+test('btnPlayLevelModal closes the level select over a campaign run and asks to confirm otherwise', () => {
+  const { ui, el, calls } = bindEventsHarness({ engine: { mode: 'campaign', state: 'playing' } });
+  let closed = 0;
+  ui.closeOverlayModal = () => {
+    closed++;
+  };
+  ui.requestDestructiveAction = (action) => calls.destructive.push(action);
+  el('btnPlayLevelModal').click();
+  assert.equal(closed, 1, 'an active campaign run just resumes');
+  assert.equal(calls.destructive.length, 0);
+
+  ui.engine.mode = 'endless';
+  el('btnPlayLevelModal').click();
+  assert.equal(calls.destructive.length, 1, 'switching from another run asks to confirm');
 });
 
 test('Pause modal delegates settings to the Settings dialog and restores focus on close', () => {
@@ -643,16 +684,43 @@ test('Codex documents cluster modifiers, obstacles, special balls, and daily mut
 });
 
 test('Digit1-Digit6 shortcut opens Workshop Ammo tab when pressing an empty special slot during a run (except Puzzle)', () => {
-  assert.match(
-    uiManagerCode,
-    /if \(count <= 0 && !isEquipped && this\.engine\.offersSpecialBalls\?\.\(\) && this\.canBuySpecialAmmo\(\)\) \{\s*this\.openShopModal\(SHOP_TABS\.AMMO\);/
-  );
   const ui = Object.create(UIManager.prototype);
   ui.isRunActive = () => true;
   ui.engine = { mode: 'campaign' };
   assert.equal(ui.canBuySpecialAmmo(), true);
   ui.engine = { mode: 'puzzle' };
   assert.equal(ui.canBuySpecialAmmo(), false, 'Puzzle mode locks special ammo refills');
+
+  // An empty slot opens the Workshop ammo tab; a stocked one equips the ball.
+  const keyUi = Object.create(UIManager.prototype);
+  const opened = [];
+  const equipped = [];
+  keyUi.setInputMode = () => {};
+  keyUi.isAnyModalOpen = () => false;
+  keyUi.canBuySpecialAmmo = () => true;
+  keyUi.openShopModal = (tab) => opened.push(tab);
+  keyUi.elements = {};
+  keyUi.engine = {
+    state: 'playing',
+    specialInventory: {},
+    offersSpecialBalls: () => true,
+    equipSpecialBall: (type) => equipped.push(type)
+  };
+  const press = (code) => keyUi.handleKeyDown({ code, repeat: false, preventDefault() {} });
+  const prevDoc = globalThis.document;
+  globalThis.document = { activeElement: null, body: {}, documentElement: {} };
+  try {
+    press('Digit1');
+    assert.equal(opened.length, 1, 'an empty special slot opens the Workshop');
+    assert.equal(equipped.length, 0);
+
+    keyUi.engine.specialInventory = { [SPECIAL_TYPES_ORDER[0]]: 1 };
+    press('Digit1');
+    assert.equal(opened.length, 1, 'a stocked slot does not open the Workshop again');
+    assert.deepEqual(equipped, [SPECIAL_TYPES_ORDER[0]], 'a stocked slot equips the ball');
+  } finally {
+    globalThis.document = prevDoc;
+  }
 });
 
 test('rerenderShopKeepingFocus keeps focus at or after the upgraded slot index when an upgrade reaches MAX', () => {
@@ -833,7 +901,7 @@ test('Level select incomplete filter, Flux same-seed button, achievement progres
   assert.match(uiManagerCode, /achievement-progress-track/);
   assert.match(uiManagerCode, /achievement-progress-fill/);
   assert.match(uiManagerCode, /levels-empty-filter/);
-  assert.match(uiManagerCode, /requestDestructiveAction\(actionCallback, confirmLabelResolver = null\)/);
+  assert.match(uiManagerCode, /requestDestructiveAction\(actionCallback, confirmLabelResolver = null, \{ always = false \} = \{\}\)/);
 
   const ui = Object.create(UIManager.prototype);
   ui.engine = {
@@ -885,6 +953,41 @@ test('Level select incomplete filter, Flux same-seed button, achievement progres
       assert.ok(locale.modals.levelSelect.card.formatBadge[badgeKey]);
     }
   }
+});
+
+test('requestDestructiveAction with always confirms a restored run that has not fired yet', () => {
+  const makeUi = () => {
+    const ui = Object.create(UIManager.prototype);
+    ui.engine = { state: 'playing', hasFiredInRound: false, physicsWorld: { balls: [{}] } };
+    const modalConfirm = { classList: { hidden: true, remove() { this.hidden = false; } } };
+    ui.elements = { modalConfirm, btnConfirmYes: { textContent: '' }, btnConfirmNo: { focus() {} } };
+    ui.isAnyModalOpen = () => false;
+    ui.saveLastFocusedElement = () => {};
+    ui.syncModalInertState = () => {};
+    return { ui, modalConfirm };
+  };
+
+  const plain = makeUi();
+  let plainRuns = 0;
+  plain.ui.requestDestructiveAction(() => {
+    plainRuns++;
+  });
+  assert.equal(plainRuns, 1, 'without always, an unfired run still proceeds silently');
+  assert.equal(plain.modalConfirm.classList.hidden, true);
+
+  const guarded = makeUi();
+  let guardedRuns = 0;
+  guarded.ui.requestDestructiveAction(
+    () => {
+      guardedRuns++;
+    },
+    null,
+    { always: true }
+  );
+  assert.equal(guardedRuns, 0, 'the action waits for the player');
+  assert.equal(guarded.modalConfirm.classList.hidden, false, 'the Confirm modal opens');
+  guarded.ui.pendingConfirmCallback();
+  assert.equal(guardedRuns, 1, 'the action runs once confirmed');
 });
 
 test('StorageManager persists all-time best achievement progress records', () => {
@@ -1269,5 +1372,383 @@ test('Fullscreen toggle is exposed in portrait HUD (#btn-fullscreen-hud) and Set
     assert.equal(ui.elements.btnFullscreenHud.getAttribute('aria-pressed'), 'false');
   } finally {
     globalThis.document = prevDoc;
+  }
+});
+
+/**
+ * Runs UIManager.bindEvents against stub elements and returns the manager, an element
+ * lookup whose stubs expose click(), and the engine calls recorded so far.
+ */
+function bindEventsHarness({ engine = {}, storage = {} } = {}) {
+  const cache = new Map();
+  const makeEl = (name) => {
+    const handlers = {};
+    return {
+      id: name,
+      textContent: '',
+      attributes: {},
+      classList: { add() {}, remove() {}, toggle() {}, contains: () => false },
+      style: {},
+      addEventListener(type, fn) {
+        (handlers[type] ||= []).push(fn);
+      },
+      click() {
+        for (const fn of handlers.click || []) {
+          fn({ preventDefault() {}, stopPropagation() {}, target: this, currentTarget: this });
+        }
+      },
+      querySelectorAll: () => [],
+      querySelector: () => null,
+      setAttribute(k, v) {
+        this.attributes[k] = v;
+      },
+      getAttribute(k) {
+        return this.attributes[k] ?? null;
+      },
+      removeAttribute() {},
+      focus() {},
+      closest: () => null
+    };
+  };
+  const el = (name) => {
+    if (!cache.has(name)) {
+      cache.set(name, makeEl(name));
+    }
+    return cache.get(name);
+  };
+  const calls = { startCampaignLevel: [], startEndlessMode: [], destructive: [] };
+  const ui = Object.create(UIManager.prototype);
+  ui.elements = new Proxy({}, { get: (_, name) => (typeof name === 'string' ? el(name) : undefined) });
+  ui.gameConfig = gameConfig;
+  ui.storageManager = storage;
+  ui.engine = {
+    state: 'playing',
+    startCampaignLevel: (id) => calls.startCampaignLevel.push(id),
+    startEndlessMode: () => calls.startEndlessMode.push(true),
+    isVictoryCelebrating: () => false,
+    ...engine
+  };
+  const prevWindow = globalThis.window;
+  const prevDoc = globalThis.document;
+  const noopTarget = { addEventListener() {}, removeEventListener() {}, hidden: false, matchMedia: () => ({ matches: false }) };
+  globalThis.window = noopTarget;
+  globalThis.document = { ...noopTarget, querySelector: () => null, querySelectorAll: () => [] };
+  try {
+    ui.bindEvents();
+  } finally {
+    globalThis.window = prevWindow;
+    globalThis.document = prevDoc;
+  }
+  return { ui, el, calls };
+}
+
+const makeClassList = (...initial) => {
+  const names = new Set(initial);
+  return {
+    add: (name) => names.add(name),
+    remove: (name) => names.delete(name),
+    contains: (name) => names.has(name),
+    toggle(name, force) {
+      const on = force ?? !names.has(name);
+      if (on) {
+        names.add(name);
+      } else {
+        names.delete(name);
+      }
+      return on;
+    }
+  };
+};
+
+/** A manager wired with just enough stub elements to exercise the slide-in menu. */
+function makeDrawerUi({ state = 'playing' } = {}) {
+  const focusLog = [];
+  const makeFocusable = (id) => ({
+    id,
+    attributes: {},
+    classList: makeClassList(),
+    inert: false,
+    setAttribute(k, v) {
+      this.attributes[k] = v;
+    },
+    removeAttribute(k) {
+      delete this.attributes[k];
+    },
+    focus() {
+      focusLog.push(id);
+    }
+  });
+  const ui = Object.create(UIManager.prototype);
+  ui.isDrawerOpen = false;
+  ui.autoPausedByOverlay = false;
+  ui.lastExtra = {};
+  ui.engine = { state, isVictoryCelebrating: () => false };
+  ui.refresh = () => {};
+  ui.syncModalInertState = () => {};
+  ui.elements = {
+    appShell: makeFocusable('app-shell'),
+    hudBar: makeFocusable('hud-bar'),
+    stageContainer: makeFocusable('stage'),
+    btnMenu: makeFocusable('btn-menu'),
+    btnCloseDrawer: makeFocusable('btn-close-drawer'),
+    drawer: makeFocusable('app-drawer'),
+    modalConfirm: makeFocusable('modal-confirm'),
+    modalLevels: makeFocusable('modal-levels'),
+    modalShop: makeFocusable('modal-shop'),
+    modalSettings: makeFocusable('modal-settings'),
+    modalPause: makeFocusable('modal-pause')
+  };
+  for (const name of ['modalConfirm', 'modalLevels', 'modalShop', 'modalSettings', 'modalPause']) {
+    ui.elements[name].classList.add('hidden');
+  }
+  ui.getModalsByPriority = () => [
+    ui.elements.modalConfirm,
+    ui.elements.modalLevels,
+    ui.elements.modalShop,
+    ui.elements.modalSettings
+  ];
+  ui.getOverlayModals = () => [ui.elements.modalLevels, ui.elements.modalShop, ui.elements.modalSettings];
+  return { ui, focusLog };
+}
+
+test('opening the menu pauses the run, takes the page behind it out of reach and flags the button', () => {
+  const { ui, focusLog } = makeDrawerUi();
+  ui.openDrawer();
+  assert.equal(ui.isDrawerOpen, true);
+  assert.equal(ui.engine.state, 'paused');
+  assert.equal(ui.autoPausedByOverlay, true);
+  assert.equal(ui.elements.hudBar.inert, true);
+  assert.equal(ui.elements.stageContainer.inert, true);
+  assert.equal(ui.elements.btnMenu.attributes['aria-expanded'], 'true');
+  assert.equal(ui.elements.drawer.attributes['aria-modal'], 'true');
+  assert.deepEqual(focusLog, ['btn-close-drawer']);
+});
+
+test('closing the menu resumes the run it paused, and hands focus back to the menu button', () => {
+  const { ui, focusLog } = makeDrawerUi();
+  ui.openDrawer();
+  ui.closeDrawer({ resume: true });
+  assert.equal(ui.engine.state, 'playing');
+  assert.equal(ui.elements.hudBar.inert, false);
+  assert.equal(ui.elements.stageContainer.inert, false);
+  assert.equal(ui.elements.btnMenu.attributes['aria-expanded'], 'false');
+  assert.equal(ui.elements.drawer.attributes['aria-modal'], undefined);
+  assert.equal(focusLog.at(-1), 'btn-menu');
+});
+
+test('closing the menu for a menu action leaves the run paused', () => {
+  const { ui, focusLog } = makeDrawerUi();
+  ui.openDrawer();
+  ui.closeDrawer({ resume: false });
+  assert.equal(ui.engine.state, 'paused');
+  assert.equal(ui.isDrawerOpen, false);
+  assert.equal(focusLog.at(-1), 'btn-menu');
+});
+
+test('gameplay shortcuts do nothing while the menu is open', () => {
+  const { ui } = makeDrawerUi();
+  const calls = [];
+  ui.setInputMode = () => {};
+  ui.canBuySpecialAmmo = () => true;
+  ui.openShopModal = (tab) => calls.push(`shop:${tab}`);
+  ui.engine.specialInventory = {};
+  ui.engine.offersSpecialBalls = () => true;
+  ui.engine.swapLauncherBalls = () => calls.push('swap');
+  ui.engine.equipSpecialBall = () => calls.push('equip');
+  ui.openDrawer();
+  const prevDoc = globalThis.document;
+  globalThis.document = { activeElement: null, body: {}, documentElement: {} };
+  try {
+    for (const code of ['Digit1', 'Digit3', 'Space']) {
+      ui.handleKeyDown({ code, repeat: false, preventDefault() {} });
+    }
+  } finally {
+    globalThis.document = prevDoc;
+  }
+  assert.deepEqual(calls, [], 'no Shop, no special ball, no swap');
+});
+
+test('Escape closes a dialog over the menu first, and the run stays paused', () => {
+  const { ui } = makeDrawerUi();
+  ui.setInputMode = () => {};
+  ui.openDrawer();
+  ui.elements.modalShop.classList.remove('hidden');
+  ui.handleKeyDown({ code: 'Escape', repeat: false });
+  assert.equal(ui.elements.modalShop.classList.contains('hidden'), true, 'the dialog closes first');
+  assert.equal(ui.isDrawerOpen, true, 'the menu is still open');
+  assert.equal(ui.engine.state, 'paused', 'closing the dialog does not resume the run');
+  ui.handleKeyDown({ code: 'Escape', repeat: false });
+  assert.equal(ui.isDrawerOpen, false, 'the next Escape closes the menu');
+  assert.equal(ui.engine.state, 'playing');
+});
+
+test('dismissing a Confirm over the menu does not resume the run', () => {
+  const { ui } = makeDrawerUi();
+  ui.openDrawer();
+  ui.elements.modalConfirm.classList.remove('hidden');
+  ui.confirmPausedRun = true;
+  ui.updateConfirmButtonLabel = () => {};
+  ui.dismissConfirm();
+  assert.equal(ui.engine.state, 'paused');
+  assert.equal(ui.isDrawerOpen, true);
+});
+
+test('Escape unwinds Confirm, then Levels, Shop and Settings, then the menu', () => {
+  const { ui } = makeDrawerUi();
+  ui.setInputMode = () => {};
+  ui.openDrawer();
+  const layers = ['modalConfirm', 'modalLevels', 'modalShop', 'modalSettings'];
+  for (const name of layers) {
+    ui.elements[name].classList.remove('hidden');
+  }
+  ui.dismissConfirm = () => ui.elements.modalConfirm.classList.add('hidden');
+  const closedOrder = [];
+  for (let i = 0; i < layers.length; i++) {
+    ui.handleKeyDown({ code: 'Escape', repeat: false });
+    closedOrder.push(layers.find((name) => ui.elements[name].classList.contains('hidden') && !closedOrder.includes(name)));
+  }
+  assert.deepEqual(closedOrder, layers);
+  assert.equal(ui.isDrawerOpen, true, 'the menu closes last');
+});
+
+test('a shared Flux link needs a confirmation only over a different saved run', () => {
+  const seed = 'a1b2c3';
+  assert.equal(isSharedFluxOverSavedRun(seed, { engine: { fluxSeed: 'ffffff' } }), true);
+  assert.equal(isSharedFluxOverSavedRun(seed, { engine: { mode: 'campaign' } }), true, 'a campaign run is saved');
+  assert.equal(isSharedFluxOverSavedRun(seed, { engine: { fluxSeed: seed } }), false, 'same run: resumed');
+  assert.equal(isSharedFluxOverSavedRun(seed, null), false, 'nothing to erase');
+  assert.equal(isSharedFluxOverSavedRun(null, { engine: {} }), false, 'no shared link');
+});
+
+test('the animation speed cycles through the configured values and wraps to the first', () => {
+  const speeds = gameConfig.defaults.animationSpeeds;
+  let stored = speeds.at(-1);
+  const sentToEngine = [];
+  const ui = Object.create(UIManager.prototype);
+  ui.gameConfig = gameConfig;
+  ui.storageManager = {
+    getAnimationSpeed: () => stored,
+    setAnimationSpeed: (value) => {
+      stored = value;
+    }
+  };
+  ui.engine = { setAnimationSpeed: (value) => sentToEngine.push(value) };
+  let refreshed = 0;
+  ui.updateAnimSpeedButton = () => {
+    refreshed++;
+  };
+  ui.cycleAnimationSpeed();
+  assert.equal(stored, speeds[0], 'the last speed wraps to the first');
+  assert.deepEqual(sentToEngine, [speeds[0]]);
+  ui.cycleAnimationSpeed();
+  assert.equal(stored, speeds[1]);
+  assert.deepEqual(sentToEngine, [speeds[0], speeds[1]]);
+  assert.equal(refreshed, 2);
+});
+
+test('fullscreen controls: hidden when unsupported or already fullscreen, synced on change, WebKit paths', async () => {
+  await i18n.init('fr', ['fr', 'en']);
+  const makeBtn = (id) => ({
+    id,
+    textContent: '',
+    title: '',
+    attributes: {},
+    listeners: {},
+    classList: makeClassList(),
+    setAttribute(k, v) {
+      this.attributes[k] = v;
+    },
+    getAttribute(k) {
+      return this.attributes[k];
+    },
+    addEventListener(type, fn) {
+      this.listeners[type] = fn;
+    },
+    closest: () => null
+  });
+  const makeUi = () => {
+    const ui = Object.create(UIManager.prototype);
+    ui.gameConfig = gameConfig;
+    ui.elements = { btnFullscreen: makeBtn('btn-fullscreen'), btnFullscreenHud: makeBtn('btn-fullscreen-hud') };
+    return ui;
+  };
+  const fullApi = () => ({
+    fullscreenEnabled: true,
+    listeners: {},
+    addEventListener(type, fn) {
+      this.listeners[type] = fn;
+    },
+    documentElement: { requestFullscreen: () => Promise.resolve() },
+    querySelector: () => null
+  });
+  const prevDoc = globalThis.document;
+  const prevWindow = globalThis.window;
+  try {
+    // No Fullscreen API: the control is hidden and nothing is wired.
+    globalThis.document = { documentElement: {}, querySelector: () => null };
+    globalThis.window = { matchMedia: () => ({ matches: false }) };
+    let ui = makeUi();
+    ui.setupFullscreenControl();
+    assert.equal(ui.elements.btnFullscreenHud.classList.contains('hidden'), true);
+    assert.deepEqual(ui.elements.btnFullscreenHud.listeners, {});
+
+    // Installed in fullscreen display mode: the API exists, the controls stay hidden.
+    const asked = [];
+    globalThis.document = fullApi();
+    globalThis.window = {
+      matchMedia: (query) => {
+        asked.push(query);
+        return { matches: true };
+      }
+    };
+    ui = makeUi();
+    ui.setupFullscreenControl();
+    assert.deepEqual(asked, [gameConfig.defaults.fullscreenDisplayModeMediaQuery]);
+    assert.equal(ui.elements.btnFullscreenHud.classList.contains('hidden'), true, 'already fullscreen: hidden');
+
+    // Without matchMedia the controls are shown, and the state follows fullscreenchange.
+    globalThis.window = {};
+    globalThis.document = fullApi();
+    ui = makeUi();
+    ui.setupFullscreenControl();
+    assert.equal(ui.elements.btnFullscreenHud.classList.contains('hidden'), false, 'no matchMedia: shown');
+    globalThis.document.webkitFullscreenElement = {};
+    globalThis.document.listeners.webkitfullscreenchange();
+    assert.equal(ui.elements.btnFullscreenHud.getAttribute('aria-pressed'), 'true');
+    globalThis.document.webkitFullscreenElement = null;
+    globalThis.document.listeners.fullscreenchange();
+    assert.equal(ui.elements.btnFullscreenHud.getAttribute('aria-pressed'), 'false');
+
+    // WebKit-prefixed enter and exit.
+    let entered = 0;
+    let exited = 0;
+    let current = null;
+    globalThis.document = {
+      webkitFullscreenEnabled: true,
+      get webkitFullscreenElement() {
+        return current;
+      },
+      documentElement: {
+        webkitRequestFullscreen() {
+          entered++;
+          current = {};
+        }
+      },
+      webkitExitFullscreen() {
+        exited++;
+        current = null;
+      },
+      querySelector: () => null
+    };
+    ui = makeUi();
+    await ui.toggleFullscreen();
+    assert.equal(entered, 1, 'webkitRequestFullscreen enters');
+    assert.equal(ui.elements.btnFullscreen.getAttribute('aria-pressed'), 'true');
+    await ui.toggleFullscreen();
+    assert.equal(exited, 1, 'webkitExitFullscreen leaves');
+    assert.equal(ui.elements.btnFullscreen.getAttribute('aria-pressed'), 'false');
+  } finally {
+    globalThis.document = prevDoc;
+    globalThis.window = prevWindow;
   }
 });

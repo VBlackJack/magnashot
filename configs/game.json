@@ -172,6 +172,9 @@
       "vignetteDefaultColor": "#f97316"
     },
     "particles": {
+      "maxParticles": 480,
+      "maxShatteringBalls": 24,
+      "maxExplosions": 128,
       "shakeStopThreshold": 0.1,
       "screenFlashInitialAlpha": 0.32,
       "screenFlashDecay": 0.04,
@@ -394,7 +397,6 @@
     "outerRingRadiusFactor": 3.5,
     "innerRingCount": 6,
     "outerRingCount": 10,
-    "overchargeShieldDamage": 1,
     "waveClearBonusBase": 600,
     "waveClearCoinBonus": 12,
     "initialSpecialCounts": {
@@ -649,9 +651,8 @@
     "ballStyle": "classic",
     "animationSpeed": 1,
     "animationSpeeds": [0.5, 1, 1.5, 2],
-    "reducedMotionMediaQuery": "(prefers-reduced-motion: reduce)",
     "coarsePointerMediaQuery": "(pointer: coarse)",
-    "drawerMediaQuery": "(max-width: 680px)"
+    "fullscreenDisplayModeMediaQuery": "(display-mode: fullscreen)"
   },
   "theme": {
     "fontFamily": "system-ui, sans-serif",

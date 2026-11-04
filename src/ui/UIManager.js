@@ -134,6 +134,7 @@ const COUNT_UP_EASE_POWER = 3;
 
 /** App shell class that slides the menu in on portrait phones. */
 const DRAWER_OPEN_CLASS = 'drawer-open';
+const VISUALLY_HIDDEN_CLASS = 'visually-hidden';
 
 /** Pointer types that mean a finger-like input without a keyboard at hand. */
 const TOUCH_POINTER_TYPES = new Set(['touch', 'pen']);
@@ -248,6 +249,17 @@ export function canOpenDrawer({ isOpen, isDrawerLayout, isModalOpen, isVictoryCe
   return !isOpen && isDrawerLayout && !isModalOpen && !isVictoryCelebrating;
 }
 
+/**
+ * True when a shared Flux link would replace a different saved run, so the player must
+ * confirm first. A link to the very run that is saved resumes it instead.
+ * @param {string|null|undefined} sharedSeed - The seed read from the URL, if any.
+ * @param {{engine?: {fluxSeed?: string}}|null|undefined} savedSnapshot - The stored run.
+ * @returns {boolean}
+ */
+export function isSharedFluxOverSavedRun(sharedSeed, savedSnapshot) {
+  return Boolean(sharedSeed && savedSnapshot && savedSnapshot.engine?.fluxSeed !== sharedSeed);
+}
+
 /** What the victory window's main button does: play the next level, jump to the next < 3★ level, or open the level select. */
 export const VICTORY_NEXT_ACTIONS = Object.freeze({
   NEXT_LEVEL: 'nextLevel',
@@ -293,19 +305,6 @@ export function resolveNextCampaignTarget(
     return { action: VICTORY_NEXT_ACTIONS.NEXT_LEVEL, targetLevelId: currentLevelId + 1 };
   }
   return { action: VICTORY_NEXT_ACTIONS.LEVEL_SELECT, targetLevelId: null };
-}
-
-/**
- * What the victory window's main button does once a campaign level is won: the next level
- * (or next < 3★ level when filtering) when there is one, else the level select.
- * A campaign victory never starts Survival.
- * @param {number} currentLevelId - The level just won.
- * @param {{has: (levelId: number) => boolean, firstId?: number, lastId?: number}} levelCatalog - The campaign's levels.
- * @param {{filterIncomplete?: boolean, unlockedLevel?: number, levelStats?: object, maxStars?: number}} [options]
- * @returns {string} One of VICTORY_NEXT_ACTIONS.
- */
-export function resolveVictoryNextAction(currentLevelId, levelCatalog, options = {}) {
-  return resolveNextCampaignTarget(currentLevelId, levelCatalog, options).action;
 }
 
 /** i18n key of the defeat explanation; an unknown reason reads as a crossed line. */
@@ -587,7 +586,7 @@ export class UIManager {
     this.scoreCountUpFrame = null;
     this.inputMode = this.detectInitialInputMode();
     this.isDrawerOpen = false;
-    this.drawerMedia = null;
+    this.drawerStarParts = null;
   }
 
   detectInitialInputMode() {
@@ -849,7 +848,7 @@ export class UIManager {
 
   /** True when the layout turns the header into a slide-in menu. */
   isDrawerLayout() {
-    return Boolean(this.elements?.btnMenu || (this.drawerMedia && this.drawerMedia.matches));
+    return Boolean(this.elements?.btnMenu);
   }
 
   /**
@@ -923,13 +922,33 @@ export class UIManager {
     }
   }
 
+  /**
+   * Builds the menu's star progress once: the glyphs are hidden from screen readers, a
+   * visually hidden span states the count, and the next target follows.
+   */
+  ensureDrawerStarParts() {
+    const host = this.elements.drawerStarProgress;
+    if (this.drawerStarParts?.host === host) {
+      return this.drawerStarParts;
+    }
+    const glyphs = document.createElement('span');
+    glyphs.setAttribute('aria-hidden', 'true');
+    const count = document.createElement('span');
+    count.className = VISUALLY_HIDDEN_CLASS;
+    const next = document.createElement('span');
+    host.textContent = '';
+    host.append(glyphs, count, ' ', next);
+    this.drawerStarParts = { host, glyphs, count, next };
+    return this.drawerStarParts;
+  }
+
   /** Copies the HUD values the compact layout hides into the menu. */
   syncDrawerStats() {
     if (this.elements.starProgress && this.elements.drawerStarProgress) {
-      const glyphs = this.elements.starGlyphs?.textContent?.trim() || '';
-      const next = this.elements.starNext?.textContent?.trim() || '';
-      const visibleStarText = glyphs && next ? `${glyphs} ${next}` : `${glyphs}${next}`;
-      setTextIfChanged(this.elements.drawerStarProgress, visibleStarText);
+      const parts = this.ensureDrawerStarParts();
+      setTextIfChanged(parts.glyphs, this.elements.starGlyphs?.textContent?.trim() || '');
+      setTextIfChanged(parts.count, this.elements.starCount?.textContent?.trim() || '');
+      setTextIfChanged(parts.next, this.elements.starNext?.textContent?.trim() || '');
       this.elements.drawerStarProgress.classList.toggle(
         'hidden',
         this.elements.starProgress.classList.contains('hidden')
@@ -950,10 +969,6 @@ export class UIManager {
   }
 
   bindDrawerEvents() {
-    const query = this.gameConfig.defaults.drawerMediaQuery;
-    if (typeof window !== 'undefined' && typeof window.matchMedia === 'function' && query) {
-      this.drawerMedia = window.matchMedia(query);
-    }
     if (this.elements.btnMenu) {
       this.elements.btnMenu.addEventListener('click', () => {
         this.openDrawer();
@@ -1099,19 +1114,10 @@ export class UIManager {
       this.elements.btnMotion.addEventListener('click', toggleMotion);
     }
 
-    const cycleAnimSpeed = () => {
-      const speeds = this.gameConfig.defaults.animationSpeeds;
-      const current = this.storageManager.getAnimationSpeed();
-      const idx = speeds.indexOf(current);
-      const nextSpeed = speeds[(idx + 1) % speeds.length];
-      this.storageManager.setAnimationSpeed(nextSpeed);
-      if (this.engine && typeof this.engine.setAnimationSpeed === 'function') {
-        this.engine.setAnimationSpeed(nextSpeed);
-      }
-      this.updateAnimSpeedButton();
-    };
     if (this.elements.btnAnimSpeed) {
-      this.elements.btnAnimSpeed.addEventListener('click', cycleAnimSpeed);
+      this.elements.btnAnimSpeed.addEventListener('click', () => {
+        this.cycleAnimationSpeed();
+      });
     }
 
     document.addEventListener('visibilitychange', () => {
@@ -1408,113 +1414,120 @@ export class UIManager {
     );
 
     window.addEventListener('keydown', (e) => {
-      this.setInputMode(INPUT_MODES.POINTER);
-      if (e.code === 'Tab' && this.isAnyModalOpen()) {
-        this.trapModalFocus(e);
-        return;
-      }
-      if (e.code === 'Tab' && this.isDrawerOpen) {
-        this.trapFocusWithin(this.elements.drawer, e);
-        return;
-      }
-
-      if (shouldIgnoreRepeatedKey(e.code, e.repeat)) {
-        return;
-      }
-
-      if (e.code === 'Escape') {
-        if (this.isDrawerOpen) {
-          this.closeDrawer({ resume: true });
-          return;
-        }
-        if (this.elements.modalConfirm && !this.elements.modalConfirm.classList.contains('hidden')) {
-          this.dismissConfirm();
-          return;
-        }
-        if (!this.elements.modalLevels.classList.contains('hidden')) {
-          this.closeOverlayModal(this.elements.modalLevels);
-          return;
-        }
-        if (!this.elements.modalShop.classList.contains('hidden')) {
-          this.closeOverlayModal(this.elements.modalShop);
-          return;
-        }
-        if (this.elements.modalSettings && !this.elements.modalSettings.classList.contains('hidden')) {
-          this.closeOverlayModal(this.elements.modalSettings);
-          return;
-        }
-        if (this.engine.state === GAME_STATES.PLAYING || this.engine.state === GAME_STATES.PAUSED) {
-          this.engine.togglePause();
-        }
-        return;
-      }
-
-      if (this.isAnyModalOpen()) {
-        return;
-      }
-
-      if (isBrowserShortcut(e)) {
-        return;
-      }
-
-      const activeEl = document.activeElement;
-      const isKeyboardInteractiveFocused = Boolean(
-        activeEl &&
-          activeEl !== document.body &&
-          activeEl !== document.documentElement &&
-          activeEl.id !== 'game-canvas' &&
-          typeof activeEl.matches === 'function' &&
-          activeEl.matches(':focus-visible') &&
-          typeof activeEl.closest === 'function' &&
-          activeEl.closest('button, a, input, select, textarea, [role="button"], [role="tab"]')
-      );
-
-      if (e.code === 'Space') {
-        if (isKeyboardInteractiveFocused) {
-          return;
-        }
-        e.preventDefault();
-        this.engine.swapLauncherBalls();
-      } else if (e.code === 'KeyF') {
-        e.preventDefault();
-        this.engine.togglePolarityFlip();
-      } else if (e.code === 'ArrowLeft' || e.code === 'ArrowRight') {
-        e.preventDefault();
-        const step = e.shiftKey
-          ? this.gameConfig.canvas.keyboardAimStepRad
-          : this.gameConfig.canvas.keyboardAimFineStepRad;
-        const dir = e.code === 'ArrowLeft' ? -1 : 1;
-        this.engine.adjustAimByDelta(dir * step);
-        this.updateAimState(this.engine);
-      } else if (e.code === 'Enter') {
-        if (isKeyboardInteractiveFocused) {
-          return;
-        }
-        e.preventDefault();
-        this.engine.shoot();
-        this.updateAimState(this.engine);
-      } else if (e.code.startsWith('Digit')) {
-        const idx = Number.parseInt(e.code.replace('Digit', ''), 10) - 1;
-        if (idx >= 0 && idx < SPECIAL_TYPES_ORDER.length) {
-          e.preventDefault();
-          const type = SPECIAL_TYPES_ORDER[idx];
-          const count = this.engine.specialInventory?.[type] || 0;
-          const isEquipped = this.engine.currentBall?.specialType === type;
-          if (count <= 0 && !isEquipped && this.engine.offersSpecialBalls?.() && this.canBuySpecialAmmo()) {
-            this.openShopModal(SHOP_TABS.AMMO);
-          } else {
-            this.engine.equipSpecialBall(type);
-          }
-        }
-      }
+      this.handleKeyDown(e);
     });
   }
 
-  requestDestructiveAction(actionCallback, confirmLabelResolver = null) {
-    const isMidRound =
-      (this.engine.state === GAME_STATES.PLAYING || this.engine.state === GAME_STATES.PAUSED) &&
-      this.engine.hasFiredInRound &&
-      this.engine.physicsWorld.balls.length > 0;
+  /** Global keyboard shortcuts: Escape unwinds the topmost layer, the rest steer the run. */
+  handleKeyDown(e) {
+    this.setInputMode(INPUT_MODES.POINTER);
+    if (e.code === 'Tab' && this.isAnyModalOpen()) {
+      this.trapModalFocus(e);
+      return;
+    }
+    if (e.code === 'Tab' && this.isDrawerOpen) {
+      this.trapFocusWithin(this.elements.drawer, e);
+      return;
+    }
+
+    if (shouldIgnoreRepeatedKey(e.code, e.repeat)) {
+      return;
+    }
+
+    if (e.code === 'Escape') {
+      if (this.elements.modalConfirm && !this.elements.modalConfirm.classList.contains('hidden')) {
+        this.dismissConfirm();
+        return;
+      }
+      if (!this.elements.modalLevels.classList.contains('hidden')) {
+        this.closeOverlayModal(this.elements.modalLevels);
+        return;
+      }
+      if (!this.elements.modalShop.classList.contains('hidden')) {
+        this.closeOverlayModal(this.elements.modalShop);
+        return;
+      }
+      if (this.elements.modalSettings && !this.elements.modalSettings.classList.contains('hidden')) {
+        this.closeOverlayModal(this.elements.modalSettings);
+        return;
+      }
+      if (this.isDrawerOpen) {
+        this.closeDrawer({ resume: true });
+        return;
+      }
+      if (this.engine.state === GAME_STATES.PLAYING || this.engine.state === GAME_STATES.PAUSED) {
+        this.engine.togglePause();
+      }
+      return;
+    }
+
+    if (this.isAnyModalOpen()) {
+      return;
+    }
+    if (this.isDrawerOpen) {
+      return;
+    }
+
+    if (isBrowserShortcut(e)) {
+      return;
+    }
+
+    const activeEl = document.activeElement;
+    const isKeyboardInteractiveFocused = Boolean(
+      activeEl &&
+        activeEl !== document.body &&
+        activeEl !== document.documentElement &&
+        activeEl.id !== 'game-canvas' &&
+        typeof activeEl.matches === 'function' &&
+        activeEl.matches(':focus-visible') &&
+        typeof activeEl.closest === 'function' &&
+        activeEl.closest('button, a, input, select, textarea, [role="button"], [role="tab"]')
+    );
+
+    if (e.code === 'Space') {
+      if (isKeyboardInteractiveFocused) {
+        return;
+      }
+      e.preventDefault();
+      this.engine.swapLauncherBalls();
+    } else if (e.code === 'KeyF') {
+      e.preventDefault();
+      this.engine.togglePolarityFlip();
+    } else if (e.code === 'ArrowLeft' || e.code === 'ArrowRight') {
+      e.preventDefault();
+      const step = e.shiftKey
+        ? this.gameConfig.canvas.keyboardAimStepRad
+        : this.gameConfig.canvas.keyboardAimFineStepRad;
+      const dir = e.code === 'ArrowLeft' ? -1 : 1;
+      this.engine.adjustAimByDelta(dir * step);
+      this.updateAimState(this.engine);
+    } else if (e.code === 'Enter') {
+      if (isKeyboardInteractiveFocused) {
+        return;
+      }
+      e.preventDefault();
+      this.engine.shoot();
+      this.updateAimState(this.engine);
+    } else if (e.code.startsWith('Digit')) {
+      const idx = Number.parseInt(e.code.replace('Digit', ''), 10) - 1;
+      if (idx >= 0 && idx < SPECIAL_TYPES_ORDER.length) {
+        e.preventDefault();
+        const type = SPECIAL_TYPES_ORDER[idx];
+        const count = this.engine.specialInventory?.[type] || 0;
+        const isEquipped = this.engine.currentBall?.specialType === type;
+        if (count <= 0 && !isEquipped && this.engine.offersSpecialBalls?.() && this.canBuySpecialAmmo()) {
+          this.openShopModal(SHOP_TABS.AMMO);
+        } else {
+          this.engine.equipSpecialBall(type);
+        }
+      }
+    }
+  }
+
+  requestDestructiveAction(actionCallback, confirmLabelResolver = null, { always = false } = {}) {
+    // `always` guards a run that holds progress before the first shot (a restored Flux run between shapes).
+    const runHasBalls = this.isRunActive() && this.engine.physicsWorld.balls.length > 0;
+    const isMidRound = runHasBalls && (always || this.engine.hasFiredInRound);
 
     if (!isMidRound || !this.elements.modalConfirm) {
       actionCallback();
@@ -1558,7 +1571,7 @@ export class UIManager {
     this.updateConfirmButtonLabel();
     if (this.confirmPausedRun) {
       this.confirmPausedRun = false;
-      if (this.engine.state === GAME_STATES.PAUSED) {
+      if (this.engine.state === GAME_STATES.PAUSED && !this.isDrawerOpen) {
         this.engine.state = GAME_STATES.PLAYING;
       }
     }
@@ -1839,7 +1852,7 @@ export class UIManager {
       this.isAnyOverlayModalOpen() ||
       Boolean(this.elements.modalConfirm && !this.elements.modalConfirm.classList.contains('hidden'));
 
-    if (!otherOverlayStillOpen) {
+    if (!otherOverlayStillOpen && !this.isDrawerOpen) {
       if (this.autoPausedByOverlay && this.engine.state === GAME_STATES.PAUSED) {
         this.autoPausedByOverlay = false;
         this.engine.state = GAME_STATES.PLAYING;
@@ -2117,16 +2130,30 @@ export class UIManager {
     }
   }
 
+  /** Moves to the next configured animation speed, wrapping after the last one. */
+  cycleAnimationSpeed() {
+    const speeds = this.gameConfig.defaults.animationSpeeds;
+    const current = this.storageManager.getAnimationSpeed();
+    const idx = speeds.indexOf(current);
+    const nextSpeed = speeds[(idx + 1) % speeds.length];
+    this.storageManager.setAnimationSpeed(nextSpeed);
+    if (this.engine && typeof this.engine.setAnimationSpeed === 'function') {
+      this.engine.setAnimationSpeed(nextSpeed);
+    }
+    this.updateAnimSpeedButton();
+  }
+
   updateAnimSpeedButton() {
     const btn = this.elements?.btnAnimSpeed;
     if (!btn) {
       return;
     }
-    const defaultSpeed = this.gameConfig.defaults.animationSpeed ?? 1;
+    const defaultSpeed = this.gameConfig.defaults.animationSpeed;
     const speed = this.storageManager?.getAnimationSpeed?.() ?? defaultSpeed;
-    const label = t('app.nav.button.animSpeed', { speed });
-    const ariaLabel = t('app.nav.button.animSpeedAria', { speed });
-    const caption = t('app.nav.button.animSpeedCaption', { speed });
+    const shownSpeed = formatNumber(speed);
+    const label = t('app.nav.button.animSpeed', { speed: shownSpeed });
+    const ariaLabel = t('app.nav.button.animSpeedAria', { speed: shownSpeed });
+    const caption = t('app.nav.button.animSpeedCaption', { speed: shownSpeed });
     setTextIfChanged(btn, label);
     setAttributeIfChanged(btn, 'aria-label', ariaLabel);
     btn.title = ariaLabel;
@@ -2140,7 +2167,8 @@ export class UIManager {
    */
   setupFullscreenControl() {
     const doc = typeof document === 'undefined' ? null : document;
-    const isSupported = isFullscreenSupported(doc);
+    // An installed app launched in fullscreen display mode is already fullscreen: nothing to toggle.
+    const isSupported = isFullscreenSupported(doc) && !this.isFullscreenDisplayMode();
     this.elements.btnFullscreen?.closest?.('.pause-setting')?.classList.toggle('hidden', !isSupported);
     this.elements.btnFullscreenHud?.classList.toggle('hidden', !isSupported);
     // Named even while hidden, so no accessibility audit finds an unnamed button.
@@ -2158,6 +2186,15 @@ export class UIManager {
     };
     this.elements.btnFullscreen?.addEventListener('click', onToggle);
     this.elements.btnFullscreenHud?.addEventListener('click', onToggle);
+  }
+
+  /** True when the installed app runs in the fullscreen display mode (manifest or OS choice). */
+  isFullscreenDisplayMode() {
+    const query = this.gameConfig?.defaults?.fullscreenDisplayModeMediaQuery;
+    if (!query || typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
+      return false;
+    }
+    return Boolean(window.matchMedia(query).matches);
   }
 
   async toggleFullscreen() {
