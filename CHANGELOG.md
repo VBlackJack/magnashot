@@ -4,6 +4,8 @@ All notable changes to **MagnaShot** are documented in this file.
 
 ## [Unreleased]
 
+## [1.12.1] - 2026-11-04
+
 ### Fixed
 - **Boss Rush Freeze on Overcharge Strike (`GameEngine.addOvercharge`, `PhysicsWorld.stepDroppingBalls`)**: An Overcharge strike that destroyed the Titan from inside a physics step (falling balls reaching the collector bin or a singularity, or an anvil crush) respawned the wave while the dropping-ball loop was still running, which threw and stopped the game loop. The wave change is now deferred until the step ends, `PhysicsWorld` stops iterating once the world is cleared, and the new wave refreshes its discovery hints.
 - **Shared Flux Links Keep Saved Runs (`main.js`, `UIManager.requestDestructiveAction`)**: Opening a `?flux=` link while another run was saved erased that run without asking. The saved run is now restored and a confirmation is required before the shared seed replaces it.
