@@ -358,7 +358,8 @@ body {
   align-items: center;
 }
 
-.hud-bar:has(> .hud-fullscreen-btn:not(.hidden)) {
+/* :where keeps this at the lowest specificity so the layout blocks below can override it. */
+.hud-bar:where(:has(> .hud-fullscreen-btn:not(.hidden))) {
   grid-template-columns: auto 1fr 2fr 1fr 1fr 1fr auto;
 }
 
@@ -386,6 +387,12 @@ body {
   font-weight: 700;
   letter-spacing: 0.03em;
   margin-top: 1px;
+}
+
+.star-empty {
+  color: var(--text-muted);
+  /* Same dimming as the other empty states; enough here, the glyphs are decorative and the count is in hidden text. */
+  opacity: 0.55;
 }
 
 .hud-subvalue-part {
@@ -2319,7 +2326,9 @@ body {
     grid-column: 3;
     grid-row: 1 / span 2;
     width: auto;
-    max-height: none;
+    /* Hug the content, but never grow over the Polarity/Swap dock in row 3. */
+    align-self: start;
+    max-height: 100%;
     min-height: 0;
     padding: 14px 12px;
   }

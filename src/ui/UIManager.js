@@ -135,6 +135,8 @@ const COUNT_UP_EASE_POWER = 3;
 /** App shell class that slides the menu in on portrait phones. */
 const DRAWER_OPEN_CLASS = 'drawer-open';
 const VISUALLY_HIDDEN_CLASS = 'visually-hidden';
+const STAR_EARNED_CLASS = 'star-earned';
+const STAR_EMPTY_CLASS = 'star-empty';
 
 /** Pointer types that mean a finger-like input without a keyboard at hand. */
 const TOUCH_POINTER_TYPES = new Set(['touch', 'pen']);
@@ -401,6 +403,9 @@ export function computeTiltShare(orientation, screenAngle, tiltCfg) {
   const span = tiltCfg.fullTiltDegrees - tiltCfg.deadZoneDegrees;
   return Math.sign(degrees) * Math.min(1, magnitude / span) * tiltCfg.maxGravityShare;
 }
+
+/** Star counts last rendered into each glyph element, so an unchanged value skips the rebuild. */
+const renderedStarGlyphs = new WeakMap();
 
 /** Writes text only when it differs, so live regions are not re-announced needlessly. */
 function setTextIfChanged(element, text) {
@@ -946,7 +951,10 @@ export class UIManager {
   syncDrawerStats() {
     if (this.elements.starProgress && this.elements.drawerStarProgress) {
       const parts = this.ensureDrawerStarParts();
-      setTextIfChanged(parts.glyphs, this.elements.starGlyphs?.textContent?.trim() || '');
+      const hudStars = renderedStarGlyphs.get(this.elements.starGlyphs);
+      if (hudStars) {
+        this.renderStarGlyphs(parts.glyphs, hudStars.stars, hudStars.maxStars);
+      }
       setTextIfChanged(parts.count, this.elements.starCount?.textContent?.trim() || '');
       setTextIfChanged(parts.next, this.elements.starNext?.textContent?.trim() || '');
       this.elements.drawerStarProgress.classList.toggle(
@@ -1977,6 +1985,34 @@ export class UIManager {
     return formatLevelDescription(summary);
   }
 
+  /**
+   * Renders the stars as one span per star so CSS can tell an earned star from an empty one.
+   * The text content matches formatStars; setTextIfChanged cannot be used because it only
+   * compares text, so the rendered counts are tracked here.
+   */
+  renderStarGlyphs(element, stars, maxStars) {
+    if (!element) {
+      return;
+    }
+    const theme = this.gameConfig.theme;
+    const filled = Math.max(0, Math.min(maxStars, stars));
+    const previous = renderedStarGlyphs.get(element);
+    if (previous && previous.stars === filled && previous.maxStars === maxStars) {
+      return;
+    }
+    const spans = [];
+    for (let i = 0; i < maxStars; i++) {
+      const star = document.createElement('span');
+      const isFilled = i < filled;
+      star.className = isFilled ? STAR_EARNED_CLASS : STAR_EMPTY_CLASS;
+      star.textContent = isFilled ? theme.starFilledSymbol : theme.starEmptySymbol;
+      spans.push(star);
+    }
+    element.textContent = '';
+    element.append(...spans);
+    renderedStarGlyphs.set(element, { stars: filled, maxStars });
+  }
+
   formatStars(stars, maxStars) {
     const theme = this.gameConfig.theme;
     const filled = Math.max(0, Math.min(maxStars, stars));
@@ -2865,11 +2901,10 @@ export class UIManager {
         const thresholds = engine.getStarThresholds();
         const maxStars = this.gameConfig.scoring.maxStars;
         const currentStars = engine.computeStars(engine.score);
-        const starsStr = this.formatStars(currentStars, maxStars);
         const nextThreshold = thresholds.find((th) => th > engine.score);
         this.updateStarMeter(engine.score, thresholds, nextThreshold);
         // Two unbreakable parts, so a narrow HUD wraps between them and never inside one.
-        setTextIfChanged(this.elements.starGlyphs, starsStr);
+        this.renderStarGlyphs(this.elements.starGlyphs, currentStars, maxStars);
         // The glyphs are hidden from screen readers; this hidden text states the count.
         setTextIfChanged(
           this.elements.starCount,
@@ -2903,10 +2938,9 @@ export class UIManager {
         const thresholds = engine.getStarThresholds();
         const maxStars = this.gameConfig.scoring.maxStars;
         const currentStars = engine.computeStars(engine.score);
-        const starsStr = this.formatStars(currentStars, maxStars);
         const nextThreshold = thresholds.find((th) => th > engine.score);
         this.updateStarMeter(engine.score, thresholds, nextThreshold);
-        setTextIfChanged(this.elements.starGlyphs, starsStr);
+        this.renderStarGlyphs(this.elements.starGlyphs, currentStars, maxStars);
         setTextIfChanged(
           this.elements.starCount,
           t('hud.stats.score.starsAria', {

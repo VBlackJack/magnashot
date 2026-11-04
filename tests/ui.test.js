@@ -515,10 +515,17 @@ test('the HUD stars are read as a count, not as glyphs', () => {
 
 test('the menu star progress is built once: hidden glyphs, a spoken count, then the next target', () => {
   const makeNode = () => ({
-    textContent: '',
+    ownText: '',
     attributes: {},
     children: [],
     className: '',
+    get textContent() {
+      return this.ownText + this.children.map((c) => (typeof c === 'string' ? c : c.textContent)).join('');
+    },
+    set textContent(value) {
+      this.ownText = value;
+      this.children = [];
+    },
     setAttribute(k, v) {
       this.attributes[k] = v;
     },
@@ -535,11 +542,13 @@ test('the menu star progress is built once: hidden glyphs, a spoken count, then 
     const ui = Object.create(UIManager.prototype);
     ui.elements = {
       starProgress: { classList },
-      starGlyphs: { textContent: '★☆☆' },
+      starGlyphs: makeNode(),
       starCount: { textContent: 'Étoiles : 1 sur 3' },
       starNext: { textContent: '• Prochain : 6 900' },
       drawerStarProgress: host
     };
+    ui.gameConfig = { theme: { starFilledSymbol: '★', starEmptySymbol: '☆' } };
+    ui.renderStarGlyphs(ui.elements.starGlyphs, 1, 3);
     ui.syncDrawerStats();
     const [glyphs, count, , next] = host.children;
     assert.equal(glyphs.textContent, '★☆☆');
@@ -548,7 +557,7 @@ test('the menu star progress is built once: hidden glyphs, a spoken count, then 
     assert.equal(count.textContent, 'Étoiles : 1 sur 3');
     assert.equal(next.textContent, '• Prochain : 6 900');
 
-    ui.elements.starGlyphs.textContent = '★★☆';
+    ui.renderStarGlyphs(ui.elements.starGlyphs, 2, 3);
     ui.syncDrawerStats();
     assert.equal(host.children.length, 4, 'the spans are created once');
     assert.equal(host.children[0], glyphs);

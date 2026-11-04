@@ -4,6 +4,11 @@ All notable changes to **MagnaShot** are documented in this file.
 
 ## [Unreleased]
 
+### Fixed
+- **Desktop and Landscape Phone HUD Grid (`styles/main.css`)**: The seven-column grid used when the HUD fullscreen button is present also overrode the wide-desktop (three columns) and landscape phone (four columns) layouts, where that button is not shown. On desktop the round stats were squeezed to the left, "Shots left" wrapped onto two lines and its value sat lower than the score. The rule now has the lowest specificity, so each layout keeps its own grid.
+- **Earned and Empty Stars (`UIManager.renderStarGlyphs`)**: In the HUD and the slide-in menu, empty stars are now drawn dimmed, one span per star, so one earned star no longer reads as three at HUD size.
+- **Desktop Special Balls Panel**: The panel hugs its content instead of stretching into a tall empty box above Polarity and Swap, and scrolls if it would reach them.
+
 ## [1.12.1] - 2026-11-04
 
 ### Fixed

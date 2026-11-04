@@ -51,6 +51,16 @@ const OVERFLOW_TOLERANCE_PX = 1;
 /** A generated level in a later chapter, for the level select test. */
 const UNLOCKED_GENERATED_LEVEL = 130;
 
+/** Track count of the HUD grid in the wide desktop layout and in the compact phone landscape layout. */
+const DESKTOP_HUD_TRACKS = 3;
+const PHONE_LANDSCAPE_HUD_TRACKS = 4;
+/** The panel's border and rounding, which scrollHeight leaves out. */
+const PANEL_BORDER_ALLOWANCE_PX = 4;
+/** Free space the hugging panel must leave above the dock at the desktop size. */
+const PANEL_HUG_MIN_SLACK_PX = 20;
+/** A short, wide window: the side panel must stay above the Polarity/Swap dock. */
+const SHORT_WIDE_VIEWPORT = Object.freeze({ width: 1000, height: 520, isTouch: false });
+
 /** Upper bound for any wait on the page, so a broken page fails instead of hanging. */
 const WAIT_TIMEOUT_MS = 20000;
 
@@ -774,6 +784,116 @@ describe('end of round (desktop)', () => {
       await captureEngine(page);
       await waitShown(page, '#modal-pause');
       assert.equal(await page.evaluate(() => window.__fluxEngine.score), 1234, 'the saved score is back');
+      assert.deepEqual(errors, []);
+    } finally {
+      await context.close();
+    }
+  });
+});
+
+/** Number of tracks in the computed grid-template-columns of the HUD bar, after checking the fullscreen button is shown. */
+async function hudTrackCount(page) {
+  return page.evaluate(() => {
+    const button = document.querySelector('#btn-fullscreen-hud');
+    const bar = document.querySelector('.hud-bar');
+    return {
+      buttonHidden: button.classList.contains('hidden'),
+      tracks: getComputedStyle(bar).gridTemplateColumns.split(' ').filter(Boolean).length
+    };
+  });
+}
+
+describe('HUD layout and stars', () => {
+  const desktop = VIEWPORTS.find((v) => v.name === 'desktop');
+  const phoneLandscape = VIEWPORTS.find((v) => v.name === 'phone landscape');
+
+  test('the desktop HUD keeps its three columns even with the fullscreen button shown', async () => {
+    const { context, page, errors } = await openGame(desktop);
+    try {
+      await startLevelOne(page);
+      const { buttonHidden, tracks } = await hudTrackCount(page);
+      assert.equal(buttonHidden, false, 'the fullscreen button is shown, so the :has rule applies');
+      assert.equal(tracks, DESKTOP_HUD_TRACKS);
+      assert.deepEqual(errors, []);
+    } finally {
+      await context.close();
+    }
+  });
+
+  test('the phone landscape HUD keeps its four columns even with the fullscreen button shown', async () => {
+    const { context, page, errors } = await openGame(phoneLandscape);
+    try {
+      await startLevelOne(page);
+      const { buttonHidden, tracks } = await hudTrackCount(page);
+      assert.equal(buttonHidden, false, 'the fullscreen button is shown, so the :has rule applies');
+      assert.equal(tracks, PHONE_LANDSCAPE_HUD_TRACKS);
+      assert.deepEqual(errors, []);
+    } finally {
+      await context.close();
+    }
+  });
+
+  test('an empty HUD star has a different color from an earned one, in the HUD and in the menu', async () => {
+    const { context, page, errors } = await openGame(desktop);
+    try {
+      await startLevelOne(page);
+      await page.evaluate(() => {
+        const engine = window.__fluxEngine;
+        engine.score = 0;
+        engine.notifyUI();
+      });
+      await page.click('#btn-menu');
+      const starColors = (selector) =>
+        page.evaluate((glyphSelector) => {
+          const colorOf = (el) => (el ? getComputedStyle(el).color : null);
+          const root = document.querySelector(glyphSelector);
+          return {
+            earned: colorOf(root.querySelector('.star-earned')),
+            empty: colorOf(root.querySelector('.star-empty'))
+          };
+        }, selector);
+      for (const selector of ['#hud-star-glyphs', '#drawer-star-progress > span[aria-hidden="true"]']) {
+        const { earned, empty } = await starColors(selector);
+        assert.ok(earned, `${selector}: at least one earned star`);
+        assert.ok(empty, `${selector}: at least one empty star`);
+        assert.notEqual(empty, earned, `${selector}: an empty star has its own colour`);
+      }
+      assert.deepEqual(errors, []);
+    } finally {
+      await context.close();
+    }
+  });
+
+  test('on a desktop window the power-ups panel hugs its content instead of stretching', async () => {
+    const { context, page, errors } = await openGame(desktop);
+    try {
+      await startLevelOne(page);
+      const { height, scrollHeight, gapToDock } = await page.evaluate(() => {
+        const panel = document.querySelector('.powerups-panel');
+        const rect = panel.getBoundingClientRect();
+        return {
+          height: rect.height,
+          scrollHeight: panel.scrollHeight,
+          gapToDock: document.querySelector('.launcher-controls-dock').getBoundingClientRect().top - rect.top
+        };
+      });
+      assert.ok(height <= scrollHeight + PANEL_BORDER_ALLOWANCE_PX, `panel ${height}px is taller than its content ${scrollHeight}px`);
+      assert.ok(height < gapToDock - PANEL_HUG_MIN_SLACK_PX, `panel ${height}px fills the ${gapToDock}px above the dock`);
+      assert.deepEqual(errors, []);
+    } finally {
+      await context.close();
+    }
+  });
+
+  test('on a short wide window the power-ups panel stays above the Polarity/Swap dock', async () => {
+    const { context, page, errors } = await openGame(SHORT_WIDE_VIEWPORT);
+    try {
+      await startLevelOne(page);
+      const { panelBottom, dockTop } = await page.evaluate(() => ({
+        panelBottom: document.querySelector('.powerups-panel').getBoundingClientRect().bottom,
+        dockTop: document.querySelector('.launcher-controls-dock').getBoundingClientRect().top
+      }));
+      assert.ok(panelBottom <= dockTop + OVERFLOW_TOLERANCE_PX, `panel bottom ${panelBottom} is below dock top ${dockTop}`);
       assert.deepEqual(errors, []);
     } finally {
       await context.close();
