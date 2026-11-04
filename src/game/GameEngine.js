@@ -111,6 +111,9 @@ export class GameEngine {
     this.victorySummary = null;
     this.gameOverSummary = null;
     this.hitStopFrames = 0;
+    this.specialSlowMoFrames = 0;
+    this.specialSlowMoTotalFrames = 0;
+    this.specialSlowMoMinScale = 1.0;
     this.impactWave = null;
     this.trailFrameCounter = 0;
     this.hasFiredInRound = false;
@@ -200,25 +203,55 @@ export class GameEngine {
   }
 
   /**
-   * Simulation speed factor read by the game loop. Time slows down while a shot flies
-   * close to one of the last few spheres of a shot-limited board, so the deciding hit
-   * can be watched; reduced motion keeps normal speed.
+   * Starts or extends a cinematic slow-motion window after a high-impact special ball
+   * detonation. Ignored when reduced motion is active.
+   * @param {number} frames - Number of fixed simulation steps to dilate.
+   * @param {number} timeScale - Minimum simulation time scale during the detonation.
+   */
+  triggerSpecialSlowMo(frames, timeScale) {
+    if (this.isReducedMotion || !frames || frames <= 0 || !Number.isFinite(timeScale) || timeScale >= 1) {
+      return;
+    }
+    this.specialSlowMoFrames = Math.max(this.specialSlowMoFrames, frames);
+    this.specialSlowMoTotalFrames = Math.max(this.specialSlowMoTotalFrames, this.specialSlowMoFrames);
+    this.specialSlowMoMinScale = Math.min(this.specialSlowMoMinScale, timeScale);
+  }
+
+  /**
+   * Simulation speed factor read by the game loop. Time slows down after an explosive
+   * special ball detonation (easing smoothly back to normal speed) and while a shot flies
+   * close to one of the last few spheres of a shot-limited board; reduced motion keeps normal speed.
    * @returns {number} 1 for normal speed, below 1 for slow motion.
    */
   getTimeScale() {
+    if (this.isReducedMotion || this.state !== GAME_STATES.PLAYING || this.hitStopFrames > 0) {
+      return 1;
+    }
     const slowMotion = this.gameConfig.juice.slowMotion;
+    let scale = 1;
+    if (this.specialSlowMoFrames > 0 && this.specialSlowMoTotalFrames > 0) {
+      const progress = 1 - this.specialSlowMoFrames / this.specialSlowMoTotalFrames;
+      const holdRatio = slowMotion.detonationHoldRatio ?? MATH_CONSTANTS.HALF;
+      if (progress <= holdRatio) {
+        scale = this.specialSlowMoMinScale;
+      } else {
+        const easeRatio = (progress - holdRatio) / Math.max(MATH_CONSTANTS.EPSILON, 1 - holdRatio);
+        scale = this.specialSlowMoMinScale + (1 - this.specialSlowMoMinScale) * easeRatio;
+      }
+    }
     const projectile = this.physicsWorld.projectile;
-    if (this.isReducedMotion || !projectile || !this.usesShotBudget() || this.state !== GAME_STATES.PLAYING) {
-      return 1;
+    if (projectile && this.usesShotBudget()) {
+      const balls = this.physicsWorld.balls;
+      if (balls.length > 0 && balls.length <= slowMotion.maxRemainingBalls) {
+        const isNearTarget = balls.some(
+          (b) => Math.hypot(b.x - projectile.x, b.y - projectile.y) <= slowMotion.triggerDistance
+        );
+        if (isNearTarget) {
+          scale = Math.min(scale, slowMotion.timeScale);
+        }
+      }
     }
-    const balls = this.physicsWorld.balls;
-    if (balls.length === 0 || balls.length > slowMotion.maxRemainingBalls) {
-      return 1;
-    }
-    const isNearTarget = balls.some(
-      (b) => Math.hypot(b.x - projectile.x, b.y - projectile.y) <= slowMotion.triggerDistance
-    );
-    return isNearTarget ? slowMotion.timeScale : 1;
+    return scale;
   }
 
   /**
@@ -366,6 +399,9 @@ export class GameEngine {
     this.victorySummary = null;
     this.gameOverSummary = null;
     this.hitStopFrames = 0;
+    this.specialSlowMoFrames = 0;
+    this.specialSlowMoTotalFrames = 0;
+    this.specialSlowMoMinScale = 1.0;
     this.impactWave = null;
     this.hasFiredInRound = false;
     this.hasUsedContinue = false;
@@ -1608,6 +1644,11 @@ export class GameEngine {
 
   setReducedMotion(enabled) {
     this.isReducedMotion = Boolean(enabled);
+    if (this.isReducedMotion) {
+      this.specialSlowMoFrames = 0;
+      this.specialSlowMoTotalFrames = 0;
+      this.specialSlowMoMinScale = 1.0;
+    }
     this.particleSystem.setReducedMotion(enabled);
   }
 
@@ -1791,10 +1832,31 @@ export class GameEngine {
       },
       onAnvilCrush: (target) => {
         const anvilSpecs = this.ballsConfig.specialTypes.anvil;
+        this.particleSystem.spawnFlash?.(
+          target.x,
+          target.y,
+          anvilSpecs.highlight,
+          target.radius * anvilSpecs.crushFlashRadiusFactor
+        );
+        this.particleSystem.spawnShockwave(
+          target.x,
+          target.y,
+          anvilSpecs.highlight,
+          target.radius * anvilSpecs.crushShockwaveFactor,
+          { lineWidth: anvilSpecs.crushRingLineWidth }
+        );
+        this.particleSystem.spawnBurst(
+          target.x,
+          target.y,
+          anvilSpecs.highlight,
+          anvilSpecs.crushBurstCount,
+          anvilSpecs.crushBurstSpeed
+        );
         if (this.destroyClusterBall(target, anvilSpecs.highlight, true)) {
           this.anvilCrushCount++;
           this.addScore(anvilSpecs.pointsPerBall);
           this.addOvercharge(this.gameConfig.scoring.overchargePerMatchedBall);
+          this.triggerSpecialSlowMo(anvilSpecs.slowMoFrames, anvilSpecs.slowMoTimeScale);
           this.audioManager.playEffect('snap');
         }
       },
@@ -1811,7 +1873,9 @@ export class GameEngine {
         this.hitStopFrames = juice.hitStopFramesSpecial;
         // An anvil that crushed nothing is a miss: it breaks the combo and counts toward the next wave.
         const madeMatch = this.anvilCrushCount > 0;
-        if (!madeMatch) {
+        if (madeMatch) {
+          this.triggerSpecialSlowMo(anvilSpecs.slowMoFrames, anvilSpecs.slowMoTimeScale);
+        } else {
           this.combo = 0;
         }
         this.handlePostTurnCleanup(madeMatch);
@@ -1956,6 +2020,14 @@ export class GameEngine {
       this.hitStopFrames--;
       this.particleSystem.update(juice.shakeDecay);
       return;
+    }
+
+    if (this.specialSlowMoFrames > 0) {
+      this.specialSlowMoFrames--;
+      if (this.specialSlowMoFrames <= 0) {
+        this.specialSlowMoTotalFrames = 0;
+        this.specialSlowMoMinScale = 1.0;
+      }
     }
 
     if (this.physicsWorld.projectile) {
@@ -2264,6 +2336,7 @@ export class GameEngine {
       }
       if (bombResult.destroyed.length > 0) {
         this.addOvercharge(bombResult.destroyed.length * this.gameConfig.scoring.overchargePerMatchedBall);
+        this.triggerSpecialSlowMo(dormantSpecs.slowMoFrames, dormantSpecs.slowMoTimeScale);
       }
     } else if (ball.clusterModifier === CLUSTER_MODIFIERS.LASER_LOCK) {
       const lockSpec = this.ballsConfig.clusterModifiers.laserLock;
@@ -2386,6 +2459,7 @@ export class GameEngine {
     this.addScore(result.scoreDelta);
     if (result.destroyed.length > 0) {
       this.addOvercharge(result.destroyed.length * this.gameConfig.scoring.overchargePerMatchedBall);
+      this.triggerSpecialSlowMo(lightningSpec.slowMoFrames, lightningSpec.slowMoTimeScale);
     }
   }
 
@@ -2398,7 +2472,9 @@ export class GameEngine {
     const bossSpec = this.ballsConfig.clusterModifiers.bossCore;
     this.awardRunCoins(bossSpec.coinReward);
     this.addScore(bossSpec.pointsBonus);
+    this.particleSystem.spawnFlash?.(ball.x, ball.y, bossSpec.ringColor, bossSpec.shockwaveRadius);
     this.particleSystem.spawnShockwave(ball.x, ball.y, bossSpec.ringColor, bossSpec.shockwaveRadius);
+    this.triggerSpecialSlowMo(bossSpec.slowMoFrames, bossSpec.slowMoTimeScale);
     this.particleSystem.spawnFloatingText(
       ball.x,
       ball.y + this.gameConfig.canvas.floatingTextOffsetY,
@@ -2468,6 +2544,9 @@ export class GameEngine {
       if (result.destroyed.length > 0) {
         this.addOvercharge(result.destroyed.length * this.gameConfig.scoring.overchargePerMatchedBall);
         this.hitStopFrames = this.gameConfig.juice.hitStopFramesSpecial;
+        if (result.slowMoFrames > 0) {
+          this.triggerSpecialSlowMo(result.slowMoFrames, result.slowMoTimeScale);
+        }
       }
       if (result.painted?.length > 0) {
         this.addOvercharge(result.painted.length * this.gameConfig.scoring.overchargePerDroppedBall);

@@ -4,6 +4,16 @@ All notable changes to **MagnaShot** are documented in this file.
 
 ## [Unreleased]
 
+## [1.9.7] - 2026-11-04
+
+### Added
+- **Cinematic Slow-Motion Detonations (`GameEngine.triggerSpecialSlowMo`, `getTimeScale`)**: Added config-driven post-hit-stop time dilation (`slowMoFrames`, `slowMoTimeScale`, `detonationHoldRatio`) for explosive and kinetic special impacts (*Bomb*, *Lightning*, *Anvil*, *Rocket*, *Prism*, *Dormant Barrel*, *Lightning Core*, and *Boss Core* destruction), smoothly easing time back to `1.0x` while bypassed when `reducedMotion` is enabled.
+- **Multi-Layer Special Ball Detonation Effects (`SpecialBallController.js`, `ParticleSystem.js`, `Renderer.js`)**:
+  - Added object-pooled radial detonation flashes (`spawnFlash`) with white-hot core gradients and sub-frame `alpha` interpolation (`prevRadius`, `prevAlpha`).
+  - Upgraded `spawnShockwave` with per-ring `lineWidth`, `expandRate`, `alphaDecay`, and sub-frame `alpha` interpolation for concentric multi-ring blast waves (*Bomb* outer blast ring + inner fireball ring, *Prism* 4-ring chromatic cascade, *Cryo* dual frost rings, *Brush* dual chromatic rings).
+  - Added point-to-point jagged electric arcs (`spawnLightningArc`) and triple-pass high-voltage lightning rendering (outer glow, main bolt, white-hot inner core) for *Lightning* and *Prism* cluster discharges.
+  - Added dual-pass glowing plasma streaks with counter-curved salvos and per-target blast rings for *Rocket*, paint-stroke streaks for *Brush*, and per-sphere kinetic shockwaves along the *Anvil* crush trajectory.
+
 ## [1.9.6] - 2026-11-04
 
 ### Added

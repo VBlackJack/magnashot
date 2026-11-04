@@ -98,7 +98,18 @@ export class SpecialBallController {
     }
     this.breakChainsInBlast(ball.x, ball.y, shockwaveOuterRadius, physicsWorld, particleSystem);
 
-    particleSystem.spawnShockwave(ball.x, ball.y, specs.highlight, blastRadius * specs.visualShockwaveFactor);
+    particleSystem.spawnFlash?.(ball.x, ball.y, specs.highlight, blastRadius * specs.flashRadiusFactor);
+    particleSystem.spawnShockwave(ball.x, ball.y, specs.highlight, blastRadius * specs.visualShockwaveFactor, {
+      lineWidth: specs.outerRingLineWidth
+    });
+    particleSystem.spawnShockwave(
+      ball.x,
+      ball.y,
+      specs.innerRingColor,
+      blastRadius * specs.innerShockwaveFactor,
+      { expandRate: specs.innerRingExpandRate }
+    );
+    particleSystem.spawnBurst(ball.x, ball.y, specs.innerRingColor, specs.coreBurstCount, specs.coreBurstSpeed);
     particleSystem.spawnFloatingText(
       ball.x,
       ball.y + this.gameConfig.canvas.floatingTextOffsetY,
@@ -111,7 +122,9 @@ export class SpecialBallController {
     return {
       destroyed,
       scoreDelta: destroyed.length * specs.pointsPerBall,
-      freezeTurns: 0
+      freezeTurns: 0,
+      slowMoFrames: specs.slowMoFrames,
+      slowMoTimeScale: specs.slowMoTimeScale
     };
   }
 
@@ -124,10 +137,26 @@ export class SpecialBallController {
     if (physicsWorld.ballMap.has(ball.id)) {
       physicsWorld.removeBall(ball);
     }
+    particleSystem.spawnFlash?.(ball.x, ball.y, specs.highlight, ball.radius * specs.launchFlashRadiusFactor);
+    particleSystem.spawnShockwave(ball.x, ball.y, specs.highlight, ball.radius * specs.launchShockwaveFactor);
     const targets = pickRocketTargets(ball, physicsWorld.balls, specs.rocketCount);
     const destroyed = [];
     for (const target of targets) {
-      particleSystem.spawnStreak(ball.x, ball.y, target.x, target.y, specs.highlight);
+      particleSystem.spawnStreak(ball.x, ball.y, target.x, target.y, specs.highlight, 1);
+      particleSystem.spawnStreak(ball.x, ball.y, target.x, target.y, specs.secondaryStreakColor, -1);
+      particleSystem.spawnFlash?.(
+        target.x,
+        target.y,
+        specs.highlight,
+        target.radius * specs.targetFlashRadiusFactor
+      );
+      particleSystem.spawnShockwave(
+        target.x,
+        target.y,
+        specs.highlight,
+        target.radius * specs.targetShockwaveFactor,
+        { lineWidth: specs.outerRingLineWidth }
+      );
       if (destroyBallFn(target, specs.highlight, true, specs.burstCount, specs.burstSpeed)) {
         destroyed.push(target);
       }
@@ -140,7 +169,13 @@ export class SpecialBallController {
     );
     particleSystem.addScreenShake(this.gameConfig.juice.bombShake, this.gameConfig.juice.maxShakeOffset);
     audioManager.playEffect('bomb');
-    return { destroyed, scoreDelta: destroyed.length * specs.pointsPerBall, freezeTurns: 0 };
+    return {
+      destroyed,
+      scoreDelta: destroyed.length * specs.pointsPerBall,
+      freezeTurns: 0,
+      slowMoFrames: specs.slowMoFrames,
+      slowMoTimeScale: specs.slowMoTimeScale
+    };
   }
 
   /**
@@ -259,8 +294,22 @@ export class SpecialBallController {
       }
     }
 
+    const paintPalette = this.ballsConfig.standardColors.find((c) => c.id === targetColor);
+    const paintHex = paintPalette?.highlight || specs.highlight;
+    particleSystem.spawnFlash?.(ball.x, ball.y, paintHex, paintRadius * specs.flashRadiusFactor);
     particleSystem.spawnShockwave(ball.x, ball.y, specs.highlight, paintRadius);
+    particleSystem.spawnShockwave(ball.x, ball.y, paintHex, paintRadius * specs.innerShockwaveFactor);
     particleSystem.spawnBurst(ball.x, ball.y, specs.highlight, specs.burstCount, specs.burstSpeed);
+    for (const target of painted) {
+      particleSystem.spawnStreak(ball.x, ball.y, target.x, target.y, paintHex);
+      particleSystem.spawnBurst(
+        target.x,
+        target.y,
+        paintHex,
+        specs.targetPaintBurstCount,
+        specs.targetPaintBurstSpeed
+      );
+    }
     particleSystem.spawnFloatingText(
       ball.x,
       ball.y + this.gameConfig.canvas.floatingTextOffsetY,
@@ -272,7 +321,9 @@ export class SpecialBallController {
       destroyed: [],
       painted,
       scoreDelta: painted.length * specs.pointsPerBall,
-      freezeTurns: 0
+      freezeTurns: 0,
+      slowMoFrames: specs.slowMoFrames,
+      slowMoTimeScale: specs.slowMoTimeScale
     };
   }
 
@@ -292,6 +343,8 @@ export class SpecialBallController {
 
     const destroyed = [];
     for (const target of targetsInBand) {
+      particleSystem.spawnLightningArc?.(ball.x, ball.y, target.x, target.y, specs.highlight);
+      particleSystem.spawnShockwave(target.x, target.y, specs.highlight, target.radius * specs.targetRingFactor);
       if (destroyBallFn(target, specs.highlight, true, specs.burstCount, specs.burstSpeed)) {
         destroyed.push(target);
       }
@@ -299,7 +352,9 @@ export class SpecialBallController {
 
     const leftX = this.gameConfig.canvas.wallMargin;
     const rightX = this.gameConfig.canvas.logicalWidth - this.gameConfig.canvas.wallMargin;
+    particleSystem.spawnFlash?.(ball.x, ball.y, specs.highlight, ball.radius * specs.flashRadiusFactor);
     particleSystem.spawnLightning(ball.y, leftX, rightX, specs.highlight);
+    particleSystem.spawnLightning(ball.y, leftX, rightX, specs.secondaryArcColor);
     particleSystem.spawnFloatingText(
       ball.x,
       ball.y + this.gameConfig.canvas.floatingTextOffsetY,
@@ -312,7 +367,9 @@ export class SpecialBallController {
     return {
       destroyed,
       scoreDelta: destroyed.length * specs.pointsPerBall,
-      freezeTurns: 0
+      freezeTurns: 0,
+      slowMoFrames: specs.slowMoFrames,
+      slowMoTimeScale: specs.slowMoTimeScale
     };
   }
 
@@ -354,12 +411,25 @@ export class SpecialBallController {
 
     const destroyed = [];
     for (const target of targetsToProcess) {
-      if (destroyBallFn(target, specs.highlight, false, specs.burstCount, specs.burstSpeed)) {
+      const targetColor = this.ballsConfig.standardColors.find((c) => c.id === target.colorId);
+      const arcColor = targetColor?.highlight || specs.highlight;
+      particleSystem.spawnLightningArc?.(ball.x, ball.y, target.x, target.y, arcColor);
+      if (destroyBallFn(target, arcColor, false, specs.burstCount, specs.burstSpeed)) {
         destroyed.push(target);
       }
     }
 
-    particleSystem.spawnShockwave(ball.x, ball.y, specs.fill, ball.radius * specs.visualShockwaveFactor);
+    particleSystem.spawnFlash?.(ball.x, ball.y, specs.highlight, ball.radius * specs.flashRadiusFactor);
+    const palette = this.ballsConfig.standardColors;
+    const baseRadius = ball.radius * specs.visualShockwaveFactor;
+    const baseExpand = this.gameConfig.juice.particles.shockwaveExpandRate;
+    for (let i = 0; i < specs.prismRingCount; i++) {
+      const ringColor = palette[i % palette.length]?.highlight || specs.fill;
+      const ringRadius = baseRadius * (1 - i * specs.prismRingStepFactor);
+      particleSystem.spawnShockwave(ball.x, ball.y, ringColor, ringRadius, {
+        expandRate: Math.max(specs.prismRingExpandStep, baseExpand - i * specs.prismRingExpandStep)
+      });
+    }
     particleSystem.spawnFloatingText(
       ball.x,
       ball.y + this.gameConfig.canvas.floatingTextOffsetY,
@@ -372,7 +442,9 @@ export class SpecialBallController {
     return {
       destroyed,
       scoreDelta: destroyed.length * specs.pointsPerBall,
-      freezeTurns: 0
+      freezeTurns: 0,
+      slowMoFrames: destroyed.length > 0 ? specs.slowMoFrames : 0,
+      slowMoTimeScale: specs.slowMoTimeScale
     };
   }
 
@@ -390,11 +462,26 @@ export class SpecialBallController {
         target.isFrozen = true;
         target.vx *= specs.velocityDampingFactor;
         target.vy *= specs.velocityDampingFactor;
+        particleSystem.spawnBurst(
+          target.x,
+          target.y,
+          specs.highlight,
+          specs.targetFrostBurstCount,
+          specs.targetFrostBurstSpeed
+        );
+        particleSystem.spawnShockwave(target.x, target.y, specs.highlight, target.radius * specs.targetRingFactor);
       }
     }
 
     physicsWorld.removeBall(ball);
+    particleSystem.spawnFlash?.(ball.x, ball.y, specs.highlight, freezeRadius * specs.flashRadiusFactor);
     particleSystem.spawnShockwave(ball.x, ball.y, specs.highlight, freezeRadius);
+    particleSystem.spawnShockwave(
+      ball.x,
+      ball.y,
+      specs.fill || specs.ringColor,
+      freezeRadius * specs.innerShockwaveFactor
+    );
     particleSystem.spawnBurst(ball.x, ball.y, specs.highlight, specs.burstCount, specs.burstSpeed);
     particleSystem.spawnFloatingText(
       ball.x,
@@ -407,7 +494,9 @@ export class SpecialBallController {
     return {
       destroyed: [],
       scoreDelta: frozenCount > 0 ? specs.pointsPerBall * specs.scoreMultiplier : 0,
-      freezeTurns: specs.freezeTurns
+      freezeTurns: specs.freezeTurns,
+      slowMoFrames: specs.slowMoFrames || 0,
+      slowMoTimeScale: specs.slowMoTimeScale || 1.0
     };
   }
 }

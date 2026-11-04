@@ -782,3 +782,39 @@ test('Aim trajectory marks wall bounce vertices with isBounce and renders glow, 
   );
   assert.ok(dashOffsets.every((offset) => offset === 0), 'aim laser freezes lineDashOffset at 0 when isReducedMotion is true');
 });
+
+test('Explosive special balls trigger cinematic slow-motion after hit-stop and spawn multi-layer flashes, shockwaves, and arcs', () => {
+  const engine = createTestEngine();
+  engine.startCampaignLevel(1);
+  const renderer = createRenderer();
+  const target = engine.physicsWorld.balls.find((b) => !b.isAnchor) || engine.physicsWorld.balls[0];
+
+  const bombBall = engine.createRandomLauncherBall('bomb');
+  bombBall.x = target.x;
+  bombBall.y = target.y + physicsConfig.ball.radius;
+  engine.physicsWorld.addBall(bombBall);
+  engine.handleProjectileSnapped(bombBall, target);
+
+  assert.equal(engine.specialSlowMoFrames, ballsConfig.specialTypes.bomb.slowMoFrames);
+  assert.ok(engine.particleSystem.flashes.length >= 1, 'bomb detonation spawns a radial core flash');
+  assert.ok(engine.particleSystem.shockwaves.length >= 2, 'bomb detonation spawns concentric multi-ring shockwaves');
+  assert.equal(engine.getTimeScale(), 1, 'getTimeScale stays 1 during hit-stop frames so hit-stop finishes briskly');
+
+  while (engine.hitStopFrames > 0) {
+    engine.update();
+  }
+  const activeScale = engine.getTimeScale();
+  assert.equal(activeScale, ballsConfig.specialTypes.bomb.slowMoTimeScale, 'slow-motion timeScale activates immediately after hit-stop');
+  assert.doesNotThrow(() => renderer.render(engine, 0.5));
+
+  while (engine.specialSlowMoFrames > 0) {
+    engine.update();
+  }
+  assert.equal(engine.getTimeScale(), 1, 'getTimeScale returns to 1 once slow-motion frames complete');
+
+  engine.triggerSpecialSlowMo(20, 0.25);
+  assert.ok(engine.getTimeScale() < 1);
+  engine.setReducedMotion(true);
+  assert.equal(engine.getTimeScale(), 1, 'enabling reduced motion immediately cancels slow-motion');
+  assert.equal(engine.particleSystem.flashes.length, 0, 'enabling reduced motion clears radial flashes');
+});

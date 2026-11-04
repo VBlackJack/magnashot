@@ -1865,25 +1865,53 @@ export class Renderer {
     const theme = this.gameConfig.theme;
     ctx.save();
 
+    if (particleSystem.flashes) {
+      for (const fl of particleSystem.flashes) {
+        const flRadius = this.interpolate(fl.prevRadius ?? fl.radius, fl.radius, alpha);
+        const flAlpha = Math.max(0, this.interpolate(fl.prevAlpha ?? fl.alpha, fl.alpha, alpha));
+        if (flRadius <= 0 || flAlpha <= 0) {
+          continue;
+        }
+        const grad = ctx.createRadialGradient(fl.x, fl.y, 0, fl.x, fl.y, flRadius);
+        grad.addColorStop(0, pCfg.flashCoreColor);
+        grad.addColorStop(pCfg.flashMidStop, fl.color);
+        grad.addColorStop(1, pCfg.flashEdgeColor);
+        ctx.fillStyle = grad;
+        ctx.globalAlpha = flAlpha;
+        ctx.beginPath();
+        ctx.arc(fl.x, fl.y, flRadius, 0, MATH_CONSTANTS.TWO_PI);
+        ctx.fill();
+      }
+    }
+
     for (const sw of particleSystem.shockwaves) {
+      const swRadius = this.interpolate(sw.prevRadius ?? sw.radius, sw.radius, alpha);
+      const swAlpha = Math.max(0, this.interpolate(sw.prevAlpha ?? sw.alpha, sw.alpha, alpha));
       ctx.strokeStyle = sw.color;
-      ctx.globalAlpha = Math.max(0, sw.alpha);
-      ctx.lineWidth = pCfg.shockwaveLineWidth;
+      ctx.globalAlpha = swAlpha;
+      ctx.lineWidth = sw.lineWidth ?? pCfg.shockwaveLineWidth;
       ctx.beginPath();
-      ctx.arc(sw.x, sw.y, sw.radius, 0, MATH_CONSTANTS.TWO_PI);
+      ctx.arc(sw.x, sw.y, swRadius, 0, MATH_CONSTANTS.TWO_PI);
       ctx.stroke();
     }
 
     for (const streak of particleSystem.streaks) {
       // The trail bows sideways, like a rocket that turned toward its target.
-      const midX = (streak.x1 + streak.x2) * MATH_CONSTANTS.HALF - (streak.y2 - streak.y1) * pCfg.streakCurveFactor;
-      const midY = (streak.y1 + streak.y2) * MATH_CONSTANTS.HALF + (streak.x2 - streak.x1) * pCfg.streakCurveFactor;
+      const curveSign = streak.curveSign ?? 1;
+      const curveFactor = pCfg.streakCurveFactor * curveSign;
+      const midX = (streak.x1 + streak.x2) * MATH_CONSTANTS.HALF - (streak.y2 - streak.y1) * curveFactor;
+      const midY = (streak.y1 + streak.y2) * MATH_CONSTANTS.HALF + (streak.x2 - streak.x1) * curveFactor;
+      const streakAlpha = Math.max(0, this.interpolate(streak.prevAlpha ?? streak.alpha, streak.alpha, alpha));
       ctx.strokeStyle = streak.color;
-      ctx.globalAlpha = Math.max(0, streak.alpha);
-      ctx.lineWidth = pCfg.streakLineWidth;
+      ctx.globalAlpha = streakAlpha * pCfg.streakGlowAlphaFactor;
+      ctx.lineWidth = pCfg.streakGlowLineWidth;
       ctx.beginPath();
       ctx.moveTo(streak.x1, streak.y1);
       ctx.quadraticCurveTo(midX, midY, streak.x2, streak.y2);
+      ctx.stroke();
+
+      ctx.globalAlpha = streakAlpha;
+      ctx.lineWidth = pCfg.streakLineWidth;
       ctx.stroke();
     }
 
@@ -1891,9 +1919,10 @@ export class Renderer {
       if (bolt.segments.length < 2) {
         continue;
       }
+      const boltAlpha = Math.max(0, this.interpolate(bolt.prevAlpha ?? bolt.alpha, bolt.alpha, alpha));
       ctx.strokeStyle = bolt.color;
-      ctx.globalAlpha = Math.max(0, bolt.alpha);
-      ctx.lineWidth = pCfg.lightningLineWidth;
+      ctx.globalAlpha = boltAlpha * pCfg.lightningGlowAlphaFactor;
+      ctx.lineWidth = pCfg.lightningGlowLineWidth;
       ctx.beginPath();
       ctx.moveTo(bolt.segments[0].x, bolt.segments[0].y);
       for (let i = 1; i < bolt.segments.length; i++) {
@@ -1901,7 +1930,17 @@ export class Renderer {
       }
       ctx.stroke();
 
+      ctx.strokeStyle = bolt.color;
+      ctx.globalAlpha = boltAlpha;
+      ctx.lineWidth = pCfg.lightningLineWidth;
+      ctx.stroke();
+
+      ctx.strokeStyle = pCfg.flashCoreColor;
+      ctx.lineWidth = pCfg.lightningCoreLineWidth;
+      ctx.stroke();
+
       if (bolt.branches) {
+        ctx.strokeStyle = bolt.color;
         ctx.lineWidth = pCfg.lightningBranchLineWidth;
         for (const branch of bolt.branches) {
           if (branch.length < 2) {

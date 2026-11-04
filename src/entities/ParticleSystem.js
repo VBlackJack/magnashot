@@ -23,6 +23,7 @@ export class ParticleSystem {
     this.particles = [];
     this.trailParticles = [];
     this.shockwaves = [];
+    this.flashes = [];
     this.floatingTexts = [];
     this.lightningBolts = [];
     this.streaks = [];
@@ -34,6 +35,7 @@ export class ParticleSystem {
     this.particlePool = [];
     this.trailPool = [];
     this.shockwavePool = [];
+    this.flashPool = [];
     this.textPool = [];
     this.shakeIntensity = 0;
     this.reducedMotion = false;
@@ -56,6 +58,9 @@ export class ParticleSystem {
     }
     while (this.shockwaves.length > 0) {
       this.shockwavePool.push(this.shockwaves.pop());
+    }
+    while (this.flashes.length > 0) {
+      this.flashPool.push(this.flashes.pop());
     }
     this.lightningBolts.length = 0;
     this.streaks.length = 0;
@@ -150,7 +155,7 @@ export class ParticleSystem {
     }
   }
 
-  spawnShockwave(x, y, color, maxRadius = this.cfg.shockwaveDefaultMaxRadius) {
+  spawnShockwave(x, y, color, maxRadius = this.cfg.shockwaveDefaultMaxRadius, options = null) {
     if (this.reducedMotion) {
       return;
     }
@@ -158,11 +163,66 @@ export class ParticleSystem {
     const item = this.shockwavePool.pop() || {};
     item.x = x;
     item.y = y;
-    item.radius = cfg.shockwaveInitialRadius;
+    item.radius = options?.initialRadius ?? cfg.shockwaveInitialRadius;
+    item.prevRadius = item.radius;
     item.maxRadius = maxRadius;
     item.color = color;
-    item.alpha = cfg.shockwaveInitialAlpha;
+    item.alpha = options?.initialAlpha ?? cfg.shockwaveInitialAlpha;
+    item.prevAlpha = item.alpha;
+    item.expandRate = options?.expandRate ?? cfg.shockwaveExpandRate;
+    item.alphaDecay = options?.alphaDecay ?? cfg.shockwaveAlphaDecay;
+    item.lineWidth = options?.lineWidth ?? cfg.shockwaveLineWidth;
     this.shockwaves.push(item);
+  }
+
+  /** Spawns a radial detonation flash / core bloom at (x, y). */
+  spawnFlash(x, y, color, maxRadius = this.cfg.shockwaveDefaultMaxRadius) {
+    if (this.reducedMotion) {
+      return;
+    }
+    const cfg = this.cfg;
+    const item = this.flashPool.pop() || {};
+    item.x = x;
+    item.y = y;
+    item.radius = maxRadius * cfg.flashInitialRadiusFactor;
+    item.prevRadius = item.radius;
+    item.maxRadius = maxRadius;
+    item.color = color;
+    item.alpha = cfg.flashInitialAlpha;
+    item.prevAlpha = item.alpha;
+    item.alphaDecay = cfg.flashAlphaDecay;
+    this.flashes.push(item);
+  }
+
+  /** Spawns a jagged electric arc between two arbitrary points (x1, y1) and (x2, y2). */
+  spawnLightningArc(x1, y1, x2, y2, color) {
+    if (this.reducedMotion) {
+      return;
+    }
+    const cfg = this.cfg;
+    const steps = cfg.lightningArcSteps;
+    const dx = x2 - x1;
+    const dy = y2 - y1;
+    const dist = Math.hypot(dx, dy);
+    const nx = dist > MATH_CONSTANTS.EPSILON ? -dy / dist : 0;
+    const ny = dist > MATH_CONSTANTS.EPSILON ? dx / dist : 1;
+    const segments = [];
+    for (let i = 0; i <= steps; i++) {
+      const t = i / steps;
+      const jitter =
+        i === 0 || i === steps ? 0 : (Math.random() - MATH_CONSTANTS.HALF) * cfg.lightningArcJitter;
+      segments.push({
+        x: x1 + dx * t + nx * jitter,
+        y: y1 + dy * t + ny * jitter
+      });
+    }
+    this.lightningBolts.push({
+      segments,
+      branches: null,
+      color,
+      alpha: 1.0,
+      prevAlpha: 1.0
+    });
   }
 
   spawnLightning(y, leftX, rightX, color) {
@@ -206,7 +266,8 @@ export class ParticleSystem {
       segments,
       branches,
       color,
-      alpha: 1.0
+      alpha: 1.0,
+      prevAlpha: 1.0
     });
   }
 
@@ -245,12 +306,12 @@ export class ParticleSystem {
     this.wallCracks.push(points);
   }
 
-  /** A curved rocket trail from a launch point to its target. */
-  spawnStreak(x1, y1, x2, y2, color) {
+  /** A curved rocket or brush trail from a launch point to its target. */
+  spawnStreak(x1, y1, x2, y2, color, curveSign = 1) {
     if (this.reducedMotion) {
       return;
     }
-    this.streaks.push({ x1, y1, x2, y2, color, alpha: 1.0 });
+    this.streaks.push({ x1, y1, x2, y2, color, curveSign, alpha: 1.0, prevAlpha: 1.0 });
   }
 
   spawnFloatingText(x, y, text, color = this.cfg.floatingTextDefaultColor) {
@@ -301,10 +362,23 @@ export class ParticleSystem {
       }
     }
 
+    for (let i = this.flashes.length - 1; i >= 0; i--) {
+      const fl = this.flashes[i];
+      fl.prevRadius = fl.radius;
+      fl.prevAlpha = fl.alpha;
+      fl.radius += (fl.maxRadius - fl.radius) * cfg.flashExpandRate;
+      fl.alpha -= fl.alphaDecay;
+      if (fl.alpha <= 0) {
+        this.removeAt(this.flashes, i, this.flashPool);
+      }
+    }
+
     for (let i = this.shockwaves.length - 1; i >= 0; i--) {
       const sw = this.shockwaves[i];
-      sw.radius += (sw.maxRadius - sw.radius) * cfg.shockwaveExpandRate;
-      sw.alpha -= cfg.shockwaveAlphaDecay;
+      sw.prevRadius = sw.radius;
+      sw.prevAlpha = sw.alpha;
+      sw.radius += (sw.maxRadius - sw.radius) * (sw.expandRate ?? cfg.shockwaveExpandRate);
+      sw.alpha -= sw.alphaDecay ?? cfg.shockwaveAlphaDecay;
       if (sw.alpha <= 0) {
         this.removeAt(this.shockwaves, i, this.shockwavePool);
       }
@@ -312,6 +386,7 @@ export class ParticleSystem {
 
     for (let i = this.lightningBolts.length - 1; i >= 0; i--) {
       const bolt = this.lightningBolts[i];
+      bolt.prevAlpha = bolt.alpha;
       bolt.alpha -= cfg.lightningAlphaDecay;
       if (bolt.alpha <= 0) {
         this.removeAt(this.lightningBolts, i);
@@ -322,6 +397,7 @@ export class ParticleSystem {
 
     for (let i = this.streaks.length - 1; i >= 0; i--) {
       const streak = this.streaks[i];
+      streak.prevAlpha = streak.alpha;
       streak.alpha -= cfg.streakAlphaDecay;
       if (streak.alpha <= 0) {
         this.removeAt(this.streaks, i);
