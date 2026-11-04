@@ -266,8 +266,8 @@ export const INPUT_ARIA_HINTS = Object.freeze([{ elementId: 'game-canvas', key: 
  * @returns {{oneShot: object, persistentExtra: object}} The two halves.
  */
 export function splitRefreshExtra(extra) {
-  const { unlockedAchievementId, fluxStageCleared, fluxPerkChosen, ...persistentExtra } = extra;
-  return { oneShot: { unlockedAchievementId, fluxStageCleared, fluxPerkChosen }, persistentExtra };
+  const { unlockedAchievementIds, fluxStageCleared, fluxPerkChosen, ...persistentExtra } = extra;
+  return { oneShot: { unlockedAchievementIds, fluxStageCleared, fluxPerkChosen }, persistentExtra };
 }
 
 /** Default star ceiling when no scoring config is passed to resolveNextCampaignTarget. */
@@ -416,6 +416,68 @@ export function resolveNextCampaignTarget(
   return { action: VICTORY_NEXT_ACTIONS.LEVEL_SELECT, targetLevelId: null };
 }
 
+/** Run metrics a near-miss line can be expressed in. */
+const RUN_METRICS = Object.freeze(['stage', 'wave', 'score']);
+
+/**
+ * Run metrics the HUD marker is shown for. Score modes already show their record in the
+ * HUD, so a marker there would only repeat it.
+ */
+const BEST_MARKER_METRICS = Object.freeze(['stage', 'wave']);
+
+/**
+ * Builds the informational near-miss line of the Game Over modal. Returns an empty string
+ * when the engine reports no near miss. The line is never tied to a purchase.
+ * @param {{ metric: string, gap: number }|null|undefined} nearMiss - Engine near-miss summary.
+ * @returns {string}
+ */
+export function formatNearMissText(nearMiss) {
+  const gap = Math.floor(Number(nearMiss?.gap));
+  if (!nearMiss || !RUN_METRICS.includes(nearMiss.metric) || !Number.isFinite(gap) || gap <= 0) {
+    return '';
+  }
+  const form = gap === 1 ? 'one' : 'other';
+  return t(`modals.gameOver.nearMiss.${nearMiss.metric}.${form}`, { count: formatNumber(gap) });
+}
+
+/**
+ * Builds the compact "Best: shape 12" run marker shown in the HUD during a stage or wave
+ * run that has a record to beat. Empty for score modes.
+ * @param {{ metric: string, best: number }|null|undefined} marker - Engine best-run marker.
+ * @returns {string}
+ */
+export function formatBestRunMarker(marker) {
+  const best = Number(marker?.best);
+  if (!marker || !BEST_MARKER_METRICS.includes(marker.metric) || !Number.isFinite(best) || best <= 0) {
+    return '';
+  }
+  return t(`hud.stats.bestRun.${marker.metric}`, { best: formatNumber(best) });
+}
+
+/**
+ * Builds the calm streak-grace note. It says the grace was used only on the day it was
+ * used, so it never reads as a lasting warning; otherwise it says whether a missed day is
+ * still forgiven or when that comes back.
+ * @param {number} streak - Current daily streak.
+ * @param {{ available?: boolean, usedOn?: string|null, daysUntilAvailable?: number }|null|undefined} grace
+ *   Storage grace state.
+ * @param {string} todayKey - UTC date key of today.
+ * @returns {string}
+ */
+export function formatStreakGraceText(streak, grace, todayKey) {
+  if (!(streak > 0) || !grace) {
+    return '';
+  }
+  if (grace.usedOn && grace.usedOn === todayKey) {
+    return t('modals.gameOver.daily.graceUsed');
+  }
+  if (grace.available) {
+    return t('modals.gameOver.daily.graceAvailable');
+  }
+  const days = Math.floor(Number(grace.daysUntilAvailable));
+  return days > 0 ? t('modals.gameOver.daily.graceReturns', { days: formatNumber(days) }) : '';
+}
+
 /** i18n key of the defeat explanation; an unknown reason reads as a crossed line. */
 export function gameOverReasonKey(reason) {
   const known = Object.values(GAME_OVER_REASONS).includes(reason) ? reason : GAME_OVER_REASONS.LINE_CROSSED;
@@ -561,6 +623,7 @@ export class UIManager {
       shotsValue: document.getElementById('hud-shots-value'),
       comboBadge: document.getElementById('hud-combo-badge'),
       frozenBadge: document.getElementById('hud-frozen-badge'),
+      bestRunBadge: document.getElementById('hud-best-run'),
       powerupsContainer: document.getElementById('powerups-bar'),
       powerupsHeader: document.getElementById('powerups-header'),
       powerupsEmpty: document.getElementById('powerups-empty'),
@@ -652,6 +715,7 @@ export class UIManager {
       gameOverBest: document.getElementById('gameover-best'),
       gameoverRemaining: document.getElementById('gameover-remaining'),
       gameOverStage: document.getElementById('gameover-stage'),
+      gameOverNearMiss: document.getElementById('gameover-near-miss'),
       gameOverDailyNext: document.getElementById('gameover-daily-next'),
       btnContinueGameOver: document.getElementById('btn-continue-gameover'),
       btnRetry: document.getElementById('btn-retry'),
@@ -2590,9 +2654,10 @@ export class UIManager {
       minutes: formatNumber(minutes)
     });
     const streak = this.storageManager?.getDailyStreak?.() || 0;
-    const text = streak > 0
-      ? `${t('modals.gameOver.daily.streak', { streak: formatNumber(streak) })} - ${nextText}`
-      : nextText;
+    const todayKey = SeededRandom.getTodayDateKey();
+    const graceText = formatStreakGraceText(streak, this.storageManager?.getDailyStreakGrace?.(todayKey), todayKey);
+    const streakParts = [t('modals.gameOver.daily.streak', { streak: formatNumber(streak) }), graceText, nextText];
+    const text = streak > 0 ? streakParts.filter(Boolean).join(' - ') : nextText;
     setTextIfChanged(this.elements.gameOverDailyNext, text);
   }
 
@@ -3073,7 +3138,7 @@ export class UIManager {
     // One-shot extras (an unlocked achievement, a cleared Flux stage) must not replay
     // when refresh is re-run with lastExtra (language change, input mode change, shop
     // purchase): they are read from this call only.
-    const { oneShot: { unlockedAchievementId, fluxStageCleared, fluxPerkChosen }, persistentExtra } =
+    const { oneShot: { unlockedAchievementIds, fluxStageCleared, fluxPerkChosen }, persistentExtra } =
       splitRefreshExtra(extra);
     this.lastExtra = persistentExtra;
     setTextIfChanged(this.elements.scoreValue, formatNumber(engine.score));
@@ -3120,6 +3185,12 @@ export class UIManager {
         dailyLabel = t('app.nav.button.dailyBonusBadge', { coins: dailyBonusCoins });
       }
       setTextIfChanged(this.elements.btnDaily, dailyLabel);
+      const graceHint = formatStreakGraceText(streak, this.storageManager.getDailyStreakGrace?.(todayKey), todayKey);
+      if (graceHint) {
+        setAttributeIfChanged(this.elements.btnDaily, 'title', graceHint);
+      } else {
+        this.elements.btnDaily.removeAttribute?.('title');
+      }
     }
 
     const overchargePct = Math.min(
@@ -3439,14 +3510,18 @@ export class UIManager {
       );
     }
 
-    if (unlockedAchievementId) {
-      const spec = this.gameConfig.achievements?.[unlockedAchievementId];
-      this.announce(
-        t('hud.announcer.achievement.unlocked', {
-          name: t(`modals.shop.achievements.items.${unlockedAchievementId}.name`),
-          coins: formatNumber(spec?.rewardCoins || 0)
-        })
+    if (Array.isArray(unlockedAchievementIds) && unlockedAchievementIds.length > 0) {
+      const rewardCoins = unlockedAchievementIds.reduce(
+        (sum, id) => sum + (this.gameConfig.achievements?.[id]?.rewardCoins || 0),
+        0
       );
+      const names = unlockedAchievementIds
+        .map((id) => t(`modals.shop.achievements.items.${id}.name`))
+        .join(t('gameplay.feedback.achievement.listSeparator'));
+      const announceKey = unlockedAchievementIds.length === 1
+        ? 'hud.announcer.achievement.unlocked'
+        : 'hud.announcer.achievement.unlockedMany';
+      this.announce(t(announceKey, { name: names, coins: formatNumber(rewardCoins) }));
     }
 
     if (engine.state === GAME_STATES.PAUSED && !this.isRunHeldByUi() && !this.isAnyOverlayModalOpen()) {
@@ -3584,6 +3659,14 @@ export class UIManager {
         }
         this.elements.gameOverStage.classList.toggle('hidden', !stageSummaryText);
       }
+      let nearMissText = '';
+      if (this.elements.gameOverNearMiss) {
+        nearMissText = formatNearMissText(summary?.nearMiss);
+        if (nearMissText) {
+          setTextIfChanged(this.elements.gameOverNearMiss, nearMissText);
+        }
+        this.elements.gameOverNearMiss.classList.toggle('hidden', !nearMissText);
+      }
       if (this.elements.gameOverDailyNext) {
         const isDaily = engine.mode === GAME_MODES.DAILY;
         if (isDaily) {
@@ -3624,7 +3707,12 @@ export class UIManager {
         this.updateShareButtonLabel();
         this.elements.gameOverShareFallback?.classList.add('hidden');
         this.saveLastFocusedElement();
-        this.announce(t('hud.announcer.round.gameOver', { reason: t(reasonKey), score: scoreText }));
+        const roundResult = t('hud.announcer.round.gameOver', { reason: t(reasonKey), score: scoreText });
+        this.announce(
+          nearMissText
+            ? t('hud.announcer.round.withNearMiss', { result: roundResult, nearMiss: nearMissText })
+            : roundResult
+        );
       }
       this.elements.modalGameOver.classList.remove('hidden');
       if (transitionedState) {
@@ -3634,6 +3722,13 @@ export class UIManager {
       this.elements.modalGameOver.classList.add('hidden');
     }
 
+    const bestRunText = engine.state !== GAME_STATES.VICTORY && engine.state !== GAME_STATES.GAME_OVER
+      ? formatBestRunMarker(engine.getRunBestMarker?.())
+      : '';
+    if (this.elements.bestRunBadge) {
+      setTextIfChanged(this.elements.bestRunBadge, bestRunText);
+      this.elements.bestRunBadge.classList.toggle('hidden', !bestRunText);
+    }
     setTextIfChanged(
       this.elements.compactInfo,
       t('hud.stats.compactLine', {

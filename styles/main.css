@@ -19,6 +19,8 @@
   --bg-panel: #111827;
   --bg-panel-border: #1e293b;
   --text-main: #f8fafc;
+  --tier-bronze: #b07a45;
+  --tier-silver: #b8c2cc;
   --text-muted: #94a3b8;
   --accent-blue: #38bdf8;
   --accent-purple: #a855f7;
@@ -526,7 +528,9 @@ body {
 
 .hud-badges-row {
   display: flex;
-  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 4px 8px;
   min-height: 20px;
 }
 
@@ -551,6 +555,16 @@ body {
   background: var(--accent-blue-alpha-22);
   color: var(--text-info-soft);
   border: 1px solid var(--accent-blue);
+}
+
+.hud-badge.best-run {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  background: var(--surface-raised);
+  color: var(--text-secondary);
+  border: 1px solid var(--border-subtle);
 }
 
 /*
@@ -1707,6 +1721,42 @@ body {
   background: var(--accent-emerald);
 }
 
+.achievement-tiers {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.achievement-tier-badge {
+  font-size: 0.68rem;
+  font-weight: 700;
+  padding: 1px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--border-subtle);
+  color: var(--text-muted);
+  background: var(--surface-sunken);
+}
+
+.achievement-tier-badge.is-unlocked {
+  color: var(--text-main);
+}
+
+.achievement-tier-badge.is-unlocked::before {
+  content: '✓ ';
+}
+
+.achievement-tier-badge.is-unlocked.tier-bronze {
+  border-color: var(--tier-bronze);
+}
+
+.achievement-tier-badge.is-unlocked.tier-silver {
+  border-color: var(--tier-silver);
+}
+
+.achievement-tier-badge.is-unlocked.tier-gold {
+  border-color: var(--accent-amber);
+}
+
 .achievement-progress-text {
   color: var(--text-secondary);
   font-weight: 600;
@@ -2593,6 +2643,8 @@ body {
   --accent-blue: #7dd3fc;
   --accent-purple: #d8b4fe;
   --accent-amber: #fcd34d;
+  --tier-bronze: #e8b27a;
+  --tier-silver: #f1f5f9;
   --accent-danger: #fca5a5;
   --accent-emerald: #6ee7b7;
   --accent-danger-solid: #b91c1c;
@@ -2633,6 +2685,8 @@ body {
     --accent-blue: #7dd3fc;
     --accent-purple: #d8b4fe;
     --accent-amber: #fcd34d;
+    --tier-bronze: #e8b27a;
+    --tier-silver: #f1f5f9;
     --accent-danger: #fca5a5;
     --accent-emerald: #6ee7b7;
     --accent-danger-solid: #b91c1c;
@@ -2679,6 +2733,7 @@ body {
   .overcharge-track,
   .star-meter,
   .achievement-progress-track,
+  .achievement-tier-badge,
   .level-card.unlocked {
     border: 1px solid ButtonText;
   }
