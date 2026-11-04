@@ -60,6 +60,10 @@
           <dt data-i18n="hud.stats.overcharge.label"></dt>
           <dd id="drawer-overcharge"></dd>
         </div>
+        <div id="drawer-perks-stat" class="drawer-stat drawer-stat-wide hidden">
+          <dt data-i18n="hud.stats.perks.label"></dt>
+          <dd id="drawer-perks" class="perk-chips"></dd>
+        </div>
       </dl>
       <nav class="nav-controls">
         <div class="nav-group nav-modes" role="group" aria-labelledby="nav-group-modes-title">
@@ -93,6 +97,7 @@
         <div class="hud-badges-row">
           <span id="hud-combo-badge" class="hud-badge combo hidden"></span>
           <span id="hud-frozen-badge" class="hud-badge frozen hidden"></span>
+          <span id="hud-perks" class="perk-chips hidden" role="group" data-i18n-aria-label="hud.stats.perks.label"></span>
         </div>
       </div>
       <div class="hud-stat-box hud-stat-shots">
@@ -287,6 +292,15 @@
         <button id="btn-levels-pause" type="button" class="modal-btn" data-i18n="modals.pause.button.levels"></button>
         <button id="btn-settings-pause" type="button" class="modal-btn" aria-haspopup="dialog"><span class="settings-btn-icon" aria-hidden="true" data-i18n="app.nav.button.settingsIcon"></span> <span data-i18n="app.nav.button.settings"></span></button>
       </div>
+    </div>
+  </div>
+
+  <!-- Flux Perk Modal: no close button, the choice is part of the run -->
+  <div id="modal-flux-perk" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="modal-flux-perk-title" aria-describedby="modal-flux-perk-subtitle">
+    <div class="modal-card">
+      <h2 id="modal-flux-perk-title" class="modal-title" data-i18n="modals.fluxPerk.title"></h2>
+      <p id="modal-flux-perk-subtitle" class="modal-subtext"></p>
+      <div id="flux-perk-cards" class="flux-perk-cards"></div>
     </div>
   </div>
 

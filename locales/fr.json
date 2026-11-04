@@ -133,7 +133,10 @@
       "frozen": {
         "label": "Gel actif ({{turns}})"
       },
-      "compactLine": "{{mode}} • {{coins}} • Record {{best}}"
+      "compactLine": "{{mode}} • {{coins}} • Record {{best}}",
+      "perks": {
+        "label": "Atouts"
+      }
     },
     "launcher": {
       "swap": {
@@ -225,6 +228,9 @@
       },
       "hints": {
         "reset": "Les indices de découverte s'afficheront de nouveau."
+      },
+      "flux": {
+        "perkChosen": "Atout choisi : {{name}}."
       }
     }
   },
@@ -238,6 +244,9 @@
       },
       "drop": {
         "popup": "AVALANCHE MAGNÉTIQUE ! +{{points}}"
+      },
+      "arsenal": {
+        "ready": "ARSENAL ! +{{count}} sphères spéciales"
       },
       "overcharge": {
         "ready": "SURCHARGE ! +1 {{name}}"
@@ -365,6 +374,32 @@
         "heart": {
           "solid": "Coeur",
           "hollow": "Coeur creux"
+        }
+      },
+      "perks": {
+        "reserve": {
+          "name": "Réserve",
+          "description": "+{{value}} tirs tout de suite."
+        },
+        "refill": {
+          "name": "Recharge",
+          "description": "+{{value}} tirs à chaque forme vidée."
+        },
+        "blast": {
+          "name": "Déflagration",
+          "description": "Les sphères spéciales explosent {{value}}% plus large."
+        },
+        "overcharge": {
+          "name": "Surtension",
+          "description": "La Surcharge se remplit {{value}}% plus vite."
+        },
+        "arsenal": {
+          "name": "Arsenal",
+          "description": "{{value}} sphères spéciales aléatoires tout de suite."
+        },
+        "golden": {
+          "name": "Doré",
+          "description": "Pièces bonus à chaque forme vidée : +{{value}}."
         }
       }
     },
@@ -837,6 +872,15 @@
         "iosHint": "Sur iPhone et iPad : Partager, puis Sur l'écran d'accueil.",
         "installedAnnounce": "Application installée. Lancez-la depuis votre écran d'accueil."
       }
+    },
+    "fluxPerk": {
+      "title": "Choisissez un atout",
+      "subtitle": {
+        "pointer": "Prenez un bonus pour la suite de cette partie. Cliquez une carte ou appuyez sur son numéro.",
+        "touch": "Prenez un bonus pour la suite de cette partie. Touchez une carte."
+      },
+      "stack": "{{stacks}}/{{max}}",
+      "stackAria": "{{stacks}} sur {{max}}"
     }
   },
   "levels": {

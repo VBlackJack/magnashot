@@ -24,6 +24,19 @@
     "rocket": 0,
     "brush": 0
   },
+  "perks": {
+    "interval": 3,
+    "offerSize": 3,
+    "order": ["reserve", "refill", "blast", "overcharge", "arsenal", "golden"],
+    "catalog": {
+      "reserve": { "step": 6, "maxStacks": 3, "icon": "🎯" },
+      "refill": { "step": 2, "maxStacks": 3, "icon": "🔄" },
+      "blast": { "step": 0.1, "unit": "percent", "maxStacks": 3, "icon": "💥" },
+      "overcharge": { "step": 0.15, "unit": "percent", "maxStacks": 3, "icon": "⚡" },
+      "arsenal": { "step": 2, "maxStacks": 3, "icon": "🧰" },
+      "golden": { "step": 1, "maxStacks": 3, "icon": "🪙" }
+    }
+  },
   "bossStageInterval": 5,
   "difficultyRampStages": 12,
   "paramJitter": 0.25,

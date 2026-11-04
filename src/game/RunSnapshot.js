@@ -166,6 +166,44 @@ const restoreWaveLog = (engine, savedLog) => {
   return rebuilt;
 };
 
+/**
+ * The saved Flux perk stacks reduced to known perks with a whole stack count inside
+ * [0, maxStacks]; anything else is dropped rather than rejecting the run.
+ */
+const restoreFluxPerks = (engine, savedPerks) => {
+  const catalog = engine.fluxConfig.perks?.catalog || {};
+  const restored = {};
+  if (!savedPerks || typeof savedPerks !== 'object') {
+    return restored;
+  }
+  for (const [id, stacks] of Object.entries(savedPerks)) {
+    if (Object.hasOwn(catalog, id) && Number.isFinite(stacks)) {
+      const clamped = Math.min(Math.max(Math.trunc(stacks), 0), catalog[id].maxStacks);
+      if (clamped > 0) {
+        restored[id] = clamped;
+      }
+    }
+  }
+  return restored;
+};
+
+/**
+ * The saved Flux perk offer when it lists 1..offerSize distinct known perks that are not
+ * at their cap; null otherwise (no offer pending, or a damaged one).
+ */
+const restoreFluxPerkOffer = (engine, savedOffer) => {
+  const perksCfg = engine.fluxConfig.perks;
+  if (!perksCfg || !Array.isArray(savedOffer)) {
+    return null;
+  }
+  const isUsable =
+    savedOffer.length >= 1 &&
+    savedOffer.length <= perksCfg.offerSize &&
+    new Set(savedOffer).size === savedOffer.length &&
+    savedOffer.every((id) => Object.hasOwn(perksCfg.catalog, id) && engine.getFluxPerkStacks(id) < perksCfg.catalog[id].maxStacks);
+  return isUsable ? [...savedOffer] : null;
+};
+
 const pickFields = (source, fields) => {
   const out = {};
   copyFields(out, source, fields);
@@ -214,6 +252,8 @@ export function captureRunSnapshot(engine, version) {
     engine: pickFields(engine, ENGINE_SCALAR_FIELDS),
     specialInventory: { ...engine.specialInventory },
     waveLog: [...engine.waveLog],
+    fluxPerks: { ...engine.fluxPerks },
+    fluxPerkOffer: engine.fluxPerkOffer ? [...engine.fluxPerkOffer] : null,
     currentBall: { colorId: engine.currentBall.colorId, specialType: engine.currentBall.specialType },
     nextBall: { colorId: engine.nextBall.colorId, specialType: engine.nextBall.specialType },
     allowTensionBreak: world.allowTensionBreak,
@@ -344,6 +384,11 @@ export function applyRunSnapshot(engine, snapshot) {
   restoreFields(engine, snapshot.engine, ENGINE_SCALAR_FIELDS);
   engine.specialInventory = { ...snapshot.specialInventory };
   engine.waveLog = restoreWaveLog(engine, snapshot.waveLog);
+  // Set after the mode restart above, which wipes both; runs saved before perks existed hold neither.
+  if (snapshot.mode === GAME_MODES.FLUX) {
+    engine.fluxPerks = restoreFluxPerks(engine, snapshot.fluxPerks);
+    engine.fluxPerkOffer = restoreFluxPerkOffer(engine, snapshot.fluxPerkOffer);
+  }
   if (engine.seededRng && Number.isFinite(snapshot.rngState)) {
     engine.seededRng.state = snapshot.rngState;
   }

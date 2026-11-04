@@ -4,6 +4,9 @@ All notable changes to **MagnaShot** are documented in this file.
 
 ## [Unreleased]
 
+### Added
+- **Flux Perks (`FluxPerkView`, `UIManager`, `configs/flux.json`)**: After every third cleared Flux shape the run pauses on a choice of three perks among six: Reserve, Refill, Blast, Surge, Arsenal and Golden, each stackable up to three times. Pick a card by tap, click, Enter or the `1` to `3` keys. Escape still pauses and Resume shows the choice again. Held perks appear as chips in the HUD and the slide-in menu, the pick is announced to screen readers, and restarting or switching mode past the first shape always asks for confirmation.
+
 ### Fixed
 - **Desktop and Landscape Phone HUD Grid (`styles/main.css`)**: The seven-column grid used when the HUD fullscreen button is present also overrode the wide-desktop (three columns) and landscape phone (four columns) layouts, where that button is not shown. On desktop the round stats were squeezed to the left, "Shots left" wrapped onto two lines and its value sat lower than the score. The rule now has the lowest specificity, so each layout keeps its own grid.
 - **Earned and Empty Stars (`UIManager.renderStarGlyphs`)**: In the HUD and the slide-in menu, empty stars are now drawn dimmed, one span per star, so one earned star no longer reads as three at HUD size.

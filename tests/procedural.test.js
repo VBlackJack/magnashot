@@ -152,6 +152,10 @@ const advanceFluxStage = (engine) => {
   while (engine.stageTransitionFrames > 0) {
     engine.update();
   }
+  // A perk offer freezes the board until one is taken.
+  if (engine.isAwaitingPerk()) {
+    engine.chooseFluxPerk(engine.fluxPerkOffer[0]);
+  }
 };
 
 test('Campaign layouts built through the registry keep their ball counts and stay fully anchored', () => {

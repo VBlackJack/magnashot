@@ -67,6 +67,7 @@ const PRECACHE_ASSETS = [
   './src/physics/PhysicsWorld.js',
   './src/physics/SpatialHashGrid.js',
   './src/ui/CodexView.js',
+  './src/ui/FluxPerkView.js',
   './src/ui/LevelSelectView.js',
   './src/ui/UIManager.js',
   './src/ui/WorkshopView.js',
