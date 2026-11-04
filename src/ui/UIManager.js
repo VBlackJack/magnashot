@@ -125,10 +125,10 @@ const MODE_BUTTON_KEYS = Object.freeze({
   [GAME_MODES.ENDLESS]: ['btnEndless'],
   [GAME_MODES.DAILY]: ['btnDaily'],
   [GAME_MODES.FLUX]: ['btnFlux'],
-  [GAME_MODES.PUZZLE]: ['btnPuzzle', 'btnModePuzzle'],
-  [GAME_MODES.BLITZ]: ['btnBlitz', 'btnModeBlitz'],
-  [GAME_MODES.BOSS_RUSH]: ['btnBossRush', 'btnModeBossRush'],
-  [GAME_MODES.CASCADE]: ['btnCascade', 'btnModeCascade']
+  [GAME_MODES.PUZZLE]: ['btnModePuzzle'],
+  [GAME_MODES.BLITZ]: ['btnModeBlitz'],
+  [GAME_MODES.BOSS_RUSH]: ['btnModeBossRush'],
+  [GAME_MODES.CASCADE]: ['btnModeCascade']
 });
 
 /** Pause modal hints that have one wording per input mode. */
@@ -432,10 +432,6 @@ export class UIManager {
       btnEndless: document.getElementById('btn-endless'),
       btnDaily: document.getElementById('btn-daily'),
       btnFlux: document.getElementById('btn-flux'),
-      btnPuzzle: document.getElementById('btn-puzzle'),
-      btnBlitz: document.getElementById('btn-blitz'),
-      btnBossRush: document.getElementById('btn-boss-rush'),
-      btnCascade: document.getElementById('btn-cascade'),
       btnShop: document.getElementById('btn-shop'),
       btnRestart: document.getElementById('btn-restart'),
       btnPause: document.getElementById('btn-pause'),
@@ -526,13 +522,7 @@ export class UIManager {
       btnResume: document.getElementById('btn-resume'),
       btnRestartPause: document.getElementById('btn-restart-pause'),
       btnLevelsPause: document.getElementById('btn-levels-pause'),
-      btnSoundPause: document.getElementById('btn-sound-pause'),
-      btnContrastPause: document.getElementById('btn-contrast-pause'),
-      btnPatternsPause: document.getElementById('btn-patterns-pause'),
-      btnTiltPause: document.getElementById('btn-tilt-pause'),
-      btnMotionPause: document.getElementById('btn-motion-pause'),
-      btnResetHintsPause: document.getElementById('btn-reset-hints-pause'),
-      btnLangPause: document.getElementById('btn-lang-pause'),
+      btnSettingsPause: document.getElementById('btn-settings-pause'),
       btnSettings: document.getElementById('btn-settings'),
       modalSettings: document.getElementById('modal-settings'),
       btnCloseSettings: document.getElementById('btn-close-settings'),
@@ -825,9 +815,9 @@ export class UIManager {
     }
   }
 
-  /** True when the layout turns the header into a slide-in menu (portrait phones). */
+  /** True when the layout turns the header into a slide-in menu. */
   isDrawerLayout() {
-    return Boolean(this.drawerMedia && this.drawerMedia.matches);
+    return Boolean(this.elements?.btnMenu || (this.drawerMedia && this.drawerMedia.matches));
   }
 
   /**
@@ -922,11 +912,6 @@ export class UIManager {
     const query = this.gameConfig.defaults.drawerMediaQuery;
     if (typeof window !== 'undefined' && typeof window.matchMedia === 'function' && query) {
       this.drawerMedia = window.matchMedia(query);
-      this.drawerMedia.addEventListener('change', () => {
-        if (!this.drawerMedia.matches) {
-          this.closeDrawer({ resume: true });
-        }
-      });
     }
     if (this.elements.btnMenu) {
       this.elements.btnMenu.addEventListener('click', () => {
@@ -1033,9 +1018,6 @@ export class UIManager {
       this.updateSoundButton();
     };
     this.elements.btnSound.addEventListener('click', toggleSound);
-    if (this.elements.btnSoundPause) {
-      this.elements.btnSoundPause.addEventListener('click', toggleSound);
-    }
 
     const toggleContrast = () => {
       const nextContrast = !this.storageManager.getHighContrast();
@@ -1048,9 +1030,6 @@ export class UIManager {
     if (this.elements.btnContrast) {
       this.elements.btnContrast.addEventListener('click', toggleContrast);
     }
-    if (this.elements.btnContrastPause) {
-      this.elements.btnContrastPause.addEventListener('click', toggleContrast);
-    }
 
     const togglePatterns = () => {
       const nextPatterns = !this.storageManager.getColorPatterns();
@@ -1060,10 +1039,8 @@ export class UIManager {
       }
       this.updatePatternsButton();
     };
-    for (const btn of [this.elements.btnPatterns, this.elements.btnPatternsPause]) {
-      if (btn) {
-        btn.addEventListener('click', togglePatterns);
-      }
+    if (this.elements.btnPatterns) {
+      this.elements.btnPatterns.addEventListener('click', togglePatterns);
     }
 
     const toggleMotion = () => {
@@ -1079,9 +1056,6 @@ export class UIManager {
     };
     if (this.elements.btnMotion) {
       this.elements.btnMotion.addEventListener('click', toggleMotion);
-    }
-    if (this.elements.btnMotionPause) {
-      this.elements.btnMotionPause.addEventListener('click', toggleMotion);
     }
 
     document.addEventListener('visibilitychange', () => {
@@ -1099,9 +1073,6 @@ export class UIManager {
       this.storageManager.setLanguage(nextLang);
     };
     this.elements.btnLang.addEventListener('click', toggleLang);
-    if (this.elements.btnLangPause) {
-      this.elements.btnLangPause.addEventListener('click', toggleLang);
-    }
 
     this.elements.swapBtn.addEventListener('click', () => {
       this.engine.swapLauncherBalls();
@@ -1115,14 +1086,6 @@ export class UIManager {
 
     if (this.elements.btnResetHints) {
       this.elements.btnResetHints.addEventListener('click', () => {
-        this.engine.resetDiscoveries();
-        this.hintsResetConfirmed = true;
-        this.updateResetHintsFeedback();
-        this.announce(t('hud.announcer.hints.reset'));
-      });
-    }
-    if (this.elements.btnResetHintsPause) {
-      this.elements.btnResetHintsPause.addEventListener('click', () => {
         this.engine.resetDiscoveries();
         this.hintsResetConfirmed = true;
         this.updateResetHintsFeedback();
@@ -1233,41 +1196,33 @@ export class UIManager {
       }
     });
 
-    for (const btn of [this.elements.btnPuzzle, this.elements.btnModePuzzle]) {
-      btn?.addEventListener('click', () => {
-        this.requestDestructiveAction(() => {
-          this.hideAllModals();
-          this.engine.startPuzzleMode(this.getSuggestedPuzzleStage());
-        }, () => t('modals.levelSelect.arcade.puzzle'));
-      });
-    }
+    this.elements.btnModePuzzle?.addEventListener('click', () => {
+      this.requestDestructiveAction(() => {
+        this.hideAllModals();
+        this.engine.startPuzzleMode(this.getSuggestedPuzzleStage());
+      }, () => t('modals.levelSelect.arcade.puzzle'));
+    });
 
-    for (const btn of [this.elements.btnBlitz, this.elements.btnModeBlitz]) {
-      btn?.addEventListener('click', () => {
-        this.requestDestructiveAction(() => {
-          this.hideAllModals();
-          this.engine.startBlitzMode();
-        }, () => t('modals.levelSelect.arcade.blitz'));
-      });
-    }
+    this.elements.btnModeBlitz?.addEventListener('click', () => {
+      this.requestDestructiveAction(() => {
+        this.hideAllModals();
+        this.engine.startBlitzMode();
+      }, () => t('modals.levelSelect.arcade.blitz'));
+    });
 
-    for (const btn of [this.elements.btnBossRush, this.elements.btnModeBossRush]) {
-      btn?.addEventListener('click', () => {
-        this.requestDestructiveAction(() => {
-          this.hideAllModals();
-          this.engine.startBossRushMode();
-        }, () => t('modals.levelSelect.arcade.bossRush'));
-      });
-    }
+    this.elements.btnModeBossRush?.addEventListener('click', () => {
+      this.requestDestructiveAction(() => {
+        this.hideAllModals();
+        this.engine.startBossRushMode();
+      }, () => t('modals.levelSelect.arcade.bossRush'));
+    });
 
-    for (const btn of [this.elements.btnCascade, this.elements.btnModeCascade]) {
-      btn?.addEventListener('click', () => {
-        this.requestDestructiveAction(() => {
-          this.hideAllModals();
-          this.engine.startCascadeMode();
-        }, () => t('modals.levelSelect.arcade.cascade'));
-      });
-    }
+    this.elements.btnModeCascade?.addEventListener('click', () => {
+      this.requestDestructiveAction(() => {
+        this.hideAllModals();
+        this.engine.startCascadeMode();
+      }, () => t('modals.levelSelect.arcade.cascade'));
+    });
 
     this.elements.inputFluxSeed?.addEventListener('keydown', (e) => {
       if (e.key === 'Enter') {
@@ -1376,6 +1331,13 @@ export class UIManager {
 
     this.elements.btnLevelsPause?.addEventListener('click', () => {
       this.openLevelsModal();
+      this.elements.modalPause.classList.add('hidden');
+      this.syncModalInertState();
+    });
+
+    this.elements.btnSettingsPause?.addEventListener('click', () => {
+      this.syncInstallControls();
+      this.openOverlayModal(this.elements.modalSettings, this.elements.btnCloseSettings);
       this.elements.modalPause.classList.add('hidden');
       this.syncModalInertState();
     });
@@ -1835,6 +1797,8 @@ export class UIManager {
       } else if (this.engine.state === GAME_STATES.PAUSED && !this.isRunHeldByUi()) {
         if (modalElement === this.elements.modalLevels) {
           this.stackedModalOpener = this.elements.btnLevelsPause;
+        } else if (modalElement === this.elements.modalSettings) {
+          this.stackedModalOpener = this.elements.btnSettingsPause;
         }
         this.elements.modalPause.classList.remove('hidden');
       }
@@ -1969,7 +1933,7 @@ export class UIManager {
 
   updateSoundButton() {
     const isMuted = this.audioManager.isMuted();
-    this.applyToggleState([this.elements.btnSound, this.elements.btnSoundPause], {
+    this.applyToggleState([this.elements.btnSound], {
       label: t(isMuted ? 'app.nav.button.soundOff' : 'app.nav.button.soundOn'),
       ariaLabel: t('app.nav.button.soundAria'),
       tooltip: t(isMuted ? 'app.nav.button.soundOffAria' : 'app.nav.button.soundOnAria'),
@@ -1979,7 +1943,7 @@ export class UIManager {
 
   updateContrastButton() {
     const isHigh = this.storageManager.getHighContrast();
-    this.applyToggleState([this.elements.btnContrast, this.elements.btnContrastPause], {
+    this.applyToggleState([this.elements.btnContrast], {
       label: t(isHigh ? 'app.nav.button.contrastOn' : 'app.nav.button.contrastOff'),
       ariaLabel: t('app.nav.button.contrastAria'),
       tooltip: t(isHigh ? 'app.nav.button.contrastOnAria' : 'app.nav.button.contrastOffAria'),
@@ -1992,7 +1956,7 @@ export class UIManager {
 
   updatePatternsButton() {
     const isOn = this.storageManager.getColorPatterns();
-    this.applyToggleState([this.elements.btnPatterns, this.elements.btnPatternsPause], {
+    this.applyToggleState([this.elements.btnPatterns], {
       label: t(isOn ? 'app.nav.button.patternsOn' : 'app.nav.button.patternsOff'),
       ariaLabel: t('app.nav.button.patternsAria'),
       tooltip: t(isOn ? 'app.nav.button.patternsOnAria' : 'app.nav.button.patternsOffAria'),
@@ -2017,9 +1981,7 @@ export class UIManager {
       typeof window.DeviceOrientationEvent !== 'undefined' &&
       typeof window.matchMedia === 'function' &&
       window.matchMedia(this.gameConfig.tilt.touchMediaQuery).matches;
-    for (const btn of [this.elements.btnTilt, this.elements.btnTiltPause]) {
-      btn?.closest('.pause-setting')?.classList.toggle('hidden', !isSupported);
-    }
+    this.elements.btnTilt?.closest('.pause-setting')?.classList.toggle('hidden', !isSupported);
     // Named even while hidden, so no audit tool finds an unnamed button.
     this.updateTiltButton();
     if (!isSupported) {
@@ -2043,9 +2005,7 @@ export class UIManager {
       this.storageManager.setTilt(next);
       this.setTiltActive(next);
     };
-    for (const btn of [this.elements.btnTilt, this.elements.btnTiltPause]) {
-      btn?.addEventListener('click', toggleTilt);
-    }
+    this.elements.btnTilt?.addEventListener('click', toggleTilt);
     this.updateTiltButton();
   }
 
@@ -2080,7 +2040,7 @@ export class UIManager {
 
   updateTiltButton() {
     const isOn = Boolean(this.isTiltActive);
-    this.applyToggleState([this.elements.btnTilt, this.elements.btnTiltPause], {
+    this.applyToggleState([this.elements.btnTilt], {
       label: t(isOn ? 'app.nav.button.tiltOn' : 'app.nav.button.tiltOff'),
       ariaLabel: t('app.nav.button.tiltAria'),
       tooltip: t(isOn ? 'app.nav.button.tiltOnAria' : 'app.nav.button.tiltOffAria'),
@@ -2090,7 +2050,7 @@ export class UIManager {
 
   updateMotionButton() {
     const isReduced = this.storageManager.getReducedMotion();
-    this.applyToggleState([this.elements.btnMotion, this.elements.btnMotionPause], {
+    this.applyToggleState([this.elements.btnMotion], {
       label: t(isReduced ? 'app.nav.button.motionReduced' : 'app.nav.button.motionOn'),
       ariaLabel: t('app.nav.button.motionAria'),
       tooltip: t(isReduced ? 'app.nav.button.motionReducedAria' : 'app.nav.button.motionOnAria'),
@@ -2111,15 +2071,14 @@ export class UIManager {
     const locale = i18n.getLocale();
     const label = t('app.nav.button.language');
     const ariaLabel = t('app.nav.button.languageAria');
-    for (const btn of [this.elements.btnLang, this.elements.btnLangPause]) {
-      if (btn) {
-        const codeSpan = document.createElement('span');
-        codeSpan.lang = locale;
-        codeSpan.textContent = label;
-        btn.replaceChildren(codeSpan);
-        btn.setAttribute('aria-label', ariaLabel);
-        btn.title = ariaLabel;
-      }
+    const btn = this.elements.btnLang;
+    if (btn) {
+      const codeSpan = document.createElement('span');
+      codeSpan.lang = locale;
+      codeSpan.textContent = label;
+      btn.replaceChildren(codeSpan);
+      btn.setAttribute('aria-label', ariaLabel);
+      btn.title = ariaLabel;
     }
     if (this.elements.btnDismissTutorial) {
       const dismissLabel = t('hud.tutorial.dismiss');
@@ -2133,11 +2092,10 @@ export class UIManager {
     const captionKey = this.hintsResetConfirmed
       ? 'app.nav.button.resetHintsDoneCaption'
       : 'app.nav.button.resetHintsCaption';
-    for (const btn of [this.elements?.btnResetHints, this.elements?.btnResetHintsPause]) {
-      if (btn) {
-        setTextIfChanged(btn, t(iconKey));
-        setTextIfChanged(document.querySelector(`[data-caption-for="${btn.id}"]`), t(captionKey));
-      }
+    const btn = this.elements?.btnResetHints;
+    if (btn) {
+      setTextIfChanged(btn, t(iconKey));
+      setTextIfChanged(document.querySelector(`[data-caption-for="${btn.id}"]`), t(captionKey));
     }
   }
 
@@ -3013,10 +2971,6 @@ export class UIManager {
         }
       }
       if (transitionedState) {
-        if (this.hintsResetConfirmed) {
-          this.hintsResetConfirmed = false;
-          this.updateResetHintsFeedback();
-        }
         this.saveLastFocusedElement();
       }
       this.elements.modalPause.classList.remove('hidden');

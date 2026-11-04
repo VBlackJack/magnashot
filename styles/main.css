@@ -99,6 +99,10 @@
   /* Fade of the tutorial hint while a finger rests on the board (portrait phones). */
   --tutorial-fade: 120ms;
   --tutorial-bottom: 18%;
+  /* Slide-in burger drawer across all viewports. */
+  --drawer-width: min(320px, 86vw);
+  --drawer-duration: 0.22s;
+  --drawer-transition: var(--drawer-duration) ease;
 }
 
 /* Hints written for one input mode only (the root carries data-input). */
@@ -174,17 +178,60 @@ body {
   flex-shrink: 0;
 }
 
+/* Slide-in burger drawer: stays off-screen until opened on any viewport. */
 .top-bar {
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 40;
+  width: var(--drawer-width);
+  display: flex;
+  flex-direction: column;
+  flex-wrap: nowrap;
+  align-items: stretch;
+  justify-content: flex-start;
+  gap: 16px;
+  padding: max(16px, env(safe-area-inset-top)) 16px max(16px, env(safe-area-inset-bottom))
+    max(16px, env(safe-area-inset-left));
+  background: var(--bg-panel);
+  border: 1px solid var(--bg-panel-border);
+  border-width: 0 1px 0 0;
+  border-radius: 0 16px 16px 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  transform: translateX(-100%);
+  visibility: hidden;
+  transition: transform var(--drawer-transition), visibility 0s linear var(--drawer-duration);
+}
+
+.app-shell.drawer-open .top-bar {
+  transform: none;
+  visibility: visible;
+  transition: transform var(--drawer-transition);
+}
+
+.drawer-backdrop {
+  display: block;
+  position: fixed;
+  inset: 0;
+  z-index: 39;
+  background: var(--bg-dark-alpha-62);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--drawer-transition);
+}
+
+.app-shell.drawer-open .drawer-backdrop {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.drawer-head {
   display: flex;
   justify-content: space-between;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 10px;
-  background: var(--bg-panel-alpha-85);
-  border: 1px solid var(--bg-panel-border);
-  border-radius: 12px;
-  padding: 10px 16px;
-  backdrop-filter: blur(8px);
+  align-items: flex-start;
+  gap: 8px;
 }
 
 .brand-group {
@@ -209,21 +256,38 @@ body {
 
 .nav-controls {
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 10px;
+  flex-direction: column;
+  align-items: stretch;
+  flex-wrap: nowrap;
+  gap: 16px;
+  width: 100%;
 }
 
 .nav-group {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   align-items: center;
-  gap: 6px;
+  gap: 8px;
+}
+
+.nav-group-title {
+  grid-column: 1 / -1;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+  margin-bottom: 2px;
 }
 
 .nav-actions {
-  padding-left: 8px;
-  border-left: 1px solid var(--border-subtle);
+  padding-top: 12px;
+  border-top: 1px solid var(--border-subtle);
+}
+
+#btn-pause,
+#btn-settings {
+  grid-column: 1 / -1;
 }
 
 .nav-btn {
@@ -231,8 +295,8 @@ body {
   color: var(--text-main);
   border: 1px solid var(--border-subtle);
   border-radius: 8px;
-  padding: 6px 12px;
-  font-size: 0.82rem;
+  padding: 6px 8px;
+  font-size: 0.85rem;
   font-weight: 600;
   cursor: pointer;
   transition: transform 0.12s ease, border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
@@ -284,7 +348,7 @@ body {
 
 .hud-bar {
   display: grid;
-  grid-template-columns: 1fr 2fr 1fr 1fr 1fr;
+  grid-template-columns: auto 1fr 2fr 1fr 1fr 1fr;
   gap: 8px;
   background: var(--bg-panel-alpha-85);
   border: 1px solid var(--bg-panel-border);
@@ -344,10 +408,10 @@ body {
   transition: width 0.3s ease;
 }
 
-/* Slide-in menu parts: only portrait phones turn the header into a menu. */
+/* Slide-in menu controls: visible on all viewports to open and close the burger drawer. */
 .hud-menu-btn,
 .drawer-close-btn {
-  display: none;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
@@ -361,8 +425,16 @@ body {
   cursor: pointer;
 }
 
-.drawer-backdrop,
-.drawer-stats,
+.drawer-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px 8px;
+  padding: 12px;
+  background: var(--surface-sunken);
+  border: 1px solid var(--border-subtle);
+  border-radius: 12px;
+}
+
 .hud-compact-info,
 .launcher-caption {
   display: none;
@@ -415,20 +487,33 @@ body {
 }
 
 .hud-mode-banner {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
   font-size: 0.92rem;
   font-weight: 700;
   color: var(--text-soft);
   text-align: center;
   cursor: pointer;
-  border-radius: 6px;
-  padding: 2px 8px;
-  border: 1px solid transparent;
-  transition: border-color 0.15s ease, background 0.15s ease;
+  background: var(--surface-raised);
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  padding: 4px 10px;
+  transition: border-color 0.15s ease, background 0.15s ease, transform 0.12s ease;
+}
+
+.hud-mode-banner::after {
+  content: '▾';
+  font-size: 0.78em;
+  color: var(--accent-blue);
+  line-height: 1;
 }
 
 .hud-mode-banner:hover {
   border-color: var(--accent-blue);
   background: var(--accent-blue-alpha-14);
+  transform: translateY(-1px);
 }
 
 .hud-badges-row {
@@ -1681,28 +1766,6 @@ body {
     --stage-column-gap: 4px;
     --stage-gap: 4px;
   }
-  .top-bar {
-    padding: 4px 6px;
-    gap: 4px;
-  }
-  /* The title stays in the accessibility tree; only its pixels go away. */
-  .brand-group {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    margin: -1px;
-    overflow: hidden;
-    clip: rect(0, 0, 0, 0);
-    white-space: nowrap;
-  }
-  #btn-restart {
-    display: none;
-  }
-  .nav-actions {
-    padding-left: 0;
-    border-left: none;
-    flex-wrap: nowrap;
-  }
   .nav-btn {
     padding: 4px 8px;
     min-height: var(--touch-target);
@@ -1723,12 +1786,18 @@ body {
     text-wrap: balance;
   }
   .hud-bar {
-    grid-template-columns: repeat(4, 1fr);
+    grid-template-columns: repeat(4, minmax(0, 1fr));
     padding: 4px 8px;
     gap: 2px 4px;
   }
+  .hud-menu-btn {
+    grid-column: 1;
+    grid-row: 1;
+    justify-self: start;
+  }
   .hud-center-info {
-    grid-column: 1 / -1;
+    grid-column: 2 / -1;
+    grid-row: 1;
     order: -1;
     flex-direction: row;
     justify-content: center;
@@ -1806,8 +1875,8 @@ body {
 
 /*
  * Portrait phones: the board takes the full width, a one-line HUD sits above it and
- * a single control row below it (launcher buttons and special balls). The header
- * becomes a slide-in menu holding navigation, settings and the stats the HUD drops.
+ * a single control row below it (launcher buttons and special balls). The slide-in
+ * burger menu holds navigation, settings and the stats the compact HUD drops.
  */
 @media (max-width: 680px) {
   :root {
@@ -1823,9 +1892,6 @@ body {
     --stage-reserve-y: calc(
       var(--control-row-height) + var(--overcharge-row-height) + 2 * var(--stage-column-gap) + var(--canvas-border)
     );
-    --drawer-width: min(320px, 86vw);
-    --drawer-duration: 0.22s;
-    --drawer-transition: var(--drawer-duration) ease;
   }
 
   /* The hint sits where the thumb aims: it steps aside while the finger is down. */
@@ -1835,102 +1901,6 @@ body {
   /* The control row has no room for a sentence; the empty slots speak for themselves. */
   .powerups-empty {
     display: none;
-  }
-
-  /* Slide-in menu: the header leaves the flow and waits off-screen. */
-  .top-bar {
-    position: fixed;
-    top: 0;
-    bottom: 0;
-    left: 0;
-    z-index: 40;
-    width: var(--drawer-width);
-    flex-direction: column;
-    flex-wrap: nowrap;
-    align-items: stretch;
-    justify-content: flex-start;
-    gap: 16px;
-    padding: max(16px, env(safe-area-inset-top)) 16px max(16px, env(safe-area-inset-bottom))
-      max(16px, env(safe-area-inset-left));
-    background: var(--bg-panel);
-    border-width: 0 1px 0 0;
-    border-radius: 0 16px 16px 0;
-    overflow-y: auto;
-    overscroll-behavior: contain;
-    transform: translateX(-100%);
-    visibility: hidden;
-    transition: transform var(--drawer-transition), visibility 0s linear var(--drawer-duration);
-  }
-  .app-shell.drawer-open .top-bar {
-    transform: none;
-    visibility: visible;
-    transition: transform var(--drawer-transition);
-  }
-  .drawer-backdrop {
-    display: block;
-    position: fixed;
-    inset: 0;
-    z-index: 39;
-    background: var(--bg-dark-alpha-62);
-    opacity: 0;
-    pointer-events: none;
-    transition: opacity var(--drawer-transition);
-  }
-  .app-shell.drawer-open .drawer-backdrop {
-    opacity: 1;
-    pointer-events: auto;
-  }
-  .drawer-head {
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
-    gap: 8px;
-  }
-  /* The compact chrome hides the title; the menu shows it again. */
-  .brand-group {
-    position: static;
-    width: auto;
-    height: auto;
-    margin: 0;
-    overflow: visible;
-    clip: auto;
-    white-space: normal;
-  }
-  .drawer-close-btn {
-    display: inline-flex;
-  }
-  .drawer-stats {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 10px 8px;
-    padding: 12px;
-    background: var(--surface-sunken);
-    border: 1px solid var(--border-subtle);
-    border-radius: 12px;
-  }
-  .nav-controls {
-    flex-direction: column;
-    align-items: stretch;
-    flex-wrap: nowrap;
-    gap: 16px;
-    width: 100%;
-  }
-  .nav-modes {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 8px;
-  }
-  .nav-actions {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 8px;
-  }
-  #btn-pause,
-  #btn-settings {
-    grid-column: 1 / -1;
-  }
-  #btn-restart {
-    display: inline-block;
   }
   .nav-controls .nav-btn {
     font-size: 0.85rem;
@@ -1945,9 +1915,6 @@ body {
     padding: 0 8px 0 max(4px, env(safe-area-inset-left));
     border-width: 0 0 1px;
     border-radius: 0;
-  }
-  .hud-menu-btn {
-    display: inline-flex;
   }
   .hud-stat-box {
     flex-direction: row;
@@ -2105,9 +2072,9 @@ body {
 }
 
 /*
- * Landscape phones and landscape desktops: header and HUD stacked on the left,
- * the canvas uses the full height in the middle, launcher controls and power-ups
- * on the right. Desktop sizes are adjusted in the block that follows.
+ * Landscape phones and landscape desktops: HUD on the left, the canvas uses the full
+ * height in the middle, launcher controls and power-ups on the right. Desktop sizes are
+ * adjusted in the block that follows.
  */
 @media (orientation: landscape) and (max-height: 500px),
   (orientation: landscape) and (min-width: 900px) and (min-aspect-ratio: 4/3) {
@@ -2130,37 +2097,9 @@ body {
     grid-template-rows: auto minmax(0, 1fr);
     align-items: start;
   }
-  .top-bar {
-    grid-column: 1;
-    grid-row: 1;
-  }
-  .nav-controls {
-    width: 100%;
-    flex-wrap: wrap;
-    gap: 4px;
-  }
-  .nav-modes {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    flex: 1 1 100%;
-    gap: 4px;
-  }
-  .nav-actions {
-    flex: 1 1 100%;
-    flex-wrap: wrap;
-    padding-left: 0;
-    border-left: none;
-  }
-  /* Pause gets a row of its own; the other round actions share the next one. */
-  .nav-actions .nav-btn {
-    flex: 1 1 0;
-  }
-  .nav-actions #btn-pause {
-    flex-basis: 100%;
-  }
   .hud-bar {
     grid-column: 1;
-    grid-row: 2;
+    grid-row: 1;
   }
   .stage-container {
     grid-column: 2;
@@ -2214,10 +2153,11 @@ body {
  * hint and the equipped-ball banner move to the free space at the bottom of the left
  * column, at its full width. Fixed positioning escapes the clipping wrapper because
  * the stage keeps container-type: normal here (a size container would trap it).
- * The nav packs the four modes on one row and the round actions on the next.
+ * The slide-in burger drawer widens to pack the four modes on a single row.
  */
 @media (orientation: landscape) and (max-height: 500px) {
   :root {
+    --drawer-width: min(460px, 92vw);
     /* Gap between the equipped banner and the tutorial hint stacked above it. */
     --landscape-overlay-stack: 52px;
     /* Board, launcher dock and power-ups column, with the gaps between them. */
@@ -2252,12 +2192,6 @@ body {
   .nav-modes {
     grid-template-columns: repeat(4, minmax(0, 1fr));
   }
-  .arcade-nav-btn {
-    display: none;
-  }
-  .nav-actions #btn-pause {
-    flex-basis: auto;
-  }
   .powerups-empty {
     display: none;
   }
@@ -2265,8 +2199,8 @@ body {
 
 /*
  * Landscape desktops and tablets: the board sits in the middle of the window at full
- * height, between two columns of the same width. The left column holds navigation and
- * the round stats; the right one holds everything used while aiming (overcharge,
+ * height, between two columns of the same width. The left column holds the burger menu
+ * button and round stats; the right one holds everything used while aiming (overcharge,
  * special balls, Polarity and Swap), with the launcher controls at the bottom, level
  * with the launcher. The stage wrappers dissolve into the shell grid (display: contents)
  * so the canvas, the special balls and the launcher controls share one row of columns.
@@ -2287,18 +2221,19 @@ body {
     column-gap: var(--stage-gap);
     row-gap: var(--shell-gap);
   }
-  .top-bar {
-    grid-column: 1;
-    grid-row: 1;
-  }
   .hud-bar {
     grid-column: 1;
-    grid-row: 2 / span 2;
+    grid-row: 1 / span 3;
     grid-template-columns: repeat(2, minmax(0, 1fr));
     align-content: start;
     align-items: start;
     gap: 18px 10px;
     padding: 16px 14px;
+  }
+  .hud-menu-btn {
+    grid-column: 1 / -1;
+    order: -2;
+    justify-self: start;
   }
   .hud-center-info {
     grid-column: 1 / -1;
@@ -2535,6 +2470,7 @@ body {
   .polarity-floating-btn,
   .swap-floating-btn,
   .hud-menu-btn,
+  .hud-mode-banner,
   .drawer-close-btn,
   .tutorial-dismiss-btn,
   .level-chapter,
@@ -2596,6 +2532,7 @@ body {
     scroll-behavior: auto !important;
   }
   .nav-btn:hover,
+  .hud-mode-banner:hover,
   .powerup-btn:hover:not(:disabled),
   .level-card.unlocked:hover {
     transform: none;
@@ -2615,6 +2552,7 @@ body {
 }
 
 :root.reduced-motion .nav-btn:hover,
+:root.reduced-motion .hud-mode-banner:hover,
 :root.reduced-motion .powerup-btn:hover:not(:disabled),
 :root.reduced-motion .level-card.unlocked:hover {
   transform: none;

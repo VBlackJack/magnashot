@@ -33,7 +33,7 @@
 </head>
 <body>
   <div class="app-shell">
-    <!-- On portrait phones this header becomes the slide-in menu (see .app-shell.drawer-open). -->
+    <!-- Slide-in burger menu (see .app-shell.drawer-open). -->
     <header id="app-drawer" class="top-bar" data-i18n-aria-label="app.drawer.aria.label">
       <div class="drawer-head">
         <div class="brand-group">
@@ -62,17 +62,15 @@
         </div>
       </dl>
       <nav class="nav-controls">
-        <div class="nav-group nav-modes" role="group" data-i18n-aria-label="app.nav.groups.modes">
+        <div class="nav-group nav-modes" role="group" aria-labelledby="nav-group-modes-title">
+          <span id="nav-group-modes-title" class="nav-group-title" data-i18n="app.nav.groups.modes"></span>
           <button id="btn-levels" type="button" data-closes-drawer class="nav-btn mode-btn" data-i18n="app.nav.button.levels"></button>
           <button id="btn-endless" type="button" data-closes-drawer class="nav-btn mode-btn" data-i18n="app.nav.button.endless"></button>
           <button id="btn-daily" type="button" data-closes-drawer class="nav-btn mode-btn" data-i18n="app.nav.button.daily"></button>
           <button id="btn-flux" type="button" data-closes-drawer class="nav-btn mode-btn" data-i18n="app.nav.button.flux"></button>
-          <button id="btn-puzzle" type="button" data-closes-drawer class="nav-btn mode-btn arcade-nav-btn" data-i18n="modals.levelSelect.arcade.puzzle"></button>
-          <button id="btn-blitz" type="button" data-closes-drawer class="nav-btn mode-btn arcade-nav-btn" data-i18n="modals.levelSelect.arcade.blitz"></button>
-          <button id="btn-boss-rush" type="button" data-closes-drawer class="nav-btn mode-btn arcade-nav-btn" data-i18n="modals.levelSelect.arcade.bossRush"></button>
-          <button id="btn-cascade" type="button" data-closes-drawer class="nav-btn mode-btn arcade-nav-btn" data-i18n="modals.levelSelect.arcade.cascade"></button>
         </div>
-        <div class="nav-group nav-actions" role="group" data-i18n-aria-label="app.nav.groups.round">
+        <div class="nav-group nav-actions" role="group" aria-labelledby="nav-group-round-title">
+          <span id="nav-group-round-title" class="nav-group-title" data-i18n="app.nav.groups.round"></span>
           <button id="btn-pause" type="button" data-closes-drawer class="nav-btn primary" data-i18n="app.nav.button.pause" data-i18n-title="app.nav.button.pauseTooltip"></button>
           <button id="btn-restart" type="button" data-closes-drawer class="nav-btn" data-i18n="app.nav.button.restart"></button>
           <button id="btn-shop" type="button" data-closes-drawer class="nav-btn gold" data-i18n="app.nav.button.shop"></button>
@@ -282,40 +280,11 @@
         <li id="pause-instruction-keyboard"></li>
         <li data-i18n="modals.pause.instructions.physics"></li>
       </ul>
-      <div class="pause-settings-row">
-        <div class="pause-setting">
-          <button id="btn-sound-pause" type="button" class="nav-btn icon-btn"></button>
-          <span class="pause-setting-caption" data-caption-for="btn-sound-pause" aria-hidden="true"></span>
-        </div>
-        <div class="pause-setting">
-          <button id="btn-contrast-pause" type="button" class="nav-btn icon-btn"></button>
-          <span class="pause-setting-caption" data-caption-for="btn-contrast-pause" aria-hidden="true"></span>
-        </div>
-        <div class="pause-setting">
-          <button id="btn-patterns-pause" type="button" class="nav-btn icon-btn"></button>
-          <span class="pause-setting-caption" data-caption-for="btn-patterns-pause" aria-hidden="true"></span>
-        </div>
-        <div class="pause-setting">
-          <button id="btn-tilt-pause" type="button" class="nav-btn icon-btn"></button>
-          <span class="pause-setting-caption" data-caption-for="btn-tilt-pause" aria-hidden="true"></span>
-        </div>
-        <div class="pause-setting">
-          <button id="btn-motion-pause" type="button" class="nav-btn icon-btn"></button>
-          <span class="pause-setting-caption" data-caption-for="btn-motion-pause" aria-hidden="true"></span>
-        </div>
-        <div class="pause-setting">
-          <button id="btn-reset-hints-pause" type="button" class="nav-btn icon-btn" data-i18n="app.nav.button.resetHints" data-i18n-aria-label="app.nav.button.resetHintsAria" data-i18n-title="app.nav.button.resetHintsAria"></button>
-          <span class="pause-setting-caption" data-i18n="app.nav.button.resetHintsCaption" data-caption-for="btn-reset-hints-pause" aria-hidden="true"></span>
-        </div>
-        <div class="pause-setting">
-          <button id="btn-lang-pause" type="button" class="nav-btn badge-btn"></button>
-          <span class="pause-setting-caption" data-i18n="app.nav.button.languageCaption" aria-hidden="true"></span>
-        </div>
-      </div>
       <div class="modal-actions">
         <button id="btn-resume" type="button" class="modal-btn primary" data-i18n="modals.pause.button.resume"></button>
         <button id="btn-restart-pause" type="button" class="modal-btn" data-i18n="modals.pause.button.restart"></button>
         <button id="btn-levels-pause" type="button" class="modal-btn" data-i18n="modals.pause.button.levels"></button>
+        <button id="btn-settings-pause" type="button" class="modal-btn" aria-haspopup="dialog"><span class="settings-btn-icon" aria-hidden="true" data-i18n="app.nav.button.settingsIcon"></span> <span data-i18n="app.nav.button.settings"></span></button>
       </div>
     </div>
   </div>

@@ -4,6 +4,14 @@ All notable changes to **MagnaShot** are documented in this file.
 
 ## [Unreleased]
 
+## [1.10.0] - 2026-11-04
+
+### Changed
+- **Unified Slide-In Burger Menu Across All Viewports (`#app-drawer`, `#btn-menu`, `UIManager.isDrawerLayout`, `styles/main.css`)**: Replaced the 12-button persistent top bar on desktop, tablet, and landscape phone with the slide-in lateral burger drawer (`☰` `#btn-menu`) across all screen sizes, keeping the main game screen focused on the HUD, arena board, and aiming controls while organizing the drawer into two labelled sections (*Game Modes* and *Current Round*) with live summary stats.
+- **Deduplicated Arcade Mode Navigation (`index.html`, `UIManager.js`)**: Removed the 4 duplicate Arcade buttons (*Puzzle*, *Blitz 90s*, *Boss Rush*, *Cascade*) from the main navigation drawer so the drawer holds the 4 primary entries (*Levels*, *Survival*, *Daily Challenge*, *Flux Mode*) while the 4 Arcade modes live as rich cards with descriptions, personal records, and the `P1`-`P5` stage selector inside `#modal-levels`.
+- **Streamlined Pause Modal (`#modal-pause`, `#btn-settings-pause`, `UIManager.closeOverlayModal`)**: Removed the 7 duplicated setting toggle buttons from `#modal-pause` and replaced them with a single **⚙ Settings** button (`#btn-settings-pause`) that opens `#modal-settings` and restores focus to `#btn-settings-pause` in `#modal-pause` when closed.
+- **Interactive HUD Mode Selector Pill (`.hud-mode-banner`)**: Styled `#hud-mode-banner` as an interactive pill button with a raised surface, subtle border, hover elevation, and a `▾` chevron indicator so players immediately see it opens the Modes & Level Select dialog (`#modal-levels`).
+
 ## [1.9.9] - 2026-11-04
 
 ### Fixed

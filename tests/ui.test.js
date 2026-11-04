@@ -594,13 +594,14 @@ test('btnPlayLevelModal asks for destructive confirmation when switching from an
   );
 });
 
-test('Pause and Settings modals both expose the reset-hints button and visible confirmation state', () => {
+test('Pause modal delegates settings to the Settings dialog and restores focus on close', () => {
   const pauseModal = elementMarkup(indexHtml, 'modal-pause');
   const settingsModal = elementMarkup(indexHtml, 'modal-settings');
-  assert.match(pauseModal, /id="btn-reset-hints-pause"/);
-  assert.match(pauseModal, /data-caption-for="btn-reset-hints-pause"/);
+  assert.match(pauseModal, /id="btn-settings-pause"[^>]*aria-haspopup="dialog"/);
+  assert.ok(!pauseModal.includes('pause-settings-row'), 'Pause modal no longer duplicates setting toggles');
   assert.match(settingsModal, /id="btn-reset-hints"/);
   assert.match(settingsModal, /data-caption-for="btn-reset-hints"/);
+  assert.match(uiManagerCode, /this\.stackedModalOpener = this\.elements\.btnSettingsPause/);
   assert.match(uiManagerCode, /updateResetHintsFeedback\(\)/);
   assert.match(uiManagerCode, /updateShareButtonLabel\(\)/);
 });
@@ -959,11 +960,13 @@ test('resolveLevelFormatBadgeKey and LevelCatalog.summarize expose landmark and 
   );
 });
 
-test('Arcade modes are accessible from both the main navigation bar and the rich cards in Modes & Level Select', () => {
+test('Arcade modes live in the rich cards of Modes & Level Select while the burger drawer groups primary modes and round actions', () => {
   const header = elementMarkup(indexHtml, 'app-drawer');
   for (const id of ['btn-puzzle', 'btn-blitz', 'btn-boss-rush', 'btn-cascade']) {
-    assert.match(header, new RegExp(`id="${id}"[^>]*class="nav-btn mode-btn arcade-nav-btn"`));
+    assert.ok(!header.includes(`id="${id}"`), `#${id} is not duplicated in the burger drawer`);
   }
+  assert.match(header, /aria-labelledby="nav-group-modes-title"/);
+  assert.match(header, /aria-labelledby="nav-group-round-title"/);
   const levelsModal = elementMarkup(indexHtml, 'modal-levels');
   for (const id of ['btn-mode-puzzle', 'btn-mode-blitz', 'btn-mode-boss-rush', 'btn-mode-cascade']) {
     assert.match(levelsModal, new RegExp(`id="${id}"[^>]*class="arcade-mode-card"`));

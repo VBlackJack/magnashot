@@ -31,13 +31,13 @@ import { startStaticServer } from './staticServer.js';
 /**
  * The layouts of styles/main.css: wide desktop, portrait tablet, landscape and portrait
  * phones, and a narrow portrait phone where the eight-button control row is the tightest.
- * hasRestartButton: the header (or its slide-in menu) shows Restart; the landscape phone
- * layout leaves it to the Pause dialog.
+ * hasDrawer / hasRestartButton: all viewports expose the slide-in burger menu and Restart.
+ * Both flags stay explicit per viewport in the test matrix.
  */
 const VIEWPORTS = Object.freeze([
-  { name: 'desktop', width: 1300, height: 850, isTouch: false, hasDrawer: false, hasRestartButton: true },
-  { name: 'tablet', width: 768, height: 1024, isTouch: true, hasDrawer: false, hasRestartButton: true },
-  { name: 'phone landscape', width: 844, height: 390, isTouch: true, hasDrawer: false, hasRestartButton: false },
+  { name: 'desktop', width: 1300, height: 850, isTouch: false, hasDrawer: true, hasRestartButton: true },
+  { name: 'tablet', width: 768, height: 1024, isTouch: true, hasDrawer: true, hasRestartButton: true },
+  { name: 'phone landscape', width: 844, height: 390, isTouch: true, hasDrawer: true, hasRestartButton: true },
   { name: 'phone portrait', width: 390, height: 844, isTouch: true, hasDrawer: true, hasRestartButton: true },
   { name: 'narrow phone portrait', width: 360, height: 800, isTouch: true, hasDrawer: true, hasRestartButton: true }
 ]);
@@ -744,7 +744,7 @@ describe('end of round (desktop)', () => {
     const { context, page, errors } = await openGame(desktop);
     try {
       await startLevelOne(page);
-      await page.click('#btn-shop');
+      await clickMenuButton(page, desktop, '#btn-shop');
       await waitShown(page, '#modal-shop');
       await page.click('#tab-shop-ammo');
       await waitShown(page, '#shop-ammo-pane');
