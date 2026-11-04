@@ -6,7 +6,7 @@
       },
       "subtitle": {
         "edition": "ÉDITION PHYSIQUE MAGNÉTIQUE",
-        "description": "Jeu de tir de billes à physique magnétique avec attraction dynamique, rotors et billes spéciales."
+        "description": "Jeu de tir de sphères à physique magnétique avec attraction dynamique, rotors et sphères spéciales."
       }
     },
     "nav": {
@@ -117,7 +117,8 @@
         "bossRush": "Boss Rush • Vague {{wave}} (👑 {{shields}})",
         "cascade": "Cascade • Vague {{wave}}",
         "coreRescueProgress": "💎 {{rescued}}/{{total}}",
-        "switchHint": "Cliquer pour changer de mode ou de niveau"
+        "switchHint": "Cliquer pour changer de mode ou de niveau",
+        "switchHintTouch": "Touchez pour changer de mode ou de niveau"
       },
       "shots": {
         "label": "Tirs restants",
@@ -173,11 +174,11 @@
     },
     "powerups": {
       "title": {
-        "label": "Billes Spéciales"
+        "label": "Sphères Spéciales"
       },
       "bomb": {
         "name": "Bombe",
-        "tooltip": "Explose les billes dans un large rayon"
+        "tooltip": "Explose les sphères dans un large rayon"
       },
       "lightning": {
         "name": "Foudre",
@@ -208,7 +209,7 @@
         "buyAria": "{{name}} : aucune en stock. Ouvrir l'Atelier pour en acheter",
         "emptyMark": "+"
       },
-      "empty": "Aucune bille spéciale dans ce niveau."
+      "empty": "Aucune sphère spéciale dans ce niveau."
     },
     "canvas": {
       "aria": {
@@ -232,6 +233,18 @@
       },
       "flux": {
         "perkChosen": "Atout choisi : {{name}}."
+      }
+    },
+    "hints": {
+      "replayAria": "Réafficher les astuces de ce niveau"
+    },
+    "levelIntro": {
+      "dismiss": "Fermer l'objectif",
+      "summary": "Niveau {{id}} : {{name}}. {{shots}} tirs. À retenir : {{mechanic}}.",
+      "summaryPlain": "Niveau {{id}} : {{name}}. {{shots}} tirs.",
+      "mechanicNames": {
+        "basics": "Pendule magnétique",
+        "pivot": "Rotor à inertie"
       }
     }
   },
@@ -405,13 +418,13 @@
       }
     },
     "tutorial": {
-      "pendulum": "Visez 3 billes de même couleur ou coupez les ancres supérieures pour déclencher une avalanche !",
-      "rotor": "Le rotor central tourne selon le poids des billes et la force d'impact de vos tirs.",
-      "repulsor": "Les coeurs répulsifs et les pôles identiques courbent votre trajectoire : fiez-vous au laser !",
-      "portal": "Tirez dans un Portail Quantique pour téléporter votre bille derrière les barrières !",
+      "pendulum": "Visez 3 sphères de même couleur ou coupez les ancres supérieures pour déclencher une avalanche !",
+      "rotor": "Le rotor central tourne selon le poids des sphères et la force d'impact de vos tirs.",
+      "repulsor": "Les coeurs répulsifs courbent votre tir : fiez-vous au laser courbé, et inversez la polarité (🧲) si une sphère le tire du mauvais côté !",
+      "portal": "Tirez dans un Portail Quantique pour téléporter votre sphère derrière les barrières !",
       "boss": "Les Noyaux Boss (👑) possèdent 3 boucliers et libèrent une pluie de pièces à leur destruction !",
       "laserLock": "Détruisez tous les Verrous (🔒) pour désactiver la barrière énergétique !",
-      "singularity": "Les billes d'avalanche aspirées par la Singularité donnent un bonus de score et de Surcharge !",
+      "singularity": "Les sphères d'avalanche aspirées par la Singularité donnent un bonus de score et de Surcharge !",
       "neutralAnchor": "Les ancres grises (⚓) ne cassent jamais dans un groupe : coupez les sphères autour, elles s'effritent dès que plus rien n'y pend !",
       "chained": "Les sphères enchaînées (⛓) ne cèdent jamais à l'étirement : faites-les sauter à la bombe, ou détruisez les sphères qu'elles retiennent !",
       "bubble": "Les sphères en bulle (◌) ne rejoignent aucun groupe : touchez-les, ou videz un groupe à côté, pour faire éclater la bulle !",
@@ -423,7 +436,21 @@
       "platform": "Les plateformes soutiennent les sphères par en dessous tout en laissant passer vos tirs !",
       "antimagnet": "Les coussins antimagnétiques repoussent l'amas suspendu sans dévier vos projectiles !",
       "rescueCore": "Libérez tous les Noyaux Captifs (💎) par un groupe ou une avalanche pour remporter aussitôt le niveau !",
-      "puzzle": "Puzzle : étudiez les rebonds et remplissez l'objectif avec votre réserve fixe de tirs !"
+      "puzzle": "Puzzle : étudiez les rebonds et remplissez l'objectif avec votre réserve fixe de tirs !",
+      "polarity": {
+        "pointer": "Cliquez sur le bouton 🧲 (ou appuyez sur F) pour inverser la charge de votre tir : les sphères l'attirent alors dans l'autre sens, et il courbe de l'autre côté.",
+        "touch": "Touchez le bouton 🧲 pour inverser la charge de votre tir : les sphères l'attirent alors dans l'autre sens, et il courbe de l'autre côté."
+      },
+      "bankShot": "Faites rebondir votre tir sur les murs et les bumpers pour atteindre les sphères hors de portée en ligne droite.",
+      "specials": {
+        "bomb": "Bombe : fait exploser toutes les sphères autour de son point d'impact. Sélectionnez son emplacement lumineux, puis tirez.",
+        "lightning": "Foudre : balaie toute une chaîne horizontale de sphères. Sélectionnez son emplacement lumineux, puis tirez.",
+        "rainbow": "Prisme : prend la couleur des sphères voisines, donc il forme toujours un groupe. Sélectionnez son emplacement lumineux, puis tirez.",
+        "anvil": "Enclume : traverse et écrase toutes les sphères sur son chemin. Sélectionnez son emplacement lumineux, puis tirez.",
+        "freeze": "Cryo : gèle la descente et calme l'oscillation magnétique. Sélectionnez son emplacement lumineux, puis tirez.",
+        "rocket": "Fusée : tire trois fusées à tête chercheuse sur les sphères les plus coriaces. Sélectionnez son emplacement lumineux, puis tirez.",
+        "brush": "Pinceau : repeint les sphères voisines d'une même couleur et décape la rouille. Sélectionnez son emplacement lumineux, puis tirez."
+      }
     },
     "discovery": {
       "hint": "Nouveau : {{icon}} {{name}}. {{description}}"
@@ -541,7 +568,7 @@
         "unavailable": "Aucune manche en cours",
         "unavailableHint": "Lancez une manche (Campagne, Survie, Défi du Jour, Flux, Blitz, Boss Rush ou Cascade) pour acheter des munitions.",
         "puzzleLocked": "Dotation fixe",
-        "puzzleLockedHint": "Les niveaux Puzzle utilisent une dotation fixe de billes spéciales.",
+        "puzzleLockedHint": "Les niveaux Puzzle utilisent une dotation fixe de sphères spéciales.",
         "blockedLabel": "Pas maintenant",
         "blocked": {
           "shotInFlight": "Attendez la fin du tir pour acheter des munitions spéciales.",
@@ -552,14 +579,14 @@
       "codex": {
         "modifiersTitle": "Modificateurs de l'Amas",
         "obstaclesTitle": "Anomalies & Obstacles Magnétiques",
-        "specialsTitle": "Billes Spéciales (Arsenal)",
+        "specialsTitle": "Sphères Spéciales (Arsenal)",
         "mutatorsTitle": "Mutateurs du Défi du Jour",
         "mechanicsTitle": "Mécaniques du Plateau & Lanceur",
         "mechanics": {
           "polarity": {
             "icon": "🧲",
             "name": "Inversion de Polarité",
-            "description": "Inverse la charge de votre projectile (touche F ou bouton 🧲) : les pôles attracteurs repoussent alors votre tir et les coeurs répulsifs l'attirent."
+            "description": "Inverse la charge magnétique de votre tir (touche F ou bouton 🧲) : les sphères l'attirent alors dans l'autre sens, et il courbe de l'autre côté. Les attracteurs et les répulseurs ne sont pas modifiés."
           },
           "collectors": {
             "icon": "⚡",
@@ -569,7 +596,7 @@
           "overcharge": {
             "icon": "🔋",
             "name": "Jauge de Surcharge",
-            "description": "Se remplit à chaque groupe détruit et sphère collectée. Une fois pleine, elle forge automatiquement une bille spéciale gratuite."
+            "description": "Se remplit à chaque groupe détruit et sphère collectée. Une fois pleine, elle forge automatiquement une sphère spéciale gratuite."
           }
         },
         "mutators": {
@@ -592,15 +619,15 @@
         },
         "modifiers": {
           "armored": {
-            "name": "Bille Blindée",
+            "name": "Sphère Blindée",
             "description": "Nécessite 2 impacts ou explosions pour être détruite."
           },
           "dormantBomb": {
             "name": "Baril Explosif",
-            "description": "Explose lorsqu'il est détruit, emportant les billes voisines."
+            "description": "Explose lorsqu'il est détruit, emportant les sphères voisines."
           },
           "chameleon": {
-            "name": "Bille Caméléon",
+            "name": "Sphère Caméléon",
             "description": "Change de couleur magnétique après chaque tir."
           },
           "coinCore": {
@@ -670,7 +697,7 @@
           "repulsor": {
             "icon": "🟠",
             "name": "Coeur Répulsif",
-            "description": "Repousse et courbe la trajectoire des billes qui traversent son champ."
+            "description": "Repousse et courbe la trajectoire des sphères qui traversent son champ."
           },
           "attractor": {
             "icon": "🟣",
@@ -690,7 +717,7 @@
           "singularity": {
             "icon": "🕳️",
             "name": "Vortex de Singularité",
-            "description": "Aspire les billes qui tombent en avalanche pour octroyer un bonus de score et de Surcharge."
+            "description": "Aspire les sphères qui tombent en avalanche pour octroyer un bonus de score et de Surcharge."
           },
           "platform": {
             "icon": "▬",
@@ -712,7 +739,7 @@
         "items": {
           "firstAvalanche": {
             "name": "Maître de l'Avalanche",
-            "description": "Faire tomber au moins 6 billes en une seule avalanche."
+            "description": "Faire tomber au moins 6 sphères en une seule avalanche."
           },
           "comboMaster": {
             "name": "Résonance en Chaîne",
@@ -749,15 +776,15 @@
         },
         "blastRadius": {
           "name": "Amplificateur Magnétique",
-          "description": "Augmente le rayon d'action des billes Bombe, Foudre et Cryo ainsi que des coeurs explosifs du plateau."
+          "description": "Augmente le rayon d'action des sphères Bombe, Foudre et Cryo ainsi que des coeurs explosifs du plateau."
         },
         "overchargeRate": {
           "name": "Condensateur de Surcharge",
-          "description": "Charge la jauge de Surcharge plus vite pour gagner des billes spéciales."
+          "description": "Charge la jauge de Surcharge plus vite pour gagner des sphères spéciales."
         },
         "startingShots": {
           "name": "Réserve de Projectiles",
-          "description": "Ajoute +{{shots}} billes au début de chaque manche en Campagne et en Mode Flux par rang."
+          "description": "Ajoute +{{shots}} sphères au début de chaque manche en Campagne et en Mode Flux par rang."
         }
       },
       "feedback": {
@@ -796,7 +823,7 @@
       },
       "reason": {
         "lineCrossed": "L'amas magnétique a franchi la ligne critique.",
-        "outOfShots": "Vous n'avez plus de billes disponibles.",
+        "outOfShots": "Vous n'avez plus de sphères disponibles.",
         "timeUp": "Temps écoulé ! Le chronomètre Blitz de 90 secondes a atteint zéro."
       },
       "stats": {
@@ -838,16 +865,16 @@
           "touch": "Viser et tirer : glissez le doigt sur le plateau, relâchez pour tirer"
         },
         "swap": {
-          "pointer": "Changer de bille : clic sur le chargeur ou Espace",
-          "touch": "Changer de bille : touchez le chargeur ou le bouton Échanger"
+          "pointer": "Changer de sphère : clic sur le chargeur ou Espace",
+          "touch": "Changer de sphère : touchez le chargeur ou le bouton Échanger"
         },
         "cancel": {
           "pointer": "Annuler un tir : relâchez le clic sous le lanceur",
           "touch": "Annuler un tir : ramenez le doigt sous le lanceur avant de relâcher"
         },
         "keyboard": {
-          "pointer": "Clavier & Arsenal : Flèches pour affiner la visée (Maj : plus vite), Entrée pour tirer, F (ou 🧲) pour inverser la polarité, 1-7 pour les billes spéciales",
-          "touch": "Polarité & Arsenal : touchez 🧲 pour inverser l'attraction/répulsion magnétique, ou sélectionnez une bille spéciale chargée par la Surcharge"
+          "pointer": "Clavier & Arsenal : Flèches pour affiner la visée (Maj : plus vite), Entrée pour tirer, F (ou 🧲) pour inverser la polarité, 1-7 pour les sphères spéciales",
+          "touch": "Polarité & Arsenal : touchez 🧲 pour inverser la façon dont les sphères attirent votre tir (il courbe de l'autre côté), ou sélectionnez une sphère spéciale chargée par la Surcharge"
         },
         "physics": "Astuce : Détachez les ancres ou déséquilibrez les rotors pour créer des réactions en chaîne !"
       },
@@ -898,7 +925,7 @@
       },
       "lvl2": {
         "name": "Rotor à Inertie",
-        "description": "Un rotor central tourne selon le poids des billes et la force de vos impacts."
+        "description": "Un rotor central tourne selon le poids des sphères et la force de vos impacts."
       },
       "lvl3": {
         "name": "Double Ancrage & Bumpers",
@@ -918,7 +945,7 @@
       },
       "lvl7": {
         "name": "Ruche Hexagonale",
-        "description": "Une structure hexagonale dense parsemée de billes caméléons et de gemmes."
+        "description": "Une structure hexagonale dense parsemée de sphères caméléons et de gemmes."
       },
       "lvl8": {
         "name": "Spirale Gravitationnelle",

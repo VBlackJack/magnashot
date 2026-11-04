@@ -37,20 +37,20 @@
       "nameKey": "levels.items.lvl2.name",
       "descriptionKey": "levels.items.lvl2.description",
       "tutorialKey": "gameplay.tutorial.rotor",
-      "starThresholds": [0, 4800, 7600],
-      "maxShots": 32,
+      "starThresholds": [0, 6200, 9900],
+      "maxShots": 48,
       "paletteCount": 4,
       "specialInventory": {
         "bomb": 1,
-        "lightning": 1,
-        "rainbow": 1,
+        "lightning": 0,
+        "rainbow": 0,
         "anvil": 0,
-        "freeze": 1,
+        "freeze": 0,
         "rocket": 0
       },
       "modifierWeights": {
         "coinCore": 0.12,
-        "dormantBomb": 0.06
+        "dormantBomb": 0
       },
       "layout": {
         "type": "ring",
@@ -59,7 +59,7 @@
         "rings": [
           { "radius": 44, "count": 6 },
           { "radius": 84, "count": 12 },
-          { "radius": 124, "count": 16 }
+          { "radius": 124, "count": 12 }
         ]
       },
       "obstacles": [
@@ -75,20 +75,21 @@
       "id": 3,
       "nameKey": "levels.items.lvl3.name",
       "descriptionKey": "levels.items.lvl3.description",
-      "starThresholds": [0, 5200, 8400],
-      "maxShots": 30,
-      "paletteCount": 5,
+      "tutorialKey": "gameplay.tutorial.bankShot",
+      "starThresholds": [0, 4000, 6400],
+      "maxShots": 36,
+      "paletteCount": 4,
       "specialInventory": {
         "bomb": 1,
         "lightning": 1,
-        "rainbow": 1,
-        "anvil": 1,
-        "freeze": 1,
+        "rainbow": 0,
+        "anvil": 0,
+        "freeze": 0,
         "rocket": 0
       },
       "modifierWeights": {
         "coinCore": 0.14,
-        "armored": 0.08
+        "armored": 0
       },
       "layout": {
         "type": "pendulum",
@@ -97,8 +98,8 @@
           { "x": 270, "y": 80 },
           { "x": 395, "y": 80 }
         ],
-        "rows": 6,
-        "cols": 9,
+        "rows": 4,
+        "cols": 8,
         "startX": 110,
         "startY": 116,
         "spacingX": 40,
@@ -122,15 +123,15 @@
       "nameKey": "levels.items.lvl4.name",
       "descriptionKey": "levels.items.lvl4.description",
       "tutorialKey": "gameplay.tutorial.repulsor",
-      "starThresholds": [0, 6900, 11100],
+      "starThresholds": [0, 6400, 10200],
       "maxShots": 46,
       "paletteCount": 5,
       "specialInventory": {
         "bomb": 2,
         "lightning": 1,
         "rainbow": 1,
-        "anvil": 1,
-        "freeze": 1,
+        "anvil": 0,
+        "freeze": 0,
         "rocket": 0
       },
       "modifierWeights": {
@@ -162,6 +163,7 @@
       "id": 5,
       "nameKey": "levels.items.lvl5.name",
       "descriptionKey": "levels.items.lvl5.description",
+      "teachesMechanics": ["polarity"],
       "starThresholds": [0, 5300, 8400],
       "maxShots": 36,
       "paletteCount": 5,

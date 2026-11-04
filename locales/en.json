@@ -6,7 +6,7 @@
       },
       "subtitle": {
         "edition": "MAGNETIC PHYSICS EDITION",
-        "description": "Magnetic physics bubble shooter game with dynamic attraction, rotors, and special balls."
+        "description": "Magnetic physics bubble shooter game with dynamic attraction, rotors, and special spheres."
       }
     },
     "nav": {
@@ -117,7 +117,8 @@
         "bossRush": "Boss Rush • Wave {{wave}} (👑 {{shields}})",
         "cascade": "Cascade Drop • Wave {{wave}}",
         "coreRescueProgress": "💎 {{rescued}}/{{total}}",
-        "switchHint": "Click to change mode or level"
+        "switchHint": "Click to change mode or level",
+        "switchHintTouch": "Tap to change mode or level"
       },
       "shots": {
         "label": "Shots Left",
@@ -173,11 +174,11 @@
     },
     "powerups": {
       "title": {
-        "label": "Special Balls"
+        "label": "Special Spheres"
       },
       "bomb": {
         "name": "Bomb",
-        "tooltip": "Detonates magnetic balls in a wide blast radius"
+        "tooltip": "Detonates magnetic spheres in a wide blast radius"
       },
       "lightning": {
         "name": "Lightning",
@@ -185,11 +186,11 @@
       },
       "rainbow": {
         "name": "Prism",
-        "tooltip": "Matches any adjacent magnetic ball color"
+        "tooltip": "Matches any adjacent magnetic sphere color"
       },
       "anvil": {
         "name": "Anvil",
-        "tooltip": "Pierces and crushes every ball in its path"
+        "tooltip": "Pierces and crushes every sphere in its path"
       },
       "freeze": {
         "name": "Cryo",
@@ -208,7 +209,7 @@
         "buyAria": "{{name}}: none left. Open the Workshop to buy more",
         "emptyMark": "+"
       },
-      "empty": "No special ball in this level."
+      "empty": "No special sphere in this level."
     },
     "canvas": {
       "aria": {
@@ -233,6 +234,18 @@
       "flux": {
         "perkChosen": "Perk chosen: {{name}}."
       }
+    },
+    "hints": {
+      "replayAria": "Show this level's hints again"
+    },
+    "levelIntro": {
+      "dismiss": "Dismiss objective",
+      "summary": "Level {{id}}: {{name}}. {{shots}} shots. Focus: {{mechanic}}.",
+      "summaryPlain": "Level {{id}}: {{name}}. {{shots}} shots.",
+      "mechanicNames": {
+        "basics": "Magnetic pendulum",
+        "pivot": "Inertia rotor"
+      }
     }
   },
   "gameplay": {
@@ -250,7 +263,7 @@
         "ready": "OVERCHARGE! +1 {{name}}"
       },
       "arsenal": {
-        "ready": "ARSENAL! +{{count}} special balls"
+        "ready": "ARSENAL! +{{count}} special spheres"
       },
       "coins": {
         "gain": "+{{coins}} ⬡"
@@ -388,7 +401,7 @@
         },
         "blast": {
           "name": "Blast",
-          "description": "Special balls blast {{value}}% wider."
+          "description": "Special spheres blast {{value}}% wider."
         },
         "overcharge": {
           "name": "Surge",
@@ -396,7 +409,7 @@
         },
         "arsenal": {
           "name": "Arsenal",
-          "description": "{{value}} random special balls right now."
+          "description": "{{value}} random special spheres right now."
         },
         "golden": {
           "name": "Golden",
@@ -405,13 +418,13 @@
       }
     },
     "tutorial": {
-      "pendulum": "Match 3+ same-color balls or sever upper anchors to trigger a magnetic avalanche!",
-      "rotor": "The central rotor spins dynamically from ball weight balance and shot impact torque.",
-      "repulsor": "Repulsive cores and like magnetic poles bend your shot: trust the curved laser!",
+      "pendulum": "Match 3+ same-color spheres or sever upper anchors to trigger a magnetic avalanche!",
+      "rotor": "The central rotor spins dynamically from sphere weight balance and shot impact torque.",
+      "repulsor": "Repulsive cores bend your shot: trust the curved laser, and flip polarity (🧲) if a sphere pulls it the wrong way!",
       "portal": "Shoot into a Quantum Portal to teleport your projectile past moving barriers!",
       "boss": "Boss Cores (👑) have 3 shields and burst into a shower of coins when destroyed!",
       "laserLock": "Destroy all Lock Cores (🔒) to disable the energy barrier!",
-      "singularity": "Avalanche balls pulled into the Singularity Vortex grant bonus points & Overcharge!",
+      "singularity": "Avalanche spheres pulled into the Singularity Vortex grant bonus points & Overcharge!",
       "neutralAnchor": "Gray anchors (⚓) never break in a match: cut the spheres around them, and they crumble once nothing hangs from them!",
       "chained": "Chained spheres (⛓) never snap loose when stretched: blast them with a bomb, or destroy the spheres they hold!",
       "bubble": "Bubbled spheres (◌) cannot join a group: hit them, or clear a group next to them, to pop the bubble!",
@@ -423,7 +436,21 @@
       "platform": "Support platforms hold hanging spheres from below while letting your shots pass right through!",
       "antimagnet": "Antimagnet cushions push hanging clusters upward without bending your shots!",
       "rescueCore": "Free all Rescue Cores (💎) by matching or dropping them to trigger an instant avalanche victory!",
-      "puzzle": "One-Shot Puzzle: study the angles and clear the objective with your fixed ammo queue!"
+      "puzzle": "One-Shot Puzzle: study the angles and clear the objective with your fixed ammo queue!",
+      "polarity": {
+        "pointer": "Click the 🧲 button (or press F) to flip your shot's charge: spheres then pull it the other way, so it curves in the opposite direction.",
+        "touch": "Tap the 🧲 button to flip your shot's charge: spheres then pull it the other way, so it curves in the opposite direction."
+      },
+      "bankShot": "Bounce your shot off the walls and bumpers to reach spheres you cannot hit head-on.",
+      "specials": {
+        "bomb": "Bomb: blasts every sphere around where it lands. Select its glowing slot, then shoot.",
+        "lightning": "Lightning: wipes out a whole horizontal chain of spheres. Select its glowing slot, then shoot.",
+        "rainbow": "Prism: counts as any adjacent color, so it always makes a match. Select its glowing slot, then shoot.",
+        "anvil": "Anvil: punches through and crushes every sphere in its path. Select its glowing slot, then shoot.",
+        "freeze": "Cryo: freezes the descent and calms the magnetic sway. Select its glowing slot, then shoot.",
+        "rocket": "Rocket: fires three homing rockets at the toughest spheres. Select its glowing slot, then shoot.",
+        "brush": "Brush: repaints nearby spheres into one color and scrubs off rust. Select its glowing slot, then shoot."
+      }
     },
     "discovery": {
       "hint": "New: {{icon}} {{name}}. {{description}}"
@@ -541,7 +568,7 @@
         "unavailable": "No active run",
         "unavailableHint": "Start a Campaign, Survival, Daily, Flux, Blitz, Boss Rush or Cascade run to buy ammo.",
         "puzzleLocked": "Fixed loadout",
-        "puzzleLockedHint": "Puzzle stages use a fixed special-ball loadout.",
+        "puzzleLockedHint": "Puzzle stages use a fixed special-sphere loadout.",
         "blockedLabel": "Not now",
         "blocked": {
           "shotInFlight": "Wait for the shot to land to buy special ammo.",
@@ -550,16 +577,16 @@
         }
       },
       "codex": {
-        "modifiersTitle": "Cluster Ball Modifiers",
+        "modifiersTitle": "Cluster Sphere Modifiers",
         "obstaclesTitle": "Magnetic Anomalies & Obstacles",
-        "specialsTitle": "Special Balls (Arsenal)",
+        "specialsTitle": "Special Spheres (Arsenal)",
         "mutatorsTitle": "Daily Challenge Mutators",
         "mechanicsTitle": "Board & Launcher Mechanics",
         "mechanics": {
           "polarity": {
             "icon": "🧲",
             "name": "Polarity Inversion",
-            "description": "Flips your projectile's magnetic charge (F key or 🧲 button): attractors repel your shot while repulsor cores pull it in."
+            "description": "Flips your shot's magnetic charge (F key or 🧲 button): spheres then pull your shot the other way, so it curves in the opposite direction. Attractors and repulsors are not affected."
           },
           "collectors": {
             "icon": "⚡",
@@ -569,7 +596,7 @@
           "overcharge": {
             "icon": "🔋",
             "name": "Overcharge Gauge",
-            "description": "Fills with every cleared group and collected sphere. When full, it automatically forges a free Special Ball."
+            "description": "Fills with every cleared group and collected sphere. When full, it automatically forges a free Special Sphere."
           }
         },
         "mutators": {
@@ -597,7 +624,7 @@
           },
           "dormantBomb": {
             "name": "Dormant Barrel",
-            "description": "Detonates when destroyed, blasting nearby cluster balls."
+            "description": "Detonates when destroyed, blasting nearby cluster spheres."
           },
           "chameleon": {
             "name": "Chameleon Sphere",
@@ -690,7 +717,7 @@
           "singularity": {
             "icon": "🕳️",
             "name": "Singularity Vortex",
-            "description": "Absorbs falling avalanche balls for bonus score and Overcharge."
+            "description": "Absorbs falling avalanche spheres for bonus score and Overcharge."
           },
           "platform": {
             "icon": "▬",
@@ -712,7 +739,7 @@
         "items": {
           "firstAvalanche": {
             "name": "Avalanche Master",
-            "description": "Drop at least 6 unanchored balls in a single avalanche."
+            "description": "Drop at least 6 unanchored spheres in a single avalanche."
           },
           "comboMaster": {
             "name": "Chain Resonance",
@@ -749,11 +776,11 @@
         },
         "blastRadius": {
           "name": "Magnetic Amplifier",
-          "description": "Increases the area of effect of Bomb, Lightning, and Cryo balls as well as board core explosions."
+          "description": "Increases the area of effect of Bomb, Lightning, and Cryo spheres as well as board core explosions."
         },
         "overchargeRate": {
           "name": "Overcharge Capacitor",
-          "description": "Fills the Overcharge gauge faster to earn free Special Balls."
+          "description": "Fills the Overcharge gauge faster to earn free Special Spheres."
         },
         "startingShots": {
           "name": "Projectile Reserve",
@@ -846,8 +873,8 @@
           "touch": "Cancel a shot: drag back below the launcher before releasing"
         },
         "keyboard": {
-          "pointer": "Keyboard & Arsenal: Left/Right to fine-tune aim (Shift: faster), Enter to shoot, F (or 🧲) to invert polarity, 1-7 for Special Balls",
-          "touch": "Polarity & Arsenal: tap 🧲 to invert magnetic attraction/repulsion, or tap a Special Ball charged by Overcharge"
+          "pointer": "Keyboard & Arsenal: Left/Right to fine-tune aim (Shift: faster), Enter to shoot, F (or 🧲) to invert polarity, 1-7 for Special Spheres",
+          "touch": "Polarity & Arsenal: tap 🧲 to flip how spheres pull your shot (it curves the other way), or tap a Special Sphere charged by Overcharge"
         },
         "physics": "Tip: Sever anchor links or unbalance rotors to trigger chain reactions!"
       },
@@ -898,7 +925,7 @@
       },
       "lvl2": {
         "name": "Inertia Rotor",
-        "description": "A central rotor spins based on ball weight balance and impact torque."
+        "description": "A central rotor spins based on sphere weight balance and impact torque."
       },
       "lvl3": {
         "name": "Dual Anchors & Bumpers",
@@ -918,7 +945,7 @@
       },
       "lvl7": {
         "name": "Hexagonal Hive",
-        "description": "A dense hexagonal matrix filled with chameleon balls and coin cores."
+        "description": "A dense hexagonal matrix filled with chameleon spheres and coin cores."
       },
       "lvl8": {
         "name": "Gravitational Spiral",
@@ -1006,7 +1033,7 @@
         },
         "arsenal": {
           "label": "Arsenal",
-          "description": "Chapter {{chapter}}: arsenal level, {{index}} of {{size}}. A big board, fewer shots and twice the special balls: use them."
+          "description": "Chapter {{chapter}}: arsenal level, {{index}} of {{size}}. A big board, fewer shots and twice the special spheres: use them."
         }
       },
       "themes": {

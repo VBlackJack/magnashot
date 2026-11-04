@@ -15,6 +15,7 @@
  */
 
 import {
+  BOARD_MECHANICS,
   GAME_MODES,
   GAME_OVER_REASONS,
   GAME_STATES,
@@ -168,6 +169,92 @@ const MODAL_INPUT_HINTS = Object.freeze([
   { elementId: 'pause-instruction-keyboard', key: 'modals.pause.instructions.keyboard' },
   { elementId: 'modal-flux-perk-subtitle', key: 'modals.fluxPerk.subtitle' }
 ]);
+
+/** Class that makes a control pulse (and outline, for reduced motion) while a hint points at it. */
+export const DISCOVERY_PULSE_CLASS = 'discovery-pulse';
+
+/** Prefix of a discovery pulse target that names a special-ball slot, e.g. 'special:bomb'. */
+const PULSE_SPECIAL_PREFIX = 'special:';
+
+/** Pulse target naming the polarity button. */
+const PULSE_POLARITY_TARGET = 'polarity';
+
+/**
+ * Maps the engine's discovery pulse target to the controls that must pulse.
+ * @param {string|null|undefined} target - 'polarity', 'special:<type>' or nothing.
+ * @returns {{polarity: boolean, specialType: string|null}} What pulses.
+ */
+export function resolvePulseTargets(target) {
+  if (target === PULSE_POLARITY_TARGET) {
+    return { polarity: true, specialType: null };
+  }
+  if (typeof target === 'string' && target.startsWith(PULSE_SPECIAL_PREFIX) && target.length > PULSE_SPECIAL_PREFIX.length) {
+    return { polarity: false, specialType: target.slice(PULSE_SPECIAL_PREFIX.length) };
+  }
+  return { polarity: false, specialType: null };
+}
+
+/** Codex sections whose entries carry a player-facing mechanic name, searched in order. */
+const MECHANIC_NAME_KEY_PREFIXES = Object.freeze([
+  'modals.shop.codex.obstacles',
+  'modals.shop.codex.modifiers',
+  'modals.shop.codex.mechanics',
+  'hud.levelIntro.mechanicNames'
+]);
+
+/**
+ * Finds the player-facing name of the mechanic a level is built around.
+ * @param {string|null|undefined} mechanicId - Discovery id of the featured mechanic.
+ * @param {(key: string) => string} translate - The translation function.
+ * @returns {string} The name, or an empty string when none is known.
+ */
+export function resolveMechanicName(mechanicId, translate) {
+  if (!mechanicId) {
+    return '';
+  }
+  for (const prefix of MECHANIC_NAME_KEY_PREFIXES) {
+    const key = prefix === 'hud.levelIntro.mechanicNames' ? `${prefix}.${mechanicId}` : `${prefix}.${mechanicId}.name`;
+    const name = translate(key);
+    if (name && name !== key) {
+      return name;
+    }
+  }
+  return '';
+}
+
+/**
+ * True when a mechanic name adds nothing to the level name next to it (the level is named
+ * after the mechanic), so the banner leaves it out.
+ * @param {string} mechanic - Player-facing mechanic name.
+ * @param {string} levelName - Display name of the level.
+ * @returns {boolean}
+ */
+function repeatsLevelName(mechanic, levelName) {
+  return levelName.toLocaleLowerCase().includes(mechanic.toLocaleLowerCase());
+}
+
+/**
+ * Builds the objective banner text of a level played for the first time. The basics are never
+ * named as the focus (every level has them), nor is a mechanic the level name already says.
+ * @param {{levelId: number, summary: Object, maxShots: number, featuredMechanicId: string|null}} intro
+ * @param {(key: string, params?: object) => string} translate - The translation function.
+ * @returns {string} The one-line summary.
+ */
+export function buildLevelIntroText(intro, translate) {
+  const levelName = formatLevelName(intro.summary);
+  const featuredName =
+    intro.featuredMechanicId === BOARD_MECHANICS.BASICS
+      ? ''
+      : resolveMechanicName(intro.featuredMechanicId, translate);
+  const mechanic = featuredName && !repeatsLevelName(featuredName, levelName) ? featuredName : '';
+  const params = {
+    id: intro.levelId,
+    name: levelName,
+    shots: intro.maxShots,
+    mechanic
+  };
+  return translate(mechanic ? 'hud.levelIntro.summary' : 'hud.levelIntro.summaryPlain', params);
+}
 
 /** Accessible names that have one wording per input mode (the board's text alternative). */
 export const INPUT_ARIA_HINTS = Object.freeze([{ elementId: 'game-canvas', key: 'hud.canvas.aria.label' }]);
@@ -496,6 +583,10 @@ export class UIManager {
       btnLang: document.getElementById('btn-lang'),
       swapBtn: document.getElementById('btn-swap-ball'),
       polarityBtn: document.getElementById('btn-polarity'),
+      hintReplayBtn: document.getElementById('btn-hint-replay'),
+      levelIntroBanner: document.getElementById('level-intro-banner'),
+      levelIntroText: document.getElementById('level-intro-text'),
+      btnDismissLevelIntro: document.getElementById('btn-dismiss-level-intro'),
       drawer: document.getElementById('app-drawer'),
       drawerBackdrop: document.getElementById('drawer-backdrop'),
       btnMenu: document.getElementById('btn-menu'),
@@ -681,6 +772,11 @@ export class UIManager {
     for (const { elementId, key } of MODAL_INPUT_HINTS) {
       setTextIfChanged(document.getElementById(elementId), t(`${key}.${this.inputMode}`));
     }
+    setAttributeIfChanged(
+      this.elements.modeBanner,
+      'title',
+      t(this.inputMode === INPUT_MODES.TOUCH ? 'hud.stats.mode.switchHintTouch' : 'hud.stats.mode.switchHint')
+    );
     for (const { elementId, key } of INPUT_ARIA_HINTS) {
       setAttributeIfChanged(document.getElementById(elementId), 'aria-label', t(`${key}.${this.inputMode}`));
     }
@@ -786,6 +882,60 @@ export class UIManager {
     if (this.elements.canvasWrapper) {
       const belowDangerPct = ((logicalHeight - dangerLineY) / logicalHeight) * FULL_PERCENT;
       this.elements.canvasWrapper.style.setProperty('--tutorial-bottom', `${belowDangerPct}%`);
+    }
+  }
+
+  /** Makes the control a hint points at pulse, and only that one. */
+  updateDiscoveryPulse(engine) {
+    const { polarity, specialType } = resolvePulseTargets(engine.getDiscoveryPulseTarget?.());
+    this.elements.polarityBtn?.classList.toggle(DISCOVERY_PULSE_CLASS, polarity);
+    for (const btn of this.elements.powerupsContainer.querySelectorAll('.powerup-btn')) {
+      btn.classList.toggle(DISCOVERY_PULSE_CLASS, btn.dataset.specialType === specialType);
+    }
+  }
+
+  /** Shows the "?" button only where the level has hints to replay. */
+  updateHintReplayButton(engine) {
+    const button = this.elements.hintReplayBtn;
+    if (!button) {
+      return;
+    }
+    button.classList.toggle('hidden', !(engine.hasLevelHints?.() && engine.state === GAME_STATES.PLAYING));
+  }
+
+  /**
+   * Shows the objective banner on the first play of a level. It never pauses the run or takes
+   * focus; it goes away on its close button, or when the first shot is fired.
+   */
+  updateLevelIntro(engine) {
+    const banner = this.elements.levelIntroBanner;
+    if (!banner) {
+      return;
+    }
+    const intro = engine.levelIntro;
+    if (!intro || engine.state !== GAME_STATES.PLAYING) {
+      banner.classList.add('hidden');
+      this.levelIntroShotsAtShow = null;
+      return;
+    }
+    if (this.levelIntroShotsAtShow === null || this.levelIntroShotsAtShow === undefined) {
+      this.levelIntroShotsAtShow = engine.shotsRemaining;
+    } else if (engine.shotsRemaining < this.levelIntroShotsAtShow) {
+      this.levelIntroShotsAtShow = null;
+      engine.dismissLevelIntro?.();
+      banner.classList.add('hidden');
+      return;
+    }
+    const text = buildLevelIntroText(intro, t);
+    revealLiveRegion({
+      region: banner,
+      textElement: this.elements.levelIntroText,
+      text,
+      schedule: scheduleNextFrame
+    });
+    if (this.announcedLevelIntroId !== intro.levelId) {
+      this.announcedLevelIntroId = intro.levelId;
+      this.announce(text);
     }
   }
 
@@ -1223,6 +1373,14 @@ export class UIManager {
         this.engine.togglePolarityFlip();
       });
     }
+
+    this.elements.hintReplayBtn?.addEventListener('click', () => {
+      this.engine.replayLevelHints?.();
+    });
+
+    this.elements.btnDismissLevelIntro?.addEventListener('click', () => {
+      this.engine.dismissLevelIntro?.();
+    });
 
     if (this.elements.btnResetHints) {
       this.elements.btnResetHints.addEventListener('click', () => {
@@ -3217,7 +3375,7 @@ export class UIManager {
     // engine event would make screen readers repeat them.
     if (this.elements.tutorialBanner) {
       const hintText = engine.activeDiscoveryId
-        ? resolveHintText(engine.activeDiscoveryId, this.gameConfig.onboarding, this.ballsConfig, t)
+        ? resolveHintText(engine.activeDiscoveryId, this.gameConfig.onboarding, this.ballsConfig, t, this.inputMode)
         : '';
       if (hintText && engine.state === GAME_STATES.PLAYING) {
         revealLiveRegion({
@@ -3250,6 +3408,10 @@ export class UIManager {
         this.elements.specialEquippedBanner.classList.add('hidden');
       }
     }
+
+    this.updateDiscoveryPulse(engine);
+    this.updateHintReplayButton(engine);
+    this.updateLevelIntro(engine);
 
     this.updateAimState(engine);
 

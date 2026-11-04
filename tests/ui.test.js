@@ -19,9 +19,10 @@ import assert from 'node:assert/strict';
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { GAME_OVER_REASONS, INPUT_MODES, SPECIAL_TYPES_ORDER } from '../src/core/Constants.js';
+import { GAME_OVER_REASONS, GAME_STATES, INPUT_MODES, SPECIAL_TYPES_ORDER } from '../src/core/Constants.js';
 import { I18nService, i18n, resolveInitialLocale } from '../src/core/I18n.js';
 import {
+  DISCOVERY_PULSE_CLASS,
   HIGH_CONTRAST_CLASS,
   INPUT_ARIA_HINTS,
   MODAL_FOCUSABLE_SELECTOR,
@@ -29,6 +30,7 @@ import {
   computeAchievementProgress,
   computeStarProgressPct,
   filterFocusTrapCandidates,
+  buildLevelIntroText,
   gameOverReasonKey,
   isBrowserShortcut,
   isDocumentFullscreen,
@@ -41,6 +43,8 @@ import {
   resolveModalFocusTarget,
   resolveNextCampaignTarget,
   resolveLevelFormatBadgeKey,
+  resolveMechanicName,
+  resolvePulseTargets,
   revealLiveRegion,
   shouldIgnoreRepeatedKey,
   splitRefreshExtra
@@ -2151,4 +2155,139 @@ test('power-up tooltips survive a refresh, and a held slot keeps the empty look 
   const idle = refreshPowerupsWith({ engineState: { canBuy: false, reason: null }, isRunActive: false });
   assert.equal(idle.btn.disabled, true, 'between runs an empty button stays inert');
   assert.equal(idle.btn.attrs.title, t(`hud.powerups.${idle.type}.tooltip`));
+});
+
+function fakeClassList(initial = []) {
+  const classes = new Set(initial);
+  return {
+    classes,
+    contains: (name) => classes.has(name),
+    remove: (name) => classes.delete(name),
+    add: (name) => classes.add(name),
+    toggle: (name, force) => (force ? classes.add(name) : classes.delete(name))
+  };
+}
+
+test('the discovery pulse target maps to the polarity button or one special slot', () => {
+  assert.deepEqual(resolvePulseTargets('polarity'), { polarity: true, specialType: null });
+  assert.deepEqual(resolvePulseTargets('special:bomb'), { polarity: false, specialType: 'bomb' });
+  assert.deepEqual(resolvePulseTargets(null), { polarity: false, specialType: null });
+  assert.deepEqual(resolvePulseTargets('special:'), { polarity: false, specialType: null });
+
+  const ui = Object.create(UIManager.prototype);
+  const polarityBtn = { classList: fakeClassList() };
+  const slots = ['bomb', 'lightning'].map((type) => ({ dataset: { specialType: type }, classList: fakeClassList() }));
+  ui.elements = { polarityBtn, powerupsContainer: { querySelectorAll: () => slots } };
+  ui.updateDiscoveryPulse({ getDiscoveryPulseTarget: () => 'special:lightning' });
+  assert.equal(polarityBtn.classList.contains(DISCOVERY_PULSE_CLASS), false);
+  assert.equal(slots[0].classList.contains(DISCOVERY_PULSE_CLASS), false);
+  assert.equal(slots[1].classList.contains(DISCOVERY_PULSE_CLASS), true);
+  ui.updateDiscoveryPulse({ getDiscoveryPulseTarget: () => 'polarity' });
+  assert.equal(polarityBtn.classList.contains(DISCOVERY_PULSE_CLASS), true);
+  assert.equal(slots[1].classList.contains(DISCOVERY_PULSE_CLASS), false);
+  ui.updateDiscoveryPulse({});
+  assert.equal(polarityBtn.classList.contains(DISCOVERY_PULSE_CLASS), false, 'an engine without a target pulses nothing');
+});
+
+test('the pulse keeps an outline so it still reads without motion', () => {
+  const css = readFileSync(new URL('../styles/main.css', import.meta.url), 'utf8');
+  const rule = css.match(/\.discovery-pulse\s*\{[^}]*\}/);
+  assert.ok(rule, 'a .discovery-pulse rule exists');
+  assert.match(rule[0], /outline:/);
+  assert.match(rule[0], /animation:/);
+});
+
+test('the "?" button shows only when the level has hints and calls the replay', () => {
+  const ui = Object.create(UIManager.prototype);
+  const button = { classList: fakeClassList(['hidden']) };
+  ui.elements = { hintReplayBtn: button };
+  ui.updateHintReplayButton({ hasLevelHints: () => true, state: GAME_STATES.PLAYING });
+  assert.equal(button.classList.contains('hidden'), false);
+  ui.updateHintReplayButton({ hasLevelHints: () => false, state: GAME_STATES.PLAYING });
+  assert.equal(button.classList.contains('hidden'), true);
+  ui.updateHintReplayButton({});
+  assert.equal(button.classList.contains('hidden'), true, 'an engine without hints hides it');
+
+  const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
+  assert.match(html, /id="btn-hint-replay"[^>]*data-i18n-aria-label="hud\.hints\.replayAria"/);
+  const source = readFileSync(new URL('../src/ui/UIManager.js', import.meta.url), 'utf8');
+  assert.match(source, /hintReplayBtn\?\.addEventListener\('click'[\s\S]{0,80}replayLevelHints/);
+});
+
+test('the objective banner shows the level, shots and mechanic, announces once and dismisses on the first shot', async () => {
+  const previousLocale = i18n.currentLocale;
+  i18n.dictionaries.set('en', JSON.parse(readFileSync('./locales/en.json', 'utf8')));
+  i18n.currentLocale = 'en';
+  const intro = {
+    levelId: 2,
+    summary: { id: 2, isGenerated: false, nameKey: 'levels.items.lvl2.name' },
+    maxShots: 12,
+    featuredMechanicId: 'bumper'
+  };
+  const levelName = t('levels.items.lvl2.name');
+  const bumperName = resolveMechanicName('bumper', t);
+  const plain = (name) => t('hud.levelIntro.summaryPlain', { id: 2, name, shots: 12 });
+  assert.ok(bumperName);
+  assert.equal(
+    buildLevelIntroText(intro, t),
+    t('hud.levelIntro.summary', { id: 2, name: levelName, shots: 12, mechanic: bumperName })
+  );
+  assert.ok(resolveMechanicName('basics', t), 'the basics have a name too');
+  assert.equal(buildLevelIntroText({ ...intro, featuredMechanicId: null }, t), plain(levelName));
+  assert.equal(
+    buildLevelIntroText({ ...intro, featuredMechanicId: 'basics' }, t),
+    plain(levelName),
+    'the basics are never the focus'
+  );
+  assert.equal(
+    buildLevelIntroText({ ...intro, featuredMechanicId: 'pivot' }, t),
+    plain(levelName),
+    'a mechanic the level name already says is not repeated'
+  );
+
+  const ui = Object.create(UIManager.prototype);
+  const announced = [];
+  ui.announce = (message) => announced.push(message);
+  const banner = { classList: fakeClassList(['hidden']) };
+  ui.elements = { levelIntroBanner: banner, levelIntroText: { textContent: '' } };
+  const dismissed = [];
+  const engine = {
+    state: GAME_STATES.PLAYING,
+    levelIntro: intro,
+    shotsRemaining: 12,
+    dismissLevelIntro: () => dismissed.push(true)
+  };
+  ui.updateLevelIntro(engine);
+  ui.updateLevelIntro(engine);
+  assert.equal(banner.classList.contains('hidden'), false);
+  assert.equal(announced.length, 1, 'announced once');
+  assert.equal(ui.elements.levelIntroText.textContent, announced[0]);
+  assert.equal(announced.length, 1, 'announced once');
+  engine.shotsRemaining = 11;
+  ui.updateLevelIntro(engine);
+  assert.equal(dismissed.length, 1, 'the first shot dismisses it');
+  assert.equal(banner.classList.contains('hidden'), true);
+  engine.levelIntro = null;
+  ui.updateLevelIntro(engine);
+  assert.equal(banner.classList.contains('hidden'), true);
+  i18n.currentLocale = previousLocale;
+});
+
+test('hint copy names the 🧲 button, covers every special and tells the truth about polarity', () => {
+  const balls = JSON.parse(readFileSync(new URL('../configs/balls.json', import.meta.url), 'utf8'));
+  for (const locale of ['en', 'fr']) {
+    const data = JSON.parse(readFileSync(new URL(`../locales/${locale}.json`, import.meta.url), 'utf8'));
+    const tutorial = data.gameplay.tutorial;
+    for (const inputMode of Object.values(INPUT_MODES)) {
+      assert.ok(tutorial.polarity[inputMode].includes('🧲'), `${locale} ${inputMode} polarity hint`);
+    }
+    assert.match(tutorial.polarity[INPUT_MODES.POINTER], /[ (]F[) ]/, `${locale} pointer hint names the key`);
+    assert.doesNotMatch(tutorial.polarity[INPUT_MODES.TOUCH], /[ (]F[) ]/, `${locale} touch hint names no key`);
+    assert.ok(tutorial.bankShot);
+    for (const type of Object.keys(balls.specialTypes)) {
+      assert.ok(tutorial.specials[type], `${locale} hint for special ${type}`);
+    }
+    const codex = data.modals.shop.codex.mechanics.polarity.description;
+    assert.doesNotMatch(codex, /attractors repel|attracteurs repoussent/i);
+  }
 });
