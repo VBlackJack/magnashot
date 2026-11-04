@@ -4,6 +4,11 @@ All notable changes to **MagnaShot** are documented in this file.
 
 ## [Unreleased]
 
+## [1.12.0] - 2026-11-04
+
+### Added
+- **Portrait Mobile HUD & Settings Fullscreen Toggle (`#btn-fullscreen-hud`, `#btn-fullscreen`, `UIManager.setupFullscreenControl`, `manifest.webmanifest`)**: Added a 1-tap Fullscreen button (`⛶`, `44x44 px`) directly on the top HUD bar in portrait mobile and tablet layouts (`#btn-fullscreen-hud`), paired with a synchronized Fullscreen toggle (`#btn-fullscreen`) in `#modal-settings` across all viewports. Uses the Fullscreen API (`requestFullscreen({ navigationUI: 'hide' })` with WebKit fallback and `fullscreenchange` synchronization) and adds `"display_override": ["fullscreen", "standalone"]` to the PWA manifest.
+
 ## [1.11.0] - 2026-11-04
 
 ### Added

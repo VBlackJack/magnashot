@@ -47,6 +47,7 @@
   - **High Contrast** mode with enhanced borders and polarity symbols; buttons meet WCAG AA contrast.
   - **Color Patterns** setting: each color gets its own pattern (stripes, dots, grid, rings) inside the spheres.
   - **Reduced Motion** toggle and **Animation Speed** selector (`0.5x`, `1x`, `1.5x`, `2x` for explosions, shattering spheres, shockwaves, and slow-motion detonations) in **Settings**, plus automatic pause on tab switch.
+  - **Fullscreen Toggle** (`⛶`) right on the top HUD bar on portrait phones and tablets, as well as in **Settings** across all devices, hiding browser address and navigation bars (`navigationUI: 'hide'`).
   - **Tilt Control** on phones and tablets, on by default: tilting the device leans gravity sideways. On iPhone and iPad, the first tap on the board asks for the motion permission. It can be turned off in **Settings**.
   - Screen reader support: labelled toggles with `aria-pressed`, named power-ups and level stars, and polite announcements for achievements and round results.
   - Full mouse, touch (with vertical finger offset and pull-down shot cancellation), and keyboard controls; held action keys do not auto-repeat. The arrows fine-tune a mouse aim: after an arrow, small mouse movements leave the aim alone and a click shoots along it.

@@ -359,6 +359,10 @@ body {
   align-items: center;
 }
 
+.hud-bar:has(> .hud-fullscreen-btn:not(.hidden)) {
+  grid-template-columns: auto 1fr 2fr 1fr 1fr 1fr auto;
+}
+
 .hud-stat-box {
   display: flex;
   flex-direction: column;
@@ -425,6 +429,11 @@ body {
   border-radius: 10px;
   font-size: 1.2rem;
   cursor: pointer;
+}
+
+.hud-fullscreen-btn[aria-pressed='true'] {
+  border-color: var(--accent-blue);
+  box-shadow: 0 0 10px var(--accent-blue-alpha-45);
 }
 
 .drawer-stats,
@@ -1913,12 +1922,12 @@ body {
     padding: 6px 8px;
   }
 
-  /* One-line HUD: menu button, score, shots and the live badges. */
+  /* One-line HUD: menu button, score, shots, live badges and fullscreen button. */
   .hud-bar {
     display: flex;
     align-items: center;
-    gap: 12px;
-    padding: 0 8px 0 max(4px, env(safe-area-inset-left));
+    gap: 8px;
+    padding: 0 max(4px, env(safe-area-inset-right)) 0 max(4px, env(safe-area-inset-left));
     border-width: 0 0 1px;
     border-radius: 0;
   }
@@ -2106,6 +2115,9 @@ body {
   .hud-bar {
     grid-column: 1;
     grid-row: 1;
+  }
+  .hud-fullscreen-btn {
+    display: none;
   }
   .stage-container {
     grid-column: 2;

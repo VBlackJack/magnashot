@@ -31,6 +31,8 @@ import {
   filterFocusTrapCandidates,
   gameOverReasonKey,
   isBrowserShortcut,
+  isDocumentFullscreen,
+  isFullscreenSupported,
   isIosBrowserTab,
   UIManager,
   VICTORY_NEXT_ACTIONS,
@@ -359,7 +361,16 @@ function elementMarkup(html, id) {
   return html.slice(open);
 }
 
-const SETTING_TOGGLE_IDS = ['btn-sound', 'btn-contrast', 'btn-patterns', 'btn-tilt', 'btn-motion', 'btn-anim-speed', 'btn-lang'];
+const SETTING_TOGGLE_IDS = [
+  'btn-sound',
+  'btn-contrast',
+  'btn-patterns',
+  'btn-tilt',
+  'btn-motion',
+  'btn-anim-speed',
+  'btn-fullscreen',
+  'btn-lang'
+];
 
 test('the header holds game modes and round actions; the setting toggles live in the Settings dialog', () => {
   const header = elementMarkup(indexHtml, 'app-drawer');
@@ -1171,6 +1182,91 @@ test('Settings modal exposes #btn-anim-speed cycling through configured animatio
     assert.equal(btnAnimSpeed.textContent, '2x');
     assert.equal(captionEl.textContent, 'Vitesse : 2x');
     assert.equal(isActive, true, 'non-default 2x speed is highlighted as active');
+  } finally {
+    globalThis.document = prevDoc;
+  }
+});
+
+test('Fullscreen toggle is exposed in portrait HUD (#btn-fullscreen-hud) and Settings (#btn-fullscreen) with Fullscreen API support', async () => {
+  await i18n.init('fr', ['fr', 'en']);
+  assert.match(indexHtml, /id="btn-fullscreen-hud"[^>]*class="hud-menu-btn hud-fullscreen-btn"/);
+  assert.match(elementMarkup(indexHtml, 'modal-settings'), /id="btn-fullscreen"/);
+
+  assert.equal(isFullscreenSupported(null), false);
+  assert.equal(isFullscreenSupported({ documentElement: {} }), false);
+  assert.equal(
+    isFullscreenSupported({
+      fullscreenEnabled: true,
+      documentElement: { requestFullscreen: () => Promise.resolve() }
+    }),
+    true
+  );
+  assert.equal(
+    isFullscreenSupported({
+      fullscreenEnabled: false,
+      documentElement: { requestFullscreen: () => Promise.resolve() }
+    }),
+    false
+  );
+  assert.equal(isDocumentFullscreen({ fullscreenElement: null }), false);
+  assert.equal(isDocumentFullscreen({ fullscreenElement: {} }), true);
+  assert.equal(isDocumentFullscreen({ webkitFullscreenElement: {} }), true);
+
+  let fullscreenEl = null;
+  let requestedOptions = null;
+  const captionEl = { textContent: '' };
+  const prevDoc = globalThis.document;
+  globalThis.document = {
+    fullscreenEnabled: true,
+    get fullscreenElement() {
+      return fullscreenEl;
+    },
+    documentElement: {
+      requestFullscreen(opts) {
+        requestedOptions = opts;
+        fullscreenEl = this;
+        return Promise.resolve();
+      }
+    },
+    exitFullscreen() {
+      fullscreenEl = null;
+      return Promise.resolve();
+    },
+    querySelector: (sel) => (sel === '[data-caption-for="btn-fullscreen"]' ? captionEl : null)
+  };
+  try {
+    const makeBtn = (id) => ({
+      id,
+      textContent: '',
+      title: '',
+      attributes: {},
+      setAttribute(k, v) {
+        this.attributes[k] = v;
+      },
+      getAttribute(k) {
+        return this.attributes[k];
+      }
+    });
+    const ui = Object.create(UIManager.prototype);
+    ui.elements = {
+      btnFullscreen: makeBtn('btn-fullscreen'),
+      btnFullscreenHud: makeBtn('btn-fullscreen-hud')
+    };
+
+    ui.updateFullscreenButton();
+    assert.equal(ui.elements.btnFullscreen.getAttribute('aria-pressed'), 'false');
+    assert.equal(ui.elements.btnFullscreenHud.getAttribute('aria-pressed'), 'false');
+    assert.equal(captionEl.textContent, 'Plein écran : Désactivé');
+
+    await ui.toggleFullscreen();
+    assert.deepEqual(requestedOptions, { navigationUI: 'hide' });
+    assert.equal(ui.elements.btnFullscreen.getAttribute('aria-pressed'), 'true');
+    assert.equal(ui.elements.btnFullscreenHud.getAttribute('aria-pressed'), 'true');
+    assert.equal(captionEl.textContent, 'Plein écran : Activé');
+
+    await ui.toggleFullscreen();
+    assert.equal(ui.elements.btnFullscreen.getAttribute('aria-pressed'), 'false');
+    assert.equal(ui.elements.btnFullscreenHud.getAttribute('aria-pressed'), 'false');
   } finally {
     globalThis.document = prevDoc;
   }

@@ -84,7 +84,32 @@ const SHARE_ABORT_ERROR_NAME = 'AbortError';
  * Media query matched once the game runs as an installed app, so the Settings install
  * entry has nothing left to offer.
  */
-const STANDALONE_DISPLAY_QUERY = '(display-mode: standalone)';
+const STANDALONE_DISPLAY_QUERY = '(display-mode: standalone), (display-mode: fullscreen)';
+
+/**
+ * True when the browser exposes the Fullscreen API (standard or WebKit-prefixed) and
+ * allows entering fullscreen on the document root.
+ * @param {object|null|undefined} doc - The document object.
+ * @returns {boolean}
+ */
+export function isFullscreenSupported(doc) {
+  if (!doc || !doc.documentElement) {
+    return false;
+  }
+  const root = doc.documentElement;
+  const canRequest =
+    typeof root.requestFullscreen === 'function' || typeof root.webkitRequestFullscreen === 'function';
+  const enabled = doc.fullscreenEnabled ?? doc.webkitFullscreenEnabled ?? canRequest;
+  return Boolean(canRequest && enabled);
+}
+
+/**
+ * @param {object|null|undefined} doc - The document object.
+ * @returns {boolean} Whether the document is currently in fullscreen mode.
+ */
+export function isDocumentFullscreen(doc) {
+  return Boolean(doc && (doc.fullscreenElement || doc.webkitFullscreenElement));
+}
 
 /**
  * True in Safari on iPhone and iPad outside the installed app. Only that browser exposes
@@ -441,6 +466,8 @@ export class UIManager {
       btnTilt: document.getElementById('btn-tilt'),
       btnMotion: document.getElementById('btn-motion'),
       btnAnimSpeed: document.getElementById('btn-anim-speed'),
+      btnFullscreen: document.getElementById('btn-fullscreen'),
+      btnFullscreenHud: document.getElementById('btn-fullscreen-hud'),
       btnResetHints: document.getElementById('btn-reset-hints'),
       btnLang: document.getElementById('btn-lang'),
       swapBtn: document.getElementById('btn-swap-ball'),
@@ -641,6 +668,7 @@ export class UIManager {
     this.setupTiltControl();
     this.updateMotionButton();
     this.updateAnimSpeedButton();
+    this.setupFullscreenControl();
     this.updateLanguageButton();
     this.bindInstallEvents();
     this.syncInstallControls();
@@ -654,6 +682,7 @@ export class UIManager {
       this.updateTiltButton();
       this.updateMotionButton();
       this.updateAnimSpeedButton();
+      this.updateFullscreenButton();
       this.updateLanguageButton();
       this.updateResetHintsFeedback();
       this.updateShareButtonLabel();
@@ -2103,6 +2132,64 @@ export class UIManager {
     btn.title = ariaLabel;
     btn.classList?.toggle?.('active', speed !== defaultSpeed);
     setTextIfChanged(document.querySelector(`[data-caption-for="${btn.id}"]`), caption);
+  }
+
+  /**
+   * Wires the HUD and Settings fullscreen buttons where the browser exposes the
+   * Fullscreen API, and keeps their state in sync with Escape or OS back gestures.
+   */
+  setupFullscreenControl() {
+    const doc = typeof document === 'undefined' ? null : document;
+    const isSupported = isFullscreenSupported(doc);
+    this.elements.btnFullscreen?.closest?.('.pause-setting')?.classList.toggle('hidden', !isSupported);
+    this.elements.btnFullscreenHud?.classList.toggle('hidden', !isSupported);
+    // Named even while hidden, so no accessibility audit finds an unnamed button.
+    this.updateFullscreenButton();
+    if (!isSupported || !doc) {
+      return;
+    }
+    const syncState = () => {
+      this.updateFullscreenButton();
+    };
+    doc.addEventListener?.('fullscreenchange', syncState);
+    doc.addEventListener?.('webkitfullscreenchange', syncState);
+    const onToggle = () => {
+      this.toggleFullscreen();
+    };
+    this.elements.btnFullscreen?.addEventListener('click', onToggle);
+    this.elements.btnFullscreenHud?.addEventListener('click', onToggle);
+  }
+
+  async toggleFullscreen() {
+    const doc = typeof document === 'undefined' ? null : document;
+    if (!isFullscreenSupported(doc)) {
+      return;
+    }
+    if (isDocumentFullscreen(doc)) {
+      const exitFn = doc.exitFullscreen || doc.webkitExitFullscreen;
+      if (typeof exitFn === 'function') {
+        await Promise.resolve(exitFn.call(doc)).catch(() => {});
+      }
+    } else {
+      const root = doc.documentElement;
+      if (typeof root.requestFullscreen === 'function') {
+        await Promise.resolve(root.requestFullscreen({ navigationUI: 'hide' })).catch(() => {});
+      } else if (typeof root.webkitRequestFullscreen === 'function') {
+        await Promise.resolve(root.webkitRequestFullscreen()).catch(() => {});
+      }
+    }
+    this.updateFullscreenButton();
+  }
+
+  updateFullscreenButton() {
+    const doc = typeof document === 'undefined' ? null : document;
+    const isFull = isDocumentFullscreen(doc);
+    this.applyToggleState([this.elements?.btnFullscreen, this.elements?.btnFullscreenHud], {
+      label: t(isFull ? 'app.nav.button.fullscreenOn' : 'app.nav.button.fullscreenOff'),
+      ariaLabel: t('app.nav.button.fullscreenAria'),
+      tooltip: t(isFull ? 'app.nav.button.fullscreenOnAria' : 'app.nav.button.fullscreenOffAria'),
+      pressed: isFull
+    });
   }
 
   updateAimState(engine) {
