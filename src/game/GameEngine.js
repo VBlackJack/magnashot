@@ -83,8 +83,12 @@ export class GameEngine {
     this.physicsWorld.setRandomSource(() => this.random());
     this.particleSystem = new ParticleSystem(gameConfig.juice);
     this.isReducedMotion = false;
+    this.animationSpeed = gameConfig.defaults?.animationSpeed ?? 1;
     if (this.storageManager && typeof this.storageManager.getReducedMotion === 'function') {
       this.setReducedMotion(this.storageManager.getReducedMotion());
+    }
+    if (this.storageManager && typeof this.storageManager.getAnimationSpeed === 'function') {
+      this.setAnimationSpeed(this.storageManager.getAnimationSpeed());
     }
     this.specialController = new SpecialBallController(ballsConfig, gameConfig);
 
@@ -1661,6 +1665,17 @@ export class GameEngine {
     this.particleSystem.setReducedMotion(enabled);
   }
 
+  /**
+   * Sets the visual playback speed multiplier for explosions, shatters, shockwaves,
+   * particles and detonation slow-motion duration.
+   * @param {number} speed - Positive animation speed multiplier (e.g. 0.5, 1, 1.5, 2).
+   */
+  setAnimationSpeed(speed) {
+    const valid = Number.isFinite(speed) && speed > 0 ? speed : 1;
+    this.animationSpeed = valid;
+    this.particleSystem.setAnimationSpeed(valid);
+  }
+
   swapLauncherBalls() {
     if (
       this.state !== GAME_STATES.PLAYING ||
@@ -2042,7 +2057,7 @@ export class GameEngine {
     }
 
     if (this.specialSlowMoFrames > 0) {
-      this.specialSlowMoFrames--;
+      this.specialSlowMoFrames = Math.max(0, this.specialSlowMoFrames - this.animationSpeed);
       if (this.specialSlowMoFrames <= 0) {
         this.specialSlowMoTotalFrames = 0;
         this.specialSlowMoMinScale = 1.0;
@@ -2655,7 +2670,7 @@ export class GameEngine {
     }
     const waveCfg = this.gameConfig.juice.impactWave;
     const wave = this.impactWave;
-    wave.frame++;
+    wave.frame += this.animationSpeed;
     if (wave.frame > waveCfg.maxHops * waveCfg.hopDelayFrames + waveCfg.durationFrames) {
       this.clearImpactWave();
       return;

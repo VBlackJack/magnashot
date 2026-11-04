@@ -359,7 +359,7 @@ function elementMarkup(html, id) {
   return html.slice(open);
 }
 
-const SETTING_TOGGLE_IDS = ['btn-sound', 'btn-contrast', 'btn-patterns', 'btn-tilt', 'btn-motion', 'btn-lang'];
+const SETTING_TOGGLE_IDS = ['btn-sound', 'btn-contrast', 'btn-patterns', 'btn-tilt', 'btn-motion', 'btn-anim-speed', 'btn-lang'];
 
 test('the header holds game modes and round actions; the setting toggles live in the Settings dialog', () => {
   const header = elementMarkup(indexHtml, 'app-drawer');
@@ -1108,4 +1108,70 @@ test('UX audit guards: Blitz HUD wave banner, locked Puzzle aria-disabled hint, 
   assert.equal(ui.getLevelsModalInitialFocus(playBtn), blitzBtn, 'Blitz run focuses the Blitz Arcade card instead of Campaign play');
   ui.engine = { mode: 'endless' };
   assert.equal(ui.getLevelsModalInitialFocus(playBtn), closeBtn, 'Survival run focuses Close instead of Campaign play');
+});
+
+test('Settings modal exposes #btn-anim-speed cycling through configured animation speeds (0.5x, 1x, 1.5x, 2x)', async () => {
+  await i18n.init('fr', ['fr', 'en']);
+  const gameConfig = loadJson('./configs/game.json');
+  assert.deepEqual(gameConfig.defaults.animationSpeeds, [0.5, 1, 1.5, 2]);
+  assert.equal(gameConfig.defaults.animationSpeed, 1);
+
+  const settingsMarkup = elementMarkup(indexHtml, 'modal-settings');
+  assert.match(settingsMarkup, /id="btn-anim-speed"/);
+  assert.match(settingsMarkup, /data-caption-for="btn-anim-speed"/);
+
+  for (const lang of SUPPORTED) {
+    const locale = loadJson(`./locales/${lang}.json`);
+    assert.deepEqual(placeholdersOf(locale.app.nav.button.animSpeed), ['speed']);
+    assert.deepEqual(placeholdersOf(locale.app.nav.button.animSpeedAria), ['speed']);
+    assert.deepEqual(placeholdersOf(locale.app.nav.button.animSpeedCaption), ['speed']);
+  }
+
+  let currentSpeed = 1;
+  const captionEl = { textContent: '' };
+  const prevDoc = globalThis.document;
+  globalThis.document = {
+    querySelector: (sel) => (sel === '[data-caption-for="btn-anim-speed"]' ? captionEl : null)
+  };
+  try {
+    const ui = Object.create(UIManager.prototype);
+    let isActive = false;
+    const btnAnimSpeed = {
+      id: 'btn-anim-speed',
+      textContent: '',
+      title: '',
+      attributes: {},
+      setAttribute(k, v) {
+        this.attributes[k] = v;
+      },
+      getAttribute(k) {
+        return this.attributes[k];
+      },
+      classList: {
+        toggle(cls, force) {
+          if (cls === 'active') {
+            isActive = Boolean(force);
+          }
+        }
+      }
+    };
+    ui.gameConfig = gameConfig;
+    ui.storageManager = {
+      getAnimationSpeed: () => currentSpeed
+    };
+    ui.elements = { btnAnimSpeed };
+
+    ui.updateAnimSpeedButton();
+    assert.equal(btnAnimSpeed.textContent, '1x');
+    assert.equal(captionEl.textContent, 'Vitesse : 1x');
+    assert.equal(isActive, false, 'default 1x speed is not marked active');
+
+    currentSpeed = 2;
+    ui.updateAnimSpeedButton();
+    assert.equal(btnAnimSpeed.textContent, '2x');
+    assert.equal(captionEl.textContent, 'Vitesse : 2x');
+    assert.equal(isActive, true, 'non-default 2x speed is highlighted as active');
+  } finally {
+    globalThis.document = prevDoc;
+  }
 });

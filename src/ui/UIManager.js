@@ -440,6 +440,7 @@ export class UIManager {
       btnPatterns: document.getElementById('btn-patterns'),
       btnTilt: document.getElementById('btn-tilt'),
       btnMotion: document.getElementById('btn-motion'),
+      btnAnimSpeed: document.getElementById('btn-anim-speed'),
       btnResetHints: document.getElementById('btn-reset-hints'),
       btnLang: document.getElementById('btn-lang'),
       swapBtn: document.getElementById('btn-swap-ball'),
@@ -639,6 +640,7 @@ export class UIManager {
     this.updatePatternsButton();
     this.setupTiltControl();
     this.updateMotionButton();
+    this.updateAnimSpeedButton();
     this.updateLanguageButton();
     this.bindInstallEvents();
     this.syncInstallControls();
@@ -651,6 +653,7 @@ export class UIManager {
       this.updatePatternsButton();
       this.updateTiltButton();
       this.updateMotionButton();
+      this.updateAnimSpeedButton();
       this.updateLanguageButton();
       this.updateResetHintsFeedback();
       this.updateShareButtonLabel();
@@ -1065,6 +1068,21 @@ export class UIManager {
     };
     if (this.elements.btnMotion) {
       this.elements.btnMotion.addEventListener('click', toggleMotion);
+    }
+
+    const cycleAnimSpeed = () => {
+      const speeds = this.gameConfig.defaults.animationSpeeds;
+      const current = this.storageManager.getAnimationSpeed();
+      const idx = speeds.indexOf(current);
+      const nextSpeed = speeds[(idx + 1) % speeds.length];
+      this.storageManager.setAnimationSpeed(nextSpeed);
+      if (this.engine && typeof this.engine.setAnimationSpeed === 'function') {
+        this.engine.setAnimationSpeed(nextSpeed);
+      }
+      this.updateAnimSpeedButton();
+    };
+    if (this.elements.btnAnimSpeed) {
+      this.elements.btnAnimSpeed.addEventListener('click', cycleAnimSpeed);
     }
 
     document.addEventListener('visibilitychange', () => {
@@ -2068,6 +2086,23 @@ export class UIManager {
     if (typeof document !== 'undefined' && document.documentElement) {
       document.documentElement.classList.toggle(REDUCED_MOTION_CLASS, isReduced);
     }
+  }
+
+  updateAnimSpeedButton() {
+    const btn = this.elements?.btnAnimSpeed;
+    if (!btn) {
+      return;
+    }
+    const defaultSpeed = this.gameConfig.defaults.animationSpeed ?? 1;
+    const speed = this.storageManager?.getAnimationSpeed?.() ?? defaultSpeed;
+    const label = t('app.nav.button.animSpeed', { speed });
+    const ariaLabel = t('app.nav.button.animSpeedAria', { speed });
+    const caption = t('app.nav.button.animSpeedCaption', { speed });
+    setTextIfChanged(btn, label);
+    setAttributeIfChanged(btn, 'aria-label', ariaLabel);
+    btn.title = ariaLabel;
+    btn.classList?.toggle?.('active', speed !== defaultSpeed);
+    setTextIfChanged(document.querySelector(`[data-caption-for="${btn.id}"]`), caption);
   }
 
   updateAimState(engine) {

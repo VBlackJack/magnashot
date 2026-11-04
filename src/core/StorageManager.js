@@ -210,6 +210,35 @@ export class StorageManager {
     this.safeSetItem(this.storageConfig.keys.reducedMotion, Boolean(enabled));
   }
 
+  /**
+   * @returns {number} Stored animation speed multiplier, or the configured default (1x).
+   */
+  getAnimationSpeed() {
+    const fallback = this.defaultsConfig.animationSpeed ?? 1;
+    const key = this.storageConfig.keys.animationSpeed;
+    if (!key) {
+      return fallback;
+    }
+    const raw = this.safeGetItem(key);
+    if (raw === null) {
+      return fallback;
+    }
+    const num = Number.parseFloat(raw);
+    const allowed = this.defaultsConfig.animationSpeeds;
+    if (Array.isArray(allowed) && allowed.includes(num)) {
+      return num;
+    }
+    return fallback;
+  }
+
+  setAnimationSpeed(speed) {
+    const allowed = this.defaultsConfig.animationSpeeds;
+    const num = Number(speed);
+    if (Array.isArray(allowed) && allowed.includes(num) && this.storageConfig.keys.animationSpeed) {
+      this.safeSetItem(this.storageConfig.keys.animationSpeed, num);
+    }
+  }
+
   hasPlayedDailyToday(dateKey) {
     const lastDate = this.safeGetItem(this.storageConfig.keys.dailyLastPlayedDate);
     return lastDate === dateKey;

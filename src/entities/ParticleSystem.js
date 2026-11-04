@@ -44,6 +44,14 @@ export class ParticleSystem {
     this.textPool = [];
     this.shakeIntensity = 0;
     this.reducedMotion = false;
+    this.animationSpeed = 1;
+  }
+
+  /**
+   * @param {number} speed - Positive animation speed multiplier (e.g. 0.5, 1, 1.5, 2).
+   */
+  setAnimationSpeed(speed) {
+    this.animationSpeed = Number.isFinite(speed) && speed > 0 ? speed : 1;
   }
 
   setReducedMotion(enabled) {
@@ -481,10 +489,16 @@ export class ParticleSystem {
   update(shakeDecay = this.juiceConfig.shakeDecay) {
     const cfg = this.cfg;
     this.updateShakeOnly(shakeDecay);
+    const speed = this.animationSpeed || 1;
+    const puffDrag = speed === 1 ? cfg.explosionPuffDrag : Math.pow(cfg.explosionPuffDrag, speed);
+    const shatterDrag = speed === 1 ? cfg.shatterDrag : Math.pow(cfg.shatterDrag, speed);
+    const trailRadiusDecay = speed === 1 ? cfg.trailRadiusDecay : Math.pow(cfg.trailRadiusDecay, speed);
+    const burstDrag = speed === 1 ? cfg.burstDrag : Math.pow(cfg.burstDrag, speed);
+    const flashExpand = Math.min(1, cfg.flashExpandRate * speed);
 
     if (this.screenFlash) {
       this.screenFlash.prevAlpha = this.screenFlash.alpha;
-      this.screenFlash.alpha -= this.screenFlash.decay;
+      this.screenFlash.alpha -= this.screenFlash.decay * speed;
       if (this.screenFlash.alpha <= 0) {
         this.screenFlash = null;
       }
@@ -497,15 +511,15 @@ export class ParticleSystem {
       ex.prevRadius = ex.radius;
       ex.prevAlpha = ex.alpha;
       ex.prevAge = ex.age;
-      ex.age++;
+      ex.age += speed;
       if (ex.kind === 'puff') {
-        ex.x += ex.vx;
-        ex.y += ex.vy + cfg.explosionPuffRiseVy;
-        ex.vx *= cfg.explosionPuffDrag;
-        ex.vy *= cfg.explosionPuffDrag;
+        ex.x += ex.vx * speed;
+        ex.y += (ex.vy + cfg.explosionPuffRiseVy) * speed;
+        ex.vx *= puffDrag;
+        ex.vy *= puffDrag;
       }
       const progress = Math.min(1, ex.age / Math.max(1, ex.maxAge));
-      ex.radius += (ex.maxRadius - ex.radius) * cfg.flashExpandRate;
+      ex.radius += (ex.maxRadius - ex.radius) * flashExpand;
       ex.alpha = Math.max(0, 1 - progress * progress);
       if (ex.age >= ex.maxAge || ex.alpha <= 0) {
         this.removeAt(this.explosions, i, this.explosionPool);
@@ -519,11 +533,11 @@ export class ParticleSystem {
       sb.prevScale = sb.scale;
       sb.prevAlpha = sb.alpha;
       sb.prevAge = sb.age;
-      sb.age++;
-      sb.x += sb.vx;
-      sb.y += sb.vy;
-      sb.vx *= cfg.shatterDrag;
-      sb.vy *= cfg.shatterDrag;
+      sb.age += speed;
+      sb.x += sb.vx * speed;
+      sb.y += sb.vy * speed;
+      sb.vx *= shatterDrag;
+      sb.vy *= shatterDrag;
       const progress = Math.min(1, sb.age / Math.max(1, sb.maxAge));
       sb.scale = 1 + (cfg.shatterMaxScale - 1) * Math.sin(progress * Math.PI * MATH_CONSTANTS.HALF);
       sb.alpha = progress < MATH_CONSTANTS.HALF ? 1.0 : Math.max(0, 1 - (progress - MATH_CONSTANTS.HALF) * 2);
@@ -558,8 +572,8 @@ export class ParticleSystem {
 
     for (let i = this.trailParticles.length - 1; i >= 0; i--) {
       const tp = this.trailParticles[i];
-      tp.radius *= cfg.trailRadiusDecay;
-      tp.alpha -= cfg.trailAlphaDecay;
+      tp.radius *= trailRadiusDecay;
+      tp.alpha -= cfg.trailAlphaDecay * speed;
       if (tp.alpha <= 0 || tp.radius < cfg.trailMinRadius) {
         this.removeAt(this.trailParticles, i, this.trailPool);
       }
@@ -569,11 +583,11 @@ export class ParticleSystem {
       const p = this.particles[i];
       p.prevX = p.x;
       p.prevY = p.y;
-      p.x += p.vx;
-      p.y += p.vy;
-      p.vy += cfg.burstGravity;
-      p.vx *= cfg.burstDrag;
-      p.alpha -= p.decay;
+      p.x += p.vx * speed;
+      p.y += p.vy * speed;
+      p.vy += cfg.burstGravity * speed;
+      p.vx *= burstDrag;
+      p.alpha -= p.decay * speed;
       if (p.alpha <= 0) {
         this.removeAt(this.particles, i, this.particlePool);
       }
@@ -583,8 +597,8 @@ export class ParticleSystem {
       const fl = this.flashes[i];
       fl.prevRadius = fl.radius;
       fl.prevAlpha = fl.alpha;
-      fl.radius += (fl.maxRadius - fl.radius) * cfg.flashExpandRate;
-      fl.alpha -= fl.alphaDecay;
+      fl.radius += (fl.maxRadius - fl.radius) * flashExpand;
+      fl.alpha -= fl.alphaDecay * speed;
       if (fl.alpha <= 0) {
         this.removeAt(this.flashes, i, this.flashPool);
       }
@@ -594,8 +608,8 @@ export class ParticleSystem {
       const sw = this.shockwaves[i];
       sw.prevRadius = sw.radius;
       sw.prevAlpha = sw.alpha;
-      sw.radius += (sw.maxRadius - sw.radius) * (sw.expandRate ?? cfg.shockwaveExpandRate);
-      sw.alpha -= sw.alphaDecay ?? cfg.shockwaveAlphaDecay;
+      sw.radius += (sw.maxRadius - sw.radius) * Math.min(1, (sw.expandRate ?? cfg.shockwaveExpandRate) * speed);
+      sw.alpha -= (sw.alphaDecay ?? cfg.shockwaveAlphaDecay) * speed;
       if (sw.alpha <= 0) {
         this.removeAt(this.shockwaves, i, this.shockwavePool);
       }
@@ -604,7 +618,7 @@ export class ParticleSystem {
     for (let i = this.lightningBolts.length - 1; i >= 0; i--) {
       const bolt = this.lightningBolts[i];
       bolt.prevAlpha = bolt.alpha;
-      bolt.alpha -= cfg.lightningAlphaDecay;
+      bolt.alpha -= cfg.lightningAlphaDecay * speed;
       if (bolt.alpha <= 0) {
         this.removeAt(this.lightningBolts, i);
       }
@@ -615,7 +629,7 @@ export class ParticleSystem {
     for (let i = this.streaks.length - 1; i >= 0; i--) {
       const streak = this.streaks[i];
       streak.prevAlpha = streak.alpha;
-      streak.alpha -= cfg.streakAlphaDecay;
+      streak.alpha -= cfg.streakAlphaDecay * speed;
       if (streak.alpha <= 0) {
         this.removeAt(this.streaks, i);
       }
@@ -624,8 +638,8 @@ export class ParticleSystem {
     for (let i = this.floatingTexts.length - 1; i >= 0; i--) {
       const ft = this.floatingTexts[i];
       ft.prevY = ft.y;
-      ft.y += ft.vy;
-      ft.age = (ft.age || 0) + 1;
+      ft.y += ft.vy * speed;
+      ft.age = (ft.age || 0) + speed;
       if (!this.reducedMotion && cfg.floatingTextPopFrames > 0 && ft.age <= cfg.floatingTextPopFrames) {
         const progress = ft.age / cfg.floatingTextPopFrames;
         ft.scale =
@@ -635,7 +649,7 @@ export class ParticleSystem {
       } else {
         ft.scale = 1.0;
       }
-      ft.alpha -= cfg.floatingTextAlphaDecay;
+      ft.alpha -= cfg.floatingTextAlphaDecay * speed;
       if (ft.alpha <= 0) {
         this.removeAt(this.floatingTexts, i, this.textPool);
       }

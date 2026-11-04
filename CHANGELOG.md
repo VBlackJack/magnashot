@@ -4,6 +4,11 @@ All notable changes to **MagnaShot** are documented in this file.
 
 ## [Unreleased]
 
+## [1.11.0] - 2026-11-04
+
+### Added
+- **Animation & Explosion Speed Setting (`#btn-anim-speed`, `ParticleSystem.setAnimationSpeed`, `GameEngine.setAnimationSpeed`, `StorageManager.getAnimationSpeed`)**: Added a persistent Animation Speed control in `#modal-settings` cycling through `0.5x`, `1x`, `1.5x`, and `2x` (`magnashot_v1_anim_speed`). Scales the playback speed of fireball explosions, shattering spheres, concentric shockwaves, radial flashes, lightning arcs, particle bursts, floating texts, cluster impact waves, and special-ball slow-motion windows (`specialSlowMoFrames`) with exponential drag scaling (`Math.pow(drag, speed)`) while keeping projectile and cluster physics untouched.
+
 ## [1.10.1] - 2026-11-04
 
 ### Fixed

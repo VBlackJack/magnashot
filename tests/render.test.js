@@ -858,3 +858,37 @@ test('StorageManager.getReducedMotion defaults to false even when OS prefers-red
     delete globalThis.window;
   }
 });
+
+test('Animation speed setting scales explosion, shattering sphere, shockwave, and slow-motion progression', () => {
+  const engine = createTestEngine();
+  assert.equal(engine.storageManager.getAnimationSpeed(), 1);
+  assert.equal(engine.animationSpeed, 1);
+  assert.equal(engine.particleSystem.animationSpeed, 1);
+
+  engine.storageManager.setAnimationSpeed(2);
+  assert.equal(engine.storageManager.getAnimationSpeed(), 2);
+  engine.storageManager.setAnimationSpeed(999);
+  assert.equal(engine.storageManager.getAnimationSpeed(), 2, 'rejects speed outside configured animationSpeeds');
+
+  engine.setAnimationSpeed(2);
+  assert.equal(engine.animationSpeed, 2);
+  assert.equal(engine.particleSystem.animationSpeed, 2);
+
+  engine.particleSystem.spawnExplosion(120, 140, 60, '#fb923c');
+  engine.particleSystem.spawnShatterBall({ x: 120, y: 140, radius: 18 }, '#fb923c', 1, 1);
+  engine.particleSystem.update();
+  assert.equal(engine.particleSystem.explosions[0].age, 2, 'explosion age advances by 2 per step at 2x speed');
+  assert.equal(engine.particleSystem.shatteringBalls[0].age, 2, 'shattering sphere age advances by 2 per step at 2x speed');
+
+  engine.setAnimationSpeed(0.5);
+  engine.particleSystem.update();
+  assert.equal(engine.particleSystem.explosions[0].age, 2.5, 'explosion age advances by 0.5 per step at 0.5x speed');
+  assert.equal(engine.particleSystem.shatteringBalls[0].age, 2.5, 'shattering sphere age advances by 0.5 per step at 0.5x speed');
+
+  engine.startCampaignLevel(1);
+  engine.setAnimationSpeed(2);
+  engine.triggerSpecialSlowMo(10, 0.25, '#fb923c');
+  assert.equal(engine.specialSlowMoFrames, 10);
+  engine.update();
+  assert.equal(engine.specialSlowMoFrames, 8, 'specialSlowMoFrames decrements by animationSpeed (2) per step');
+});

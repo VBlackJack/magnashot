@@ -46,7 +46,7 @@
   - Interface bilingue (**FR** / **EN**) sans aucun texte codé en dur ; à la première visite, la langue suit celle du navigateur.
   - Mode **contraste élevé** avec bordures renforcées et symboles de polarité ; les boutons respectent le contraste WCAG AA.
   - Option **motifs de couleur** : chaque couleur reçoit son propre motif (rayures, points, grille, anneaux) à l'intérieur des sphères.
-  - Option **réduction des animations** dans les **Réglages** et pause automatique au changement d'onglet.
+  - Option **réduction des animations** et sélecteur de **vitesse des animations** (`0.5x`, `1x`, `1.5x`, `2x` pour les explosions, l'éclatement des sphères, les ondes de choc et le ralenti des détonations) dans les **Réglages**, ainsi que pause automatique au changement d'onglet.
   - **Contrôle par inclinaison** sur téléphone et tablette, activé par défaut : incliner l'appareil penche la gravité sur le côté. Sur iPhone et iPad, le premier appui sur le plateau demande l'autorisation des mouvements. Il se désactive dans les **Réglages**.
   - Prise en charge des lecteurs d'écran : boutons bascules étiquetés avec `aria-pressed`, sphères spéciales et étoiles des niveaux nommées, annonces discrètes des succès et des fins de manche.
   - Contrôles complets à la souris, au tactile (décalage vertical du doigt et annulation du tir en glissant vers le bas) et au clavier ; une touche d'action maintenue ne se répète pas. Les flèches affinent une visée à la souris : après une flèche, les petits mouvements de souris laissent la visée en place et un clic tire dans cette direction.

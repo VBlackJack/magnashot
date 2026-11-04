@@ -612,6 +612,7 @@
       "colorPatterns": "color_patterns",
       "tilt": "tilt",
       "reducedMotion": "reduced_motion",
+      "animationSpeed": "anim_speed",
       "unlockedLevel": "unlocked_level",
       "levelStats": "level_stats",
       "endlessHighScore": "endless_high_score",
@@ -646,6 +647,8 @@
     "matchMinCount": 3,
     "initialCoins": 50,
     "ballStyle": "classic",
+    "animationSpeed": 1,
+    "animationSpeeds": [0.5, 1, 1.5, 2],
     "reducedMotionMediaQuery": "(prefers-reduced-motion: reduce)",
     "coarsePointerMediaQuery": "(pointer: coarse)",
     "drawerMediaQuery": "(max-width: 680px)"
