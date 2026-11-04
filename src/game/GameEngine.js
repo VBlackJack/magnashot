@@ -119,6 +119,9 @@ export class GameEngine {
     this.specialSlowMoTotalFrames = 0;
     this.specialSlowMoMinScale = 1.0;
     this.specialSlowMoColor = null;
+    this.isSteppingPhysics = false;
+    this.pendingRoundEnd = false;
+    this.hadDroppingBalls = false;
     this.detonationOrigin = null;
     this.impactWave = null;
     this.trailFrameCounter = 0;
@@ -413,6 +416,9 @@ export class GameEngine {
     this.specialSlowMoTotalFrames = 0;
     this.specialSlowMoMinScale = 1.0;
     this.specialSlowMoColor = null;
+    this.isSteppingPhysics = false;
+    this.pendingRoundEnd = false;
+    this.hadDroppingBalls = false;
     this.detonationOrigin = null;
     this.impactWave = null;
     this.hasFiredInRound = false;
@@ -2057,7 +2063,9 @@ export class GameEngine {
     }
 
     if (this.specialSlowMoFrames > 0) {
-      this.specialSlowMoFrames = Math.max(0, this.specialSlowMoFrames - this.animationSpeed);
+      // Slow animation speeds must not stretch the slow motion in real time (free aiming
+      // time in Blitz): the countdown never runs slower than one frame per step.
+      this.specialSlowMoFrames = Math.max(0, this.specialSlowMoFrames - Math.max(1, this.animationSpeed));
       if (this.specialSlowMoFrames <= 0) {
         this.specialSlowMoTotalFrames = 0;
         this.specialSlowMoMinScale = 1.0;
@@ -2082,7 +2090,17 @@ export class GameEngine {
       }
     }
 
-    this.physicsWorld.step(this.getStepCallbacks());
+    // Step callbacks must not tear the world down mid-step: a round end they trigger
+    // (an overcharge strike on the boss) is deferred until the step has returned.
+    this.isSteppingPhysics = true;
+    try {
+      this.physicsWorld.step(this.getStepCallbacks());
+    } finally {
+      this.isSteppingPhysics = false;
+    }
+    if (this.pendingRoundEnd) {
+      this.evaluateRoundEnd();
+    }
 
     if (this.physicsWorld.hasBrokenBondThisStep) {
       this.physicsWorld.hasBrokenBondThisStep = false;
@@ -2091,6 +2109,14 @@ export class GameEngine {
       this.saveRunSnapshot();
       this.notifyUI();
     }
+
+    // Falling balls still pay score and overcharge until they land: store the run once
+    // the last one is gone, so a reload cannot lose those rewards.
+    const hasDroppingBalls = this.physicsWorld.droppingBalls.length > 0;
+    if (this.hadDroppingBalls && !hasDroppingBalls) {
+      this.saveRunSnapshot();
+    }
+    this.hadDroppingBalls = hasDroppingBalls;
 
     if (!this.isRunPlaying()) {
       this.particleSystem.update(juice.shakeDecay);
@@ -2824,7 +2850,13 @@ export class GameEngine {
           );
           const destroyed = this.destroyClusterBall(bossBall, bossSpec.ringColor, false);
           if (destroyed) {
-            this.evaluateRoundEnd();
+            // Inside a physics step the next wave would clear the world under the loop
+            // that called us: update() runs the round end once the step has returned.
+            if (this.isSteppingPhysics) {
+              this.pendingRoundEnd = true;
+            } else {
+              this.evaluateRoundEnd();
+            }
           }
         }
       }
@@ -3100,6 +3132,7 @@ export class GameEngine {
   }
 
   evaluateRoundEnd() {
+    this.pendingRoundEnd = false;
     // A cleared Flux shape is paid once: later checks in the same frame see the empty
     // board of the transition, not a second clear.
     if (!this.isRunPlaying() || this.stageTransitionFrames > 0) {
@@ -3223,6 +3256,7 @@ export class GameEngine {
         this.persistRunHighScore();
         this.spawnBossRushWave();
         this.refreshStaleLauncherColors();
+        this.refreshDiscovery();
         this.saveRunSnapshot({ force: true });
         this.notifyUI();
       } else if (this.physicsWorld.balls.length === 1) {

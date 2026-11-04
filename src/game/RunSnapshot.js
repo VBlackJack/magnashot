@@ -175,7 +175,9 @@ const pickFields = (source, fields) => {
 /**
  * True when the run can be captured without losing anything: a run is in progress,
  * no projectile is in flight and no Flux shape is being replaced. Falling avalanche
- * balls are already rewarded and are purely visual, so they do not block a capture.
+ * balls are not serialized and still pay score and overcharge when they reach the
+ * collector bin or a singularity, so they do not block a capture: the engine stores the
+ * run again once the last one is gone.
  * @param {import('./GameEngine.js').GameEngine} engine
  */
 export function isRunSnapshotable(engine) {
