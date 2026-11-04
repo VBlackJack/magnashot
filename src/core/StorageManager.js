@@ -203,13 +203,7 @@ export class StorageManager {
 
   getReducedMotion() {
     const raw = this.safeGetItem(this.storageConfig.keys.reducedMotion);
-    if (raw !== null) {
-      return raw === 'true';
-    }
-    if (typeof window !== 'undefined' && typeof window.matchMedia === 'function') {
-      return Boolean(window.matchMedia(this.defaultsConfig.reducedMotionMediaQuery).matches);
-    }
-    return false;
+    return raw === 'true';
   }
 
   setReducedMotion(enabled) {

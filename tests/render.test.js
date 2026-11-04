@@ -836,3 +836,25 @@ test('Explosive special balls trigger cinematic slow-motion after hit-stop and s
   assert.equal(engine.particleSystem.explosions.length, 0, 'enabling reduced motion clears fireball explosions');
   assert.equal(engine.particleSystem.shatteringBalls.length, 0, 'enabling reduced motion clears shattering spheres');
 });
+
+test('StorageManager.getReducedMotion defaults to false even when OS prefers-reduced-motion is active, and honors explicit toggle', () => {
+  globalThis.window = {
+    addEventListener() {},
+    matchMedia() {
+      return { matches: true };
+    }
+  };
+  try {
+    const engine = createTestEngine();
+    assert.equal(
+      engine.storageManager.getReducedMotion(),
+      false,
+      'OS prefers-reduced-motion does not silently disable game effects unless toggled in Settings'
+    );
+    assert.equal(engine.isReducedMotion, false);
+    engine.storageManager.setReducedMotion(true);
+    assert.equal(engine.storageManager.getReducedMotion(), true);
+  } finally {
+    delete globalThis.window;
+  }
+});

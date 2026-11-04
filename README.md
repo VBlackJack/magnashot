@@ -46,7 +46,7 @@
   - Bilingual interface (**FR** / **EN**) with zero hardcoded strings; the first visit follows the browser language.
   - **High Contrast** mode with enhanced borders and polarity symbols; buttons meet WCAG AA contrast.
   - **Color Patterns** setting: each color gets its own pattern (stripes, dots, grid, rings) inside the spheres.
-  - **Reduced Motion** toggle (`prefers-reduced-motion` aware) and automatic pause on tab switch.
+  - **Reduced Motion** toggle in **Settings** and automatic pause on tab switch.
   - **Tilt Control** on phones and tablets, on by default: tilting the device leans gravity sideways. On iPhone and iPad, the first tap on the board asks for the motion permission. It can be turned off in **Settings**.
   - Screen reader support: labelled toggles with `aria-pressed`, named power-ups and level stars, and polite announcements for achievements and round results.
   - Full mouse, touch (with vertical finger offset and pull-down shot cancellation), and keyboard controls; held action keys do not auto-repeat. The arrows fine-tune a mouse aim: after an arrow, small mouse movements leave the aim alone and a click shoots along it.

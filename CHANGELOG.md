@@ -4,6 +4,11 @@ All notable changes to **MagnaShot** are documented in this file.
 
 ## [Unreleased]
 
+## [1.9.9] - 2026-11-04
+
+### Fixed
+- **Windows Desktop Animation Setting vs. Game VFX (`StorageManager.getReducedMotion`)**: Stopped auto-enabling `reducedMotion = true` from `window.matchMedia('(prefers-reduced-motion: reduce)')` when the player has never toggled Reduced Motion in the in-game Settings. On Windows 10/11, disabling OS desktop window animations (`SPI_GETCLIENTAREAANIMATION = False` / `MinAnimate = 0`) causes browsers to report `prefers-reduced-motion: reduce`, which previously silenced every particle, shockwave, lightning bolt, fireball explosion, shattering sphere, and slow-motion effect by default.
+
 ## [1.9.8] - 2026-11-04
 
 ### Added
