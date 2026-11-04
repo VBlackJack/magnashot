@@ -80,10 +80,10 @@
       "shockwaveForce": 14.0,
       "burstCount": 14,
       "burstSpeed": 6.5,
-      "coreBurstCount": 22,
-      "coreBurstSpeed": 8.0,
-      "slowMoFrames": 26,
-      "slowMoTimeScale": 0.25,
+      "coreBurstCount": 32,
+      "coreBurstSpeed": 9.5,
+      "slowMoFrames": 36,
+      "slowMoTimeScale": 0.18,
       "pointsPerBall": 130
     },
     "lightning": {
@@ -99,8 +99,8 @@
       "targetRingFactor": 2.2,
       "burstCount": 10,
       "burstSpeed": 5.5,
-      "slowMoFrames": 22,
-      "slowMoTimeScale": 0.28,
+      "slowMoFrames": 30,
+      "slowMoTimeScale": 0.2,
       "pointsPerBall": 140
     },
     "rainbow": {
@@ -119,8 +119,8 @@
       "burstCount": 12,
       "burstSpeed": 5.0,
       "matchAudioCombo": 2,
-      "slowMoFrames": 18,
-      "slowMoTimeScale": 0.35,
+      "slowMoFrames": 26,
+      "slowMoTimeScale": 0.24,
       "pointsPerBall": 125
     },
     "anvil": {
@@ -134,10 +134,10 @@
       "crushFlashRadiusFactor": 2.4,
       "crushShockwaveFactor": 2.8,
       "crushRingLineWidth": 4.2,
-      "crushBurstCount": 10,
-      "crushBurstSpeed": 5.5,
-      "slowMoFrames": 24,
-      "slowMoTimeScale": 0.28,
+      "crushBurstCount": 14,
+      "crushBurstSpeed": 6.5,
+      "slowMoFrames": 32,
+      "slowMoTimeScale": 0.2,
       "pointsPerBall": 150
     },
     "freeze": {
@@ -176,10 +176,10 @@
       "targetFlashRadiusFactor": 2.8,
       "targetShockwaveFactor": 3.0,
       "outerRingLineWidth": 4.5,
-      "burstCount": 12,
-      "burstSpeed": 5,
-      "slowMoFrames": 24,
-      "slowMoTimeScale": 0.28,
+      "burstCount": 16,
+      "burstSpeed": 6.5,
+      "slowMoFrames": 32,
+      "slowMoTimeScale": 0.2,
       "pointsPerBall": 150
     },
     "brush": {

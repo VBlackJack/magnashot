@@ -4,6 +4,17 @@ All notable changes to **MagnaShot** are documented in this file.
 
 ## [Unreleased]
 
+## [1.9.8] - 2026-11-04
+
+### Added
+- **Shattering & Swell-Pop Sphere Destruction (`ParticleSystem.spawnShatterBall`, `Renderer.drawShatteringBalls`, `GameEngine.destroyClusterBall`)**: Destroyed spheres no longer vanish invisibly on frame 0; while physics removal stays immediate and deterministic, each destroyed sphere spawns an object-pooled shattering animation that gets knocked radially outward from the blast origin, swells to `1.46x` scale, glows white-hot from within, fractures along jagged radial crack lines, and bursts into a secondary fireball puff and spark shower during the slow-motion window.
+- **Multi-Stage Fireball Explosions, Starburst Rays & Slow-Motion Vignette (`ParticleSystem.spawnExplosion`, `Renderer.drawParticles`, `Renderer.drawSlowMoOverlay`)**:
+  - Added multi-phase fireball cloud puffs transitioning from white-hot and yellow (`#fef08a`) to fiery orange (`#f97316`), crimson (`#dc2626`), and rising dark smoke, paired with a 12-ray additive starburst core and a brief full-arena impact flash (`screenFlash`).
+  - Added a colored perimeter slow-motion vignette (`drawSlowMoOverlay`, `specialSlowMoColor`) while `specialSlowMoFrames > 0`, and velocity-stretched glowing shrapnel tails with white-hot inner cores on fast burst particles.
+
+### Fixed
+- **Hit-Stop vs. Slow-Motion Particle Ordering (`ParticleSystem.updateShakeOnly`, `GameEngine.update`)**: Decayed only screen shake during `hitStopFrames > 0` instead of advancing particle, explosion, and shattering-sphere ages at `1.0x` speed during the hit-stop freeze, ensuring 100% of the detonation and sphere-shattering animation plays out during the `0.18x - 0.24x` slow-motion window.
+
 ## [1.9.7] - 2026-11-04
 
 ### Added

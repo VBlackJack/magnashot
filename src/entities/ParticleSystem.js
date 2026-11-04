@@ -24,9 +24,12 @@ export class ParticleSystem {
     this.trailParticles = [];
     this.shockwaves = [];
     this.flashes = [];
+    this.explosions = [];
+    this.shatteringBalls = [];
     this.floatingTexts = [];
     this.lightningBolts = [];
     this.streaks = [];
+    this.screenFlash = null;
     // Surface of the liquid at the bottom of the board: one height and speed per column.
     this.liquidHeights = new Array(this.cfg.liquidColumns).fill(0);
     this.liquidVelocities = new Array(this.cfg.liquidColumns).fill(0);
@@ -36,6 +39,8 @@ export class ParticleSystem {
     this.trailPool = [];
     this.shockwavePool = [];
     this.flashPool = [];
+    this.explosionPool = [];
+    this.shatterPool = [];
     this.textPool = [];
     this.shakeIntensity = 0;
     this.reducedMotion = false;
@@ -62,6 +67,13 @@ export class ParticleSystem {
     while (this.flashes.length > 0) {
       this.flashPool.push(this.flashes.pop());
     }
+    while (this.explosions.length > 0) {
+      this.explosionPool.push(this.explosions.pop());
+    }
+    while (this.shatteringBalls.length > 0) {
+      this.shatterPool.push(this.shatteringBalls.pop());
+    }
+    this.screenFlash = null;
     this.lightningBolts.length = 0;
     this.streaks.length = 0;
     this.shakeIntensity = 0;
@@ -192,6 +204,131 @@ export class ParticleSystem {
     item.prevAlpha = item.alpha;
     item.alphaDecay = cfg.flashAlphaDecay;
     this.flashes.push(item);
+  }
+
+  /**
+   * Spawns a multi-stage fireball explosion at (x, y): screen impact flash, central starburst
+   * with radial light spikes, and a ring of billowing fireball/smoke cloud puffs.
+   */
+  spawnExplosion(x, y, blastRadius = this.cfg.shockwaveDefaultMaxRadius, color = this.cfg.explosionFireColor) {
+    if (this.reducedMotion) {
+      return;
+    }
+    const cfg = this.cfg;
+    this.screenFlash = {
+      color,
+      alpha: cfg.screenFlashInitialAlpha,
+      prevAlpha: cfg.screenFlashInitialAlpha,
+      decay: cfg.screenFlashDecay
+    };
+
+    const core = this.explosionPool.pop() || {};
+    core.kind = 'core';
+    core.x = x;
+    core.y = y;
+    core.prevX = x;
+    core.prevY = y;
+    core.vx = 0;
+    core.vy = 0;
+    core.radius = blastRadius * cfg.explosionCoreStartFactor;
+    core.prevRadius = core.radius;
+    core.maxRadius = blastRadius * cfg.explosionCoreMaxFactor;
+    core.color = color;
+    core.age = 0;
+    core.prevAge = 0;
+    core.maxAge = cfg.explosionCoreFrames;
+    core.alpha = 1.0;
+    core.prevAlpha = 1.0;
+    const rayCount = cfg.explosionRayCount;
+    const rays = [];
+    for (let r = 0; r < rayCount; r++) {
+      const baseAngle = (MATH_CONSTANTS.TWO_PI * r) / rayCount;
+      const jitter = (Math.random() - MATH_CONSTANTS.HALF) * (MATH_CONSTANTS.TWO_PI / (rayCount * 2));
+      const lenFactor =
+        cfg.explosionRayMinFactor + Math.random() * (cfg.explosionRayMaxFactor - cfg.explosionRayMinFactor);
+      rays.push({ angle: baseAngle + jitter, lenFactor });
+    }
+    core.rays = rays;
+    this.explosions.push(core);
+
+    const puffCount = cfg.explosionPuffCount;
+    for (let i = 0; i < puffCount; i++) {
+      const angle =
+        (MATH_CONSTANTS.TWO_PI * i) / puffCount + (Math.random() - MATH_CONSTANTS.HALF) * cfg.burstAngleJitter;
+      const speed =
+        blastRadius * cfg.explosionPuffSpeedFactor * (cfg.burstSpeedMinFactor + Math.random() * cfg.burstSpeedRangeFactor);
+      const puff = this.explosionPool.pop() || {};
+      puff.kind = 'puff';
+      puff.x = x + Math.cos(angle) * blastRadius * cfg.explosionPuffStartRadiusFactor;
+      puff.y = y + Math.sin(angle) * blastRadius * cfg.explosionPuffStartRadiusFactor;
+      puff.prevX = puff.x;
+      puff.prevY = puff.y;
+      puff.vx = Math.cos(angle) * speed;
+      puff.vy = Math.sin(angle) * speed;
+      puff.radius = blastRadius * cfg.explosionPuffStartRadiusFactor;
+      puff.prevRadius = puff.radius;
+      puff.maxRadius = blastRadius * cfg.explosionPuffMaxRadiusFactor;
+      puff.color = color;
+      puff.age = 0;
+      puff.prevAge = 0;
+      puff.maxAge = cfg.explosionPuffFrames;
+      puff.alpha = 1.0;
+      puff.prevAlpha = 1.0;
+      puff.rays = null;
+      this.explosions.push(puff);
+    }
+  }
+
+  /**
+   * Spawns a visual shattering sphere animation when a sphere is destroyed, so spheres
+   * visibly swell, glow from within, crack open, and burst outward instead of vanishing on frame 0.
+   */
+  spawnShatterBall(ball, burstColor, pushVx = 0, pushVy = 0) {
+    if (this.reducedMotion || !ball) {
+      return;
+    }
+    const cfg = this.cfg;
+    const item = this.shatterPool.pop() || {};
+    item.x = ball.x;
+    item.y = ball.y;
+    item.prevX = ball.x;
+    item.prevY = ball.y;
+    item.vx = pushVx;
+    item.vy = pushVy;
+    item.radius = ball.radius;
+    item.colorId = ball.colorId || null;
+    item.specialType = ball.specialType || null;
+    item.clusterModifier = null;
+    item.isAnchor = false;
+    item.isFrozen = false;
+    item.burstColor = burstColor || cfg.explosionFireColor;
+    item.scale = 1.0;
+    item.prevScale = 1.0;
+    item.alpha = 1.0;
+    item.prevAlpha = 1.0;
+    item.age = 0;
+    item.prevAge = 0;
+    item.maxAge = cfg.shatterFrames;
+    const crackCount = cfg.shatterCrackCount;
+    const segCount = cfg.shatterCrackSegments;
+    const cracks = [];
+    for (let c = 0; c < crackCount; c++) {
+      const baseAngle =
+        (MATH_CONSTANTS.TWO_PI * c) / crackCount + (Math.random() - MATH_CONSTANTS.HALF) * cfg.burstAngleJitter;
+      const points = [{ x: 0, y: 0 }];
+      for (let s = 1; s <= segCount; s++) {
+        const frac = s / segCount;
+        const jitterAngle =
+          baseAngle + (s < segCount ? (Math.random() - MATH_CONSTANTS.HALF) * cfg.shatterCrackJitterFactor * 2 : 0);
+        points.push({
+          x: Math.cos(jitterAngle) * ball.radius * frac,
+          y: Math.sin(jitterAngle) * ball.radius * frac
+        });
+      }
+      cracks.push(points);
+    }
+    item.cracks = cracks;
+    this.shatteringBalls.push(item);
   }
 
   /** Spawns a jagged electric arc between two arbitrary points (x1, y1) and (x2, y2). */
@@ -328,7 +465,8 @@ export class ParticleSystem {
     this.floatingTexts.push(item);
   }
 
-  update(shakeDecay = this.juiceConfig.shakeDecay) {
+  /** Decays screen shake during hit-stop freezes without consuming explosion or particle frames. */
+  updateShakeOnly(shakeDecay = this.juiceConfig.shakeDecay) {
     const cfg = this.cfg;
     if (this.shakeIntensity > MATH_CONSTANTS.EPSILON) {
       this.shakeIntensity *= shakeDecay;
@@ -337,6 +475,85 @@ export class ParticleSystem {
       }
     } else {
       this.shakeIntensity = 0;
+    }
+  }
+
+  update(shakeDecay = this.juiceConfig.shakeDecay) {
+    const cfg = this.cfg;
+    this.updateShakeOnly(shakeDecay);
+
+    if (this.screenFlash) {
+      this.screenFlash.prevAlpha = this.screenFlash.alpha;
+      this.screenFlash.alpha -= this.screenFlash.decay;
+      if (this.screenFlash.alpha <= 0) {
+        this.screenFlash = null;
+      }
+    }
+
+    for (let i = this.explosions.length - 1; i >= 0; i--) {
+      const ex = this.explosions[i];
+      ex.prevX = ex.x;
+      ex.prevY = ex.y;
+      ex.prevRadius = ex.radius;
+      ex.prevAlpha = ex.alpha;
+      ex.prevAge = ex.age;
+      ex.age++;
+      if (ex.kind === 'puff') {
+        ex.x += ex.vx;
+        ex.y += ex.vy + cfg.explosionPuffRiseVy;
+        ex.vx *= cfg.explosionPuffDrag;
+        ex.vy *= cfg.explosionPuffDrag;
+      }
+      const progress = Math.min(1, ex.age / Math.max(1, ex.maxAge));
+      ex.radius += (ex.maxRadius - ex.radius) * cfg.flashExpandRate;
+      ex.alpha = Math.max(0, 1 - progress * progress);
+      if (ex.age >= ex.maxAge || ex.alpha <= 0) {
+        this.removeAt(this.explosions, i, this.explosionPool);
+      }
+    }
+
+    for (let i = this.shatteringBalls.length - 1; i >= 0; i--) {
+      const sb = this.shatteringBalls[i];
+      sb.prevX = sb.x;
+      sb.prevY = sb.y;
+      sb.prevScale = sb.scale;
+      sb.prevAlpha = sb.alpha;
+      sb.prevAge = sb.age;
+      sb.age++;
+      sb.x += sb.vx;
+      sb.y += sb.vy;
+      sb.vx *= cfg.shatterDrag;
+      sb.vy *= cfg.shatterDrag;
+      const progress = Math.min(1, sb.age / Math.max(1, sb.maxAge));
+      sb.scale = 1 + (cfg.shatterMaxScale - 1) * Math.sin(progress * Math.PI * MATH_CONSTANTS.HALF);
+      sb.alpha = progress < MATH_CONSTANTS.HALF ? 1.0 : Math.max(0, 1 - (progress - MATH_CONSTANTS.HALF) * 2);
+      if (sb.age >= sb.maxAge || sb.alpha <= 0) {
+        const popX = sb.x;
+        const popY = sb.y;
+        const popRadius = sb.radius;
+        const popColor = sb.burstColor;
+        this.removeAt(this.shatteringBalls, i, this.shatterPool);
+        const puff = this.explosionPool.pop() || {};
+        puff.kind = 'puff';
+        puff.x = popX;
+        puff.y = popY;
+        puff.prevX = popX;
+        puff.prevY = popY;
+        puff.vx = 0;
+        puff.vy = cfg.explosionPuffRiseVy;
+        puff.radius = popRadius * MATH_CONSTANTS.HALF;
+        puff.prevRadius = puff.radius;
+        puff.maxRadius = popRadius * cfg.shatterPopPuffRadiusFactor;
+        puff.color = popColor;
+        puff.age = 0;
+        puff.prevAge = 0;
+        puff.maxAge = Math.max(1, Math.round(cfg.explosionPuffFrames * MATH_CONSTANTS.HALF));
+        puff.alpha = 1.0;
+        puff.prevAlpha = 1.0;
+        puff.rays = null;
+        this.explosions.push(puff);
+        this.spawnBurst(popX, popY, popColor, cfg.shatterPopBurstCount, cfg.shatterPopBurstSpeed);
+      }
     }
 
     for (let i = this.trailParticles.length - 1; i >= 0; i--) {

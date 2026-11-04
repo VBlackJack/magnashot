@@ -98,6 +98,7 @@ export class SpecialBallController {
     }
     this.breakChainsInBlast(ball.x, ball.y, shockwaveOuterRadius, physicsWorld, particleSystem);
 
+    particleSystem.spawnExplosion?.(ball.x, ball.y, blastRadius, specs.highlight);
     particleSystem.spawnFlash?.(ball.x, ball.y, specs.highlight, blastRadius * specs.flashRadiusFactor);
     particleSystem.spawnShockwave(ball.x, ball.y, specs.highlight, blastRadius * specs.visualShockwaveFactor, {
       lineWidth: specs.outerRingLineWidth
@@ -124,7 +125,8 @@ export class SpecialBallController {
       scoreDelta: destroyed.length * specs.pointsPerBall,
       freezeTurns: 0,
       slowMoFrames: specs.slowMoFrames,
-      slowMoTimeScale: specs.slowMoTimeScale
+      slowMoTimeScale: specs.slowMoTimeScale,
+      slowMoColor: specs.highlight
     };
   }
 
@@ -137,6 +139,7 @@ export class SpecialBallController {
     if (physicsWorld.ballMap.has(ball.id)) {
       physicsWorld.removeBall(ball);
     }
+    particleSystem.spawnExplosion?.(ball.x, ball.y, ball.radius * specs.launchShockwaveFactor, specs.highlight);
     particleSystem.spawnFlash?.(ball.x, ball.y, specs.highlight, ball.radius * specs.launchFlashRadiusFactor);
     particleSystem.spawnShockwave(ball.x, ball.y, specs.highlight, ball.radius * specs.launchShockwaveFactor);
     const targets = pickRocketTargets(ball, physicsWorld.balls, specs.rocketCount);
@@ -144,6 +147,7 @@ export class SpecialBallController {
     for (const target of targets) {
       particleSystem.spawnStreak(ball.x, ball.y, target.x, target.y, specs.highlight, 1);
       particleSystem.spawnStreak(ball.x, ball.y, target.x, target.y, specs.secondaryStreakColor, -1);
+      particleSystem.spawnExplosion?.(target.x, target.y, target.radius * specs.targetShockwaveFactor, specs.highlight);
       particleSystem.spawnFlash?.(
         target.x,
         target.y,
@@ -174,7 +178,8 @@ export class SpecialBallController {
       scoreDelta: destroyed.length * specs.pointsPerBall,
       freezeTurns: 0,
       slowMoFrames: specs.slowMoFrames,
-      slowMoTimeScale: specs.slowMoTimeScale
+      slowMoTimeScale: specs.slowMoTimeScale,
+      slowMoColor: specs.highlight
     };
   }
 
@@ -352,6 +357,7 @@ export class SpecialBallController {
 
     const leftX = this.gameConfig.canvas.wallMargin;
     const rightX = this.gameConfig.canvas.logicalWidth - this.gameConfig.canvas.wallMargin;
+    particleSystem.spawnExplosion?.(ball.x, ball.y, ball.radius * specs.flashRadiusFactor, specs.highlight);
     particleSystem.spawnFlash?.(ball.x, ball.y, specs.highlight, ball.radius * specs.flashRadiusFactor);
     particleSystem.spawnLightning(ball.y, leftX, rightX, specs.highlight);
     particleSystem.spawnLightning(ball.y, leftX, rightX, specs.secondaryArcColor);
@@ -369,7 +375,8 @@ export class SpecialBallController {
       scoreDelta: destroyed.length * specs.pointsPerBall,
       freezeTurns: 0,
       slowMoFrames: specs.slowMoFrames,
-      slowMoTimeScale: specs.slowMoTimeScale
+      slowMoTimeScale: specs.slowMoTimeScale,
+      slowMoColor: specs.highlight
     };
   }
 
@@ -419,6 +426,7 @@ export class SpecialBallController {
       }
     }
 
+    particleSystem.spawnExplosion?.(ball.x, ball.y, ball.radius * specs.flashRadiusFactor, specs.highlight);
     particleSystem.spawnFlash?.(ball.x, ball.y, specs.highlight, ball.radius * specs.flashRadiusFactor);
     const palette = this.ballsConfig.standardColors;
     const baseRadius = ball.radius * specs.visualShockwaveFactor;
@@ -444,7 +452,8 @@ export class SpecialBallController {
       scoreDelta: destroyed.length * specs.pointsPerBall,
       freezeTurns: 0,
       slowMoFrames: destroyed.length > 0 ? specs.slowMoFrames : 0,
-      slowMoTimeScale: specs.slowMoTimeScale
+      slowMoTimeScale: specs.slowMoTimeScale,
+      slowMoColor: specs.highlight
     };
   }
 
@@ -496,7 +505,8 @@ export class SpecialBallController {
       scoreDelta: frozenCount > 0 ? specs.pointsPerBall * specs.scoreMultiplier : 0,
       freezeTurns: specs.freezeTurns,
       slowMoFrames: specs.slowMoFrames || 0,
-      slowMoTimeScale: specs.slowMoTimeScale || 1.0
+      slowMoTimeScale: specs.slowMoTimeScale || 1.0,
+      slowMoColor: specs.highlight
     };
   }
 }

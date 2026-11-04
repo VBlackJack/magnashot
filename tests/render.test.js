@@ -797,24 +797,42 @@ test('Explosive special balls trigger cinematic slow-motion after hit-stop and s
 
   assert.equal(engine.specialSlowMoFrames, ballsConfig.specialTypes.bomb.slowMoFrames);
   assert.ok(engine.particleSystem.flashes.length >= 1, 'bomb detonation spawns a radial core flash');
+  assert.ok(engine.particleSystem.explosions.length >= 2, 'bomb detonation spawns a starburst core and fireball cloud puffs');
+  assert.ok(engine.particleSystem.screenFlash, 'bomb detonation triggers an arena impact flash');
+  assert.ok(
+    engine.particleSystem.shatteringBalls.length >= 1,
+    'destroyed spheres spawn swelling/cracking shattering animations instead of vanishing instantly'
+  );
   assert.ok(engine.particleSystem.shockwaves.length >= 2, 'bomb detonation spawns concentric multi-ring shockwaves');
   assert.equal(engine.getTimeScale(), 1, 'getTimeScale stays 1 during hit-stop frames so hit-stop finishes briskly');
 
   while (engine.hitStopFrames > 0) {
     engine.update();
   }
+  assert.equal(
+    engine.particleSystem.shatteringBalls[0].age,
+    0,
+    'shattering spheres and explosions do not advance during hit-stop so 100% of the blast plays in slow-motion'
+  );
   const activeScale = engine.getTimeScale();
   assert.equal(activeScale, ballsConfig.specialTypes.bomb.slowMoTimeScale, 'slow-motion timeScale activates immediately after hit-stop');
+  engine.update();
+  assert.equal(engine.particleSystem.shatteringBalls[0].age, 1, 'shattering spheres advance during slow-motion');
+  assert.ok(engine.particleSystem.shatteringBalls[0].scale > 1.0, 'shattering spheres swell above 1.0x before bursting');
   assert.doesNotThrow(() => renderer.render(engine, 0.5));
 
   while (engine.specialSlowMoFrames > 0) {
     engine.update();
   }
   assert.equal(engine.getTimeScale(), 1, 'getTimeScale returns to 1 once slow-motion frames complete');
+  assert.equal(engine.particleSystem.shatteringBalls.length, 0, 'shattering spheres finish and pop into secondary puffs');
 
-  engine.triggerSpecialSlowMo(20, 0.25);
+  engine.triggerSpecialSlowMo(20, 0.25, '#fb923c');
   assert.ok(engine.getTimeScale() < 1);
+  assert.equal(engine.specialSlowMoColor, '#fb923c');
   engine.setReducedMotion(true);
   assert.equal(engine.getTimeScale(), 1, 'enabling reduced motion immediately cancels slow-motion');
   assert.equal(engine.particleSystem.flashes.length, 0, 'enabling reduced motion clears radial flashes');
+  assert.equal(engine.particleSystem.explosions.length, 0, 'enabling reduced motion clears fireball explosions');
+  assert.equal(engine.particleSystem.shatteringBalls.length, 0, 'enabling reduced motion clears shattering spheres');
 });

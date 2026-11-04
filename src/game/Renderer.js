@@ -417,6 +417,7 @@ export class Renderer {
     for (const ball of engineState.physicsWorld.droppingBalls) {
       this.drawBall(ctx, ball, now, alpha);
     }
+    this.drawShatteringBalls(ctx, engineState.particleSystem, now, alpha);
 
     if (engineState.aimPoints && !engineState.physicsWorld.projectile && !engineState.isAimCancelled) {
       this.drawAimTrajectory(
@@ -440,7 +441,53 @@ export class Renderer {
 
     this.drawLauncher(ctx, engineState, theme, now);
     this.drawParticles(ctx, engineState.particleSystem, alpha);
+    this.drawSlowMoOverlay(ctx, engineState, width, height, alpha);
     ctx.restore();
+  }
+
+  /**
+   * Renders a brief full-arena impact flash and a cinematic perimeter glow while
+   * special-ball slow-motion time dilation is active.
+   */
+  drawSlowMoOverlay(ctx, engineState, width, height, alpha = 1.0) {
+    if (this.isReducedMotion) {
+      return;
+    }
+    const ps = engineState.particleSystem;
+    if (ps?.screenFlash) {
+      const sf = ps.screenFlash;
+      const flashAlpha = Math.max(0, this.interpolate(sf.prevAlpha ?? sf.alpha, sf.alpha, alpha));
+      if (flashAlpha > 0) {
+        ctx.save();
+        ctx.fillStyle = sf.color;
+        ctx.globalAlpha = flashAlpha;
+        ctx.fillRect(0, 0, width, height);
+        ctx.restore();
+      }
+    }
+    if (engineState.specialSlowMoFrames > 0 && typeof engineState.getTimeScale === 'function') {
+      const timeScale = engineState.getTimeScale();
+      if (timeScale < 1) {
+        const slowCfg = this.gameConfig.juice.slowMotion;
+        const pCfg = this.gameConfig.juice.particles;
+        const edgeAlpha = (1 - timeScale) * (slowCfg.vignetteMaxAlpha ?? 0.34);
+        if (edgeAlpha > 0) {
+          const cx = width * MATH_CONSTANTS.HALF;
+          const cy = height * MATH_CONSTANTS.HALF;
+          const innerR = width * (slowCfg.vignetteInnerRadiusFactor ?? 0.36);
+          const outerR = height * (slowCfg.vignetteOuterRadiusFactor ?? 0.85);
+          const color = engineState.specialSlowMoColor || slowCfg.vignetteDefaultColor;
+          const grad = ctx.createRadialGradient(cx, cy, innerR, cx, cy, outerR);
+          grad.addColorStop(0, pCfg.flashEdgeColor);
+          grad.addColorStop(1, color);
+          ctx.save();
+          ctx.fillStyle = grad;
+          ctx.globalAlpha = edgeAlpha;
+          ctx.fillRect(0, 0, width, height);
+          ctx.restore();
+        }
+      }
+    }
   }
 
   drawGrid(ctx, width, height, theme) {
@@ -1860,10 +1907,147 @@ export class Renderer {
     });
   }
 
+  /**
+   * Draws spheres currently in their swell-and-shatter destruction animation: the sphere
+   * visibly swells outward, glows white-hot from within, and splits along radial fracture lines.
+   */
+  drawShatteringBalls(ctx, particleSystem, now, alpha = 1.0) {
+    if (this.isReducedMotion || !particleSystem?.shatteringBalls?.length) {
+      return;
+    }
+    const pCfg = this.gameConfig.juice.particles;
+    for (const sb of particleSystem.shatteringBalls) {
+      const sbX = this.interpolate(sb.prevX ?? sb.x, sb.x, alpha);
+      const sbY = this.interpolate(sb.prevY ?? sb.y, sb.y, alpha);
+      const sbScale = this.interpolate(sb.prevScale ?? sb.scale, sb.scale, alpha);
+      const sbAlpha = Math.max(0, this.interpolate(sb.prevAlpha ?? sb.alpha, sb.alpha, alpha));
+      if (sbAlpha <= 0 || sbScale <= 0) {
+        continue;
+      }
+      const interpAge = this.interpolate(sb.prevAge ?? sb.age, sb.age, alpha);
+      const progress = Math.min(1, Math.max(0, interpAge / Math.max(1, sb.maxAge)));
+
+      ctx.save();
+      ctx.translate(sbX, sbY);
+      ctx.scale(sbScale, sbScale);
+      ctx.globalAlpha = sbAlpha;
+      this.drawBallAt(ctx, sb, 0, 0, now);
+
+      ctx.globalCompositeOperation = 'lighter';
+      const coreAlpha = sbAlpha * progress * pCfg.shatterCoreFlashAlpha;
+      if (coreAlpha > 0) {
+        const grad = ctx.createRadialGradient(0, 0, 0, 0, 0, sb.radius);
+        grad.addColorStop(0, pCfg.flashCoreColor);
+        grad.addColorStop(pCfg.flashMidStop, sb.burstColor);
+        grad.addColorStop(1, pCfg.flashEdgeColor);
+        ctx.fillStyle = grad;
+        ctx.globalAlpha = coreAlpha;
+        ctx.beginPath();
+        ctx.arc(0, 0, sb.radius, 0, MATH_CONSTANTS.TWO_PI);
+        ctx.fill();
+      }
+
+      if (sb.cracks) {
+        ctx.strokeStyle = sb.burstColor;
+        ctx.lineWidth = pCfg.shatterCrackGlowWidth;
+        ctx.globalAlpha = sbAlpha;
+        ctx.beginPath();
+        for (const crack of sb.cracks) {
+          if (crack.length < 2) {
+            continue;
+          }
+          ctx.moveTo(crack[0].x, crack[0].y);
+          for (let i = 1; i < crack.length; i++) {
+            ctx.lineTo(crack[i].x, crack[i].y);
+          }
+        }
+        ctx.stroke();
+
+        ctx.strokeStyle = pCfg.flashCoreColor;
+        ctx.lineWidth = pCfg.shatterCrackCoreWidth;
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
+  }
+
   drawParticles(ctx, particleSystem, alpha = 1.0) {
     const pCfg = this.gameConfig.juice.particles;
     const theme = this.gameConfig.theme;
     ctx.save();
+
+    if (particleSystem.explosions) {
+      for (const ex of particleSystem.explosions) {
+        if (ex.kind !== 'puff') {
+          continue;
+        }
+        const exX = this.interpolate(ex.prevX ?? ex.x, ex.x, alpha);
+        const exY = this.interpolate(ex.prevY ?? ex.y, ex.y, alpha);
+        const exRadius = this.interpolate(ex.prevRadius ?? ex.radius, ex.radius, alpha);
+        const exAlpha = Math.max(0, this.interpolate(ex.prevAlpha ?? ex.alpha, ex.alpha, alpha));
+        if (exRadius <= 0 || exAlpha <= 0) {
+          continue;
+        }
+        const interpAge = this.interpolate(ex.prevAge ?? ex.age, ex.age, alpha);
+        const progress = Math.min(1, Math.max(0, interpAge / Math.max(1, ex.maxAge)));
+        const grad = ctx.createRadialGradient(exX, exY, 0, exX, exY, exRadius);
+        if (progress < pCfg.explosionHotPhaseEnd) {
+          grad.addColorStop(0, pCfg.flashCoreColor);
+          grad.addColorStop(pCfg.flashMidStop, pCfg.explosionHotColor);
+          grad.addColorStop(1, ex.color);
+        } else if (progress < pCfg.explosionFirePhaseEnd) {
+          grad.addColorStop(0, pCfg.explosionHotColor);
+          grad.addColorStop(pCfg.flashMidStop, ex.color);
+          grad.addColorStop(1, pCfg.explosionEmberColor);
+        } else {
+          grad.addColorStop(0, ex.color);
+          grad.addColorStop(pCfg.flashMidStop, pCfg.explosionEmberColor);
+          grad.addColorStop(1, pCfg.explosionSmokeColor);
+        }
+        ctx.fillStyle = grad;
+        ctx.globalAlpha = exAlpha;
+        ctx.beginPath();
+        ctx.arc(exX, exY, exRadius, 0, MATH_CONSTANTS.TWO_PI);
+        ctx.fill();
+      }
+    }
+
+    ctx.globalCompositeOperation = 'lighter';
+
+    if (particleSystem.explosions) {
+      for (const ex of particleSystem.explosions) {
+        if (ex.kind !== 'core') {
+          continue;
+        }
+        const exRadius = this.interpolate(ex.prevRadius ?? ex.radius, ex.radius, alpha);
+        const exAlpha = Math.max(0, this.interpolate(ex.prevAlpha ?? ex.alpha, ex.alpha, alpha));
+        if (exRadius <= 0 || exAlpha <= 0) {
+          continue;
+        }
+        const grad = ctx.createRadialGradient(ex.x, ex.y, 0, ex.x, ex.y, exRadius);
+        grad.addColorStop(0, pCfg.flashCoreColor);
+        grad.addColorStop(pCfg.flashMidStop, ex.color);
+        grad.addColorStop(1, pCfg.flashEdgeColor);
+        ctx.fillStyle = grad;
+        ctx.globalAlpha = exAlpha;
+        ctx.beginPath();
+        ctx.arc(ex.x, ex.y, exRadius, 0, MATH_CONSTANTS.TWO_PI);
+        ctx.fill();
+
+        if (ex.rays) {
+          ctx.strokeStyle = pCfg.flashCoreColor;
+          ctx.lineWidth = pCfg.explosionRayWidth;
+          ctx.globalAlpha = exAlpha;
+          ctx.beginPath();
+          for (const ray of ex.rays) {
+            const rayLen = exRadius * ray.lenFactor;
+            ctx.moveTo(ex.x, ex.y);
+            ctx.lineTo(ex.x + Math.cos(ray.angle) * rayLen, ex.y + Math.sin(ray.angle) * rayLen);
+          }
+          ctx.stroke();
+        }
+      }
+    }
 
     if (particleSystem.flashes) {
       for (const fl of particleSystem.flashes) {
@@ -1957,18 +2141,32 @@ export class Renderer {
     }
 
     for (const p of particleSystem.particles) {
+      const px = this.interpolate(p.prevX, p.x, alpha);
+      const py = this.interpolate(p.prevY, p.y, alpha);
+      const pAlpha = Math.max(0, p.alpha);
+      const speed = Math.hypot(p.vx || 0, p.vy || 0);
+      if (speed >= pCfg.sparkTailMinSpeed) {
+        ctx.strokeStyle = p.color;
+        ctx.globalAlpha = pAlpha;
+        ctx.lineWidth = p.radius * pCfg.sparkTailWidthFactor;
+        ctx.beginPath();
+        ctx.moveTo(px - p.vx * pCfg.sparkTailLengthFactor, py - p.vy * pCfg.sparkTailLengthFactor);
+        ctx.lineTo(px, py);
+        ctx.stroke();
+      }
       ctx.fillStyle = p.color;
-      ctx.globalAlpha = Math.max(0, p.alpha);
+      ctx.globalAlpha = pAlpha;
       ctx.beginPath();
-      ctx.arc(
-        this.interpolate(p.prevX, p.x, alpha),
-        this.interpolate(p.prevY, p.y, alpha),
-        p.radius,
-        0,
-        MATH_CONSTANTS.TWO_PI
-      );
+      ctx.arc(px, py, p.radius, 0, MATH_CONSTANTS.TWO_PI);
+      ctx.fill();
+
+      ctx.fillStyle = pCfg.flashCoreColor;
+      ctx.beginPath();
+      ctx.arc(px, py, p.radius * pCfg.sparkCoreRadiusFactor, 0, MATH_CONSTANTS.TWO_PI);
       ctx.fill();
     }
+
+    ctx.globalCompositeOperation = 'source-over';
 
     const shadowColor = theme.floatingTextShadowColor;
     const shadowOffset = pCfg.floatingTextShadowOffset;

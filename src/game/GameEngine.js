@@ -114,6 +114,8 @@ export class GameEngine {
     this.specialSlowMoFrames = 0;
     this.specialSlowMoTotalFrames = 0;
     this.specialSlowMoMinScale = 1.0;
+    this.specialSlowMoColor = null;
+    this.detonationOrigin = null;
     this.impactWave = null;
     this.trailFrameCounter = 0;
     this.hasFiredInRound = false;
@@ -207,14 +209,18 @@ export class GameEngine {
    * detonation. Ignored when reduced motion is active.
    * @param {number} frames - Number of fixed simulation steps to dilate.
    * @param {number} timeScale - Minimum simulation time scale during the detonation.
+   * @param {string|null} [color] - Highlight color for the slow-motion perimeter glow.
    */
-  triggerSpecialSlowMo(frames, timeScale) {
+  triggerSpecialSlowMo(frames, timeScale, color = null) {
     if (this.isReducedMotion || !frames || frames <= 0 || !Number.isFinite(timeScale) || timeScale >= 1) {
       return;
     }
     this.specialSlowMoFrames = Math.max(this.specialSlowMoFrames, frames);
     this.specialSlowMoTotalFrames = Math.max(this.specialSlowMoTotalFrames, this.specialSlowMoFrames);
     this.specialSlowMoMinScale = Math.min(this.specialSlowMoMinScale, timeScale);
+    if (color) {
+      this.specialSlowMoColor = color;
+    }
   }
 
   /**
@@ -402,6 +408,8 @@ export class GameEngine {
     this.specialSlowMoFrames = 0;
     this.specialSlowMoTotalFrames = 0;
     this.specialSlowMoMinScale = 1.0;
+    this.specialSlowMoColor = null;
+    this.detonationOrigin = null;
     this.impactWave = null;
     this.hasFiredInRound = false;
     this.hasUsedContinue = false;
@@ -1648,6 +1656,7 @@ export class GameEngine {
       this.specialSlowMoFrames = 0;
       this.specialSlowMoTotalFrames = 0;
       this.specialSlowMoMinScale = 1.0;
+      this.specialSlowMoColor = null;
     }
     this.particleSystem.setReducedMotion(enabled);
   }
@@ -1832,6 +1841,12 @@ export class GameEngine {
       },
       onAnvilCrush: (target) => {
         const anvilSpecs = this.ballsConfig.specialTypes.anvil;
+        this.particleSystem.spawnExplosion?.(
+          target.x,
+          target.y,
+          target.radius * anvilSpecs.crushShockwaveFactor,
+          anvilSpecs.highlight
+        );
         this.particleSystem.spawnFlash?.(
           target.x,
           target.y,
@@ -1852,11 +1867,15 @@ export class GameEngine {
           anvilSpecs.crushBurstCount,
           anvilSpecs.crushBurstSpeed
         );
-        if (this.destroyClusterBall(target, anvilSpecs.highlight, true)) {
+        const prevOrigin = this.detonationOrigin;
+        this.detonationOrigin = this.physicsWorld.projectile || target;
+        const crushed = this.destroyClusterBall(target, anvilSpecs.highlight, true);
+        this.detonationOrigin = prevOrigin;
+        if (crushed) {
           this.anvilCrushCount++;
           this.addScore(anvilSpecs.pointsPerBall);
           this.addOvercharge(this.gameConfig.scoring.overchargePerMatchedBall);
-          this.triggerSpecialSlowMo(anvilSpecs.slowMoFrames, anvilSpecs.slowMoTimeScale);
+          this.triggerSpecialSlowMo(anvilSpecs.slowMoFrames, anvilSpecs.slowMoTimeScale, anvilSpecs.highlight);
           this.audioManager.playEffect('snap');
         }
       },
@@ -1874,7 +1893,7 @@ export class GameEngine {
         // An anvil that crushed nothing is a miss: it breaks the combo and counts toward the next wave.
         const madeMatch = this.anvilCrushCount > 0;
         if (madeMatch) {
-          this.triggerSpecialSlowMo(anvilSpecs.slowMoFrames, anvilSpecs.slowMoTimeScale);
+          this.triggerSpecialSlowMo(anvilSpecs.slowMoFrames, anvilSpecs.slowMoTimeScale, anvilSpecs.highlight);
         } else {
           this.combo = 0;
         }
@@ -2018,7 +2037,7 @@ export class GameEngine {
 
     if (this.hitStopFrames > 0) {
       this.hitStopFrames--;
-      this.particleSystem.update(juice.shakeDecay);
+      this.particleSystem.updateShakeOnly(juice.shakeDecay);
       return;
     }
 
@@ -2027,6 +2046,7 @@ export class GameEngine {
       if (this.specialSlowMoFrames <= 0) {
         this.specialSlowMoTotalFrames = 0;
         this.specialSlowMoMinScale = 1.0;
+        this.specialSlowMoColor = null;
       }
     }
 
@@ -2158,12 +2178,15 @@ export class GameEngine {
     const palette = this.ballsConfig.standardColors.find((c) => c.id === originBall.colorId);
     const burstColor = palette ? palette.highlight : theme.anchorCoreColor;
 
+    const prevOrigin = this.detonationOrigin;
+    this.detonationOrigin = originBall;
     let destroyedCount = 0;
     for (const member of cluster) {
       if (this.destroyClusterBall(member, burstColor, false)) {
         destroyedCount++;
       }
     }
+    this.detonationOrigin = prevOrigin;
     if (destroyedCount === 0) {
       return 0;
     }
@@ -2305,6 +2328,20 @@ export class GameEngine {
       return false;
     }
 
+    const pCfg = this.gameConfig.juice.particles;
+    let pushVx = 0;
+    let pushVy = 0;
+    if (this.detonationOrigin && this.detonationOrigin !== ball) {
+      const dx = ball.x - this.detonationOrigin.x;
+      const dy = ball.y - this.detonationOrigin.y;
+      const dist = Math.hypot(dx, dy);
+      if (dist > MATH_CONSTANTS.EPSILON) {
+        const pushSpeed = pCfg.shatterPushSpeed || 0;
+        pushVx = (dx / dist) * pushSpeed;
+        pushVy = (dy / dist) * pushSpeed;
+      }
+    }
+    this.particleSystem.spawnShatterBall?.(ball, burstColor, pushVx, pushVy);
     this.particleSystem.spawnBurst(ball.x, ball.y, burstColor, burstCount, burstSpeed);
     this.popBubblesAround(ball);
     this.physicsWorld.removeBall(ball);
@@ -2322,6 +2359,8 @@ export class GameEngine {
       );
     } else if (ball.clusterModifier === CLUSTER_MODIFIERS.DORMANT_BOMB) {
       const dormantSpecs = this.ballsConfig.clusterModifiers.dormantBomb;
+      const prevOrigin = this.detonationOrigin;
+      this.detonationOrigin = ball;
       const bombResult = this.specialController.triggerBomb(
         ball,
         dormantSpecs,
@@ -2331,12 +2370,13 @@ export class GameEngine {
         this.getBlastRadiusMultiplier(),
         (target, color, ignArmor, count, speed) => this.destroyClusterBall(target, color, ignArmor, count, speed)
       );
+      this.detonationOrigin = prevOrigin;
       if (bombResult.scoreDelta > 0) {
         this.addScore(bombResult.scoreDelta);
       }
       if (bombResult.destroyed.length > 0) {
         this.addOvercharge(bombResult.destroyed.length * this.gameConfig.scoring.overchargePerMatchedBall);
-        this.triggerSpecialSlowMo(dormantSpecs.slowMoFrames, dormantSpecs.slowMoTimeScale);
+        this.triggerSpecialSlowMo(dormantSpecs.slowMoFrames, dormantSpecs.slowMoTimeScale, dormantSpecs.highlight);
       }
     } else if (ball.clusterModifier === CLUSTER_MODIFIERS.LASER_LOCK) {
       const lockSpec = this.ballsConfig.clusterModifiers.laserLock;
@@ -2447,6 +2487,8 @@ export class GameEngine {
   /** A Lightning Core strikes the horizontal band it sits in, like a Lightning shot. */
   triggerLightningCore(ball) {
     const lightningSpec = this.ballsConfig.clusterModifiers.lightningCore;
+    const prevOrigin = this.detonationOrigin;
+    this.detonationOrigin = ball;
     const result = this.specialController.triggerLightning(
       ball,
       lightningSpec,
@@ -2456,10 +2498,11 @@ export class GameEngine {
       this.getBlastRadiusMultiplier(),
       (target, color, ignArmor, count, speed) => this.destroyClusterBall(target, color, ignArmor, count, speed)
     );
+    this.detonationOrigin = prevOrigin;
     this.addScore(result.scoreDelta);
     if (result.destroyed.length > 0) {
       this.addOvercharge(result.destroyed.length * this.gameConfig.scoring.overchargePerMatchedBall);
-      this.triggerSpecialSlowMo(lightningSpec.slowMoFrames, lightningSpec.slowMoTimeScale);
+      this.triggerSpecialSlowMo(lightningSpec.slowMoFrames, lightningSpec.slowMoTimeScale, lightningSpec.highlight);
     }
   }
 
@@ -2472,9 +2515,10 @@ export class GameEngine {
     const bossSpec = this.ballsConfig.clusterModifiers.bossCore;
     this.awardRunCoins(bossSpec.coinReward);
     this.addScore(bossSpec.pointsBonus);
+    this.particleSystem.spawnExplosion?.(ball.x, ball.y, bossSpec.shockwaveRadius, bossSpec.ringColor);
     this.particleSystem.spawnFlash?.(ball.x, ball.y, bossSpec.ringColor, bossSpec.shockwaveRadius);
     this.particleSystem.spawnShockwave(ball.x, ball.y, bossSpec.ringColor, bossSpec.shockwaveRadius);
-    this.triggerSpecialSlowMo(bossSpec.slowMoFrames, bossSpec.slowMoTimeScale);
+    this.triggerSpecialSlowMo(bossSpec.slowMoFrames, bossSpec.slowMoTimeScale, bossSpec.ringColor);
     this.particleSystem.spawnFloatingText(
       ball.x,
       ball.y + this.gameConfig.canvas.floatingTextOffsetY,
@@ -2530,6 +2574,8 @@ export class GameEngine {
     }
 
     if (snappedBall.specialType) {
+      const prevOrigin = this.detonationOrigin;
+      this.detonationOrigin = snappedBall;
       const result = this.specialController.resolveSpecialImpact(
         snappedBall,
         this.physicsWorld,
@@ -2538,6 +2584,7 @@ export class GameEngine {
         this.getBlastRadiusMultiplier(),
         (target, color, ignoreArmor, count, speed) => this.destroyClusterBall(target, color, ignoreArmor, count, speed)
       );
+      this.detonationOrigin = prevOrigin;
       if (result.scoreDelta > 0) {
         this.addScore(result.scoreDelta);
       }
@@ -2545,7 +2592,7 @@ export class GameEngine {
         this.addOvercharge(result.destroyed.length * this.gameConfig.scoring.overchargePerMatchedBall);
         this.hitStopFrames = this.gameConfig.juice.hitStopFramesSpecial;
         if (result.slowMoFrames > 0) {
-          this.triggerSpecialSlowMo(result.slowMoFrames, result.slowMoTimeScale);
+          this.triggerSpecialSlowMo(result.slowMoFrames, result.slowMoTimeScale, result.slowMoColor);
         }
       }
       if (result.painted?.length > 0) {
