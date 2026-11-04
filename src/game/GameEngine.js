@@ -46,6 +46,16 @@ import {
   pickNextDiscovery
 } from './Discovery.js';
 
+/** Flux perk ids; the specs (step, maxStacks, icon) live in configs/flux.json. */
+export const FLUX_PERK_IDS = Object.freeze({
+  RESERVE: 'reserve',
+  REFILL: 'refill',
+  BLAST: 'blast',
+  OVERCHARGE: 'overcharge',
+  ARSENAL: 'arsenal',
+  GOLDEN: 'golden'
+});
+
 export class GameEngine {
   constructor({
     gameConfig,
@@ -144,6 +154,8 @@ export class GameEngine {
     this.fluxPreviousFamily = null;
     this.fluxShapeIds = [];
     this.fluxIsBossStage = false;
+    this.fluxPerks = {};
+    this.fluxPerkOffer = null;
     this.stageTransitionFrames = 0;
     this.stageIntroFrames = 0;
     this.currentObjective = OBJECTIVE_TYPES.CLEAR_ALL;
@@ -442,6 +454,8 @@ export class GameEngine {
     this.fluxPreviousFamily = null;
     this.fluxShapeIds = [];
     this.fluxIsBossStage = false;
+    this.fluxPerks = {};
+    this.fluxPerkOffer = null;
     this.stageTransitionFrames = 0;
     this.stageIntroFrames = 0;
     this.currentObjective = OBJECTIVE_TYPES.CLEAR_ALL;
@@ -479,13 +493,13 @@ export class GameEngine {
   getBlastRadiusMultiplier() {
     const lvl = this.storageManager.getUpgradeLevel('blastRadius');
     const spec = this.gameConfig.upgrades.blastRadius;
-    return 1 + lvl * spec.radiusMultiplierPerLevel;
+    return 1 + lvl * spec.radiusMultiplierPerLevel + this.getFluxPerkBonus(FLUX_PERK_IDS.BLAST);
   }
 
   getOverchargeMultiplier() {
     const lvl = this.storageManager.getUpgradeLevel('overchargeRate');
     const spec = this.gameConfig.upgrades.overchargeRate;
-    return 1 + lvl * spec.rateMultiplierPerLevel;
+    return 1 + lvl * spec.rateMultiplierPerLevel + this.getFluxPerkBonus(FLUX_PERK_IDS.OVERCHARGE);
   }
 
   /**
@@ -1149,13 +1163,13 @@ export class GameEngine {
     const rewards = this.fluxConfig.rewards;
     const clearedStage = this.fluxStage;
     const points = rewards.stageClearPointsBase + rewards.stageClearPointsPerStage * clearedStage;
-    const refill = this.getFluxShotRefill(clearedStage);
+    const refill = this.getFluxShotRefill(clearedStage) + this.getFluxPerkBonus(FLUX_PERK_IDS.REFILL);
     // The transition starts first so the run is not capturable while it is paid: the coins
     // are held until the next shape is stored, instead of being paid on top of a stored
     // run that still shows this shape uncleared.
     this.stageTransitionFrames = this.fluxConfig.transition.clearFrames;
     this.addScore(points);
-    this.awardRunCoins(rewards.stageClearCoins);
+    this.awardRunCoins(rewards.stageClearCoins + this.getFluxPerkBonus(FLUX_PERK_IDS.GOLDEN));
     this.shotsRemaining += refill;
     if (this.fluxIsBossStage) {
       for (let i = 0; i < rewards.bossClearSpecials; i++) {
@@ -1174,12 +1188,105 @@ export class GameEngine {
     this.notifyUI({ fluxStageCleared: clearedStage });
   }
 
+  /** Stacks held of a Flux perk; 0 outside Flux or when never picked. */
+  getFluxPerkStacks(perkId) {
+    return this.mode === GAME_MODES.FLUX ? this.fluxPerks[perkId] || 0 : 0;
+  }
+
+  /** Total effect of a Flux perk: its step times the stacks held. */
+  getFluxPerkBonus(perkId) {
+    const spec = this.fluxConfig?.perks?.catalog?.[perkId];
+    return spec ? spec.step * this.getFluxPerkStacks(perkId) : 0;
+  }
+
+  /** True while a Flux perk choice is pending: the board is frozen until one is picked. */
+  isAwaitingPerk() {
+    return this.mode === GAME_MODES.FLUX && Array.isArray(this.fluxPerkOffer) && this.fluxPerkOffer.length > 0;
+  }
+
+  /**
+   * Draws the perks offered after a cleared Flux shape. The draw depends only on the run
+   * seed and the cleared stage, and skips perks already at their stack cap.
+   * @param {number} clearedStage - Stage of the shape that was just cleared.
+   * @returns {string[]|null} Distinct perk ids, or null when no offer is due or none is left.
+   */
+  drawFluxPerkOffer(clearedStage) {
+    const perksCfg = this.fluxConfig.perks;
+    if (this.mode !== GAME_MODES.FLUX || clearedStage < 1 || clearedStage % perksCfg.interval !== 0) {
+      return null;
+    }
+    const pool = perksCfg.order.filter((id) => this.getFluxPerkStacks(id) < perksCfg.catalog[id].maxStacks);
+    if (pool.length === 0) {
+      return null;
+    }
+    const rng = new SeededRandom(`${this.fluxSeed}:perks:${clearedStage}`);
+    const offer = [];
+    while (offer.length < perksCfg.offerSize && pool.length > 0) {
+      offer.push(pool.splice(Math.floor(rng.next() * pool.length), 1)[0]);
+    }
+    return offer;
+  }
+
+  /**
+   * Takes one of the offered Flux perks: instant effects apply now, the others are read
+   * from the stack count when they trigger.
+   * @param {string} perkId - Perk picked from the pending offer.
+   * @returns {boolean} False when no offer is pending or the perk is not in it.
+   */
+  chooseFluxPerk(perkId) {
+    if (!this.isAwaitingPerk() || !this.fluxPerkOffer.includes(perkId)) {
+      return false;
+    }
+    const spec = this.fluxConfig.perks.catalog[perkId];
+    this.fluxPerks[perkId] = this.getFluxPerkStacks(perkId) + 1;
+    this.fluxPerkOffer = null;
+    if (perkId === FLUX_PERK_IDS.RESERVE) {
+      this.shotsRemaining += spec.step;
+    } else if (perkId === FLUX_PERK_IDS.ARSENAL) {
+      this.grantStartingSpecialBalls(spec.step);
+    }
+    if (this.currentBall) {
+      this.updateAimFromAngle(this.aimAngle);
+    }
+    this.saveRunSnapshot({ force: true });
+    this.notifyUI({ fluxPerkChosen: perkId });
+    return true;
+  }
+
+  /**
+   * Adds random special balls among the types the run starts with (a starting count above
+   * zero), with the same sound and popup as any other special ball grant, once per call.
+   * @param {number} count - Number of balls to add.
+   */
+  grantStartingSpecialBalls(count) {
+    const startingTypes = Object.entries(this.fluxConfig.initialSpecialCounts)
+      .filter(([type, initial]) => initial > 0 && Object.values(SPECIAL_TYPES).includes(type))
+      .map(([type]) => type);
+    if (startingTypes.length === 0 || count <= 0) {
+      return;
+    }
+    for (let i = 0; i < count; i++) {
+      const granted = startingTypes[Math.floor(this.random() * startingTypes.length)];
+      this.specialInventory[granted] = (this.specialInventory[granted] || 0) + 1;
+    }
+    const canvasCfg = this.gameConfig.canvas;
+    this.audioManager.playEffect('overcharge');
+    this.particleSystem.spawnFloatingText(
+      canvasCfg.launcherX,
+      canvasCfg.launcherY + canvasCfg.launcherPopupOffsetY,
+      t('gameplay.feedback.arsenal.ready', { count }),
+      this.gameConfig.theme.overchargePopupColor
+    );
+  }
+
   /** Lets the cleared shape's last balls fall, then brings in the next shape. */
   updateStageTransition() {
     this.physicsWorld.stepDroppingBalls(this.getStepCallbacks());
     this.particleSystem.update(this.gameConfig.juice.shakeDecay);
     this.stageTransitionFrames--;
     if (this.stageTransitionFrames === 0) {
+      // fluxStage already points at the next shape: the cleared one is the stage before it.
+      this.fluxPerkOffer = this.drawFluxPerkOffer(this.fluxStage - 1);
       this.buildFluxStage({ persist: true });
       this.notifyUI();
     }
@@ -1999,7 +2106,7 @@ export class GameEngine {
       this.isAimCancelled = false;
       return;
     }
-    if (this.isStageChanging() || (this.usesShotBudget() && this.shotsRemaining <= 0)) {
+    if (this.isAwaitingPerk() || this.isStageChanging() || (this.usesShotBudget() && this.shotsRemaining <= 0)) {
       return;
     }
     const ballCfg = this.physicsConfig.ball;
@@ -2041,6 +2148,10 @@ export class GameEngine {
       return;
     }
     if (this.state !== GAME_STATES.PLAYING) {
+      return;
+    }
+    if (this.isAwaitingPerk()) {
+      this.particleSystem.update(this.gameConfig.juice.shakeDecay);
       return;
     }
     if (this.stageTransitionFrames > 0) {

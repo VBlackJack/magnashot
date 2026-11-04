@@ -45,6 +45,7 @@ import {
   rerenderWorkshopKeepingFocus,
   renderWorkshopContents
 } from './WorkshopView.js';
+import { fluxPerkIndexForKey, renderFluxPerkChips, syncFluxPerkModal } from './FluxPerkView.js';
 import {
   LEVEL_CHAPTER_TAB_ID_PREFIX,
   LABELLED_LEVEL_FORMATS,
@@ -159,16 +160,28 @@ const MODE_BUTTON_KEYS = Object.freeze({
   [GAME_MODES.CASCADE]: ['btnModeCascade']
 });
 
-/** Pause modal hints that have one wording per input mode. */
-const PAUSE_INPUT_HINTS = Object.freeze([
+/** Modal texts (pause instructions, perk choice subtitle) that have one wording per input mode. */
+const MODAL_INPUT_HINTS = Object.freeze([
   { elementId: 'pause-instruction-aim', key: 'modals.pause.instructions.aim' },
   { elementId: 'pause-instruction-swap', key: 'modals.pause.instructions.swap' },
   { elementId: 'pause-instruction-cancel', key: 'modals.pause.instructions.cancel' },
-  { elementId: 'pause-instruction-keyboard', key: 'modals.pause.instructions.keyboard' }
+  { elementId: 'pause-instruction-keyboard', key: 'modals.pause.instructions.keyboard' },
+  { elementId: 'modal-flux-perk-subtitle', key: 'modals.fluxPerk.subtitle' }
 ]);
 
 /** Accessible names that have one wording per input mode (the board's text alternative). */
 export const INPUT_ARIA_HINTS = Object.freeze([{ elementId: 'game-canvas', key: 'hud.canvas.aria.label' }]);
+
+/**
+ * Splits the extras of a refresh into the one-shot ones, read from that call only, and the
+ * persistent ones kept in lastExtra for the re-runs (language change, shop purchase...).
+ * @param {object} extra - Extras passed to refresh.
+ * @returns {{oneShot: object, persistentExtra: object}} The two halves.
+ */
+export function splitRefreshExtra(extra) {
+  const { unlockedAchievementId, fluxStageCleared, fluxPerkChosen, ...persistentExtra } = extra;
+  return { oneShot: { unlockedAchievementId, fluxStageCleared, fluxPerkChosen }, persistentExtra };
+}
 
 /** Default star ceiling when no scoring config is passed to resolveNextCampaignTarget. */
 const DEFAULT_MAX_STARS = 3;
@@ -550,6 +563,11 @@ export class UIManager {
       gameOverShareFallback: document.getElementById('gameover-share-fallback'),
       gameOverShareText: document.getElementById('gameover-share-text'),
       modalPause: document.getElementById('modal-pause'),
+      modalFluxPerk: document.getElementById('modal-flux-perk'),
+      fluxPerkCards: document.getElementById('flux-perk-cards'),
+      hudPerks: document.getElementById('hud-perks'),
+      drawerPerks: document.getElementById('drawer-perks'),
+      drawerPerksStat: document.getElementById('drawer-perks-stat'),
       pauseLevelTip: document.getElementById('pause-level-tip'),
       btnResume: document.getElementById('btn-resume'),
       btnRestartPause: document.getElementById('btn-restart-pause'),
@@ -653,7 +671,7 @@ export class UIManager {
       'hud.launcher.swap.shortcut',
       'hud.launcher.swap.caption'
     );
-    for (const { elementId, key } of PAUSE_INPUT_HINTS) {
+    for (const { elementId, key } of MODAL_INPUT_HINTS) {
       setTextIfChanged(document.getElementById(elementId), t(`${key}.${this.inputMode}`));
     }
     for (const { elementId, key } of INPUT_ARIA_HINTS) {
@@ -949,6 +967,8 @@ export class UIManager {
 
   /** Copies the HUD values the compact layout hides into the menu. */
   syncDrawerStats() {
+    renderFluxPerkChips(this.elements.hudPerks, this.engine);
+    renderFluxPerkChips(this.elements.drawerPerks, this.engine, this.elements.drawerPerksStat);
     if (this.elements.starProgress && this.elements.drawerStarProgress) {
       const parts = this.ensureDrawerStarParts();
       const hudStars = renderedStarGlyphs.get(this.elements.starGlyphs);
@@ -1389,6 +1409,13 @@ export class UIManager {
       this.engine.togglePause();
     });
 
+    this.elements.fluxPerkCards?.addEventListener('click', (e) => {
+      const card = e.target.closest?.('[data-perk-id]');
+      if (card) {
+        this.engine.chooseFluxPerk(card.dataset.perkId);
+      }
+    });
+
     this.elements.btnRestartPause.addEventListener('click', () => {
       this.requestDestructiveAction(
         () => {
@@ -1469,6 +1496,16 @@ export class UIManager {
       return;
     }
 
+    // The perk choice is the top dialog: its digits pick a card and never equip a special ball.
+    if (this.isFluxPerkModalTop()) {
+      const cardIndex = fluxPerkIndexForKey(e.code, this.engine.fluxPerkOffer?.length || 0);
+      if (cardIndex >= 0 && !isBrowserShortcut(e)) {
+        e.preventDefault();
+        this.engine.chooseFluxPerk(this.engine.fluxPerkOffer[cardIndex]);
+      }
+      return;
+    }
+
     if (this.isAnyModalOpen()) {
       return;
     }
@@ -1532,10 +1569,18 @@ export class UIManager {
     }
   }
 
+  /** True when the Flux perk choice is open and is the dialog on top. */
+  isFluxPerkModalTop() {
+    const modal = this.elements.modalFluxPerk;
+    return Boolean(modal) && !modal.classList.contains('hidden') && this.getActiveTopModal() === modal;
+  }
+
   requestDestructiveAction(actionCallback, confirmLabelResolver = null, { always = false } = {}) {
     // `always` guards a run that holds progress before the first shot (a restored Flux run between shapes).
+    // Past the first Flux shape the run holds cleared shapes and perks, whether or not a shot was fired.
+    const holdsFluxProgress = this.engine.mode === GAME_MODES.FLUX && this.engine.fluxStage > 1;
     const runHasBalls = this.isRunActive() && this.engine.physicsWorld.balls.length > 0;
-    const isMidRound = runHasBalls && (always || this.engine.hasFiredInRound);
+    const isMidRound = runHasBalls && (always || holdsFluxProgress || this.engine.hasFiredInRound);
 
     if (!isMidRound || !this.elements.modalConfirm) {
       actionCallback();
@@ -1690,7 +1735,8 @@ export class UIManager {
       ...this.getOverlayModals(),
       this.elements.modalVictory,
       this.elements.modalGameOver,
-      this.elements.modalPause
+      this.elements.modalPause,
+      this.elements.modalFluxPerk
     ].filter(Boolean);
   }
 
@@ -2776,7 +2822,8 @@ export class UIManager {
     // One-shot extras (an unlocked achievement, a cleared Flux stage) must not replay
     // when refresh is re-run with lastExtra (language change, input mode change, shop
     // purchase): they are read from this call only.
-    const { unlockedAchievementId, fluxStageCleared, ...persistentExtra } = extra;
+    const { oneShot: { unlockedAchievementId, fluxStageCleared, fluxPerkChosen }, persistentExtra } =
+      splitRefreshExtra(extra);
     this.lastExtra = persistentExtra;
     setTextIfChanged(this.elements.scoreValue, formatNumber(engine.score));
     setTextIfChanged(
@@ -3148,6 +3195,12 @@ export class UIManager {
       this.announce(t('hud.announcer.round.fluxStageCleared', { stage: fluxStageCleared }));
     }
 
+    if (fluxPerkChosen) {
+      this.announce(
+        t('hud.announcer.flux.perkChosen', { name: t(`gameplay.flux.perks.${fluxPerkChosen}.name`) })
+      );
+    }
+
     if (unlockedAchievementId) {
       const spec = this.gameConfig.achievements?.[unlockedAchievementId];
       this.announce(
@@ -3182,6 +3235,8 @@ export class UIManager {
     } else {
       this.elements.modalPause.classList.add('hidden');
     }
+
+    syncFluxPerkModal.call(this, engine);
 
     // The modal waits for the post-victory celebration, and for any menu opened meanwhile:
     // closing that menu reveals it (see closeOverlayModal).

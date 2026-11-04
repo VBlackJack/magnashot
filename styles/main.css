@@ -1702,6 +1702,87 @@ body {
   border-color: var(--accent-blue);
 }
 
+/* Flux perk choice: one tappable card per offered perk. */
+.flux-perk-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.flux-perk-card {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  grid-template-areas:
+    'icon name stack'
+    'icon description description';
+  align-items: center;
+  column-gap: 12px;
+  row-gap: 2px;
+  min-height: calc(var(--touch-target) + 20px);
+  padding: 10px 14px;
+  background: var(--surface-raised);
+  color: var(--text-main);
+  border: 1px solid var(--border-strong);
+  border-radius: 12px;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    border-color 0.15s ease,
+    background-color 0.15s ease;
+}
+
+.flux-perk-card:hover,
+.flux-perk-card:focus-visible {
+  border-color: var(--accent-blue);
+  background: var(--accent-blue-alpha-22);
+}
+
+.flux-perk-icon {
+  grid-area: icon;
+  font-size: 1.8rem;
+  line-height: 1;
+}
+
+.flux-perk-name {
+  grid-area: name;
+  font-size: 1rem;
+  font-weight: 800;
+}
+
+.flux-perk-stack {
+  grid-area: stack;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--text-gold-soft);
+}
+
+.flux-perk-description {
+  grid-area: description;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+/* Active perks: a compact row of icon and stack count. */
+.perk-chips {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 4px;
+}
+
+.perk-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  background: var(--accent-amber-alpha-20);
+  color: var(--text-gold-soft);
+  border: 1px solid var(--accent-amber);
+}
+
 .modal-btn.danger {
   background: var(--accent-danger-solid);
   color: var(--text-bright);
@@ -2577,6 +2658,9 @@ body {
     transform: none;
   }
   .tutorial-banner {
+    transition: none;
+  }
+  .flux-perk-card {
     transition: none;
   }
 }

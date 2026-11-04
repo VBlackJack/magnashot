@@ -42,11 +42,14 @@ import {
   resolveNextCampaignTarget,
   resolveLevelFormatBadgeKey,
   revealLiveRegion,
-  shouldIgnoreRepeatedKey
+  shouldIgnoreRepeatedKey,
+  splitRefreshExtra
 } from '../src/ui/UIManager.js';
 import { applyWorldGeometry } from '../src/core/WorldGeometry.js';
 import { StorageManager } from '../src/core/StorageManager.js';
 import { LevelCatalog, LEVEL_FORMATS } from '../src/game/LevelCatalog.js';
+import { t } from '../src/core/I18n.js';
+import { syncFluxPerkModal } from '../src/ui/FluxPerkView.js';
 import { parseFluxSeedInput, stripFluxSeedFromUrl } from '../src/game/DailyShare.js';
 
 const loadJson = (p) => JSON.parse(readFileSync(p, 'utf8'));
@@ -1759,5 +1762,231 @@ test('fullscreen controls: hidden when unsupported or already fullscreen, synced
   } finally {
     globalThis.document = prevDoc;
     globalThis.window = prevWindow;
+  }
+});
+
+test('Flux perk digits pick the matching card and never equip a special ball', () => {
+  const ui = Object.create(UIManager.prototype);
+  const chosen = [];
+  const equipped = [];
+  const classes = new Set();
+  const perkModal = {
+    classList: {
+      contains: (name) => classes.has(name),
+      add: (name) => classes.add(name),
+      remove: (name) => classes.delete(name)
+    }
+  };
+  ui.setInputMode = () => {};
+  ui.isDrawerOpen = false;
+  ui.elements = { modalFluxPerk: perkModal };
+  ui.getActiveTopModal = () => perkModal;
+  ui.isAnyModalOpen = () => true;
+  ui.engine = {
+    state: 'playing',
+    fluxPerkOffer: ['reserve', 'blast', 'golden'],
+    chooseFluxPerk: (id) => chosen.push(id),
+    equipSpecialBall: (type) => equipped.push(type)
+  };
+  const press = (code, extra = {}) => ui.handleKeyDown({ code, repeat: false, preventDefault() {}, ...extra });
+  press('Digit2');
+  press('Digit3');
+  press('Digit4');
+  press('Digit1', { ctrlKey: true });
+  assert.deepEqual(chosen, ['blast', 'golden'], 'digits pick cards; a digit past the offer and Ctrl+digit do nothing');
+  assert.deepEqual(equipped, [], 'no special ball is equipped under the perk choice');
+
+  classes.add('hidden');
+  ui.isAnyModalOpen = () => false;
+  assert.equal(ui.isFluxPerkModalTop(), false, 'a hidden perk dialog does not capture the digits');
+});
+
+test('refresh keeps the one-shot extras out of lastExtra', () => {
+  const { oneShot, persistentExtra } = splitRefreshExtra({
+    fluxPerkChosen: 'blast',
+    fluxStageCleared: 3,
+    unlockedAchievementId: 'a1',
+    gameOverReason: 'x'
+  });
+  assert.deepEqual(persistentExtra, { gameOverReason: 'x' });
+  assert.deepEqual(oneShot, { unlockedAchievementId: 'a1', fluxStageCleared: 3, fluxPerkChosen: 'blast' });
+});
+
+test('Flux perk helpers map keys, values and held perks', async () => {
+  const { fluxPerkIndexForKey, fluxPerkDisplayValue, listActiveFluxPerks, isFluxPerkChoiceVisible } = await import(
+    '../src/ui/FluxPerkView.js'
+  );
+  assert.equal(fluxPerkIndexForKey('Digit1', 3), 0);
+  assert.equal(fluxPerkIndexForKey('Digit3', 3), 2);
+  assert.equal(fluxPerkIndexForKey('Digit3', 2), -1);
+  assert.equal(fluxPerkIndexForKey('KeyF', 3), -1);
+  assert.equal(fluxPerkIndexForKey('Digit0', 3), -1);
+  assert.equal(fluxPerkDisplayValue({ step: 6 }), '6');
+  assert.equal(fluxPerkDisplayValue({ step: 0.15, unit: 'percent' }), '15');
+  assert.equal(fluxPerkDisplayValue({ step: 6 }), '6', 'counts are shown as they are');
+
+  const catalog = { reserve: { step: 6, maxStacks: 3, icon: 'R' }, blast: { step: 0.1, maxStacks: 3, icon: 'B' } };
+  const engine = {
+    mode: 'flux',
+    state: 'playing',
+    fluxConfig: { perks: { order: ['reserve', 'blast'], catalog } },
+    fluxPerks: { blast: 2 },
+    isAwaitingPerk: () => true
+  };
+  assert.deepEqual(listActiveFluxPerks(engine), [{ id: 'blast', stacks: 2, max: 3 }]);
+  assert.deepEqual(listActiveFluxPerks({ ...engine, mode: 'campaign' }), [], 'no chips outside Flux');
+  assert.equal(isFluxPerkChoiceVisible(engine), true);
+  assert.equal(isFluxPerkChoiceVisible({ ...engine, state: 'paused' }), false, 'Escape pause hides the choice');
+});
+
+test('a Flux run past the first shape always asks before it is abandoned', () => {
+  const ui = Object.create(UIManager.prototype);
+  const classes = new Set(['hidden']);
+  let ran = false;
+  ui.isRunActive = () => true;
+  ui.isAnyModalOpen = () => false;
+  ui.saveLastFocusedElement = () => {};
+  ui.updateConfirmButtonLabel = () => {};
+  ui.syncModalInertState = () => {};
+  ui.elements = {
+    modalConfirm: {
+      classList: { add: (n) => classes.add(n), remove: (n) => classes.delete(n), contains: (n) => classes.has(n) }
+    }
+  };
+  ui.engine = { mode: 'flux', fluxStage: 4, hasFiredInRound: false, state: 'paused', physicsWorld: { balls: [{}] } };
+  ui.requestDestructiveAction(() => {
+    ran = true;
+  });
+  assert.equal(ran, false, 'the action waits for the Confirm');
+  assert.equal(classes.has('hidden'), false, 'the Confirm is open');
+
+  classes.add('hidden');
+  ui.engine.fluxStage = 1;
+  ui.requestDestructiveAction(() => {
+    ran = true;
+  });
+  assert.equal(ran, true, 'the first shape with no shot fired restarts without asking');
+});
+
+test('the Flux perk subtitle has one wording per input mode and the touch one names no key', () => {
+  const subtitleTag = indexHtml.match(/<p id="modal-flux-perk-subtitle"[^>]*>/)[0];
+  assert.doesNotMatch(subtitleTag, /data-i18n/, 'the subtitle is written by updateInputHints');
+  for (const lang of SUPPORTED) {
+    const { subtitle } = loadJson(`./locales/${lang}.json`).modals.fluxPerk;
+    assert.ok(subtitle.pointer && subtitle.touch);
+    assert.notEqual(subtitle.pointer, subtitle.touch);
+    assert.doesNotMatch(subtitle.touch, /\d/, `${lang}: touch text names no number key`);
+  }
+});
+
+test('the Flux perk dialog is shown, hidden by the pause and restored with focus', async () => {
+  await i18n.init('en', ['en']);
+  const makeNode = () => ({
+    dataset: {},
+    attributes: {},
+    children: [],
+    setAttribute(k, v) {
+      this.attributes[k] = v;
+    },
+    append(...nodes) {
+      this.children.push(...nodes);
+    },
+    focus() {
+      globalThis.globalThis.document.activeElement = this;
+    }
+  });
+  const makeClassList = (initial) => {
+    const set = new Set(initial);
+    return { contains: (n) => set.has(n), add: (n) => set.add(n), remove: (n) => set.delete(n) };
+  };
+  const cards = {
+    ...makeNode(),
+    replaceChildren(...nodes) {
+      this.children = nodes;
+    },
+    get firstElementChild() {
+      return this.children[0];
+    }
+  };
+  const modal = {
+    classList: makeClassList(['hidden']),
+    inert: false,
+    contains: (el) => cards.children.includes(el),
+    querySelectorAll: () => [],
+    setAttribute() {},
+    removeAttribute() {}
+  };
+  const pauseModal = {
+    classList: makeClassList(['hidden']),
+    inert: false,
+    contains: () => false,
+    querySelectorAll: () => [],
+    setAttribute() {},
+    removeAttribute() {}
+  };
+  const appShell = { inert: false, setAttribute() {}, removeAttribute() {} };
+  const boardElement = { ...makeNode(), closest: () => null };
+  const resumeButton = { ...makeNode(), closest: () => ({}) };
+  const prevDoc = globalThis.document;
+  globalThis.document = {
+    activeElement: boardElement,
+    body: {},
+    documentElement: {},
+    createElement: makeNode
+  };
+  try {
+    const ui = Object.create(UIManager.prototype);
+    ui.inputMode = INPUT_MODES.TOUCH;
+    ui.elements = { modalFluxPerk: modal, fluxPerkCards: cards, appShell };
+    ui.getModalsByPriority = () => [pauseModal, modal];
+    const engine = {
+      mode: 'flux',
+      state: 'playing',
+      fluxPerkOffer: ['reserve', 'blast'],
+      fluxConfig: {
+        perks: {
+          catalog: {
+            reserve: { step: 6, maxStacks: 3, icon: 'R' },
+            blast: { step: 0.1, unit: 'percent', maxStacks: 3, icon: 'B' }
+          }
+        }
+      },
+      isAwaitingPerk() {
+        return Array.isArray(this.fluxPerkOffer);
+      },
+      getFluxPerkStacks: () => 0
+    };
+    const sync = () => {
+      syncFluxPerkModal.call(ui, engine);
+      ui.syncModalInertState();
+    };
+
+    sync();
+    assert.equal(modal.classList.contains('hidden'), false, 'shown while playing with an offer');
+    assert.equal(globalThis.document.activeElement, cards.firstElementChild, 'focus lands on the first card');
+    assert.equal(appShell.inert, true, 'the board is inert behind the choice');
+    assert.equal(cards.children[0].attributes['aria-keyshortcuts'], undefined, 'touch cards name no key');
+    assert.equal(cards.children[0].children[3].attributes['aria-label'], t('modals.fluxPerk.stackAria', { stacks: '1', max: '3' }));
+
+    engine.state = 'paused';
+    pauseModal.classList.remove('hidden');
+    sync();
+    assert.equal(modal.classList.contains('hidden'), true, 'hidden under the pause');
+
+    engine.state = 'playing';
+    globalThis.document.activeElement = resumeButton;
+    pauseModal.classList.add('hidden');
+    sync();
+    assert.equal(modal.classList.contains('hidden'), false, 'shown again after Resume');
+    assert.equal(ui.lastFocusedElement, boardElement, 'the dialog behind Resume is not saved as the focus target');
+
+    engine.fluxPerkOffer = null;
+    sync();
+    assert.equal(modal.classList.contains('hidden'), true, 'hidden after the pick');
+    assert.equal(modal.inert, false);
+    assert.equal(appShell.inert, false, 'the board is reachable again');
+    assert.equal(globalThis.document.activeElement, boardElement, 'focus returns to a visible element');
+  } finally {
+    globalThis.document = prevDoc;
   }
 });

@@ -133,7 +133,10 @@
       "frozen": {
         "label": "Frozen ({{turns}})"
       },
-      "compactLine": "{{mode}} • {{coins}} • Best {{best}}"
+      "compactLine": "{{mode}} • {{coins}} • Best {{best}}",
+      "perks": {
+        "label": "Perks"
+      }
     },
     "launcher": {
       "swap": {
@@ -225,6 +228,9 @@
       },
       "hints": {
         "reset": "Discovery hints will show again."
+      },
+      "flux": {
+        "perkChosen": "Perk chosen: {{name}}."
       }
     }
   },
@@ -241,6 +247,9 @@
       },
       "overcharge": {
         "ready": "OVERCHARGE! +1 {{name}}"
+      },
+      "arsenal": {
+        "ready": "ARSENAL! +{{count}} special balls"
       },
       "coins": {
         "gain": "+{{coins}} ⬡"
@@ -365,6 +374,32 @@
         "heart": {
           "solid": "Heart",
           "hollow": "Hollow Heart"
+        }
+      },
+      "perks": {
+        "reserve": {
+          "name": "Reserve",
+          "description": "+{{value}} shots right now."
+        },
+        "refill": {
+          "name": "Refill",
+          "description": "+{{value}} shots each time a shape is cleared."
+        },
+        "blast": {
+          "name": "Blast",
+          "description": "Special balls blast {{value}}% wider."
+        },
+        "overcharge": {
+          "name": "Surge",
+          "description": "Overcharge fills {{value}}% faster."
+        },
+        "arsenal": {
+          "name": "Arsenal",
+          "description": "{{value}} random special balls right now."
+        },
+        "golden": {
+          "name": "Golden",
+          "description": "+{{value}} bonus coins on every cleared shape."
         }
       }
     },
@@ -837,6 +872,15 @@
         "iosHint": "On iPhone and iPad: Share, then Add to Home Screen.",
         "installedAnnounce": "App installed. Launch it from your home screen."
       }
+    },
+    "fluxPerk": {
+      "title": "Choose a Perk",
+      "subtitle": {
+        "pointer": "Pick one bonus for the rest of this run. Click a card or press its number key.",
+        "touch": "Pick one bonus for the rest of this run. Tap a card."
+      },
+      "stack": "{{stacks}}/{{max}}",
+      "stackAria": "{{stacks}} of {{max}}"
     }
   },
   "levels": {
