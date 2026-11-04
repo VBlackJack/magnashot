@@ -157,6 +157,11 @@ export class ParticleSystem {
       return;
     }
     const cfg = this.cfg;
+    // Trim instead of recycling a live item: swap-removal breaks age order and prev* interpolation.
+    count = Math.min(count, cfg.maxParticles - this.particles.length);
+    if (count <= 0) {
+      return;
+    }
     for (let i = 0; i < count; i++) {
       const angle = (MATH_CONSTANTS.TWO_PI * i) / count + (Math.random() - MATH_CONSTANTS.HALF) * cfg.burstAngleJitter;
       const mag = (cfg.burstSpeedMinFactor + Math.random() * cfg.burstSpeedRangeFactor) * speed;
@@ -248,19 +253,26 @@ export class ParticleSystem {
     core.alpha = 1.0;
     core.prevAlpha = 1.0;
     const rayCount = cfg.explosionRayCount;
-    const rays = [];
+    // The array and its ray objects stay with the pooled item so a spawn allocates nothing.
+    const rays = core.raysBuffer || (core.raysBuffer = []);
+    rays.length = rayCount;
     for (let r = 0; r < rayCount; r++) {
       const baseAngle = (MATH_CONSTANTS.TWO_PI * r) / rayCount;
       const jitter = (Math.random() - MATH_CONSTANTS.HALF) * (MATH_CONSTANTS.TWO_PI / (rayCount * 2));
       const lenFactor =
         cfg.explosionRayMinFactor + Math.random() * (cfg.explosionRayMaxFactor - cfg.explosionRayMinFactor);
-      rays.push({ angle: baseAngle + jitter, lenFactor });
+      const ray = rays[r] || (rays[r] = {});
+      ray.angle = baseAngle + jitter;
+      ray.lenFactor = lenFactor;
     }
     core.rays = rays;
     this.explosions.push(core);
 
     const puffCount = cfg.explosionPuffCount;
     for (let i = 0; i < puffCount; i++) {
+      if (this.explosions.length >= cfg.maxExplosions) {
+        break;
+      }
       const angle =
         (MATH_CONSTANTS.TWO_PI * i) / puffCount + (Math.random() - MATH_CONSTANTS.HALF) * cfg.burstAngleJitter;
       const speed =
@@ -296,6 +308,9 @@ export class ParticleSystem {
       return;
     }
     const cfg = this.cfg;
+    if (this.shatteringBalls.length >= cfg.maxShatteringBalls) {
+      return;
+    }
     const item = this.shatterPool.pop() || {};
     item.x = ball.x;
     item.y = ball.y;
@@ -319,23 +334,26 @@ export class ParticleSystem {
     item.maxAge = cfg.shatterFrames;
     const crackCount = cfg.shatterCrackCount;
     const segCount = cfg.shatterCrackSegments;
-    const cracks = [];
+    // Pooled cracks keep their arrays and point objects across spawns.
+    const cracks = item.cracks || (item.cracks = []);
+    cracks.length = crackCount;
     for (let c = 0; c < crackCount; c++) {
       const baseAngle =
         (MATH_CONSTANTS.TWO_PI * c) / crackCount + (Math.random() - MATH_CONSTANTS.HALF) * cfg.burstAngleJitter;
-      const points = [{ x: 0, y: 0 }];
+      const points = cracks[c] || (cracks[c] = []);
+      points.length = segCount + 1;
+      const origin = points[0] || (points[0] = {});
+      origin.x = 0;
+      origin.y = 0;
       for (let s = 1; s <= segCount; s++) {
         const frac = s / segCount;
         const jitterAngle =
           baseAngle + (s < segCount ? (Math.random() - MATH_CONSTANTS.HALF) * cfg.shatterCrackJitterFactor * 2 : 0);
-        points.push({
-          x: Math.cos(jitterAngle) * ball.radius * frac,
-          y: Math.sin(jitterAngle) * ball.radius * frac
-        });
+        const point = points[s] || (points[s] = {});
+        point.x = Math.cos(jitterAngle) * ball.radius * frac;
+        point.y = Math.sin(jitterAngle) * ball.radius * frac;
       }
-      cracks.push(points);
     }
-    item.cracks = cracks;
     this.shatteringBalls.push(item);
   }
 
@@ -547,25 +565,28 @@ export class ParticleSystem {
         const popRadius = sb.radius;
         const popColor = sb.burstColor;
         this.removeAt(this.shatteringBalls, i, this.shatterPool);
-        const puff = this.explosionPool.pop() || {};
-        puff.kind = 'puff';
-        puff.x = popX;
-        puff.y = popY;
-        puff.prevX = popX;
-        puff.prevY = popY;
-        puff.vx = 0;
-        puff.vy = cfg.explosionPuffRiseVy;
-        puff.radius = popRadius * MATH_CONSTANTS.HALF;
-        puff.prevRadius = puff.radius;
-        puff.maxRadius = popRadius * cfg.shatterPopPuffRadiusFactor;
-        puff.color = popColor;
-        puff.age = 0;
-        puff.prevAge = 0;
-        puff.maxAge = Math.max(1, Math.round(cfg.explosionPuffFrames * MATH_CONSTANTS.HALF));
-        puff.alpha = 1.0;
-        puff.prevAlpha = 1.0;
-        puff.rays = null;
-        this.explosions.push(puff);
+        // Over the cap the puff is skipped; the pop burst below still goes through its own cap.
+        const puff = this.explosions.length < cfg.maxExplosions ? this.explosionPool.pop() || {} : null;
+        if (puff) {
+          puff.kind = 'puff';
+          puff.x = popX;
+          puff.y = popY;
+          puff.prevX = popX;
+          puff.prevY = popY;
+          puff.vx = 0;
+          puff.vy = cfg.explosionPuffRiseVy;
+          puff.radius = popRadius * MATH_CONSTANTS.HALF;
+          puff.prevRadius = puff.radius;
+          puff.maxRadius = popRadius * cfg.shatterPopPuffRadiusFactor;
+          puff.color = popColor;
+          puff.age = 0;
+          puff.prevAge = 0;
+          puff.maxAge = Math.max(1, Math.round(cfg.explosionPuffFrames * MATH_CONSTANTS.HALF));
+          puff.alpha = 1.0;
+          puff.prevAlpha = 1.0;
+          puff.rays = null;
+          this.explosions.push(puff);
+        }
         this.spawnBurst(popX, popY, popColor, cfg.shatterPopBurstCount, cfg.shatterPopBurstSpeed);
       }
     }
