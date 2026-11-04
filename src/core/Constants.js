@@ -188,7 +188,6 @@ export const MATH_CONSTANTS = Object.freeze({
   HALF: 0.5,
   QUARTER_PI: Math.PI / 4,
   TWO_PI: Math.PI * 2,
-  DEG_TO_RAD: Math.PI / 180,
   EPSILON: 0.0001
 });
 

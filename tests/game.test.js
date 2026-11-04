@@ -393,6 +393,21 @@ test('StorageManager handles corrupted JSON gracefully and caches upgrade levels
   assert.equal(sm.getUpgradeLevel('laserSight'), 1);
 });
 
+test('StorageManager ignores non-finite coin writes and negative stored high scores', () => {
+  const engine = createTestEngine();
+  const sm = engine.storageManager;
+  sm.setCoins(120);
+  sm.setCoins(Number.NaN);
+  assert.equal(sm.getCoins(), 120);
+  sm.addCoins(undefined);
+  assert.equal(sm.getCoins(), 120);
+  assert.equal(sm.addCoins(Number.NaN), 120);
+  assert.equal(sm.getCoins(), 120);
+
+  sm.safeSetItem(gameConfig.storage.keys.endlessHighScore, '-500');
+  assert.equal(sm.getEndlessHighScore(), 0);
+});
+
 test('Repulsor, Attractor, and Singularity obstacles noticeably deflect projectile trajectories', () => {
   const engine = createTestEngine();
   engine.startCampaignLevel(1);
