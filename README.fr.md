@@ -113,7 +113,7 @@ Le code suit une architecture en modules ES sans dépendance, avec une séparati
 │   │   ├── RunSnapshot.js    # Sauvegarde et reprise après rechargement d'une partie en cours
 │   │   ├── SpecialBallController.js # Résolution des impacts Bombe, Éclair, Prisme, Enclume, Cryo, Fusée et Pinceau
 │   │   ├── Discovery.js      # Indices de première rencontre : mécaniques du plateau, prochaine inconnue, texte
-│   │   ├── DailyShare.js     # Texte de résultat du Défi du jour, sans rien dévoiler, pour le bouton Partager
+│   │   ├── DailyShare.js     # Texte de résultat de chaque mode hors campagne, sans rien dévoiler, pour le bouton Partager
 │   │   └── layouts/
 │   │       ├── LayoutGenerators.js   # Géométrie pure des formes : pendule, anneaux, hexagone, spirale, croix, masques
 │   │       ├── ShapeGenerator.js     # Silhouettes Flux générées : courbes polaires sur la grille, filtre de qualité
@@ -125,7 +125,7 @@ Le code suit une architecture en modules ES sans dépendance, avec une séparati
 │       ├── UIManager.js      # Mise à jour du HUD, fenêtres accessibles (piège de focus + inert) et modes d'entrée
 │       └── WorkshopView.js   # Améliorations, munitions spéciales en manche et barres de progression des succès
 ├── styles/main.css           # Mise en page adaptative et jetons de design
-├── eslint.config.js          # Configuration plate ESLint 9
+├── eslint.config.js          # Configuration plate ESLint 10
 ├── index.html                # Squelette de l'application et bandeau d'erreur de démarrage statique
 ├── manifest.webmanifest      # Manifeste PWA
 ├── sw.js                     # Service Worker réseau d'abord, avec délai d'attente et repli hors ligne versionné

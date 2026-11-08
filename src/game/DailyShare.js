@@ -18,8 +18,8 @@ import { GAME_MODES } from '../core/Constants.js';
 import { t, formatNumber } from '../core/I18n.js';
 
 /**
- * Shareable result text of every mode that shares one (Daily Challenge, Survival, Flux),
- * plus the time left before the next Daily Challenge. Pure functions, no DOM and no storage.
+ * Shareable result text of every non-campaign mode (Daily Challenge, Survival, Flux, Puzzle, Blitz,
+ * Boss Rush, Cascade), plus the time left before the next Daily Challenge. Pure functions, no DOM and no storage.
  */
 
 const MS_PER_MINUTE = 60 * 1000;
