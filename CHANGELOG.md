@@ -4,6 +4,8 @@ All notable changes to **MagnaShot** are documented in this file.
 
 ## [Unreleased]
 
+## [1.20.0] - 2026-11-08
+
 ### Added
 - **Polarity Duel (`VersusRules`, `EngineVersus`, `VersusMatch`, `VersusHud`, `UIVersus`, `Renderer`, `StorageManager`)**: A head-to-head mode against the CPU on two Classic-style boards, best of three rounds, opened at campaign level 6 from its card in the Level Select. Three difficulties (Easy, Normal, Hard; Hard opens after a win against Normal) with their own records, shown in My stats. A shot that makes spheres fall sends charged spheres to the other board; they rise from the defender's danger line and snap into the cluster unless neutralised. A shot of the opposite polarity shatters a charge (a strong one takes two hits), the same polarity bounces off, bombs and lightning clear every charge they reach, and every 3 charges neutralised grants a special sphere. Neutralising fills the Overcharge meter, and a full meter fires a field pulse that lowers the opponent's anchor rail. A round is lost when a board crosses its danger line (a double loss replays it) and sudden death lowers both rails every 20 seconds after 3 minutes. The shot polarity is drawn on the launcher spheres and the Polarity button, and the aim preview marks what the shot would do to the first charge it crosses (a crack to shatter, a rebound arrow to bounce). Two boards side by side on wide screens, a mini-view of the CPU board on phones; keyboard, pointer, touch and controller all work. The result card and the share text count the whole match.
 - **Strength Test (`npm run test:slow`)**: Plays 50 seeded Hard against Easy matches and requires at least 80% wins for Hard.
