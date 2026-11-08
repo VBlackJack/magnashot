@@ -89,6 +89,9 @@ export const engineDiscoveryMethods = {
    * @param {string} mechanicId - Mechanic the player now knows.
    */
   markMechanicLearned(mechanicId) {
+    if (this.isVersusRole) {
+      return;
+    }
     const group = listMechanicsSharingHint(mechanicId, this.gameConfig.onboarding.mechanics);
     this.storageManager.markDiscovered(group);
     if (this.activeDiscoveryId && group.includes(this.activeDiscoveryId)) {
@@ -105,7 +108,7 @@ export const engineDiscoveryMethods = {
    * @param {?string} [specialType] - Special ball type fired, for the USE interaction.
    */
   recordDiscoveryInteraction(interaction, specialType = null) {
-    if (this.isRestoringRun) {
+    if (this.isRestoringRun || this.isVersusRole) {
       return;
     }
     const mechanics = this.gameConfig.onboarding.mechanics;
@@ -195,7 +198,7 @@ export const engineDiscoveryMethods = {
    * before the player sees it.
    */
   refreshDiscovery() {
-    if (this.isRestoringRun) {
+    if (this.isRestoringRun || this.isVersusRole) {
       return;
     }
     const onboarding = this.gameConfig.onboarding;
@@ -341,6 +344,9 @@ export const engineDiscoveryMethods = {
    * stored is touched. A new player gets an empty set and starts from the basics.
    */
   seedDiscoveriesFromProgress() {
+    if (this.isVersusRole) {
+      return;
+    }
     const currentVersion = this.gameConfig.onboarding.discoveriesVersion;
     const storage = this.storageManager;
     if (!storage.hasDiscoveries()) {

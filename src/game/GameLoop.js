@@ -29,18 +29,32 @@ export function willSimulationAdvance(engine) {
 }
 
 /**
+ * Scene flag value that forces a time scale of 1 and ignores hit-stop on every board.
+ */
+export const SCENE_TIME_SCALE_FIXED = 'fixed';
+
+/**
  * Creates a fixed-timestep game loop with render interpolation.
+ *
+ * The loop drives a scene made of one or more boards. All boards share one accumulator and
+ * step in lockstep (board 0, then board 1, ...) at the fixed timestep, then every board is
+ * rendered by its own renderer. The classic `{engine, renderer}` construction is wrapped as a
+ * one-board scene, so single player behaves exactly as before: slow motion and hit-stop come
+ * from that one engine. A scene that declares `versus: true` (or `timeScale: 'fixed'`) runs at
+ * time scale 1 and ignores hit-stop for the interpolation of every board.
  *
  * Interpolation alpha is forced to 1 whenever the last update did not advance the
  * simulation (hit-stop, pause, menus, Flux stage transition), because previous positions are only saved by a
- * real physics step. While the engine is neither playing nor celebrating a victory, the
+ * real physics step. While no board is playing or celebrating a victory, the
  * scene is static and is redrawn at the configured idle interval instead of every frame. Any exception
  * thrown by update or render stops the loop for good and is reported once.
  *
  * @param {object} options
- * @param {object} options.engine - Game engine (update(), state, hitStopFrames, and the
+ * @param {object} [options.engine] - Game engine for the one-board form (update(), state, hitStopFrames, and the
  *   optional getTimeScale() below 1 for slow motion and refreshAimPreview() before a render).
- * @param {object} options.renderer - Renderer exposing render(engine, alpha).
+ * @param {object} [options.renderer] - Renderer exposing render(engine, alpha), for the one-board form.
+ * @param {Function} [options.getScene] - Returns `{boards: [{engine, renderer}], versus?, timeScale?}`.
+ *   Takes precedence over engine and renderer and is read once per frame.
  * @param {number} options.fixedStepMs - Fixed simulation step in milliseconds.
  * @param {number} options.maxAccumulatedMs - Upper bound of elapsed time per frame.
  * @param {number} options.idleRenderIntervalMs - Redraw interval while not playing.
@@ -54,6 +68,7 @@ export function willSimulationAdvance(engine) {
 export function createGameLoop({
   engine,
   renderer,
+  getScene,
   fixedStepMs,
   maxAccumulatedMs,
   idleRenderIntervalMs,
@@ -64,9 +79,13 @@ export function createGameLoop({
 }) {
   let lastTime = null;
   let accumulator = 0;
-  let lastUpdateAdvanced = false;
   let lastRenderTime = null;
   let stopped = false;
+  // Per-board "last update advanced the simulation" flags, indexed like scene.boards.
+  const lastUpdateAdvanced = [];
+
+  const singleScene = { boards: [{ engine, renderer }] };
+  const readScene = typeof getScene === 'function' ? getScene : () => singleScene;
 
   const frame = (now) => {
     if (stopped) {
@@ -81,23 +100,36 @@ export function createGameLoop({
       } catch (hookErr) {
         onHookError(hookErr);
       }
+      const scene = readScene();
+      const boards = scene.boards;
+      const fixedTime = scene.versus === true || scene.timeScale === SCENE_TIME_SCALE_FIXED;
+      const leadEngine = boards[0].engine;
       // Slow motion: fewer fixed steps per real second; interpolation keeps it smooth.
-      const timeScale = typeof engine.getTimeScale === 'function' ? engine.getTimeScale() : 1;
+      const timeScale = !fixedTime && typeof leadEngine.getTimeScale === 'function' ? leadEngine.getTimeScale() : 1;
       accumulator += elapsed * timeScale;
 
       while (accumulator >= fixedStepMs) {
-        lastUpdateAdvanced = willSimulationAdvance(engine);
-        engine.update();
+        for (let i = 0; i < boards.length; i++) {
+          const boardEngine = boards[i].engine;
+          lastUpdateAdvanced[i] = fixedTime
+            ? boardEngine.state === GAME_STATES.PLAYING && !(boardEngine.stageTransitionFrames > 0)
+            : willSimulationAdvance(boardEngine);
+          boardEngine.update();
+        }
         accumulator -= fixedStepMs;
       }
-      if (typeof engine.refreshAimPreview === 'function') {
-        engine.refreshAimPreview();
+      for (const board of boards) {
+        if (typeof board.engine.refreshAimPreview === 'function') {
+          board.engine.refreshAimPreview();
+        }
       }
 
-      const alpha = lastUpdateAdvanced && fixedStepMs > 0 ? accumulator / fixedStepMs : 1.0;
-      const isLive = engine.state === GAME_STATES.PLAYING || engine.isVictoryCelebrating();
+      const isLive = boards.some((board) => board.engine.state === GAME_STATES.PLAYING || board.engine.isVictoryCelebrating());
       if (isLive || lastRenderTime === null || now - lastRenderTime >= idleRenderIntervalMs) {
-        renderer.render(engine, alpha);
+        for (let i = 0; i < boards.length; i++) {
+          const alpha = lastUpdateAdvanced[i] && fixedStepMs > 0 ? accumulator / fixedStepMs : 1.0;
+          boards[i].renderer.render(boards[i].engine, alpha);
+        }
         lastRenderTime = now;
       }
       scheduleFrame(frame);

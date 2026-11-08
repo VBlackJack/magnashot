@@ -57,7 +57,7 @@ export const engineGhostDuelMethods = {
    * @returns {boolean} True when the duel started.
    */
   startGhostDuel(ghost) {
-    if (!ghost || (ghost.mode !== GHOST_MODE_DAILY && ghost.mode !== GHOST_MODE_FLUX)) {
+    if (this.isVersusRole || !ghost || (ghost.mode !== GHOST_MODE_DAILY && ghost.mode !== GHOST_MODE_FLUX)) {
       return false;
     }
     if (ghost.mode === GHOST_MODE_DAILY) {
@@ -76,7 +76,7 @@ export const engineGhostDuelMethods = {
    */
   attachGhost(ghost) {
     this.ghostDuel = null;
-    if (!ghost) {
+    if (this.isVersusRole || !ghost) {
       return false;
     }
     const isDailyMatch = ghost.mode === GHOST_MODE_DAILY

@@ -216,7 +216,16 @@ const EXPECTED_PROTOTYPE_NAMES = [
   'restoreGhostDuel',
   'retractGhostDuel',
   'settleGhostDuel',
-  'startGhostDuel'
+  'startGhostDuel',
+  'beginVersusTurn',
+  'closeVersusTurn',
+  'getClassicStageStreamKey',
+  'getVersusAttack',
+  'launchClassicBoard',
+  'noteVersusBoardClear',
+  'noteVersusDrop',
+  'noteVersusLink',
+  'startVersusBoard'
 ];
 
 test('GameEngine.prototype exposes exactly the same members after the module split', () => {

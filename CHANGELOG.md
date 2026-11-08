@@ -4,6 +4,9 @@ All notable changes to **MagnaShot** are documented in this file.
 
 ## [Unreleased]
 
+### Changed
+- **Multi-Board Foundation (`GameLoop`, `GameEngine`, `Renderer`, `UIManager`, `StorageView`, `AudioChannel`, `CanvasInput`, `BotBrain`, `EngineVersus`, `VersusMatch`)**: Internal groundwork for a future two-board mode, with no gameplay change. The game loop can step several boards in lockstep, an engine can run in a read-only "versus" role with its own storage view and audio channel, the canvas input and the bot decisions move out of `main.js` and the bot script into shared modules, the renderer gains a lightweight mode and a dispose step, and a hidden seeded board plus a headless CPU-versus-CPU match back new determinism, storage and performance tests. Nothing is reachable from the interface yet.
+
 ## [1.19.0] - 2026-11-08
 
 ### Added

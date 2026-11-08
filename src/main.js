@@ -26,6 +26,7 @@ import { createGameLoop } from './game/GameLoop.js';
 import { FLUX_SEED_QUERY_PARAM, readFluxSeedFromSearch, stripFluxSeedFromUrl } from './game/DailyShare.js';
 import { DUEL_STATUS, readDuelFromSearch } from './game/GhostCodec.js';
 import { GAME_MODES } from './core/Constants.js';
+import { bindCanvasInput } from './ui/CanvasInput.js';
 
 const BOOTSTRAP_ERROR_ELEMENT_ID = 'bootstrap-error';
 const HIDDEN_CLASS = 'hidden';
@@ -109,7 +110,10 @@ class Application {
       gamepadInput.attach(window);
       uiManager.setGamepadInput(gamepadInput);
 
-      this.bindCanvasInput(canvas, engine, gameConfig, uiManager);
+      bindCanvasInput(canvas, () => engine, gameConfig, {
+        isBlocked: () => uiManager.isAnyModalOpen(),
+        onAimChanged: (activeEngine) => uiManager.updateAimState(activeEngine)
+      });
 
       // High scores are only written at run end; also flush them when the page is left mid-run.
       // The run itself is stored too: mobile browsers discard hidden tabs without warning.
@@ -205,178 +209,6 @@ class Application {
         // Ignore service worker registration errors in local dev
       });
     }
-  }
-
-  bindCanvasInput(canvas, engine, gameConfig, uiManager) {
-    const toLogicalCoords = (clientX, clientY) => {
-      const rect = canvas.getBoundingClientRect();
-      const scaleX = gameConfig.canvas.logicalWidth / rect.width;
-      const scaleY = gameConfig.canvas.logicalHeight / rect.height;
-      return {
-        x: (clientX - rect.left) * scaleX,
-        y: (clientY - rect.top) * scaleY
-      };
-    };
-
-    const getAimAdjustedCoords = (e, pos) => {
-      if (e.pointerType === 'touch') {
-        const canvasCfg = gameConfig.canvas;
-        const cancelThresholdY = canvasCfg.launcherY + canvasCfg.cancelAimOffsetY;
-        if (pos.y > cancelThresholdY) {
-          return pos;
-        }
-        const shiftedY = pos.y + canvasCfg.touchAimVerticalOffset;
-        const maxAnchorY = canvasCfg.launcherY + canvasCfg.touchMinAimAnchorOffsetY;
-        return {
-          x: pos.x,
-          y: Math.min(shiftedY, maxAnchorY)
-        };
-      }
-      return pos;
-    };
-
-    const isSwapClick = (x, y) => {
-      const canvasCfg = gameConfig.canvas;
-      const nx = canvasCfg.launcherX + canvasCfg.nextBallOffsetX;
-      const ny = canvasCfg.launcherY + canvasCfg.nextBallOffsetY;
-      return Math.hypot(x - nx, y - ny) <= canvasCfg.swapClickRadius;
-    };
-
-    const isLauncherBaseTap = (x, y, startPos) => {
-      const canvasCfg = gameConfig.canvas;
-      const distToLauncher = Math.hypot(x - canvasCfg.launcherX, y - canvasCfg.launcherY);
-      if (distToLauncher > canvasCfg.launcherTapSwapRadius) {
-        return false;
-      }
-      if (!startPos) {
-        return true;
-      }
-      return Math.hypot(x - startPos.x, y - startPos.y) <= canvasCfg.tapMaxMoveDistance;
-    };
-
-    // A finger always aims; a mouse leaves a keyboard-adjusted aim alone until it moves
-    // far enough (GameEngine.followPointer).
-    const aimsAtPointer = (e, pos) => {
-      if (e.pointerType === 'touch') {
-        engine.releaseAimLock();
-        return true;
-      }
-      return engine.followPointer(pos.x, pos.y);
-    };
-
-    let isPointerDownOnCanvas = false;
-    let pointerDownPos = null;
-
-    canvas.addEventListener('pointermove', (e) => {
-      if (!e.isPrimary) {
-        return;
-      }
-      if (uiManager && uiManager.isAnyModalOpen()) {
-        return;
-      }
-      const rawPos = toLogicalCoords(e.clientX, e.clientY);
-      const aimPos = getAimAdjustedCoords(e, rawPos);
-      if (aimsAtPointer(e, aimPos)) {
-        engine.updateAim(aimPos.x, aimPos.y);
-      }
-      if (uiManager) {
-        uiManager.updateAimState(engine);
-      }
-    });
-
-    canvas.addEventListener('pointerdown', (e) => {
-      if (!e.isPrimary) {
-        return;
-      }
-      if (e.button !== undefined && e.button !== 0) {
-        return;
-      }
-      if (uiManager && uiManager.isAnyModalOpen()) {
-        return;
-      }
-      isPointerDownOnCanvas = true;
-      if (typeof canvas.setPointerCapture === 'function') {
-        try {
-          canvas.setPointerCapture(e.pointerId);
-        } catch {
-          // Ignore pointer capture errors
-        }
-      }
-      const rawPos = toLogicalCoords(e.clientX, e.clientY);
-      pointerDownPos = { x: rawPos.x, y: rawPos.y };
-      if (isSwapClick(rawPos.x, rawPos.y) || isLauncherBaseTap(rawPos.x, rawPos.y, null)) {
-        return;
-      }
-      const aimPos = getAimAdjustedCoords(e, rawPos);
-      if (aimsAtPointer(e, aimPos)) {
-        engine.updateAim(aimPos.x, aimPos.y);
-      }
-      if (uiManager) {
-        uiManager.updateAimState(engine);
-      }
-    });
-
-    canvas.addEventListener('pointerup', (e) => {
-      if (!e.isPrimary) {
-        return;
-      }
-      if (e.button !== undefined && e.button !== 0) {
-        return;
-      }
-      if (!isPointerDownOnCanvas) {
-        return;
-      }
-      isPointerDownOnCanvas = false;
-      if (typeof canvas.releasePointerCapture === 'function') {
-        try {
-          canvas.releasePointerCapture(e.pointerId);
-        } catch {
-          // Ignore pointer capture errors
-        }
-      }
-      const startPos = pointerDownPos;
-      pointerDownPos = null;
-      if (uiManager && uiManager.isAnyModalOpen()) {
-        return;
-      }
-      const rawPos = toLogicalCoords(e.clientX, e.clientY);
-      if (isSwapClick(rawPos.x, rawPos.y) || isLauncherBaseTap(rawPos.x, rawPos.y, startPos)) {
-        engine.isAimCancelled = false;
-        engine.swapLauncherBalls();
-        if (uiManager) {
-          uiManager.updateAimState(engine);
-        }
-        return;
-      }
-      const aimPos = getAimAdjustedCoords(e, rawPos);
-      // A click within the lock shoots along the keyboard-adjusted angle.
-      if (aimsAtPointer(e, aimPos)) {
-        engine.updateAim(aimPos.x, aimPos.y);
-      }
-      engine.shoot();
-      if (uiManager) {
-        uiManager.updateAimState(engine);
-      }
-    });
-
-    canvas.addEventListener('pointercancel', (e) => {
-      if (!e.isPrimary) {
-        return;
-      }
-      isPointerDownOnCanvas = false;
-      pointerDownPos = null;
-      if (typeof canvas.releasePointerCapture === 'function' && e?.pointerId !== undefined) {
-        try {
-          canvas.releasePointerCapture(e.pointerId);
-        } catch {
-          // Ignore pointer capture errors
-        }
-      }
-      engine.isAimCancelled = false;
-      if (uiManager) {
-        uiManager.updateAimState(engine);
-      }
-    });
   }
 }
 

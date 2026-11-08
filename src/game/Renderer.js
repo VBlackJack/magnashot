@@ -77,8 +77,19 @@ export function buildResolutionQuery(dpr) {
  * high-contrast mode, and predictive trajectory/AOE/avalanche overlays.
  */
 export class Renderer {
-  constructor(canvas, gameConfig, ballsConfig, obstaclesConfig) {
+  /**
+   * @param {object} [options]
+   * @param {boolean} [options.lite] Secondary-board mode: pixel ratio fixed by `renderLite`,
+   *   no particles, no aim preview, no slow-motion overlay. The board stays fully readable.
+   */
+  constructor(canvas, gameConfig, ballsConfig, obstaclesConfig, options = {}) {
     this.canvas = canvas;
+    this.lite = Boolean(options?.lite);
+    this.disposed = false;
+    this.windowListeners = [];
+    this.resizeObserver = null;
+    this.resolutionQuery = null;
+    this.resolutionQueryHandler = null;
     this.ctx = canvas.getContext('2d');
     this.gameConfig = gameConfig;
     this.ballsConfig = ballsConfig;
@@ -187,8 +198,10 @@ export class Renderer {
     const invalidate = () => {
       this.resolutionDirty = true;
     };
-    window.addEventListener('resize', invalidate);
-    window.addEventListener('orientationchange', invalidate);
+    for (const type of ['resize', 'orientationchange']) {
+      window.addEventListener(type, invalidate);
+      this.windowListeners.push({ type, handler: invalidate });
+    }
     if (typeof ResizeObserver === 'function') {
       this.resizeObserver = new ResizeObserver(invalidate);
       this.resizeObserver.observe(this.canvas);
@@ -202,7 +215,7 @@ export class Renderer {
    * only matches the ratio it was built for, so each change re-arms a new one.
    */
   watchDevicePixelRatio(onChange) {
-    if (typeof window.matchMedia !== 'function') {
+    if (this.disposed || typeof window.matchMedia !== 'function') {
       return;
     }
     const dpr = window.devicePixelRatio || 1;
@@ -210,14 +223,40 @@ export class Renderer {
     if (typeof query.addEventListener !== 'function') {
       return;
     }
-    query.addEventListener(
-      'change',
-      () => {
-        onChange();
-        this.watchDevicePixelRatio(onChange);
-      },
-      { once: true }
-    );
+    const handler = () => {
+      this.resolutionQuery = null;
+      this.resolutionQueryHandler = null;
+      onChange();
+      this.watchDevicePixelRatio(onChange);
+    };
+    this.resolutionQuery = query;
+    this.resolutionQueryHandler = handler;
+    query.addEventListener('change', handler, { once: true });
+  }
+
+  /**
+   * Releases every listener and observer registered on construction. Idempotent.
+   */
+  dispose() {
+    if (this.disposed) {
+      return;
+    }
+    this.disposed = true;
+    if (typeof window !== 'undefined' && typeof window.removeEventListener === 'function') {
+      for (const { type, handler } of this.windowListeners) {
+        window.removeEventListener(type, handler);
+      }
+    }
+    this.windowListeners = [];
+    if (this.resizeObserver) {
+      this.resizeObserver.disconnect();
+      this.resizeObserver = null;
+    }
+    if (this.resolutionQuery && typeof this.resolutionQuery.removeEventListener === 'function') {
+      this.resolutionQuery.removeEventListener('change', this.resolutionQueryHandler);
+    }
+    this.resolutionQuery = null;
+    this.resolutionQueryHandler = null;
   }
 
   /**
@@ -230,7 +269,9 @@ export class Renderer {
     }
     this.resolutionDirty = false;
     const rawDpr = typeof window !== 'undefined' && window.devicePixelRatio ? window.devicePixelRatio : 1;
-    const nextDpr = Math.max(1, Math.min(this.gameConfig.canvas.maxDevicePixelRatio, rawDpr));
+    const nextDpr = this.lite
+      ? this.gameConfig.renderLite.devicePixelRatio
+      : Math.max(1, Math.min(this.gameConfig.canvas.maxDevicePixelRatio, rawDpr));
     const rect = this.canvas.getBoundingClientRect();
     const displayW = rect.width > 0 ? rect.width : this.logicalWidth;
     const displayH = rect.height > 0 ? rect.height : this.logicalHeight;
@@ -441,7 +482,7 @@ export class Renderer {
     const now = this.isReducedMotion ? REDUCED_MOTION_CLOCK_MS : performance.now();
 
     ctx.setTransform(this.scaleX, 0, 0, this.scaleY, 0, 0);
-    const shake = engineState.particleSystem.shakeIntensity;
+    const shake = this.lite ? 0 : engineState.particleSystem.shakeIntensity;
     if (shake > 0) {
       // The shaken static layer no longer covers the edges: paint them first so no strip of
       // the previous frame shows through.
@@ -456,7 +497,9 @@ export class Renderer {
     }
 
     ctx.drawImage(this.staticLayer, 0, 0, width, height);
-    this.drawWallCracks(ctx, engineState.particleSystem);
+    if (!this.lite) {
+      this.drawWallCracks(ctx, engineState.particleSystem);
+    }
     this.drawLiquid(ctx, engineState.particleSystem, width, height);
     this.drawCollectorBins(ctx, width, height, theme, engineState);
 
@@ -496,9 +539,11 @@ export class Renderer {
     for (const ball of engineState.physicsWorld.droppingBalls) {
       this.drawBall(ctx, ball, now, alpha);
     }
-    this.drawShatteringBalls(ctx, engineState.particleSystem, now, alpha);
+    if (!this.lite) {
+      this.drawShatteringBalls(ctx, engineState.particleSystem, now, alpha);
+    }
 
-    if (engineState.aimPoints && !engineState.physicsWorld.projectile && !engineState.isAimCancelled) {
+    if (!this.lite && engineState.aimPoints && !engineState.physicsWorld.projectile && !engineState.isAimCancelled) {
       this.drawAimTrajectory(
         ctx,
         engineState.aimPoints,
@@ -512,7 +557,9 @@ export class Renderer {
       );
     }
 
-    this.drawTrail(ctx, engineState.particleSystem);
+    if (!this.lite) {
+      this.drawTrail(ctx, engineState.particleSystem);
+    }
 
     if (engineState.physicsWorld.projectile) {
       this.drawBall(ctx, engineState.physicsWorld.projectile, now, alpha);
@@ -520,10 +567,22 @@ export class Renderer {
 
     this.drawLauncher(ctx, engineState, theme, now);
     this.drawSagGauge(ctx, engineState, theme);
-    this.drawParticles(ctx, engineState.particleSystem, alpha);
-    this.drawSlowMoOverlay(ctx, engineState, width, height, alpha);
+    if (!this.lite) {
+      this.drawParticles(ctx, engineState.particleSystem, alpha);
+      this.drawSlowMoOverlay(ctx, engineState, width, height, alpha);
+    }
+    if (engineState.versus) {
+      this.drawVersusCharges(ctx, engineState);
+    }
     ctx.restore();
   }
+
+  /**
+   * Hook for the Polarity Duel charged spheres. Intentionally empty until the versus
+   * mode fills it; it is only ever called when the engine carries a versus state.
+   */
+  // eslint-disable-next-line no-unused-vars
+  drawVersusCharges(ctx, engineState) {}
 
   /**
    * Renders a brief full-arena impact flash and a cinematic perimeter glow while

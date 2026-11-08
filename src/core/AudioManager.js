@@ -35,6 +35,8 @@ export class AudioManager {
     this.activeOscillators = new Map();
     this.lastEffectTimes = new Map();
     this.lastHapticTime = -Infinity;
+    // Stereo pan of the effect being played (-1 left, 1 right); undefined means centred.
+    this.activePan = undefined;
     this.visibilityBound = false;
     this.clock = () => performance.now();
     // Timer pair behind the deferred mute suspend, injectable so tests can run the
@@ -204,6 +206,20 @@ export class AudioManager {
     return this.activeOscillators.size;
   }
 
+  /**
+   * Returns a stereo panner for the effect being played, or null when no pan applies
+   * (centred, unset, or no StereoPannerNode in this browser).
+   */
+  createPanner() {
+    const pan = this.activePan;
+    if (!Number.isFinite(pan) || pan === 0 || typeof this.ctx.createStereoPanner !== 'function') {
+      return null;
+    }
+    const panner = this.ctx.createStereoPanner();
+    panner.pan.value = Math.max(-1, Math.min(1, pan));
+    return panner;
+  }
+
   playTone(type, startFreq, endFreq, duration, startOffset = 0, gainScale = 1.0) {
     if (this.muted || !this.config) {
       return;
@@ -229,12 +245,19 @@ export class AudioManager {
     gain.gain.exponentialRampToValueAtTime(minGain, stopTime);
 
     osc.connect(gain);
-    gain.connect(this.output);
+    const panner = this.createPanner();
+    if (panner) {
+      gain.connect(panner);
+      panner.connect(this.output);
+    } else {
+      gain.connect(this.output);
+    }
 
     this.activeOscillators.set(osc, gain);
     osc.onended = () => {
       this.activeOscillators.delete(osc);
       gain.disconnect();
+      panner?.disconnect();
     };
 
     osc.start(startTime);
@@ -255,7 +278,16 @@ export class AudioManager {
     return true;
   }
 
-  playEffect(effectName, comboIndex = 0) {
+  playEffect(effectName, comboIndex = 0, { pan } = {}) {
+    this.activePan = pan;
+    try {
+      this.playEffectVoices(effectName, comboIndex);
+    } finally {
+      this.activePan = undefined;
+    }
+  }
+
+  playEffectVoices(effectName, comboIndex) {
     if (this.muted || !this.config) {
       return;
     }

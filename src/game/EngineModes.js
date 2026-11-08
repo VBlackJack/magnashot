@@ -150,12 +150,24 @@ export const engineModeMethods = {
    * @param {number} [stage=1] - 1-based stage to start on.
    */
   startClassicMode(stage = 1) {
+    const drawRunSeed = this.seedSource || Math.random;
+    // A run stream of its own (launcher draws) so the stage boards can be scoped: a stage
+    // board never depends on the shots played before it.
+    this.launchClassicBoard(stage, new SeededRandom(`${this.gameConfig.classic.seedPrefix}:run:${drawRunSeed()}`));
+  },
+
+  /**
+   * Shared start of a Classic-style board: Classic itself and a board of a versus duel.
+   * @param {number} stage - 1-based stage to start on.
+   * @param {SeededRandom} runRng - Run stream feeding the launcher and physics draws.
+   * @param {object|null} [versusState] - Versus state of the board (null for plain Classic).
+   */
+  launchClassicBoard(stage, runRng, versusState = null) {
     const cleanStage = Math.max(1, Math.floor(Number(stage) || 1));
     this.resetRunState(GAME_MODES.CLASSIC);
+    this.versus = versusState;
     this.classicStage = cleanStage;
-    // A run stream of its own (launcher draws) so the stage boards below can be scoped: a stage
-    // board never depends on the shots played before it.
-    this.seededRng = new SeededRandom(`${this.gameConfig.classic.seedPrefix}:run:${Math.random()}`);
+    this.seededRng = runRng;
     this.waveCount = 1;
     this.endlessRowParity = 0;
     this.sagLevel = 0;
@@ -173,6 +185,18 @@ export const engineModeMethods = {
     const canvasCfg = this.gameConfig.canvas;
     this.updateAim(canvasCfg.launcherX, canvasCfg.launcherY + canvasCfg.initialAimOffsetY);
     this.notifyUI();
+  },
+
+  /**
+   * Stream key of the seeded board of a Classic stage. A versus board draws from the key of
+   * its duel, so both boards of a round get the same stage.
+   * @param {number} stage - 1-based stage number.
+   * @returns {string}
+   */
+  getClassicStageStreamKey(stage) {
+    return this.versus
+      ? `${this.versus.seedKey}:board:${stage}`
+      : `${this.gameConfig.classic.seedPrefix}:${stage}`;
   },
 
   /**
@@ -194,7 +218,7 @@ export const engineModeMethods = {
     const cols = classicCfg.columns;
     const spacingX = r * this.physicsConfig.simulation.bondRestDistanceFactor;
     const startX = (this.gameConfig.canvas.logicalWidth - (cols - 1) * spacingX) * MATH_CONSTANTS.HALF;
-    this.withScopedRandom(`${classicCfg.seedPrefix}:${stage}`, () => {
+    this.withScopedRandom(this.getClassicStageStreamKey(stage), () => {
       for (let row = 0; row < rows; row++) {
         const y = classicCfg.startY + row * classicCfg.rowSpacingY;
         const rowOffset = (row % 2) * r * MATH_CONSTANTS.HALF;
@@ -234,6 +258,7 @@ export const engineModeMethods = {
       t('gameplay.feedback.classic.stageCleared', { points }),
       this.gameConfig.theme.victoryPopupColor
     );
+    this.noteVersusBoardClear();
     this.classicStage = clearedStage + 1;
     this.sagLevel = 0;
     this.railDrops = 0;

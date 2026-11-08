@@ -31,7 +31,7 @@ export const engineProgressMethods = {
    * @param {'win'|'loss'|'quit'} outcome - How the run ended.
    */
   recordRunOutcome(outcome) {
-    if (this.runOutcomeRecorded) {
+    if (this.runOutcomeRecorded || this.isVersusRole) {
       return;
     }
     const run = {
@@ -74,13 +74,16 @@ export const engineProgressMethods = {
   recordAbandonedRun() {
     const isLive = this.state === GAME_STATES.PLAYING || this.state === GAME_STATES.PAUSED;
     const hasFired = this.hasFiredInRound || this.runShotsFired > 0;
-    if (this.isRestoringRun || this.runOutcomeRecorded || !isLive || !hasFired) {
+    if (this.isVersusRole || this.isRestoringRun || this.runOutcomeRecorded || !isLive || !hasFired) {
       return;
     }
     this.recordRunOutcome(OUTCOME_QUIT);
   },
 
   countShotForStats() {
+    if (this.isVersusRole) {
+      return;
+    }
     this.runShotsFired += 1;
     this.pendingShots += 1;
     if (this.pendingShots >= this.gameConfig.playerStats.flushEveryShots) {
@@ -92,6 +95,9 @@ export const engineProgressMethods = {
    * @param {number} ms - Play time to add (one fixed simulation step per update).
    */
   countPlayTimeForStats(ms) {
+    if (this.isVersusRole) {
+      return;
+    }
     this.pendingPlayMs += ms;
     if (this.pendingPlayMs >= this.gameConfig.playerStats.flushEveryPlayMs) {
       this.flushPlayerStats();
@@ -169,7 +175,7 @@ export const engineProgressMethods = {
    */
   sampleShotTimeline(isFinal = false) {
     const isDaily = this.mode === GAME_MODES.DAILY;
-    if (!isDaily && this.mode !== GAME_MODES.FLUX) {
+    if (this.isVersusRole || (!isDaily && this.mode !== GAME_MODES.FLUX)) {
       return;
     }
     const cfg = this.gameConfig.shotTimeline;

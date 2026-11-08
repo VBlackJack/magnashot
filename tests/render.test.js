@@ -23,6 +23,7 @@ import { StorageManager } from '../src/core/StorageManager.js';
 import { AudioManager } from '../src/core/AudioManager.js';
 import { GameEngine } from '../src/game/GameEngine.js';
 import { Renderer, buildResolutionQuery } from '../src/game/Renderer.js';
+import { Renderer as FrozenRenderer } from './fixtures/Renderer.v1.19.0.js';
 import { ParticleSystem } from '../src/entities/ParticleSystem.js';
 import { createGameLoop } from '../src/game/GameLoop.js';
 import { GAME_STATES } from '../src/core/Constants.js';
@@ -1176,4 +1177,271 @@ test('The lowering offset moves the cluster and the anchor rail, never the fixed
   assert.equal(seen.drawAnchorRail, 1, 'the anchor rail eases down with the cluster');
   assert.equal(seen.drawMagneticBonds, 1, 'the bonds ease down with the cluster');
   assert.equal(ctx.saveDepth, 0);
+});
+
+const createListenerWindow = () => {
+  const log = { added: [], removed: [], observers: [], queries: [] };
+  globalThis.window = {
+    devicePixelRatio: 2,
+    addEventListener: (type, handler) => log.added.push({ type, handler }),
+    removeEventListener: (type, handler) => log.removed.push({ type, handler }),
+    matchMedia(query) {
+      const entry = { query, added: [], removed: [] };
+      log.queries.push(entry);
+      return {
+        addEventListener: (type, handler) => entry.added.push({ type, handler }),
+        removeEventListener: (type, handler) => entry.removed.push({ type, handler })
+      };
+    }
+  };
+  globalThis.ResizeObserver = class {
+    constructor(cb) {
+      this.cb = cb;
+      this.disconnected = 0;
+      log.observers.push(this);
+    }
+    observe() {}
+    disconnect() {
+      this.disconnected++;
+    }
+  };
+  return log;
+};
+
+const restoreListenerWindow = () => {
+  delete globalThis.window;
+  delete globalThis.ResizeObserver;
+};
+
+test('Renderer.dispose removes every window, observer and media query listener, and is idempotent', () => {
+  const log = createListenerWindow();
+  try {
+    const renderer = createRenderer();
+    assert.equal(log.added.length, 2);
+    assert.equal(log.observers.length, 1);
+    assert.equal(log.queries[0].added.length, 1);
+    renderer.dispose();
+    assert.deepEqual(log.removed, log.added, 'each added window listener is removed with the same handler');
+    assert.equal(log.observers[0].disconnected, 1);
+    assert.equal(log.queries[0].removed.length, 1);
+    assert.equal(log.queries[0].removed[0].handler, log.queries[0].added[0].handler);
+    renderer.dispose();
+    assert.equal(log.removed.length, log.added.length, 'a second dispose removes nothing more');
+    assert.equal(log.observers[0].disconnected, 1);
+    assert.equal(log.queries[0].removed.length, 1);
+  } finally {
+    restoreListenerWindow();
+  }
+});
+
+test('Renderer.dispose removes the re-armed media query listener and stops re-arming', () => {
+  const log = createListenerWindow();
+  try {
+    const renderer = createRenderer();
+    log.queries[0].added[0].handler();
+    assert.equal(log.queries.length, 2, 'a change re-arms a new query');
+    renderer.dispose();
+    assert.equal(log.queries[1].removed.length, 1);
+    assert.equal(log.queries[0].removed.length, 0, 'the fired once-listener is not removed again');
+    renderer.watchDevicePixelRatio(() => {});
+    assert.equal(log.queries.length, 2, 'a disposed renderer never arms a new query');
+  } finally {
+    restoreListenerWindow();
+  }
+});
+
+test('Renderer.dispose is safe without a window', () => {
+  const renderer = createRenderer();
+  renderer.dispose();
+  renderer.dispose();
+  assert.equal(renderer.disposed, true);
+});
+
+const LITE_SKIPPED_DRAWS = ['drawParticles', 'drawTrail', 'drawShatteringBalls', 'drawWallCracks', 'drawSlowMoOverlay', 'drawAimTrajectory'];
+
+const renderFrameWithCalls = (renderer, engine, names) => {
+  const called = [];
+  for (const name of names) {
+    const original = renderer[name].bind(renderer);
+    renderer[name] = (...args) => {
+      called.push(name);
+      return original(...args);
+    };
+  }
+  renderer.render(engine, 1.0);
+  return called;
+};
+
+const createLiteRenderer = () => {
+  const renderer = new Renderer(createStubCanvas(), gameConfig, ballsConfig, obstaclesConfig, { lite: true });
+  renderer.createLayerCanvas = () => createStubCanvas();
+  return renderer;
+};
+
+test('Lite renderer fixes the pixel ratio and skips particles, aim preview and slow-motion overlay', () => {
+  createListenerWindow();
+  try {
+    const engine = createTestEngine();
+    engine.startClassicMode(1);
+    engine.setReducedMotion(false);
+    engine.aimPoints = [{ x: 100, y: 100 }, { x: 120, y: 80 }];
+    const lite = createLiteRenderer();
+    const full = createRenderer();
+    assert.equal(lite.dpr, 1, 'window dpr is 2 but the lite renderer stays at 1');
+    assert.equal(full.dpr, 2);
+    const liteCalls = renderFrameWithCalls(lite, engine, LITE_SKIPPED_DRAWS);
+    const fullCalls = renderFrameWithCalls(full, engine, LITE_SKIPPED_DRAWS);
+    for (const name of LITE_SKIPPED_DRAWS) {
+      assert.ok(!liteCalls.includes(name), `lite skips ${name}`);
+    }
+    for (const name of ['drawParticles', 'drawTrail', 'drawShatteringBalls', 'drawWallCracks', 'drawSlowMoOverlay']) {
+      assert.ok(fullCalls.includes(name), `full draws ${name}`);
+    }
+    assert.equal(lite.ctx.saveDepth, 0, 'save/restore stays balanced in lite mode');
+    assert.equal(lite.ctx.restoreUnderflows, 0);
+  } finally {
+    restoreListenerWindow();
+  }
+});
+
+test('Lite renderer still draws the board: balls, rail, danger line and sag gauge', () => {
+  const engine = createTestEngine();
+  engine.startClassicMode(1);
+  const names = ['drawBall', 'drawAnchorRail', 'drawDangerZone', 'drawSagGauge', 'drawMagneticBonds', 'drawLauncher'];
+  const seen = renderFrameWithCalls(createLiteRenderer(), engine, names);
+  for (const name of names) {
+    assert.ok(seen.includes(name), `${name} still runs in lite mode`);
+  }
+});
+
+test('drawVersusCharges runs only when the engine has a versus state', () => {
+  const engine = createTestEngine();
+  engine.startClassicMode(1);
+  assert.ok(!renderFrameWithCalls(createRenderer(), engine, ['drawVersusCharges']).includes('drawVersusCharges'));
+  engine.versus = { charges: [] };
+  const renderer = createRenderer();
+  assert.ok(renderFrameWithCalls(renderer, engine, ['drawVersusCharges']).includes('drawVersusCharges'));
+  assert.equal(renderer.ctx.saveDepth, 0);
+});
+
+test('Single-player render call log is unchanged (golden)', () => {
+  const engine = createTestEngine();
+  engine.startClassicMode(1);
+  engine.setReducedMotion(false);
+  const names = [
+    'drawWallCracks', 'drawLiquid', 'drawCollectorBins', 'drawDangerZone', 'drawObstacles', 'drawRails',
+    'drawAnchorRail', 'drawMagneticBonds', 'drawTethers', 'drawChainLinkOverlays', 'drawShatteringBalls',
+    'drawTrail', 'drawLauncher', 'drawSagGauge', 'drawParticles', 'drawSlowMoOverlay'
+  ];
+  assert.deepEqual(renderFrameWithCalls(createRenderer(), engine, names), names);
+});
+
+/**
+ * Canvas context that records every method call (with its arguments) and every property
+ * write, so two renderers can be compared draw call for draw call.
+ */
+const createRecordingCanvas = (log) => {
+  const describe = (value) => {
+    if (typeof value === 'number') {
+      return Number.isFinite(value) ? value : String(value);
+    }
+    if (value && typeof value === 'object') {
+      if (typeof value.getContext === 'function' || value.isRecordingTarget) {
+        return '[canvas]';
+      }
+      if (value.isGradient) {
+        return `[gradient:${value.id}]`;
+      }
+      return JSON.parse(JSON.stringify(value, (key, inner) => (typeof inner === 'function' ? '[fn]' : inner)));
+    }
+    return typeof value === 'function' ? '[fn]' : value;
+  };
+  let gradients = 0;
+  const props = {};
+  const ctx = new Proxy(props, {
+    get(target, prop) {
+      if (typeof prop === 'symbol') {
+        return undefined;
+      }
+      if (prop in target) {
+        return target[prop];
+      }
+      return (...args) => {
+        log.push([prop, ...args.map(describe)]);
+        if (prop === 'createLinearGradient' || prop === 'createRadialGradient') {
+          const gradient = { isGradient: true, id: gradients++, addColorStop: (...stop) => log.push(['addColorStop', gradient.id, ...stop]) };
+          return gradient;
+        }
+        if (prop === 'measureText') {
+          return { width: 10 };
+        }
+        return undefined;
+      };
+    },
+    set(target, prop, value) {
+      target[prop] = value;
+      log.push(['set', prop, describe(value)]);
+      return true;
+    }
+  });
+  return {
+    width: 0,
+    height: 0,
+    isRecordingTarget: true,
+    getContext: () => ctx,
+    getBoundingClientRect: () => ({ left: 0, top: 0, width: 0, height: 0 })
+  };
+};
+
+const FROZEN_CLOCK_MS = 1000;
+const RANDOM_SEED_MULTIPLIER = 16807;
+const RANDOM_SEED_MODULUS = 2147483647;
+const RANDOM_SEED_START = 12345;
+
+/** Runs fn with Math.random and performance.now replaced by deterministic sources. */
+const withDeterministicSources = (fn) => {
+  const realRandom = Math.random;
+  const realNow = performance.now;
+  let seed = RANDOM_SEED_START;
+  Math.random = () => {
+    seed = (seed * RANDOM_SEED_MULTIPLIER) % RANDOM_SEED_MODULUS;
+    return seed / RANDOM_SEED_MODULUS;
+  };
+  performance.now = () => FROZEN_CLOCK_MS;
+  try {
+    return fn();
+  } finally {
+    Math.random = realRandom;
+    performance.now = realNow;
+  }
+};
+
+const recordFrame = (RendererClass, prepare) => withDeterministicSources(() => {
+  const log = [];
+  const canvas = createRecordingCanvas(log);
+  const renderer = new RendererClass(canvas, gameConfig, ballsConfig, obstaclesConfig);
+  renderer.createLayerCanvas = () => createRecordingCanvas(log);
+  const engine = createTestEngine();
+  engine.startClassicMode(1);
+  engine.setReducedMotion(true);
+  prepare?.(engine);
+  log.length = 0;
+  renderer.render(engine, 1.0);
+  renderer.render(engine, 0.5);
+  return log;
+});
+
+test('Single-player render output equals the frozen v1.19.0 renderer draw call for draw call', () => {
+  const scenarios = [
+    undefined,
+    (engine) => {
+      engine.aimPoints = [{ x: 100, y: 100 }, { x: 120, y: 80 }];
+    }
+  ];
+  for (const prepare of scenarios) {
+    const frozen = recordFrame(FrozenRenderer, prepare);
+    const current = recordFrame(Renderer, prepare);
+    assert.ok(frozen.length > 100, 'the reference frame records many draw calls');
+    assert.deepEqual(current, frozen);
+  }
 });

@@ -161,7 +161,13 @@ export const uiGamepadMethods = {
     const message = t(isConnected ? 'toast.gamepad.connected' : 'toast.gamepad.disconnected');
     this.showToast(message);
     this.announce(message);
-    if (event === GAMEPAD_EVENTS.DISCONNECTED && this.engine.state === GAME_STATES.PLAYING) {
+    if (event !== GAMEPAD_EVENTS.DISCONNECTED) {
+      return;
+    }
+    const sceneController = this.getSceneController();
+    if (sceneController) {
+      sceneController.pause();
+    } else if (this.engine.state === GAME_STATES.PLAYING) {
       this.engine.togglePause();
     }
   },
@@ -182,6 +188,11 @@ export const uiGamepadMethods = {
 
   /** Run controls: the same engine entry points the keyboard uses. */
   routeGamepadGameplay(result) {
+    const sceneController = this.getSceneController();
+    if (sceneController) {
+      sceneController.handleGamepadActions(result.actions, result.aimDelta);
+      return;
+    }
     const engine = this.engine;
     // A stick resting slightly off centre must not steer the aim while the mouse or touch is in use.
     if (result.aimDelta !== 0 && this.inputMode === INPUT_MODES.GAMEPAD) {

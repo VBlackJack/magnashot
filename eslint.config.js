@@ -43,6 +43,11 @@ export default [
     languageOptions: { globals: globals.node }
   },
   {
+    // Frozen copies of browser modules, run by the tests under Node with stubbed globals.
+    files: ['tests/fixtures/**/*.js'],
+    languageOptions: { globals: { ...globals.node, ...globals.browser } }
+  },
+  {
     files: ['tests/browser/**/*.js'],
     languageOptions: { globals: { ...globals.node, ...globals.browser } }
   }
