@@ -677,6 +677,29 @@ test('btnPlayLevelModal closes the level select over a campaign run and asks to 
   assert.equal(calls.destructive.length, 1, 'switching from another run asks to confirm');
 });
 
+test('btnPlayLevelModal opened from Pause unpauses before closing Level Select so Pause stays hidden and focus returns to the board', () => {
+  const stateAtClose = [];
+  const { ui, el } = bindEventsHarness({
+    engine: {
+      mode: 'campaign',
+      state: 'paused',
+      togglePause() {
+        this.state = 'playing';
+      }
+    }
+  });
+  ui.autoPausedByOverlay = false;
+  ui.closeOverlayModal = () => {
+    stateAtClose.push(ui.engine.state);
+  };
+  el('btnPlayLevelModal').click();
+  assert.deepEqual(stateAtClose, ['playing'], 'the run is already playing when closeOverlayModal runs');
+  assert.match(
+    uiManagerCode,
+    /t\('modals\.shop\.achievements\.reward',\s*\{\s*coins:\s*formatNumber\(shown\.spec\.rewardCoins\)\s*\}\)/
+  );
+});
+
 test('Pause modal delegates settings to the Settings dialog and restores focus on close', () => {
   const pauseModal = elementMarkup(indexHtml, 'modal-pause');
   const settingsModal = elementMarkup(indexHtml, 'modal-settings');

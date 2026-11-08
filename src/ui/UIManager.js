@@ -1600,10 +1600,10 @@ export class UIManager {
 
     this.elements.btnPlayLevelModal.addEventListener('click', () => {
       if (this.isCampaignRunActive()) {
-        this.closeOverlayModal(this.elements.modalLevels);
-        if (this.engine.state === GAME_STATES.PAUSED) {
+        if (!this.autoPausedByOverlay && this.engine.state === GAME_STATES.PAUSED) {
           this.engine.togglePause();
         }
+        this.closeOverlayModal(this.elements.modalLevels);
         return;
       }
       this.requestDestructiveAction(

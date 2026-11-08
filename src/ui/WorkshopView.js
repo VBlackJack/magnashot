@@ -445,7 +445,7 @@ export function renderWorkshopContents() {
 
       const header = document.createElement('div');
       header.className = 'level-card-header';
-      header.textContent = t('modals.shop.achievements.reward', { coins: shown.spec.rewardCoins });
+      header.textContent = t('modals.shop.achievements.reward', { coins: formatNumber(shown.spec.rewardCoins) });
 
       const title = document.createElement('div');
       title.className = 'level-card-title';

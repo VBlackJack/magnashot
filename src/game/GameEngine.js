@@ -3081,7 +3081,7 @@ export class GameEngine {
       this.triggerLightningCore(ball);
     } else if (ball.clusterModifier === CLUSTER_MODIFIERS.PAINT_CORE) {
       const paintSpec = this.ballsConfig.clusterModifiers.paintCore;
-      const paintResult = this.specialController.triggerPaint(ball, paintSpec, this.physicsWorld, this.particleSystem, this.audioManager);
+      const paintResult = this.specialController.triggerPaint(ball, paintSpec, this.physicsWorld, this.particleSystem, this.audioManager, this.getBlastRadiusMultiplier());
       this.addScore(paintResult.scoreDelta);
     } else if (ball.clusterModifier === CLUSTER_MODIFIERS.RESCUE_CORE) {
       this.rewardRescueCore(ball);

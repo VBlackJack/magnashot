@@ -203,8 +203,8 @@ export class SpecialBallController {
    * groups they form go off on their own a moment later.
    * @returns {{painted: Array, scoreDelta: number}}
    */
-  triggerPaint(ball, specs, physicsWorld, particleSystem, audioManager) {
-    const paintRadius = ball.radius * specs.paintRadiusFactor;
+  triggerPaint(ball, specs, physicsWorld, particleSystem, audioManager, radiusMultiplier = 1) {
+    const paintRadius = ball.radius * specs.paintRadiusFactor * radiusMultiplier;
     const color = ball.colorId;
     const painted = [];
     if (color) {
