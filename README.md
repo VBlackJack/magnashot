@@ -115,6 +115,26 @@ A head-to-head mode against the CPU, opened at campaign level 6 from its card in
 - **Screens**: on wide screens (tablets, desktop) the two boards sit side by side; on phones the CPU board becomes a mini-view next to or above yours. The same controls as a single player run work, and a controller is supported.
 - **Records**: your wins and losses per difficulty are kept locally and shown in **My stats**; the result card has a Share button.
 
+### Two players on one device
+
+Under the difficulty picker, **2 players (same device)** opens a lobby for a match between two people on the same screen: no CPU, the same rules, best of 3 rounds. The entry is only shown on wide screens (at least 680 px wide and 520 px tall); on a phone it is not offered, and a match that is shrunk below two boards pauses and waits for a larger window (the Pause dialog says so and Resume stays out of reach until the boards fit).
+
+Each player picks a device in the lobby, and pressing a join key or a controller button takes a free place:
+
+| Device | Player | How to join | Controls |
+| :--- | :--- | :--- | :--- |
+| **Left half of the keyboard** | 1 | `W` | `A` / `D` aim (hold `Left Shift` for fine aim), `W` shoot, `S` swap, `Q` flip polarity, `E` next special sphere |
+| **Right half of the keyboard** | 2 | `Up` | `Left` / `Right` aim (hold `Right Shift` for fine aim), `Enter` shoot, `Down` swap, `/` flip polarity, `.` next special sphere |
+| **Left keys and mouse** | 1 | Change device | The left keys above, and the mouse aims and shoots on the first board |
+| **Touch** | 1 or 2 | Change device | Drag on your own board; each board follows its own finger, so both players can touch at once |
+| **Controller** | 1 or 2 | Press the bottom face button | The controls of the single player run; Start or Select pauses, the back button frees the place in the lobby |
+
+- The aim follows the keys while they are held, so both players can aim at the same time. The key names follow your keyboard layout (an AZERTY keyboard shows `Z` where this table says `W`); the number pad twins of Enter, `/` and `.` work as well. Space, `F` and the digits do nothing in a two-player match, and Escape pauses.
+- **Handicap**: each player can slow down the rise of the charges that arrive on their own board (normal, x1.25 or x1.5), for a mixed-skill match.
+- A controller that is unplugged during the match pauses it; press the bottom face button on any other controller to take its place, or quit.
+- The result card names the winner and shows the score, the charges neutralised and the pulses of each player, with **Play again** (same devices and handicaps), **Change players** and **Back**. A finished match only adds to a "2P matches" count in **My stats**: no personal statistics or CPU records change, and there is no Share button.
+- Two things depend on your hardware. Many keyboards cannot report every key combination at once (ghosting), so if a key stops responding while both players hold several keys, use a controller or touch for one player. On Windows, pressing Shift five times opens Sticky Keys, which can interrupt the fine aim keys: turn the shortcut off in the system settings if that happens.
+
 ---
 
 ## Architecture Overview
@@ -190,6 +210,7 @@ The codebase follows a modular, zero-dependency ES module architecture with stri
 │   └── ui/
 │       ├── CodexView.js      # Illustrated Codex & Guide tab rendering
 │       ├── CanvasInput.js    # Canvas pointer and touch aiming, bound to any board's engine
+│       ├── LocalInput.js     # Pure two-player helpers: split keyboard mapping, device slots, pointer rules, wide-screen check
 │       ├── FluxPerkView.js   # Flux perk choice dialog and active perk chips
 │       ├── LevelSelectView.js# Campaign chapters, level cards, format badges & < 3★ filter
 │       ├── UIManager.js      # UI core: construction, wiring and the modules below
@@ -197,6 +218,7 @@ The codebase follows a modular, zero-dependency ES module architecture with stri
 │       ├── UIHudRefresh.js   # UIManager module: HUD and menu refresh
 │       ├── UIGamepad.js      # UIManager module: controller routing, menu focus navigation, Settings controller row
 │       ├── UIVersus.js       # UIManager module: Polarity Duel difficulty picker, screen, layouts, pause, result and records
+│       ├── UIVersusLocal.js  # UIManager module: two players on one device, entry, lobby, devices and handicap
 │       ├── VersusHud.js      # Polarity Duel HUD: layout choice, announcements, top bar, incoming charges, pulse meter and controls
 │       ├── UIInputBindings.js# UIManager module: install, drawer and keyboard bindings
 │       ├── UIModals.js       # UIManager module: dialogs, shop tabs, focus trap and inert handling
@@ -247,7 +269,7 @@ The suites in `tests/` cover the game engine, physics, rendering loop, UI helper
 - `modeUnlocks.test.js`, `weeklyFlux.test.js`, `dailyHistory.test.js`, `playerStats.test.js` and `shotTimeline.test.js` check the progressive unlock thresholds, the ISO week keys and seeds (year boundaries, Monday 00:00 UTC), the 60-day Daily history, the local statistics and the compact shot timelines; `saveSchema.test.js` also covers the migrations that keep every mode for existing players.
 - `sagMeter.test.js`, `classicMode.test.js` and `uiSag.test.js` check the Sag meter rules (what counts as a miss, fill, avalanche drain and its cap, reset on a drop, warning phase), Survival and Daily lowering exactly one wave per full meter, Purist stages (no specials or upgrades, rail drops that move anchors and pivots but not platforms, stage clear, line crossed), same-seed determinism, run snapshots (including the old `shotsUntilWave` field), the HUD Sag box and its announcements, and the Purist card, records and share text.
 - `ghostCodec.test.js`, `ghostDuel.test.js`, `ghostStorage.test.js`, `ghostEngine.test.js` and `uiGhostDuel.test.js` check the duel link (round trips, rejection of every truncation and bit flip, strict caps, fuzzing that never throws and always re-encodes identically), the ghost interpolation, announcement hysteresis and outcomes, the bounded duel history and alias, the duel lifecycle (rematch without bonus or streak, tilt lock, restart, reload and Continue), and the duel card, rival badge, game over line and challenge share.
-- `versusRules.test.js`, `versusEngine.test.js`, `versusMatch.test.js`, `versusHud.test.js`, `uiVersus.test.js` and `versusRecords.test.js` check the Polarity Duel: the attack table, polarity and charge rules, charge rise, hits, landing and field pulses, seeded identical CPU matches, rounds and sudden death, the storage view that writes nothing, the HUD and layout choice, the announcements, the dialogs and the records. `tests/slow/versusStrength.test.js` (run by `npm run test:slow`) plays 50 seeded Hard against Easy matches.
+- `versusRules.test.js`, `versusEngine.test.js`, `versusMatch.test.js`, `versusHud.test.js`, `uiVersus.test.js` and `versusRecords.test.js` check the Polarity Duel (with `localInput.test.js` and `uiVersusLocal.test.js` for the two-player mode): the attack table, polarity and charge rules, charge rise, hits, landing and field pulses, seeded identical CPU matches, rounds and sudden death, the storage view that writes nothing, the HUD and layout choice, the announcements, the dialogs and the records. `tests/slow/versusStrength.test.js` (run by `npm run test:slow`) plays 50 seeded Hard against Easy matches.
 
 The generated levels are calibrated outside CI by two bots (`scripts/bot/CampaignBot.js`):
 
