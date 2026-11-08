@@ -14,6 +14,10 @@
  * limitations under the License.
  */
 
+const POINTER_OWNERSHIP_PRIMARY = 'primary';
+const POINTER_OWNERSHIP_PER_CANVAS = 'perCanvas';
+const MOUSE_POINTER_TYPE = 'mouse';
+
 /**
  * Binds the pointer controls of a game canvas (aim, tap-to-swap, release-to-shoot) to the
  * engine returned by `getEngine` at the time of each event.
@@ -25,10 +29,19 @@
  * @param {() => boolean} [options.isBlocked] True while a dialog owns the pointer.
  * @param {(engine: object) => void} [options.onAimChanged] Called after the aim state changed.
  * @param {(event: PointerEvent) => boolean} [options.acceptPointer] Filters the pointers this canvas follows.
+ * @param {'primary'|'perCanvas'} [options.pointerOwnership] 'primary' follows the primary pointer only
+ *   (default). 'perCanvas' lets this canvas own one pointerId from pointerdown until up, cancel or
+ *   lost capture, ignoring every other pointer; with no owned pointer only mouse hover moves the aim.
  * @returns {{unbind: () => void}}
  */
 export function bindCanvasInput(canvas, getEngine, gameConfig, options = {}) {
-  const { isBlocked = () => false, onAimChanged = () => {}, acceptPointer = () => true } = options;
+  const {
+    isBlocked = () => false,
+    onAimChanged = () => {},
+    acceptPointer = () => true,
+    pointerOwnership = POINTER_OWNERSHIP_PRIMARY
+  } = options;
+  const perCanvas = pointerOwnership === POINTER_OWNERSHIP_PER_CANVAS;
   const unbinders = [];
   const listen = (type, handler) => {
     canvas.addEventListener(type, handler);
@@ -93,10 +106,31 @@ export function bindCanvasInput(canvas, getEngine, gameConfig, options = {}) {
 
   let isPointerDownOnCanvas = false;
   let pointerDownPos = null;
+  let ownedPointerId = null;
+
+  // 'primary': only the primary pointer counts. 'perCanvas': only the owned pointer counts.
+  const followsPointer = (e) => {
+    if (!acceptPointer(e)) {
+      return false;
+    }
+    if (!perCanvas) {
+      return Boolean(e.isPrimary);
+    }
+    return ownedPointerId === null ? true : e.pointerId === ownedPointerId;
+  };
+
+  const clearOwnership = () => {
+    isPointerDownOnCanvas = false;
+    pointerDownPos = null;
+    ownedPointerId = null;
+  };
 
   listen('pointermove', (e) => {
     const engine = getEngine();
-    if (!e.isPrimary || !acceptPointer(e)) {
+    if (!followsPointer(e)) {
+      return;
+    }
+    if (perCanvas && ownedPointerId === null && e.pointerType !== MOUSE_POINTER_TYPE) {
       return;
     }
     if (isBlocked()) {
@@ -112,7 +146,7 @@ export function bindCanvasInput(canvas, getEngine, gameConfig, options = {}) {
 
   listen('pointerdown', (e) => {
     const engine = getEngine();
-    if (!e.isPrimary || !acceptPointer(e)) {
+    if (!followsPointer(e) || (perCanvas && ownedPointerId !== null)) {
       return;
     }
     if (e.button !== undefined && e.button !== 0) {
@@ -122,6 +156,9 @@ export function bindCanvasInput(canvas, getEngine, gameConfig, options = {}) {
       return;
     }
     isPointerDownOnCanvas = true;
+    if (perCanvas) {
+      ownedPointerId = e.pointerId;
+    }
     if (typeof canvas.setPointerCapture === 'function') {
       try {
         canvas.setPointerCapture(e.pointerId);
@@ -143,7 +180,7 @@ export function bindCanvasInput(canvas, getEngine, gameConfig, options = {}) {
 
   listen('pointerup', (e) => {
     const engine = getEngine();
-    if (!e.isPrimary || !acceptPointer(e)) {
+    if (!followsPointer(e)) {
       return;
     }
     if (e.button !== undefined && e.button !== 0) {
@@ -153,6 +190,7 @@ export function bindCanvasInput(canvas, getEngine, gameConfig, options = {}) {
       return;
     }
     isPointerDownOnCanvas = false;
+    ownedPointerId = null;
     if (typeof canvas.releasePointerCapture === 'function') {
       try {
         canvas.releasePointerCapture(e.pointerId);
@@ -183,11 +221,10 @@ export function bindCanvasInput(canvas, getEngine, gameConfig, options = {}) {
 
   listen('pointercancel', (e) => {
     const engine = getEngine();
-    if (!e.isPrimary || !acceptPointer(e)) {
+    if (!followsPointer(e)) {
       return;
     }
-    isPointerDownOnCanvas = false;
-    pointerDownPos = null;
+    clearOwnership();
     if (typeof canvas.releasePointerCapture === 'function' && e?.pointerId !== undefined) {
       try {
         canvas.releasePointerCapture(e.pointerId);
@@ -198,6 +235,19 @@ export function bindCanvasInput(canvas, getEngine, gameConfig, options = {}) {
     engine.isAimCancelled = false;
     onAimChanged(engine);
   });
+
+  // Capture lost without an up or cancel (element removed, capture stolen): free the pointer.
+  if (perCanvas) {
+    listen('lostpointercapture', (e) => {
+      if (ownedPointerId === null || e.pointerId !== ownedPointerId) {
+        return;
+      }
+      clearOwnership();
+      const engine = getEngine();
+      engine.isAimCancelled = false;
+      onAimChanged(engine);
+    });
+  }
 
   return {
     unbind() {
