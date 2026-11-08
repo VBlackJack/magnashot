@@ -987,7 +987,11 @@ describe('Polarity Duel (desktop)', () => {
       const flipped = () => page.evaluate(() => window.__versusBoards[0].isPolarityFlipped);
       await page.keyboard.press('KeyF');
       assert.equal(await flipped(), true);
-      assert.equal(await page.evaluate(() => document.querySelector('#btn-versus-polarity').getAttribute('aria-pressed')), 'true');
+      await page.waitForFunction(
+        () => document.querySelector('#btn-versus-polarity').getAttribute('aria-pressed') === 'true',
+        undefined,
+        { timeout: WAIT_TIMEOUT_MS }
+      );
       assert.deepEqual(errors, []);
     } finally {
       await context.close();

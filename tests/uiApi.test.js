@@ -227,6 +227,7 @@ const EXPECTED_PROTOTYPE_NAMES = [
   'buildVersusRenderers',
   'stepVersus',
   'refreshVersusHud',
+  'refreshVersusPlayerControls',
   'refreshVersusLanguage',
   'handleVersusEvent',
   'showVersusRoundOverlay',

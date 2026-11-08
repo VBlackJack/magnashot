@@ -540,6 +540,18 @@ export const uiVersusMethods = {
     const state = v.controller.getState();
     const cpuTierName = t(`versus.tier.${v.tier}`);
     v.hud.refresh(state, { cpuTierName });
+    this.refreshVersusPlayerControls();
+  },
+
+  /**
+   * Repaints what depends on the player's engine (polarity button, stocked specials) at once, so
+   * assistive technology hears an input's effect without waiting for the periodic HUD refresh.
+   */
+  refreshVersusPlayerControls() {
+    const v = this.versus;
+    if (!v) {
+      return;
+    }
     const changed = v.hud.refreshPlayerControls(v.controller.engines[PLAYER_BOARD], {
       types: SPECIAL_TYPES_ORDER,
       specs: this.ballsConfig.specialTypes,
@@ -801,6 +813,7 @@ export const uiVersusMethods = {
     }
     action(this.versus.controller.engines[PLAYER_BOARD]);
     this.versus.hudDirty = true;
+    this.refreshVersusPlayerControls();
   },
 
   /** The same keys as a single player run, sent to the player's board. */
@@ -846,6 +859,7 @@ export const uiVersusMethods = {
       }
     }
     this.versus.hudDirty = true;
+    this.refreshVersusPlayerControls();
   },
 
   /** Controller actions for the player's board; Start and Select pause both boards. */
@@ -892,6 +906,9 @@ export const uiVersusMethods = {
       }
     }
     this.versus.hudDirty = true;
+    if (actions.length > 0) {
+      this.refreshVersusPlayerControls();
+    }
   },
 
   /** Text of the arcade card of the level select: the player's overall record against the CPU. */
