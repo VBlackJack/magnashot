@@ -49,6 +49,7 @@ import {
   collectVersusHudElements,
   computeMiniSize,
   createAnnouncementQueue,
+  createVersusTutorial,
   fitBoard,
   renderAnnouncement
 } from './VersusHud.js';
@@ -321,6 +322,62 @@ export const uiVersusMethods = {
     // A window too small for two boards opened the pause dialog already: it keeps the focus.
     if (!this.isAnyModalOpen()) {
       this.elements.versusCanvas0.focus();
+      this.maybeShowVersusTutorial();
+    }
+  },
+
+  // ---------------------------------------------------------------------------------------
+  // First-duel tutorial
+  // ---------------------------------------------------------------------------------------
+
+  /** True while the first-duel tutorial is on screen (the match is held). */
+  isVersusTutorialOpen() {
+    return Boolean(this.versus?.tutorial?.isOpen());
+  },
+
+  /** Opens the tutorial on the first duel of this device; it is never shown again afterwards. */
+  maybeShowVersusTutorial() {
+    const v = this.versus;
+    const cfg = this.gameConfig.versus.tutorial;
+    if (!v || !cfg || this.storageManager.getVersusTutorialSeen?.() !== false) {
+      return;
+    }
+    // Stored first: a page left in the middle of the tutorial does not bring it back.
+    this.storageManager.setVersusTutorialSeen?.(true);
+    v.kb?.releaseAll();
+    v.controller.pause();
+    v.tutorial = createVersusTutorial({
+      steps: cfg.steps,
+      stepKeyPrefix: cfg.stepKeyPrefix,
+      onClose: () => this.closeVersusTutorial()
+    });
+    document.body.append(v.tutorial.element);
+    v.tutorial.open();
+  },
+
+  /** Takes the tutorial off the page and hands the board back: the match resumes. */
+  closeVersusTutorial() {
+    const v = this.versus;
+    if (!v?.tutorial) {
+      return;
+    }
+    v.tutorial.element.remove?.();
+    v.tutorial = null;
+    v.controller.resume();
+    v.hudDirty = true;
+    this.elements.versusCanvas0.focus();
+  },
+
+  /** Pad actions while the tutorial is open: confirm moves on, back or Start skips. */
+  routeVersusTutorialActions(actions) {
+    const tutorial = this.versus?.tutorial;
+    if (!tutorial) {
+      return;
+    }
+    if (actions.includes(A.BACK) || actions.includes(A.PAUSE) || actions.includes(A.MENU)) {
+      tutorial.close('skip');
+    } else if (actions.includes(A.SHOOT) || actions.includes(A.CONFIRM)) {
+      tutorial.next();
     }
   },
 
@@ -373,6 +430,8 @@ export const uiVersusMethods = {
     }
     v.unsubscribe?.();
     v.unbindInput?.();
+    v.tutorial?.element.remove?.();
+    v.tutorial = null;
     v.kb?.releaseAll();
     clearTimeout(v.resultGuardTimer);
     for (const type of ['resize', 'orientationchange']) {
@@ -744,6 +803,7 @@ export const uiVersusMethods = {
       return;
     }
     v.hud.refreshLabels();
+    v.tutorial?.refresh();
     this.refreshVersusHud();
     if (v.result && !this.elements.modalDuelResult.classList.contains(HIDDEN_CLASS)) {
       this.fillVersusResult(v.result);
@@ -757,6 +817,7 @@ export const uiVersusMethods = {
       return;
     }
     v.hudDirty = true;
+    this.rumbleForVersusEvent(event);
     switch (event.type) {
       case MATCH_EVENTS.ROUND_START:
         v.phase = SCREEN_PHASES.PLAYING;
@@ -782,6 +843,46 @@ export const uiVersusMethods = {
     }
     for (const entry of v.queue.push(event, v.clock)) {
       this.announce(renderAnnouncement(entry));
+    }
+  },
+
+  /** Controller of a board: the pad of its slot (two players), or the active pad on the player's board. */
+  getVersusPadIndex(board) {
+    const v = this.versus;
+    if (!v) {
+      return -1;
+    }
+    if (v.kind === VERSUS_KINDS.LOCAL) {
+      const device = v.slots[board]?.device;
+      return device?.type === DEVICE_TYPES.PAD && !v.slots[board].padLost ? device.padIndex : -1;
+    }
+    return board === PLAYER_BOARD && this.inputMode === INPUT_MODES.GAMEPAD ? (this.gamepadInput?.activeIndex ?? -1) : -1;
+  },
+
+  /** Vibrates the pad of the board a charge landed on, a pulse hit, or a round was lost on. */
+  rumbleForVersusEvent(event) {
+    let kind;
+    let board = event.board;
+    switch (event.type) {
+      case MATCH_EVENTS.CHARGE_LANDED:
+        kind = 'charge';
+        break;
+      case MATCH_EVENTS.PULSE_RECEIVED:
+        kind = 'pulse';
+        break;
+      case MATCH_EVENTS.ROUND_LOST:
+        kind = 'roundLost';
+        board = PLAYER_BOARD;
+        break;
+      case MATCH_EVENTS.ROUND_DECIDED:
+        kind = 'roundLost';
+        board = event.loser;
+        break;
+      default:
+        return;
+    }
+    if (Number.isInteger(board)) {
+      this.rumbleGamepad?.(kind, this.getVersusPadIndex(board));
     }
   },
 
@@ -820,7 +921,7 @@ export const uiVersusMethods = {
   /** Holds both boards and opens the pause dialog. */
   pauseVersus() {
     const v = this.versus;
-    if (!v || v.phase === SCREEN_PHASES.MATCH_OVER || this.isAnyModalOpen()) {
+    if (!v || v.phase === SCREEN_PHASES.MATCH_OVER || v.tutorial || this.isAnyModalOpen()) {
       return;
     }
     v.controller.pause();
@@ -915,6 +1016,10 @@ export const uiVersusMethods = {
     const v = this.versus;
     if (!v) {
       return false;
+    }
+    if (v.tutorial) {
+      v.tutorial.close('skip');
+      return true;
     }
     if (!this.elements.modalDuelResult.classList.contains(HIDDEN_CLASS)) {
       this.leaveVersus();
@@ -1137,6 +1242,10 @@ export const uiVersusMethods = {
 
   /** Controller actions for the player's board; Start and Select pause both boards. */
   handleVersusGamepadActions(actions, aimDelta) {
+    if (this.isVersusTutorialOpen()) {
+      this.routeVersusTutorialActions(actions);
+      return;
+    }
     if (!this.canControlVersusPlayer()) {
       return;
     }
@@ -1278,6 +1387,10 @@ export const uiVersusMethods = {
     for (const pad of results.pads) {
       const board = slotForPad(v.slots, pad.padIndex);
       if (board < 0) {
+        continue;
+      }
+      if (this.isVersusTutorialOpen()) {
+        this.routeVersusTutorialActions(pad.actions);
         continue;
       }
       if (pad.actions.includes(A.PAUSE) || pad.actions.includes(A.MENU)) {

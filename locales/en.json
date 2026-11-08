@@ -1144,7 +1144,8 @@
           "normal": "Normal",
           "fast": "Fast"
         },
-        "invertX": "Invert horizontal aim"
+        "invertX": "Invert horizontal aim",
+        "rumble": "Vibration"
       }
     },
     "fluxPerk": {
@@ -1438,6 +1439,27 @@
     "defaultName": "Ghost"
   },
   "versus": {
+    "tutorial": {
+      "title": "How a duel works",
+      "progress": "Step {{current}} of {{total}}",
+      "next": "Next",
+      "done": "Got it",
+      "skip": "Skip",
+      "step": {
+        "charges": {
+          "title": "Charges",
+          "body": "Big combos send charged spheres at your rival, and theirs come for you. Each one has a + or - sign and rises toward your cluster."
+        },
+        "guard": {
+          "title": "Polarity guard",
+          "body": "Shoot a sphere of the opposite sign to cancel a charge. Flip your polarity to match, and shoot the same sign and it bounces away."
+        },
+        "pulse": {
+          "title": "Field pulse",
+          "body": "Neutralising charges fills your pulse meter. When it is full, a pulse lowers your rival's anchor rail by itself."
+        }
+      }
+    },
     "local": {
       "entry": "2 players (same device)",
       "entryHint": "Needs a wider screen for two boards",
