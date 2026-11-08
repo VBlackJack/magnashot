@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-import { GAME_MODES, GAME_STATES, WAVE_TYPES } from '../core/Constants.js';
+import { GAME_MODES, GAME_STATES, SPECIAL_TYPES_ORDER, WAVE_TYPES } from '../core/Constants.js';
 import { Ball } from '../entities/Ball.js';
 
 /** Sentinel stored in place of an obstacle index when a ball has no pivot. */
@@ -33,6 +33,7 @@ const ENGINE_SCALAR_FIELDS = [
   'endlessRowParity',
   'shotsUntilWave',
   'freezeTurnsRemaining',
+  'isCoreFreezeApplied',
   'chainCooldown',
   'outOfShotsGraceFrames',
   'hasFiredInRound',
@@ -309,6 +310,22 @@ export function isValidRunSnapshot(snapshot, version) {
 }
 
 /**
+ * Validates a saved special inventory: only known special types, each a non-negative
+ * finite integer. Any other shape keeps the inventory the mode start produced.
+ * @param {Object<string, number>} fallback - Inventory to keep when the saved one is damaged.
+ * @param {*} saved - Saved inventory.
+ * @returns {Object<string, number>}
+ */
+function restoreSpecialInventory(fallback, saved) {
+  const known = new Set(SPECIAL_TYPES_ORDER);
+  const entries = saved && typeof saved === 'object' && !Array.isArray(saved) ? Object.entries(saved) : null;
+  const isValid =
+    entries !== null &&
+    entries.every(([type, count]) => known.has(type) && Number.isInteger(count) && count >= 0);
+  return isValid ? { ...saved } : { ...fallback };
+}
+
+/**
  * Rebuilds the board of the snapshot's mode (obstacles, palette, mutators), then
  * replaces its balls and live state with the saved ones. The run resumes paused.
  * @param {import('./GameEngine.js').GameEngine} engine
@@ -363,7 +380,7 @@ export function applyRunSnapshot(engine, snapshot) {
   });
 
   snapshot.balls.forEach((saved, idx) => {
-    for (const savedNeighborId of saved.bonds) {
+    for (const savedNeighborId of Array.isArray(saved.bonds) ? saved.bonds : []) {
       const neighborId = newIdBySavedId.get(savedNeighborId);
       if (neighborId !== undefined) {
         restored[idx].bonds.add(neighborId);
@@ -387,7 +404,7 @@ export function applyRunSnapshot(engine, snapshot) {
   world.allowTensionBreak = Boolean(snapshot.allowTensionBreak);
 
   restoreFields(engine, snapshot.engine, ENGINE_SCALAR_FIELDS);
-  engine.specialInventory = { ...snapshot.specialInventory };
+  engine.specialInventory = restoreSpecialInventory(engine.specialInventory, snapshot.specialInventory);
   engine.waveLog = restoreWaveLog(engine, snapshot.waveLog);
   // Optional: a run saved before hints could run out holds none, and a damaged list is dropped.
   engine.discoveryShownIds = new Set(
@@ -412,7 +429,15 @@ export function applyRunSnapshot(engine, snapshot) {
   const isValidQueue = Array.isArray(savedQueue) && savedQueue.every((color) => engine.activePalette.includes(color));
   engine.upcomingColorIds = isValidQueue ? [...savedQueue] : [];
   if (snapshot.mode === GAME_MODES.PUZZLE) {
-    engine.puzzleQueue = engine.upcomingColorIds.map((colorId) => ({ colorId, specialType: null }));
+    // The mode start rebuilt the full scripted queue: its tail matching the saved colors
+    // keeps the special types; otherwise the saved colors stand alone.
+    const rebuilt = engine.puzzleQueue.slice(Math.max(0, engine.puzzleQueue.length - engine.upcomingColorIds.length));
+    const tailMatches =
+      rebuilt.length === engine.upcomingColorIds.length &&
+      rebuilt.every((spec, idx) => spec.colorId === engine.upcomingColorIds[idx]);
+    engine.puzzleQueue = tailMatches
+      ? rebuilt
+      : engine.upcomingColorIds.map((colorId) => ({ colorId, specialType: null }));
   } else {
     engine.fillUpcomingColors();
   }
