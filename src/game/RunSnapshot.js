@@ -434,7 +434,7 @@ export function applyRunSnapshot(engine, snapshot) {
     const rebuilt = engine.puzzleQueue.slice(Math.max(0, engine.puzzleQueue.length - engine.upcomingColorIds.length));
     const tailMatches =
       rebuilt.length === engine.upcomingColorIds.length &&
-      rebuilt.every((spec, idx) => spec.colorId === engine.upcomingColorIds[idx]);
+      rebuilt.every((spec, idx) => (spec.colorId || engine.activePalette[0]) === engine.upcomingColorIds[idx]);
     engine.puzzleQueue = tailMatches
       ? rebuilt
       : engine.upcomingColorIds.map((colorId) => ({ colorId, specialType: null }));
