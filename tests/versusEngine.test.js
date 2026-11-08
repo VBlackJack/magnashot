@@ -404,8 +404,8 @@ test('a full Overcharge fires the field pulse instead of granting a special', ()
   const normalMax = gameConfig.scoring.overchargeMax;
   assert.equal(engine.getOverchargeCap(), normalMax * versusCfg.overchargeMaxMultiplier);
   engine.addOvercharge(normalMax);
-  assert.deepEqual(engine.drainVersusOutput().outbox, [], 'a normal full meter is only half of a duel meter');
-  engine.addOvercharge(normalMax);
+  assert.deepEqual(engine.drainVersusOutput().outbox, [], 'a normal full meter is only a share of a duel meter');
+  engine.addOvercharge(normalMax * (versusCfg.overchargeMaxMultiplier - 1));
   const { outbox } = engine.drainVersusOutput();
   assert.deepEqual(outbox, [{ type: 'pulse' }]);
   assert.equal(Object.values(engine.specialInventory).reduce((sum, n) => sum + n, 0), 0);

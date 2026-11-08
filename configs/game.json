@@ -1550,11 +1550,11 @@
     "threatRatio": 0.4,
     "chargeRadius": 0.9,
     "strength2RawThreshold": 8,
-    "neutraliseOverchargeGain": 0.15,
+    "neutraliseOverchargeGain": 0.09,
     "guardStreakSize": 3,
     "framesPerSecond": 60,
     "fallbackPolarity": 1,
-    "overchargeMaxMultiplier": 2,
+    "overchargeMaxMultiplier": 5,
     "suddenDeath": { "startSeconds": 180, "intervalSeconds": 20 },
     "roundsToWin": 2,
     "cpu": {
