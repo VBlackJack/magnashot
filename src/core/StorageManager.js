@@ -22,6 +22,16 @@ import { countCampaignLevels } from '../game/LevelCatalog.js';
 const MS_PER_UTC_DAY = 86_400_000;
 
 /**
+ * Ordered save schema migrations. Contract: every step is idempotent and never deletes
+ * data, so a step can be retried after a failure and a rollback to an older build keeps
+ * working. A step returns false when it could not complete (it is then retried next launch).
+ */
+export const SAVE_MIGRATIONS = Object.freeze([
+  { toVersion: 1, run: (manager) => manager.migrateLegacyKeys() }
+]);
+export const CURRENT_SAVE_SCHEMA_VERSION = SAVE_MIGRATIONS.at(-1).toVersion;
+
+/**
  * Manages persistent player progress, settings, currency, and upgrades
  * with an automatic in-memory fallback when localStorage is unavailable.
  */
@@ -49,8 +59,45 @@ export class StorageManager {
     this.dailyConfig = gameConfig.daily || {};
     this.maxCampaignLevel = countCampaignLevels(levelsConfig, campaignConfig);
     this.upgradesCache = null;
-    this.migrateLegacyKeys();
+    this.runSaveMigrations();
     this.bindCrossTabSync();
+  }
+
+  /**
+   * Applies the pending save schema steps in order. The stored version is read straight from
+   * localStorage (never the in-memory fallback) and written only after a step succeeded.
+   * A version newer than this build knows (downgrade) is left untouched.
+   */
+  runSaveMigrations() {
+    const versionSuffix = this.storageConfig.keys.schemaVersion;
+    if (typeof versionSuffix !== 'string') {
+      this.migrateLegacyKeys();
+      return;
+    }
+    const versionKey = this.buildKey(versionSuffix);
+    let stored;
+    try {
+      const parsed = Number.parseInt(localStorage.getItem(versionKey), 10);
+      stored = Number.isInteger(parsed) && parsed > 0 ? parsed : 0;
+    } catch {
+      return;
+    }
+    if (stored > CURRENT_SAVE_SCHEMA_VERSION) {
+      return;
+    }
+    for (const step of SAVE_MIGRATIONS) {
+      if (step.toVersion <= stored) {
+        continue;
+      }
+      if (step.run(this) === false) {
+        return;
+      }
+      try {
+        localStorage.setItem(versionKey, String(step.toVersion));
+      } catch {
+        return;
+      }
+    }
   }
 
   /**
@@ -66,12 +113,12 @@ export class StorageManager {
     const migration = this.storageConfig.legacyMigration;
     const legacyPrefixes = migration && Array.isArray(migration.prefixes) ? migration.prefixes : [];
     if (legacyPrefixes.length === 0) {
-      return;
+      return true;
     }
     const markerKey = this.buildKey(migration.markerKey);
     try {
       if (localStorage.getItem(markerKey) !== null) {
-        return;
+        return true;
       }
       const legacyKeys = [];
       for (let i = 0; i < localStorage.length; i++) {
@@ -112,8 +159,10 @@ export class StorageManager {
         }
       }
       localStorage.setItem(markerKey, String(true));
+      return true;
     } catch {
       // localStorage is restricted or full; migration is retried on the next launch
+      return false;
     }
   }
 

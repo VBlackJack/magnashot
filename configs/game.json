@@ -1519,7 +1519,8 @@
       "discoveries": "discoveries",
       "discoveriesVersion": "discoveries_version",
       "unlockedBallStyles": "ball_styles",
-      "activeBallStyle": "ball_style"
+      "activeBallStyle": "ball_style",
+      "schemaVersion": "schema_version"
     },
     "runSnapshotVersion": 1,
     "legacyMigration": {
