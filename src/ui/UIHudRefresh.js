@@ -540,6 +540,12 @@ export const uiHudRefreshMethods = {
     const transitionedState = this.prevEngineState !== engine.state;
     this.prevEngineState = engine.state;
 
+    if (extra.ghostAnnouncement) {
+      this.announceGhostEvent(extra.ghostAnnouncement);
+      // Announced once: a refresh re-run with lastExtra must not repeat it.
+      delete this.lastExtra.ghostAnnouncement;
+    }
+
     if (fluxStageCleared) {
       this.announce(t('hud.announcer.round.fluxStageCleared', { stage: fluxStageCleared }));
     }
@@ -723,6 +729,7 @@ export const uiHudRefreshMethods = {
         }
         this.elements.gameOverNearMiss.classList.toggle('hidden', !nearMissText);
       }
+      const duelText = this.refreshGameOverDuel(summary);
       if (this.elements.gameOverDailyNext) {
         const isDaily = engine.mode === GAME_MODES.DAILY;
         if (isDaily) {
@@ -761,10 +768,12 @@ export const uiHudRefreshMethods = {
       }
       if (transitionedState) {
         this.shareCopied = false;
+        this.refreshChallengeUrl();
         this.updateShareButtonLabel();
         this.elements.gameOverShareFallback?.classList.add('hidden');
         this.saveLastFocusedElement();
-        const roundResult = t('hud.announcer.round.gameOver', { reason: t(reasonKey), score: scoreText });
+        const gameOverResult = t('hud.announcer.round.gameOver', { reason: t(reasonKey), score: scoreText });
+        const roundResult = duelText ? `${gameOverResult} ${duelText}` : gameOverResult;
         this.announce(
           nearMissText
             ? t('hud.announcer.round.withNearMiss', { result: roundResult, nearMiss: nearMissText })
@@ -779,9 +788,14 @@ export const uiHudRefreshMethods = {
       this.elements.modalGameOver.classList.add('hidden');
     }
 
-    const bestRunText = engine.state !== GAME_STATES.VICTORY && engine.state !== GAME_STATES.GAME_OVER
+    // During a duel the rival badge takes the best-run marker's place in the badge row.
+    const isDuelBadgeShown = this.refreshGhostBadge(engine);
+    const bestRunText = engine.state !== GAME_STATES.VICTORY && engine.state !== GAME_STATES.GAME_OVER && !isDuelBadgeShown
       ? formatBestRunMarker(engine.getRunBestMarker?.())
       : '';
+    if (this.isDuelCardOpen()) {
+      this.renderDuelCard();
+    }
     if (this.elements.bestRunBadge) {
       setTextIfChanged(this.elements.bestRunBadge, bestRunText);
       this.elements.bestRunBadge.classList.toggle('hidden', !bestRunText);

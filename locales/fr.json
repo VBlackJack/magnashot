@@ -259,7 +259,13 @@
       "flux": {
         "perkChosen": "Atout choisi : {{name}}."
       },
-      "modeUnlocked": "Nouveau mode débloqué : {{modes}}"
+      "modeUnlocked": "Nouveau mode débloqué : {{modes}}",
+      "ghost": {
+        "ahead": "Tu passes devant {{name}}",
+        "behind": "{{name}} prend la tête",
+        "ended": "La partie de {{name}} s'est arrêtée à {{score}}",
+        "passed": "Tu as dépassé le score final de {{name}}"
+      }
     },
     "hints": {
       "replayAria": "Réafficher les astuces de ce niveau"
@@ -277,6 +283,18 @@
       "dailyFairPlay": "Mêmes règles pour tous : les améliorations de l'Atelier et les munitions de la boutique sont désactivées aujourd'hui.",
       "dailyFairPlayUpgrades": "Mêmes règles pour tous : les améliorations de l'Atelier sont désactivées aujourd'hui.",
       "dailyFairPlayAmmo": "Mêmes règles pour tous : les munitions de la boutique sont désactivées aujourd'hui."
+    },
+    "ghost": {
+      "ahead": "+{{gap}} vs {{name}}",
+      "behind": "-{{gap}} vs {{name}}",
+      "tied": "= {{name}}",
+      "final": "{{text}} (final)",
+      "aria": "Tu es {{side}} {{name}} de {{gap}} points au tir {{shot}}",
+      "ariaTied": "Tu es à égalité avec {{name}} au tir {{shot}}",
+      "side": {
+        "ahead": "devant",
+        "behind": "derrière"
+      }
     }
   },
   "gameplay": {
@@ -1001,7 +1019,8 @@
         "levels": "Choisir un Niveau",
         "share": "Partager",
         "shareCopied": "Copié ✓",
-        "dailyHistory": "Historique"
+        "dailyHistory": "Historique",
+        "shareChallenge": "Partager le défi"
       },
       "share": {
         "field": {
@@ -1028,6 +1047,11 @@
           "one": "{{count}} point de moins que votre record",
           "other": "{{count}} points de moins que votre record"
         }
+      },
+      "duel": {
+        "won": "Tu bats {{name}} de {{gap}}",
+        "lost": "{{name}} gagne de {{gap}}",
+        "tie": "Égalité parfaite avec {{name}}"
       }
     },
     "pause": {
@@ -1081,6 +1105,10 @@
         "button": "Installer l'application",
         "iosHint": "Sur iPhone et iPad : Partager, puis Sur l'écran d'accueil.",
         "installedAnnounce": "Application installée. Lancez-la depuis votre écran d'accueil."
+      },
+      "duelName": {
+        "label": "Nom de duel (facultatif)",
+        "hint": "Lettres et chiffres, 12 max. Visible des amis que tu défies."
       }
     },
     "fluxPerk": {
@@ -1143,6 +1171,11 @@
         "unknown": "-",
         "empty": "Vos résultats du Défi du Jour seront listés ici à partir de maintenant.",
         "summary": "Joué {{played}} jours sur les {{days}} derniers. Meilleur : {{score}} le {{date}}."
+      },
+      "duels": {
+        "title": "Duels",
+        "record": "{{won}} gagnés - {{lost}} perdus",
+        "empty": "Aucun duel pour l'instant."
       }
     }
   },
@@ -1325,6 +1358,12 @@
       "header": "MagnaShot Puriste",
       "stats": "Étape {{stage}} - {{score}} pts",
       "drops": "Chutes du rail : {{drops}}"
+    },
+    "duel": {
+      "header": "vs {{name}} : {{result}}",
+      "won": "gagné de {{gap}}",
+      "lost": "perdu de {{gap}}",
+      "tie": "égalité"
     }
   },
   "stats": {
@@ -1339,5 +1378,26 @@
       "hardestLine": "Niveau le plus dur : {{level}} ({{fails}} échecs)",
       "schemaLine": "Schéma de sauvegarde {{version}}"
     }
+  },
+  "duel": {
+    "card": {
+      "title": "Duel fantôme",
+      "daily": "{{name}} a fait {{score}} au défi du jour n°{{number}}",
+      "flux": "{{name}} a fait {{score}} en Flux n°{{seed}}",
+      "rematch": "Défi passé : ni bonus ni série",
+      "assists": "Aides du rival : Atelier +{{levels}} - Munitions {{ammo}} - Continuer {{continues}}",
+      "tiltFree": "Le rival a joué avec l'inclinaison",
+      "version": "Créé avec une autre version : le plateau peut différer",
+      "accept": "Accepter le duel",
+      "decline": "Pas maintenant"
+    },
+    "error": {
+      "invalid": "Ce lien de duel est abîmé ou incomplet.",
+      "expired": "Ce duel du jour est trop ancien pour être rejoué.",
+      "future": "Ce défi du jour n'est pas encore disponible.",
+      "newer": "Ce duel nécessite une version plus récente de MagnaShot. Recharge pour mettre à jour.",
+      "ok": "OK"
+    },
+    "defaultName": "Fantôme"
   }
 }

@@ -19,6 +19,7 @@ import { BALL_STYLES } from './Constants.js';
 import { SeededRandom } from './SeededRandom.js';
 import { countCampaignLevels } from '../game/LevelCatalog.js';
 import { resolveModeAccess, computeNewlyEarned, getNewState, getSeenState } from '../game/ModeUnlocks.js';
+import { sanitizeAlias } from '../game/GhostCodec.js';
 import { normalizeShotTimeline } from '../game/ShotTimeline.js';
 import { normalizePlayerStats, applyPlayerStatsDelta } from '../game/PlayerStats.js';
 
@@ -26,6 +27,9 @@ const MS_PER_UTC_DAY = 86_400_000;
 const DATE_KEY_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 /** Value of a shot timeline's `c` field once its run is over. */
 const COMPLETE_TIMELINE_FLAG = 1;
+const GHOST_DUEL_MODES = ['daily', 'flux'];
+const GHOST_DUEL_OUTCOMES = ['won', 'lost', 'tie'];
+const GHOST_DUEL_KEY_PATTERN = /^[A-Za-z0-9-]{1,32}$/;
 
 /**
  * Ordered save schema migrations. Contract: every step is idempotent and never deletes
@@ -56,6 +60,7 @@ export class StorageManager {
     this.weeklyFluxConfig = null;
     this.playerStatsConfig = null;
     this.shotTimelineConfig = null;
+    this.ghostDuelConfig = null;
     this.maxCampaignLevel = null;
     this.memoryFallback = new Map();
     this.upgradesCache = null;
@@ -76,6 +81,7 @@ export class StorageManager {
     this.weeklyFluxConfig = gameConfig.weeklyFlux || {};
     this.playerStatsConfig = gameConfig.playerStats || {};
     this.shotTimelineConfig = gameConfig.shotTimeline || {};
+    this.ghostDuelConfig = gameConfig.ghostDuel || {};
     this.maxCampaignLevel = countCampaignLevels(levelsConfig, campaignConfig);
     this.upgradesCache = null;
     this.runSaveMigrations();
@@ -1269,6 +1275,118 @@ export class StorageManager {
       .map((entry) => StorageManager.sanitizeDailyHistoryEntry(entry, this.shotTimelineConfig))
       .filter(Boolean)
       .sort(StorageManager.compareNewestFirst);
+  }
+
+  static sanitizeGhostDuelEntry(raw, cfg) {
+    if (!StorageManager.isPlainObject(raw)) {
+      return null;
+    }
+    const maxScore = cfg.maxScore > 0 ? cfg.maxScore : Number.MAX_SAFE_INTEGER;
+    const toScore = (value) => (Number.isSafeInteger(value) && value >= 0 && value <= maxScore ? value : null);
+    const ghostScore = toScore(raw.ghostScore);
+    const myScore = toScore(raw.myScore);
+    if (!GHOST_DUEL_MODES.includes(raw.mode) || !GHOST_DUEL_OUTCOMES.includes(raw.outcome)
+      || typeof raw.key !== 'string' || !GHOST_DUEL_KEY_PATTERN.test(raw.key)
+      || !StorageManager.isDateKey(raw.dateKey) || ghostScore === null || myScore === null) {
+      return null;
+    }
+    return {
+      mode: raw.mode,
+      key: raw.key,
+      alias: sanitizeAlias(raw.alias, cfg),
+      ghostScore,
+      myScore,
+      outcome: raw.outcome,
+      dateKey: raw.dateKey
+    };
+  }
+
+  /** @returns {Array<{mode: string, key: string, alias: string, ghostScore: number, myScore: number, outcome: string, dateKey: string}>} Duel history, newest first, bounded. */
+  getGhostDuels() {
+    const key = this.storageConfig.keys.ghostDuels;
+    const raw = key ? this.safeGetItem(key) : null;
+    if (!raw) {
+      return [];
+    }
+    let parsed;
+    try {
+      parsed = JSON.parse(raw);
+    } catch {
+      return [];
+    }
+    if (!Array.isArray(parsed)) {
+      return [];
+    }
+    const cfg = this.ghostDuelConfig;
+    const limit = cfg.historyMaxEntries > 0 ? cfg.historyMaxEntries : parsed.length;
+    return parsed
+      .map((entry) => StorageManager.sanitizeGhostDuelEntry(entry, cfg))
+      .filter(Boolean)
+      .slice(0, limit);
+  }
+
+  /**
+   * Records a finished duel as the newest history entry; older entries beyond the configured bound drop off.
+   * @param {{mode: string, key: string, alias?: string, ghostScore: number, myScore: number, outcome: string, dateKey: string}} result
+   * @returns {boolean} True when the entry was valid and stored.
+   */
+  recordGhostDuel(result) {
+    const key = this.storageConfig.keys.ghostDuels;
+    const entry = key ? StorageManager.sanitizeGhostDuelEntry(result, this.ghostDuelConfig) : null;
+    if (!entry) {
+      return false;
+    }
+    const limit = this.ghostDuelConfig.historyMaxEntries > 0 ? this.ghostDuelConfig.historyMaxEntries : 1;
+    this.safeSetItem(key, JSON.stringify([entry, ...this.getGhostDuels()].slice(0, limit)));
+    return true;
+  }
+
+  /**
+   * Removes the newest duel entry when it matches the given duel (same mode, key and date, and the same
+   * score when one is given). Used when a Flux continue retracts the run's record.
+   * @param {{mode: string, key: string, dateKey: string, myScore?: number}} matcher
+   * @returns {boolean} True when an entry was removed.
+   */
+  retractLastGhostDuel(matcher) {
+    const key = this.storageConfig.keys.ghostDuels;
+    const history = key ? this.getGhostDuels() : [];
+    const last = history[0];
+    if (!last || !StorageManager.isPlainObject(matcher)
+      || last.mode !== matcher.mode || last.key !== matcher.key || last.dateKey !== matcher.dateKey
+      || (matcher.myScore !== undefined && last.myScore !== matcher.myScore)) {
+      return false;
+    }
+    this.safeSetItem(key, JSON.stringify(history.slice(1)));
+    return true;
+  }
+
+  /** @returns {{won: number, lost: number, tie: number}} Totals over the stored duel history. */
+  getGhostDuelRecord() {
+    const record = { won: 0, lost: 0, tie: 0 };
+    for (const entry of this.getGhostDuels()) {
+      record[entry.outcome] += 1;
+    }
+    return record;
+  }
+
+  /** @returns {string} The stored duel alias, or an empty string. */
+  getGhostAlias() {
+    const key = this.storageConfig.keys.ghostAlias;
+    return sanitizeAlias(key ? this.safeGetItem(key) : '', this.ghostDuelConfig);
+  }
+
+  /**
+   * Stores the duel alias after sanitizing it; an empty result clears it.
+   * @param {unknown} raw
+   * @returns {string} The alias actually stored.
+   */
+  setGhostAlias(raw) {
+    const key = this.storageConfig.keys.ghostAlias;
+    const alias = sanitizeAlias(raw, this.ghostDuelConfig);
+    if (key) {
+      this.safeSetItem(key, alias);
+    }
+    return alias;
   }
 
   static compareNewestFirst(first, second) {

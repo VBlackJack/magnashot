@@ -259,7 +259,13 @@
       "flux": {
         "perkChosen": "Perk chosen: {{name}}."
       },
-      "modeUnlocked": "New mode unlocked: {{modes}}"
+      "modeUnlocked": "New mode unlocked: {{modes}}",
+      "ghost": {
+        "ahead": "You took the lead over {{name}}",
+        "behind": "{{name}} took the lead",
+        "ended": "{{name}}'s run ended at {{score}}",
+        "passed": "You passed {{name}}'s final score"
+      }
     },
     "hints": {
       "replayAria": "Show this level's hints again"
@@ -277,6 +283,18 @@
       "dailyFairPlay": "Same rules for everyone: Workshop upgrades and shop ammo are off today.",
       "dailyFairPlayUpgrades": "Same rules for everyone: Workshop upgrades are off today.",
       "dailyFairPlayAmmo": "Same rules for everyone: shop ammo is off today."
+    },
+    "ghost": {
+      "ahead": "+{{gap}} vs {{name}}",
+      "behind": "-{{gap}} vs {{name}}",
+      "tied": "= {{name}}",
+      "final": "{{text}} (final)",
+      "aria": "You are {{gap}} points {{side}} {{name}} at shot {{shot}}",
+      "ariaTied": "You are tied with {{name}} at shot {{shot}}",
+      "side": {
+        "ahead": "ahead of",
+        "behind": "behind"
+      }
     }
   },
   "gameplay": {
@@ -1001,7 +1019,8 @@
         "levels": "Select Level",
         "share": "Share",
         "shareCopied": "Copied ✓",
-        "dailyHistory": "History"
+        "dailyHistory": "History",
+        "shareChallenge": "Share challenge"
       },
       "share": {
         "field": {
@@ -1028,6 +1047,11 @@
           "one": "{{count}} point short of your best",
           "other": "{{count}} points short of your best"
         }
+      },
+      "duel": {
+        "won": "You beat {{name}} by {{gap}}",
+        "lost": "{{name}} wins by {{gap}}",
+        "tie": "Dead heat with {{name}}"
       }
     },
     "pause": {
@@ -1081,6 +1105,10 @@
         "button": "Install the app",
         "iosHint": "On iPhone and iPad: Share, then Add to Home Screen.",
         "installedAnnounce": "App installed. Launch it from your home screen."
+      },
+      "duelName": {
+        "label": "Duel name (optional)",
+        "hint": "Letters and digits, 12 max. Shown to friends you challenge."
       }
     },
     "fluxPerk": {
@@ -1143,6 +1171,11 @@
         "unknown": "-",
         "empty": "Your Daily results will be listed here from now on.",
         "summary": "Played {{played}} of the last {{days}} days. Best: {{score}} on {{date}}."
+      },
+      "duels": {
+        "title": "Duels",
+        "record": "{{won}} won - {{lost}} lost",
+        "empty": "No duels yet."
       }
     }
   },
@@ -1325,6 +1358,12 @@
       "header": "MagnaShot Purist",
       "stats": "Stage {{stage}} - {{score}} pts",
       "drops": "Rail drops: {{drops}}"
+    },
+    "duel": {
+      "header": "vs {{name}}: {{result}}",
+      "won": "won by {{gap}}",
+      "lost": "lost by {{gap}}",
+      "tie": "dead heat"
     }
   },
   "stats": {
@@ -1339,5 +1378,26 @@
       "hardestLine": "Hardest level: {{level}} ({{fails}} failed attempts)",
       "schemaLine": "Save schema {{version}}"
     }
+  },
+  "duel": {
+    "card": {
+      "title": "Ghost Duel",
+      "daily": "{{name}} scored {{score}} on Daily #{{number}}",
+      "flux": "{{name}} scored {{score}} on Flux #{{seed}}",
+      "rematch": "Past Daily: no bonus or streak",
+      "assists": "Rival assists: Workshop +{{levels}} - Ammo {{ammo}} - Continue {{continues}}",
+      "tiltFree": "Rival played with tilt on",
+      "version": "Made with another version: the board may differ",
+      "accept": "Accept duel",
+      "decline": "Not now"
+    },
+    "error": {
+      "invalid": "This duel link is damaged or incomplete.",
+      "expired": "This Daily duel is too old to replay.",
+      "future": "This Daily is not out yet.",
+      "newer": "This duel needs a newer MagnaShot. Reload to update.",
+      "ok": "OK"
+    },
+    "defaultName": "Ghost"
   }
 }

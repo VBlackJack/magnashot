@@ -274,7 +274,7 @@ test('an old snapshot without progress fields restores with an empty timeline an
   });
 });
 
-test('Campaign and a normal Flux run record no timeline and no daily history', () => {
+test('Campaign records no timeline; a normal Flux run samples one but persists nothing', () => {
   withEngine((engine, storage) => {
     engine.startCampaignLevel(FIRST_LEVEL);
     fireShots(engine, SHOTS_FIRED);
@@ -282,7 +282,9 @@ test('Campaign and a normal Flux run record no timeline and no daily history', (
     engine.startFluxRun('abc123');
     fireShots(engine, SHOTS_FIRED);
     engine.triggerGameOver(GAME_OVER_REASONS.LINE_CROSSED);
-    assert.equal(engine.shotTimeline, null);
+    // Sampled for Ghost Duels (changed from null), yet never persisted.
+    assert.equal(engine.shotTimeline.n, SHOTS_FIRED + 1);
+    assert.equal(engine.shotTimeline.c, 1);
     assert.equal(engine.isWeeklyFluxRun, false);
     assert.deepEqual(storage.getDailyHistory(), []);
     assert.equal(storage.getWeeklyFluxBest(getUtcIsoWeekKey(Date.now())), null);

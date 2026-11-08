@@ -44,6 +44,7 @@ import { engineControlsMethods } from './EngineControls.js';
 import { engineTurnResolutionMethods } from './EngineTurnResolution.js';
 import { engineRoundFlowMethods } from './EngineRoundFlow.js';
 import { engineProgressMethods } from './EngineProgress.js';
+import { engineGhostDuelMethods } from './EngineGhostDuel.js';
 
 /** What a run is measured by when it is compared with the mode's record. */
 export const RUN_BEST_METRICS = Object.freeze({
@@ -136,6 +137,9 @@ export class GameEngine {
     this.weeklyWeekKey = null;
     // Outcomes of the shots of a Daily or weekly Flux run (see ShotTimeline.js).
     this.shotTimeline = null;
+    // Ghost Duel: the rival run being raced (see EngineGhostDuel.js) and the replay of a past Daily.
+    this.ghostDuel = null;
+    this.isDailyRematch = false;
     this.anvilCrushCount = 0;
     this.isCoreFreezeApplied = false;
     this.outOfShotsGraceFrames = 0;
@@ -482,6 +486,10 @@ export class GameEngine {
     if (this.mode === GAME_MODES.ENDLESS) {
       this.storageManager.setEndlessHighScore(this.score);
     } else if (this.mode === GAME_MODES.DAILY) {
+      // A rematch of a past Daily writes no daily high score, streak or history.
+      if (this.isDailyRematch) {
+        return;
+      }
       this.storageManager.setDailyHighScore(this.score, this.dailySeedKey);
       if (this.hasFiredInRound || this.runShotsFired > 0) {
         this.storageManager.recordDailyResult?.({
@@ -621,6 +629,8 @@ export class GameEngine {
     this.isWeeklyFluxRun = false;
     this.weeklyWeekKey = null;
     this.shotTimeline = null;
+    this.ghostDuel = null;
+    this.isDailyRematch = false;
     // clear() keeps the tilt: a run must not start leaning from the previous run's last reading.
     this.physicsWorld.tiltFactor = 0;
     this.score = 0;
@@ -1179,6 +1189,7 @@ export class GameEngine {
     }
     // The previous shot has settled: this is the state it left behind.
     this.sampleShotTimeline();
+    this.evaluateGhostShot();
     this.countShotForStats();
     const ballCfg = this.physicsConfig.ball;
     const projectile = this.currentBall;
@@ -1428,10 +1439,14 @@ export class GameEngine {
   }
 
   restartCurrent() {
+    // A restart on the same board keeps the ghost; any other start clears it (resetRunState).
+    const ghost = this.ghostDuel?.ghost ?? null;
     if (this.mode === GAME_MODES.CAMPAIGN) {
       this.startCampaignLevel(this.currentLevelId);
     } else if (this.mode === GAME_MODES.DAILY) {
-      this.startDailyChallenge(this.dailySeedKey, true);
+      this.startDailyChallenge(this.dailySeedKey, true, { isRematch: this.isDailyRematch });
+    } else if (this.mode === GAME_MODES.FLUX && ghost) {
+      this.startFluxRun(this.fluxSeed, { isShared: true, isRestart: true, weekKey: this.weeklyWeekKey ?? undefined });
     } else if (this.mode === GAME_MODES.FLUX && this.isWeeklyFluxRun) {
       this.startWeeklyFlux({ isRestart: true });
     } else if (this.mode === GAME_MODES.FLUX) {
@@ -1448,6 +1463,9 @@ export class GameEngine {
       this.startClassicMode(1);
     } else {
       this.startEndlessMode();
+    }
+    if (ghost) {
+      this.attachGhost(ghost);
     }
   }
 
@@ -1466,3 +1484,4 @@ installMethods(GameEngine, engineControlsMethods);
 installMethods(GameEngine, engineTurnResolutionMethods);
 installMethods(GameEngine, engineRoundFlowMethods);
 installMethods(GameEngine, engineProgressMethods);
+installMethods(GameEngine, engineGhostDuelMethods);

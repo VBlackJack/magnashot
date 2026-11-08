@@ -474,7 +474,8 @@ export const engineRoundFlowMethods = {
     } else if (this.mode === GAME_MODES.CLASSIC) {
       previousBestScore = this.storageManager.getClassicHighScore?.() || 0;
     }
-    const isNewRecord = this.mode !== GAME_MODES.CAMPAIGN && previousBestScore > 0 && this.score > previousBestScore;
+    // A Daily rematch persists nothing, so it never sets a record.
+    const isNewRecord = this.mode !== GAME_MODES.CAMPAIGN && !this.isDailyRematch && previousBestScore > 0 && this.score > previousBestScore;
     const remainingSpheres = this.physicsWorld.balls.length;
     this.gameOverSummary = {
       reasonKey,
@@ -487,6 +488,7 @@ export const engineRoundFlowMethods = {
     this.state = GAME_STATES.GAME_OVER;
     // The state the last shot left behind, written as a finished timeline.
     this.sampleShotTimeline(true);
+    this.settleGhostDuel();
     this.persistRunHighScore();
     this.recordRunOutcome('loss');
     this.flushPendingRunCoins();
@@ -522,6 +524,7 @@ export const engineRoundFlowMethods = {
     this.storageManager.setCoins(coins - pack.costCoins);
     this.hasUsedContinue = true;
     this.retractRunOutcome();
+    this.retractGhostDuel();
     this.shotsRemaining = pack.shots;
     this.outOfShotsGraceFrames = 0;
     this.gameOverSummary = null;

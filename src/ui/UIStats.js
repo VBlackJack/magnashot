@@ -372,6 +372,7 @@ export const uiStatsMethods = {
       );
       els.statsCampaignList.classList.toggle('hidden', overview.notes.length === 0);
     }
+    this.renderStatsDuels();
   },
 
   createStatsTerm(text) {

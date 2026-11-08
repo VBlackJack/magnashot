@@ -22,7 +22,8 @@ import { Renderer } from './game/Renderer.js';
 import { GameEngine } from './game/GameEngine.js';
 import { UIManager, isSharedFluxOverSavedRun } from './ui/UIManager.js';
 import { createGameLoop } from './game/GameLoop.js';
-import { readFluxSeedFromSearch, stripFluxSeedFromUrl } from './game/DailyShare.js';
+import { FLUX_SEED_QUERY_PARAM, readFluxSeedFromSearch, stripFluxSeedFromUrl } from './game/DailyShare.js';
+import { DUEL_STATUS, readDuelFromSearch } from './game/GhostCodec.js';
 import { GAME_MODES } from './core/Constants.js';
 
 const BOOTSTRAP_ERROR_ELEMENT_ID = 'bootstrap-error';
@@ -110,10 +111,19 @@ class Application {
         }
       });
 
-      const sharedFluxSeed = readFluxSeedFromSearch(window.location?.search, fluxConfig.seed);
+      // The duel link is read before the boot: starting a run rewrites the address bar. A valid
+      // duel is started from its card, so the Flux seed next to it does not drive the boot.
+      const duelRead = readDuelFromSearch(window.location?.search, gameConfig.ghostDuel, {
+        ...engine.buildGhostContext(),
+        fluxParam: FLUX_SEED_QUERY_PARAM
+      });
+      const hasValidDuel = duelRead.status === DUEL_STATUS.VALID;
+      const sharedFluxSeed = hasValidDuel ? null : readFluxSeedFromSearch(window.location?.search, fluxConfig.seed);
       const savedSnapshot = storageManager.loadRunSnapshot();
+      let hasRestoredRun = false;
       const canRestoreSaved = !sharedFluxSeed || savedSnapshot?.engine?.fluxSeed === sharedFluxSeed;
       if (isSharedFluxOverSavedRun(sharedFluxSeed, savedSnapshot) && engine.restoreSavedRun()) {
+        hasRestoredRun = true;
         // A shared link must not silently erase a saved run: the player confirms first.
         uiManager.requestDestructiveAction(
           () => {
@@ -123,12 +133,20 @@ class Application {
           () => t('app.nav.button.flux'),
           { always: true }
         );
-      } else if (!canRestoreSaved || !engine.restoreSavedRun()) {
-        if (sharedFluxSeed) {
-          engine.startFluxRun(sharedFluxSeed, { isShared: true });
-        } else {
-          engine.startCampaignLevel(storageManager.getUnlockedLevel());
+      } else {
+        hasRestoredRun = canRestoreSaved && engine.restoreSavedRun();
+        if (!hasRestoredRun) {
+          if (sharedFluxSeed) {
+            engine.startFluxRun(sharedFluxSeed, { isShared: true });
+          } else {
+            engine.startCampaignLevel(storageManager.getUnlockedLevel());
+          }
         }
+      }
+
+      // The card goes on top of the normal boot: the explicit start of a duel, or why it cannot start.
+      if (duelRead.status !== DUEL_STATUS.NONE) {
+        uiManager.showDuelCard(duelRead, { isRunAtStake: hasRestoredRun });
       }
 
       const gameLoop = createGameLoop({

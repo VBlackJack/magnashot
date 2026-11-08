@@ -326,11 +326,19 @@ export const uiSettingsControlMethods = {
     }
   },
 
+  /** Label key of the game over Share button: copied, challenge (a duel address exists) or plain share. */
+  getShareButtonLabelKey() {
+    if (this.shareCopied) {
+      return 'modals.gameOver.button.shareCopied';
+    }
+    return this.challengeUrl ? 'modals.gameOver.button.shareChallenge' : 'modals.gameOver.button.share';
+  },
+
   updateShareButtonLabel() {
     if (this.elements?.btnShareGameOver) {
       setTextIfChanged(
         this.elements.btnShareGameOver,
-        t(this.shareCopied ? 'modals.gameOver.button.shareCopied' : 'modals.gameOver.button.share')
+        t(this.getShareButtonLabelKey())
       );
     }
   },
@@ -402,6 +410,7 @@ export const uiSettingsControlMethods = {
   async shareRunResultOnce() {
     const engine = this.engine;
     const shareConfig = this.gameConfig.share;
+    const { duel, duelUrl } = this.getShareDuel();
     const text = buildShareText(
       {
         mode: engine.mode,
@@ -419,6 +428,8 @@ export const uiSettingsControlMethods = {
         workshopLevels: this.getOwnedWorkshopLevelSum(),
         ammoBought: engine.specialAmmoBoughtInRun || 0,
         continues: engine.hasUsedContinue ? 1 : 0,
+        duel,
+        duelUrl,
         url: shareConfig.url
       },
       shareConfig

@@ -4,6 +4,12 @@ All notable changes to **MagnaShot** are documented in this file.
 
 ## [Unreleased]
 
+### Added
+- **Ghost Duels (`GhostCodec`, `GhostDuel`, `EngineGhostDuel`, `UIGhostDuel`, `StorageManager`)**: Race a friend's run on the same board. The Share result of a Daily or Flux run now ends with a challenge link (`?duel=<code>`, next to `?flux=<seed>` for Flux) that carries your score after each shot and never your inputs, in about 600 characters. Opening a link shows a Duel card and nothing starts until the player accepts (a saved run asks for confirmation first, a fresh profile unlocks Flux as a shared seed link does). Works on today's Daily, on any Daily of the last 30 days as a rematch (same board, no first-play bonus, no streak, no Daily record) and on any Flux seed, Weekly Flux included. Links are unsigned and treated as hostile input: strict canonical decoding, size and charset checks before decoding, a checksum, caps, and an explanatory card for a damaged, too old, not yet released or newer-version link.
+- **Rival Badge and Result**: A live badge in the HUD (`+1,240 vs Sam`, `-320 vs Sam`, `= Sam`, with `(final)` after their last shot) takes the place of the best-run marker, with a sentence label, a forced-colors border and no pulse under reduced motion. Lead changes, the end of the rival's run and passing their final score are announced once per shot at most, with hysteresis. The game over states the result and Share becomes "Share challenge".
+- **Duel Name and History**: An optional duel name in Settings (1 to 12 letters, digits and spaces, stored locally) and a Duels section in My stats with the last 10 duels and the won and lost record. Friendly rivalry only: no leaderboard, no coins or achievements.
+- **Browser Smoke Tests**: Duel link on a fresh profile and over a saved run, a damaged link, a past Daily rematch without bonus, the game over result and the challenge link, and the unchanged HUD columns at all five layouts.
+
 ## [1.17.0] - 2026-11-08
 
 ### Added
