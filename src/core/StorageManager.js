@@ -944,6 +944,21 @@ export class StorageManager {
     this.safeSetItem(key, JSON.stringify(records));
   }
 
+  /** @returns {number} Number of finished local two-player duels on this device. */
+  getVersusLocalMatches() {
+    const key = this.storageConfig?.keys?.versusLocalMatches;
+    return key ? this.readNonNegativeInt(key) : 0;
+  }
+
+  /** Counts one finished local two-player duel. No winner is stored: both players share the device. */
+  recordVersusLocalMatch() {
+    const key = this.storageConfig?.keys?.versusLocalMatches;
+    if (!key) {
+      return;
+    }
+    this.safeSetItem(key, this.getVersusLocalMatches() + 1);
+  }
+
   /** @returns {boolean} True when the CPU tier can be picked (a tier may require wins on another). */
   isVersusTierUnlocked(tier) {
     const tiers = this.getVersusTiers();

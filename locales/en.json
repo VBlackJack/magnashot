@@ -1438,6 +1438,58 @@
     "defaultName": "Ghost"
   },
   "versus": {
+    "local": {
+      "lobby": {
+        "title": "Two players",
+        "subtitle": "Each player picks a device",
+        "slotPress": "Press to join",
+        "player": "Player {{n}}",
+        "joined": "Player {{n}}: {{device}}",
+        "change": "Change device",
+        "leave": "Leave",
+        "handicap": "Charge rise speed",
+        "start": "Start match",
+        "back": "Back",
+        "needTwo": "Both players must join",
+        "joinKeys": "Keyboard: press {{key}} to join"
+      },
+      "device": {
+        "pad": "Controller",
+        "keyboardLeft": "Left keys",
+        "keyboardMouse": "Left keys and mouse",
+        "keyboardRight": "Right keys",
+        "touch": "Touch"
+      },
+      "handicap": {
+        "none": "Normal",
+        "slow": "Slower (x1.25)",
+        "slower": "Slowest (x1.5)"
+      },
+      "announce": {
+        "joined": "Player {{n}} joined with {{device}}",
+        "left": "Player {{n}} left",
+        "roundWon": "Player {{n}} wins the round",
+        "matchWon": "Player {{n}} wins the match {{a}} to {{b}}",
+        "pulseSent": "Player {{n}} sent a field pulse",
+        "padLost": "Player {{n}} controller disconnected. Press any button on a controller to take over, or quit."
+      },
+      "hud": {
+        "board": "Player {{n}} board"
+      },
+      "pause": {
+        "tooSmall": "The window is too small for two boards. Make it larger to continue."
+      },
+      "result": {
+        "title": "Player {{n}} wins",
+        "score": "Player 1 {{a}} - {{b}} Player 2",
+        "neutralised": "Player {{n}}: {{count}} charges neutralized",
+        "pulses": "Player {{n}}: {{count}} pulses",
+        "changePlayers": "Change players"
+      },
+      "stats": {
+        "matches": "2P matches: {{count}}"
+      }
+    },
     "stats": {
       "tierLine": "{{tier}}: {{record}}"
     },

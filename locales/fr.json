@@ -1438,6 +1438,58 @@
     "defaultName": "Fantôme"
   },
   "versus": {
+    "local": {
+      "lobby": {
+        "title": "Deux joueurs",
+        "subtitle": "Chaque joueur choisit son périphérique",
+        "slotPress": "Appuyez pour rejoindre",
+        "player": "Joueur {{n}}",
+        "joined": "Joueur {{n}} : {{device}}",
+        "change": "Changer de périphérique",
+        "leave": "Quitter",
+        "handicap": "Vitesse de montée des charges",
+        "start": "Lancer le match",
+        "back": "Retour",
+        "needTwo": "Les deux joueurs doivent rejoindre",
+        "joinKeys": "Clavier : appuyez sur {{key}} pour rejoindre"
+      },
+      "device": {
+        "pad": "Manette",
+        "keyboardLeft": "Touches de gauche",
+        "keyboardMouse": "Touches de gauche et souris",
+        "keyboardRight": "Touches de droite",
+        "touch": "Tactile"
+      },
+      "handicap": {
+        "none": "Normale",
+        "slow": "Plus lente (x1,25)",
+        "slower": "La plus lente (x1,5)"
+      },
+      "announce": {
+        "joined": "Le joueur {{n}} a rejoint avec : {{device}}",
+        "left": "Le joueur {{n}} est parti",
+        "roundWon": "Le joueur {{n}} remporte la manche",
+        "matchWon": "Le joueur {{n}} remporte le match {{a}} à {{b}}",
+        "pulseSent": "Le joueur {{n}} a envoyé une impulsion de champ",
+        "padLost": "Manette du joueur {{n}} déconnectée. Appuyez sur un bouton d'une manette pour la remplacer, ou quittez."
+      },
+      "hud": {
+        "board": "Plateau du joueur {{n}}"
+      },
+      "pause": {
+        "tooSmall": "La fenêtre est trop petite pour deux plateaux. Agrandissez-la pour continuer."
+      },
+      "result": {
+        "title": "Le joueur {{n}} gagne",
+        "score": "Joueur 1 {{a}} - {{b}} Joueur 2",
+        "neutralised": "Joueur {{n}} : {{count}} charges neutralisées",
+        "pulses": "Joueur {{n}} : {{count}} impulsions",
+        "changePlayers": "Changer de joueurs"
+      },
+      "stats": {
+        "matches": "Matchs à 2 joueurs : {{count}}"
+      }
+    },
     "stats": {
       "tierLine": "{{tier}} : {{record}}"
     },
