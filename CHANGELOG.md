@@ -4,6 +4,8 @@ All notable changes to **MagnaShot** are documented in this file.
 
 ## [Unreleased]
 
+## [1.17.0] - 2026-11-08
+
 ### Added
 - **Sag Meter (`SagMeter`, `EngineTurnResolution`, `EngineRoundFlow`, `Renderer`, `UIHudRefresh`)**: Survival, the Daily Challenge and Purist show how close the cluster is to sinking. Every shot that removes nothing fills one segment, a match leaves the meter as it is, and an avalanche caused by your shot that drops four or more spheres lifts it by one (three or more, up to two, in Purist); chain-reaction and in-flight bond-break avalanches do not drain, and a no-match shot that still causes an avalanche no longer counts as a miss. A full meter drops the cluster one step and empties. The HUD box (the former "Next Wave" box, same grid) carries a segmented `role="meter"` with a spoken value, a gauge is drawn beside the launcher, the warning (amber, dashed outline) comes one miss before the drop and is announced once per cycle, and the drop has a creak, a shake (none under reduced motion), a floating text and haptics. Forced colors and reduced motion are handled.
 - **Purist Mode (`EngineModes`, `StorageManager`, `DailyShare`, `UIManager`)**: Pure rules on a fixed ceiling: stages from a seeded stream, 6 rows of 4 colors growing to 9 rows and 6 colors, a fully anchored top row, no special spheres, no Workshop upgrades, no tilt and no shot budget. Misses lower the rail one step; clearing the board pays a stage bonus and starts the next stage. It opens at campaign level 4 (a save from before the update shows it as "New"), keeps its own records (best score and best stage), and its Share result lists the stage, the score and the rail drops. Its card is the first of the arcade strip in the Level Select.
