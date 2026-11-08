@@ -1445,3 +1445,188 @@ test('Single-player render output equals the frozen v1.19.0 renderer draw call f
     assert.deepEqual(current, frozen);
   }
 });
+
+const createChargeRecorder = () => {
+  const calls = [];
+  let depth = 0;
+  let underflows = 0;
+  const state = { calls, get depth() { return depth; }, get underflows() { return underflows; } };
+  return new Proxy(state, {
+    get(target, prop) {
+      if (prop in target) {
+        return target[prop];
+      }
+      if (prop === 'save') {
+        return () => { depth++; calls.push({ name: 'save' }); };
+      }
+      if (prop === 'restore') {
+        return () => { if (depth === 0) { underflows++; } else { depth--; } calls.push({ name: 'restore' }); };
+      }
+      return (...args) => { calls.push({ name: String(prop), args }); };
+    },
+    set(target, prop, value) {
+      calls.push({ name: `set:${String(prop)}`, value });
+      return true;
+    }
+  });
+};
+
+const chargeState = (charges, extra = {}) => ({
+  physicsWorld: { physicsConfig: { ball: { radius: 20 } } },
+  versus: { charges, ...(extra.versus ?? {}) },
+  aimPreview: extra.aimPreview ?? null
+});
+
+const dashesFor = (ctx) => ctx.calls.filter((c) => c.name === 'setLineDash').map((c) => c.args[0].length);
+const arcCount = (ctx) => ctx.calls.filter((c) => c.name === 'arc').length;
+const lineToCount = (ctx) => ctx.calls.filter((c) => c.name === 'lineTo').length;
+
+test('Versus charges: draw is save/restore balanced', () => {
+  const renderer = createRenderer();
+  const ctx = createChargeRecorder();
+  renderer.drawVersusCharges(ctx, chargeState([
+    { id: 1, polarity: 1, strength: 2, x: 50, y: 90, progress: 0.2 },
+    { id: 2, polarity: -1, strength: 1, x: 120, y: 60, progress: 0.9, threatening: true }
+  ], { aimPreview: { chargeHit: { x: 10, y: 10, polarity: -1 } } }));
+  assert.equal(ctx.depth, 0);
+  assert.equal(ctx.underflows, 0);
+});
+
+test('Versus charges: outline is solid for plus and dashed for minus', () => {
+  const renderer = createRenderer();
+  const plus = createChargeRecorder();
+  renderer.drawVersusCharges(plus, chargeState([{ id: 1, polarity: 1, strength: 1, x: 50, y: 90, progress: 0.2 }]));
+  const minus = createChargeRecorder();
+  renderer.drawVersusCharges(minus, chargeState([{ id: 2, polarity: -1, strength: 1, x: 50, y: 90, progress: 0.2 }]));
+  assert.ok(dashesFor(plus).every((n) => n === 0), 'plus outline never uses a dash');
+  assert.ok(dashesFor(minus).some((n) => n > 0), 'minus outline is dashed');
+  assert.equal(lineToCount(plus), 2, 'plus glyph has two bars');
+  assert.equal(lineToCount(minus), 1, 'minus glyph has one bar');
+});
+
+test('Versus charges: strength 2 draws a second ring', () => {
+  const renderer = createRenderer();
+  const one = createChargeRecorder();
+  renderer.drawVersusCharges(one, chargeState([{ id: 1, polarity: 1, strength: 1, x: 50, y: 90 }]));
+  const two = createChargeRecorder();
+  renderer.drawVersusCharges(two, chargeState([{ id: 1, polarity: 1, strength: 2, x: 50, y: 90 }]));
+  assert.equal(arcCount(two), arcCount(one) + 1);
+});
+
+test('Versus charges: threatening charge gets a thicker outline and a halo, not colour only', () => {
+  const renderer = createRenderer();
+  const calm = createChargeRecorder();
+  renderer.drawVersusCharges(calm, chargeState([{ id: 7, polarity: 1, strength: 1, x: 50, y: 90 }]));
+  const hot = createChargeRecorder();
+  renderer.drawVersusCharges(hot, chargeState([{ id: 7, polarity: 1, strength: 1, x: 50, y: 90 }], { versus: { threatIds: [7] } }));
+  const widths = (ctx) => ctx.calls.filter((c) => c.name === 'set:lineWidth').map((c) => c.value);
+  assert.ok(Math.max(...widths(hot)) > Math.max(...widths(calm)));
+  assert.equal(arcCount(hot), arcCount(calm) + 1);
+});
+
+test('Versus charges: rise trail is disabled under reduced motion and in lite mode', () => {
+  const charges = [{ id: 1, polarity: 1, strength: 1, x: 50, y: 90 }];
+  const full = createRenderer();
+  full.isReducedMotion = false;
+  const withTrail = createChargeRecorder();
+  full.drawVersusCharges(withTrail, chargeState(charges));
+  const reduced = createRenderer();
+  reduced.isReducedMotion = true;
+  const noTrail = createChargeRecorder();
+  reduced.drawVersusCharges(noTrail, chargeState(charges));
+  assert.ok(arcCount(withTrail) > arcCount(noTrail));
+  assert.equal(arcCount(noTrail), 1);
+  const lite = new Renderer(createStubCanvas(), gameConfig, ballsConfig, obstaclesConfig, { lite: true });
+  const liteCtx = createChargeRecorder();
+  lite.drawVersusCharges(liteCtx, chargeState(charges));
+  assert.equal(arcCount(liteCtx), 1, 'lite mode draws the charge body without a trail');
+});
+
+test('Versus charges: aim preview ring carries the polarity glyph', () => {
+  const renderer = createRenderer();
+  const ctx = createChargeRecorder();
+  renderer.drawVersusCharges(ctx, chargeState([], { aimPreview: { chargeHit: { x: 70, y: 80, polarity: -1 } } }));
+  assert.equal(arcCount(ctx), 1);
+  assert.ok(dashesFor(ctx).some((n) => n > 0));
+  assert.equal(lineToCount(ctx), 1);
+  const none = createChargeRecorder();
+  renderer.drawVersusCharges(none, chargeState([]));
+  assert.equal(arcCount(none), 0);
+});
+
+test('Versus charges: a full render with versus state stays balanced', () => {
+  const renderer = createRenderer();
+  const engine = createTestEngine();
+  engine.startClassicMode(1);
+  engine.versus = { charges: [{ id: 1, polarity: -1, strength: 2, x: 100, y: 200, progress: 0.5 }] };
+  renderer.render(engine, 1.0);
+  const ctx = renderer.ctx;
+  assert.equal(ctx.saveDepth, 0);
+  assert.equal(ctx.restoreUnderflows, 0);
+});
+
+test('Versus preview ring: the predicted outcome is a shape, a crack to shatter and a rebound arrow to bounce', () => {
+  const renderer = createRenderer();
+  const draw = (outcome) => {
+    const ctx = createChargeRecorder();
+    renderer.drawVersusCharges(ctx, chargeState([], { aimPreview: { chargeHit: { x: 70, y: 80, polarity: -1, outcome } } }));
+    return ctx;
+  };
+  const none = draw(undefined);
+  const shatter = draw('neutralised');
+  const weaken = draw('weakened');
+  const bounce = draw('deflected');
+  assert.equal(lineToCount(none), 1, 'without a prediction only the polarity glyph is drawn');
+  assert.equal(lineToCount(shatter), lineToCount(none) + 3, 'the crack is a three-segment zigzag');
+  assert.equal(lineToCount(weaken), lineToCount(shatter), 'a weakened charge shows the break mark too');
+  assert.equal(lineToCount(bounce), lineToCount(none) + 4, 'the rebound arrow is a V with an arrowhead');
+  assert.notEqual(lineToCount(bounce), lineToCount(shatter));
+  for (const ctx of [shatter, bounce]) {
+    assert.equal(ctx.depth, 0);
+    assert.equal(ctx.underflows, 0);
+  }
+});
+
+test('Versus launcher: the loaded and the next sphere show their +/- glyph, on a versus board only', () => {
+  const drawWith = (setup, options) => {
+    const renderer = options?.lite
+      ? new Renderer(createStubCanvas(), gameConfig, ballsConfig, obstaclesConfig, { lite: true })
+      : createRenderer();
+    renderer.createLayerCanvas = () => createStubCanvas();
+    const calls = [];
+    renderer.drawShotPolarityGlyph = (ctx, x, y, half, polarity) => calls.push({ x, y, half, polarity });
+    const engine = createTestEngine();
+    engine.startClassicMode(1);
+    setup(engine);
+    renderer.render(engine, 1.0);
+    return { calls, engine };
+  };
+  const versusSetup = (engine) => {
+    engine.versus = { charges: [] };
+    engine.getVersusShotPolarity = (_ball, flipped = engine.isPolarityFlipped) => (flipped ? -1 : 1);
+  };
+  const versus = drawWith(versusSetup);
+  assert.equal(versus.calls.length, 2, 'one glyph on the launcher, one on the next sphere');
+  const radius = versus.engine.currentBall.radius;
+  assert.equal(versus.calls[0].half, radius * gameConfig.versus.render.launcherGlyphSizeFactor);
+  assert.equal(versus.calls[0].x, gameConfig.canvas.launcherX);
+  assert.equal(versus.calls[1].half, versus.engine.nextBall.radius * gameConfig.versus.render.nextGlyphSizeFactor);
+  const flipped = drawWith((engine) => {
+    versusSetup(engine);
+    engine.isPolarityFlipped = true;
+  });
+  assert.equal(flipped.calls[0].polarity, -1, 'the loaded sphere follows the flip');
+  assert.equal(flipped.calls[1].polarity, 1, 'the next sphere is not flipped yet');
+  assert.equal(drawWith(versusSetup, { lite: true }).calls.length, 0, 'lite boards draw no glyph');
+  assert.equal(drawWith(() => {}).calls.length, 0, 'a single player board draws none');
+  const special = drawWith((engine) => {
+    versusSetup(engine);
+    engine.getVersusShotPolarity = (ball = engine.currentBall) => (ball === engine.currentBall ? null : 1);
+  });
+  assert.equal(special.calls.length, 1, 'a special loaded sphere has no polarity glyph');
+
+  const ctx = createChargeRecorder();
+  createRenderer().drawShotPolarityGlyph(ctx, 10, 10, 8, -1);
+  assert.equal(lineToCount(ctx), 2, 'a minus is drawn twice: backdrop, then the sign');
+  assert.equal(ctx.depth, 0);
+});

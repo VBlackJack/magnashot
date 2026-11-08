@@ -40,7 +40,8 @@ export const SAVE_MIGRATIONS = Object.freeze([
   { toVersion: 1, run: (manager) => manager.migrateLegacyKeys() },
   { toVersion: 2, run: (manager) => manager.grandfatherModeUnlocks() },
   { toVersion: 3, run: (manager) => manager.seedDailyHistory() },
-  { toVersion: 4, run: (manager) => manager.announceIntroducedModes() }
+  { toVersion: 4, run: (manager) => manager.announceIntroducedModes() },
+  { toVersion: 5, run: (manager) => manager.announceIntroducedModes() }
 ]);
 export const CURRENT_SAVE_SCHEMA_VERSION = SAVE_MIGRATIONS.at(-1).toVersion;
 
@@ -57,6 +58,7 @@ export class StorageManager {
     this.achievementsConfig = null;
     this.dailyConfig = null;
     this.modeUnlocksConfig = null;
+    this.versusConfig = null;
     this.dailyHistoryConfig = null;
     this.weeklyFluxConfig = null;
     this.playerStatsConfig = null;
@@ -79,6 +81,7 @@ export class StorageManager {
     this.achievementsConfig = gameConfig.achievements || {};
     this.dailyConfig = gameConfig.daily || {};
     this.modeUnlocksConfig = gameConfig.modeUnlocks || {};
+    this.versusConfig = gameConfig.versus || {};
     this.dailyHistoryConfig = gameConfig.dailyHistory || {};
     this.weeklyFluxConfig = gameConfig.weeklyFlux || {};
     this.playerStatsConfig = gameConfig.playerStats || {};
@@ -904,6 +907,62 @@ export class StorageManager {
     }
   }
 
+  /** @returns {string[]} Configured versus CPU tiers, easiest first. */
+  getVersusTiers() {
+    const tiers = this.versusConfig?.records?.tiers;
+    return Array.isArray(tiers) ? tiers : [];
+  }
+
+  /** @returns {Object<string, {w: number, l: number}>} Sanitized versus win/loss counts per CPU tier. */
+  getVersusRecords() {
+    const key = this.storageConfig?.keys?.versusRecords;
+    const parsed = key ? this.readJsonObject(key) : {};
+    const records = {};
+    for (const tier of this.getVersusTiers()) {
+      const entry = StorageManager.isPlainObject(parsed[tier]) ? parsed[tier] : {};
+      records[tier] = {
+        w: StorageManager.toNonNegativeInt(entry.w),
+        l: StorageManager.toNonNegativeInt(entry.l)
+      };
+    }
+    return records;
+  }
+
+  /**
+   * Adds one finished match against a CPU tier to the versus records.
+   * @param {string} tier Configured CPU tier id.
+   * @param {boolean} won True when the player won the match.
+   */
+  recordVersusResult(tier, won) {
+    const key = this.storageConfig?.keys?.versusRecords;
+    if (!key || !this.getVersusTiers().includes(tier)) {
+      return;
+    }
+    const records = this.getVersusRecords();
+    const field = won ? 'w' : 'l';
+    records[tier][field] += 1;
+    this.safeSetItem(key, JSON.stringify(records));
+  }
+
+  /** @returns {boolean} True when the CPU tier can be picked (a tier may require wins on another). */
+  isVersusTierUnlocked(tier) {
+    const tiers = this.getVersusTiers();
+    if (!tiers.includes(tier)) {
+      return false;
+    }
+    const rule = this.versusConfig?.records?.unlock?.[tier];
+    if (!rule) {
+      return true;
+    }
+    const required = Math.max(0, Math.floor(Number(rule.wins) || 0));
+    return (this.getVersusRecords()[rule.requiresWinsOn]?.w || 0) >= required;
+  }
+
+  static toNonNegativeInt(value) {
+    const n = Math.floor(Number(value));
+    return Number.isFinite(n) && n > 0 ? n : 0;
+  }
+
   getDailyHighScore(dateKey = SeededRandom.getTodayDateKey()) {
     const savedDate = this.safeGetItem(this.storageConfig.keys.dailyBestDate);
     if (savedDate !== dateKey) {
@@ -1250,6 +1309,9 @@ export class StorageManager {
     const keys = this.storageConfig.keys;
     return (Array.isArray(keyNames) ? keyNames : []).some((name) => {
       const suffix = keys[name];
+      if (name === 'versusRecords') {
+        return Object.values(this.getVersusRecords()).some((entry) => entry.w + entry.l > 0);
+      }
       return typeof suffix === 'string' && Number.parseInt(this.safeGetItem(suffix), 10) > 0;
     });
   }

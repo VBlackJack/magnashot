@@ -262,6 +262,8 @@ export const uiModalMethods = {
     return [
       this.elements.modalConfirm,
       ...this.getOverlayModals(),
+      this.elements.modalDuelResult,
+      this.elements.modalDuelPause,
       this.elements.modalVictory,
       this.elements.modalGameOver,
       this.elements.modalPause,
@@ -272,6 +274,7 @@ export const uiModalMethods = {
   /** Dialogs opened from the menu over a run, which they pause until they close. */
   getOverlayModals() {
     return [
+      this.elements.modalVersusTiers,
       this.elements.modalLevels,
       this.elements.modalShop,
       this.elements.modalSettings,
@@ -351,12 +354,25 @@ export const uiModalMethods = {
 
   syncModalInertState() {
     const anyOpen = this.isAnyModalOpen();
+    // The versus screen is a layer of its own over the shell: the shell stays out of reach while it is open.
+    const isShellHeld = anyOpen || Boolean(this.versus);
     if (this.elements.appShell) {
-      this.elements.appShell.inert = anyOpen;
-      if (anyOpen) {
+      this.elements.appShell.inert = isShellHeld;
+      if (isShellHeld) {
         this.elements.appShell.setAttribute('aria-hidden', 'true');
       } else {
         this.elements.appShell.removeAttribute('aria-hidden');
+      }
+    }
+    // The duel screen itself is out of reach while one of its dialogs (pause, result) is open.
+    const versusScreen = this.elements.versusScreen;
+    if (versusScreen) {
+      const isScreenHeld = Boolean(this.versus) && anyOpen;
+      versusScreen.inert = isScreenHeld;
+      if (isScreenHeld) {
+        versusScreen.setAttribute('aria-hidden', 'true');
+      } else {
+        versusScreen.removeAttribute('aria-hidden');
       }
     }
     // A modal stacked on another (Confirm over Pause or Levels) leaves the
@@ -386,7 +402,7 @@ export const uiModalMethods = {
       } else if (wasAnyOpen) {
         // Nothing usable to return to (focus was on the page body, or the opener is now hidden):
         // the game canvas keeps keyboard focus inside the app instead of dropping to body.
-        const canvas = this.elements.gameCanvas;
+        const canvas = this.versus ? this.elements.versusCanvas0 : this.elements.gameCanvas;
         if (canvas && typeof canvas.focus === 'function') {
           canvas.focus();
         }

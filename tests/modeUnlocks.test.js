@@ -89,6 +89,7 @@ test('every gated mode follows its threshold exactly', () => {
     [GAME_MODES.ENDLESS]: 3,
     [CLASSIC_MODE]: 4,
     [GAME_MODES.PUZZLE]: 5,
+    [GAME_MODES.VERSUS]: 6,
     [GAME_MODES.BLITZ]: 7,
     [GAME_MODES.FLUX]: 8,
     [GAME_MODES.CASCADE]: 10,
@@ -211,7 +212,7 @@ test('storage: a mode with a record of its own is open without a stored unlock',
 test('classic: unlocks at campaign level 4, right after Survival, and is announced as introduced', () => {
   assert.equal(cfg.order.indexOf(CLASSIC_MODE), cfg.order.indexOf(GAME_MODES.ENDLESS) + 1);
   assert.equal(cfg.campaignLevelCleared[CLASSIC_MODE], 4);
-  assert.deepEqual(cfg.introduced, { [CLASSIC_MODE]: 4 });
+  assert.deepEqual(cfg.introduced, { [CLASSIC_MODE]: 4, [GAME_MODES.VERSUS]: 6 });
   assert.deepEqual(cfg.recordKeys[CLASSIC_MODE], ['classicHighScore', 'classicBestStage']);
   assert.equal(resolveModeAccess({}, 3, cfg)[CLASSIC_MODE].unlocked, false);
   assert.equal(resolveModeAccess({}, 4, cfg)[CLASSIC_MODE].unlocked, true);
@@ -227,5 +228,24 @@ test('classic: records only ever rise and a record opens the mode', () => {
     assert.equal(manager.getClassicHighScore(), 900);
     assert.equal(manager.getClassicBestStage(), 5);
     assert.equal(manager.getModeAccess()[CLASSIC_MODE].unlocked, true);
+  });
+});
+
+test('versus: unlocks at campaign level 6, right after Purist, and is announced as introduced', () => {
+  assert.equal(GAME_MODES.VERSUS, 'versus');
+  assert.equal(cfg.order.indexOf(GAME_MODES.VERSUS), cfg.order.indexOf(CLASSIC_MODE) + 1);
+  assert.equal(cfg.campaignLevelCleared[GAME_MODES.VERSUS], 6);
+  assert.equal(cfg.introduced[GAME_MODES.VERSUS], 6);
+  assert.deepEqual(cfg.recordKeys[GAME_MODES.VERSUS], ['versusRecords']);
+  assert.ok(cfg.grandfather.progressKeys.includes('versusRecords'));
+  assert.equal(resolveModeAccess({}, 5, cfg)[GAME_MODES.VERSUS].unlocked, false);
+  assert.equal(resolveModeAccess({}, 6, cfg)[GAME_MODES.VERSUS].unlocked, true);
+});
+
+test('versus: a stored match result opens the mode', () => {
+  withManager(null, (manager) => {
+    assert.equal(manager.getModeAccess()[GAME_MODES.VERSUS].unlocked, false);
+    manager.recordVersusResult('easy', false);
+    assert.equal(manager.getModeAccess()[GAME_MODES.VERSUS].unlocked, true);
   });
 });

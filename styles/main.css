@@ -3385,3 +3385,462 @@ body {
     border-color: CanvasText;
   }
 }
+
+/* ==========================================================================
+   Polarity Duel: the tier picker, the versus screen, its pause and result.
+   ========================================================================== */
+.versus-tier-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 12px 0;
+}
+
+.versus-tier-btn {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  min-height: var(--touch-target);
+  padding: 10px 14px;
+  background: var(--surface-raised);
+  color: var(--text-main);
+  border: 1px solid var(--border-strong);
+  border-radius: 10px;
+  font: inherit;
+  font-weight: 700;
+  text-align: left;
+  cursor: pointer;
+}
+
+.versus-tier-btn:hover:not([aria-disabled='true']) {
+  border-color: var(--accent-blue);
+}
+
+.versus-tier-btn:focus-visible {
+  outline: 3px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.versus-tier-btn[aria-disabled='true'] {
+  color: var(--text-muted);
+  background: var(--surface-locked);
+  border-style: dashed;
+  cursor: not-allowed;
+}
+
+.versus-tier-record {
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+.versus-screen {
+  --versus-gap: 12px;
+  --versus-pad: 8px;
+  /* Starting size of the CPU board in the mini-view; the layout code writes the measured one. */
+  --versus-mini-width: 132px;
+  --versus-mini-height: 230px;
+  --versus-player-width: 184px;
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  gap: var(--versus-pad);
+  padding: max(var(--versus-pad), env(safe-area-inset-top)) max(var(--versus-pad), env(safe-area-inset-right))
+    max(var(--versus-pad), env(safe-area-inset-bottom)) max(var(--versus-pad), env(safe-area-inset-left));
+  background-color: var(--bg-dark);
+  background-image: radial-gradient(circle at top, var(--bg-glow) 0%, var(--bg-dark) 100%);
+  overflow: hidden;
+}
+
+.versus-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: var(--touch-target);
+  flex-shrink: 0;
+}
+
+.versus-round-pips {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 700;
+  font-size: 0.9rem;
+}
+
+.versus-pip-group {
+  display: inline-flex;
+  gap: 4px;
+  padding: 3px 6px;
+  border-radius: 999px;
+  border: 1px solid currentColor;
+}
+
+.versus-pip-group[data-side='player'] {
+  color: var(--accent-blue);
+}
+
+.versus-pip-group[data-side='cpu'] {
+  color: var(--accent-amber);
+}
+
+/* Won rounds are filled discs, open rounds are hollow rings: the shape tells them apart, not the colour. */
+.versus-pip {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 2px solid currentColor;
+  background: transparent;
+}
+
+.versus-pip.is-won {
+  background: currentColor;
+}
+
+.versus-sudden-death {
+  padding: 2px 8px;
+  border: 2px solid var(--accent-danger);
+  border-radius: 6px;
+  color: var(--text-danger-soft);
+  font-size: 0.8rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.versus-timer {
+  margin-left: auto;
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+}
+
+.versus-boards {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
+  gap: 6px var(--versus-gap);
+}
+
+.versus-board {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  min-height: 0;
+}
+
+.versus-canvas-wrap {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+}
+
+.versus-canvas-wrap canvas {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  display: block;
+  touch-action: none;
+  border-radius: 6px;
+}
+
+#versus-canvas-0 {
+  cursor: crosshair;
+}
+
+#versus-canvas-0:focus-visible {
+  outline: 3px solid var(--focus-ring);
+  outline-offset: -3px;
+}
+
+.versus-hud {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+  padding: 4px 8px;
+  background: var(--bg-panel-alpha-85);
+  border: 1px solid var(--bg-panel-border);
+  border-radius: 10px;
+  font-size: 0.8rem;
+}
+
+.versus-hud-label {
+  font-weight: 700;
+}
+
+/* The count is text, never only a colour: the border style changes with the danger as well. */
+.versus-incoming {
+  padding: 1px 8px;
+  border: 2px solid var(--border-strong);
+  border-radius: 6px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+}
+
+.versus-incoming.has-incoming {
+  border-color: var(--accent-amber);
+  color: var(--text-gold-soft);
+}
+
+.versus-incoming.has-threat {
+  border-style: dashed;
+  border-color: var(--accent-danger);
+  color: var(--text-danger-soft);
+}
+
+.versus-pulse {
+  position: relative;
+  flex: 1;
+  min-width: 56px;
+  height: 12px;
+  border: 1px solid var(--border-strong);
+  border-radius: 6px;
+  background: var(--surface-sunken);
+  overflow: hidden;
+}
+
+.versus-pulse-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 0;
+  background: var(--accent-purple);
+  transition: width 0.15s ease;
+}
+
+.versus-hud-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.versus-action-btn,
+.versus-special-btn {
+  min-width: var(--touch-target);
+  min-height: var(--touch-target);
+  padding: 4px 10px;
+  background: var(--surface-raised);
+  color: var(--text-main);
+  border: 1px solid var(--border-strong);
+  border-radius: 10px;
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.versus-action-btn[aria-pressed='true'],
+.versus-special-btn.equipped {
+  border-color: var(--accent-blue);
+  box-shadow: inset 0 0 0 2px var(--accent-blue);
+}
+
+.versus-action-btn:focus-visible,
+.versus-special-btn:focus-visible {
+  outline: 3px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.versus-specials {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  width: 100%;
+}
+
+.versus-special-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.versus-round-overlay {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  max-width: calc(100% - 32px);
+  padding: 12px 20px;
+  background: var(--surface-sunken-alpha-94);
+  border: 2px solid var(--accent-blue);
+  border-radius: 12px;
+  font-size: 1.1rem;
+  font-weight: 800;
+  text-align: center;
+  pointer-events: none;
+}
+
+/* Split and the wide mini-view put every HUD and canvas on one grid: the boards line up exactly. */
+.versus-screen:is([data-layout='split'], [data-layout='mini'][data-orient='landscape']) .versus-board {
+  display: contents;
+}
+
+.versus-screen[data-layout='split'] .versus-boards {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-areas:
+    'ph ch'
+    'pc cc';
+}
+
+.versus-board[data-board='0'] .versus-canvas-wrap {
+  grid-area: pc;
+}
+
+.versus-board[data-board='0'] .versus-hud {
+  grid-area: ph;
+}
+
+.versus-board[data-board='1'] .versus-canvas-wrap {
+  grid-area: cc;
+}
+
+.versus-board[data-board='1'] .versus-hud {
+  grid-area: ch;
+}
+
+/* Mini-view: the player board fills the screen, the CPU board is a small one on top of it. */
+.versus-screen[data-layout='mini'] .versus-board[data-board='1'] {
+  position: absolute;
+  top: 0;
+  right: 0;
+  z-index: 2;
+  width: max-content;
+  padding: 4px;
+  background: var(--bg-dark-alpha-78);
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  pointer-events: none;
+}
+
+.versus-screen[data-layout='mini'] .versus-board[data-board='1'] .versus-canvas-wrap {
+  flex: none;
+  width: var(--versus-mini-width);
+  height: var(--versus-mini-height);
+}
+
+.versus-screen[data-layout='mini'] .versus-board[data-board='1'] .versus-hud {
+  width: var(--versus-mini-width);
+  padding: 2px 4px;
+  font-size: 0.7rem;
+}
+
+.versus-screen[data-layout='mini'] .versus-board[data-board='1'] .versus-hud-label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+}
+
+.versus-screen[data-layout='mini'] .versus-board[data-board='1'] .versus-pulse {
+  min-width: 24px;
+}
+
+/* Narrow mini-view: controls sit under the board, in reach of the thumbs. */
+.versus-screen[data-layout='mini'][data-orient='portrait'] .versus-board .versus-hud {
+  order: 1;
+}
+
+/* Mini-view on a wide, short screen: the controls on the left, the CPU board on the right, the player board between. */
+.versus-screen[data-layout='mini'][data-orient='landscape'] .versus-boards {
+  grid-template-columns: minmax(0, 1fr) var(--versus-player-width) minmax(0, 1fr);
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
+  grid-template-areas:
+    'ph pc cc'
+    'ph pc ch'
+    'ph pc .'
+    'ph pc bar';
+  align-items: start;
+}
+
+/* The top bar sits at the foot of the CPU column, so the player board keeps the whole height. */
+.versus-screen[data-layout='mini'][data-orient='landscape'] .versus-boards > .versus-bar .versus-timer {
+  margin-left: 0;
+}
+
+.versus-screen[data-layout='mini'][data-orient='landscape'] .versus-boards > .versus-bar {
+  grid-area: bar;
+  flex-direction: column;
+  align-items: stretch;
+  align-self: end;
+  gap: 6px;
+  min-height: 0;
+}
+
+.versus-screen[data-layout='mini'][data-orient='landscape'] .versus-board[data-board='1'] {
+  position: static;
+  width: auto;
+  padding: 0;
+  background: none;
+  border: 0;
+}
+
+.versus-screen[data-layout='mini'][data-orient='landscape'] .versus-board[data-board='0'] .versus-canvas-wrap {
+  align-self: stretch;
+}
+
+.versus-screen[data-layout='mini'][data-orient='landscape'] .versus-board[data-board='0'] .versus-hud {
+  flex-direction: column;
+  align-items: stretch;
+  justify-self: end;
+  width: var(--versus-mini-width);
+}
+
+.versus-screen[data-layout='mini'][data-orient='landscape'] .versus-board[data-board='0'] .versus-hud-label {
+  display: none;
+}
+
+.versus-screen[data-layout='mini'][data-orient='landscape'] .versus-board[data-board='0'] .versus-hud-actions {
+  flex-direction: column;
+}
+
+.versus-screen[data-layout='mini'][data-orient='landscape'] .versus-board[data-board='1'] .versus-canvas-wrap,
+.versus-screen[data-layout='mini'][data-orient='landscape'] .versus-board[data-board='1'] .versus-hud {
+  justify-self: start;
+}
+
+@media (forced-colors: active) {
+  .versus-tier-btn,
+  .versus-action-btn,
+  .versus-special-btn,
+  .versus-hud,
+  .versus-pulse,
+  .versus-incoming,
+  .versus-round-overlay,
+  .versus-pip-group,
+  .versus-sudden-death {
+    border: 1px solid ButtonText;
+    forced-color-adjust: none;
+    color: ButtonText;
+    background: Canvas;
+  }
+  .versus-tier-btn[aria-disabled='true'] {
+    color: GrayText;
+    border-color: GrayText;
+  }
+  .versus-pip {
+    border-color: ButtonText;
+  }
+  .versus-pip.is-won {
+    background: ButtonText;
+  }
+  .versus-pulse-fill {
+    background: Highlight;
+  }
+  .versus-action-btn[aria-pressed='true'],
+  .versus-special-btn.equipped {
+    border: 3px solid Highlight;
+    box-shadow: none;
+  }
+  .versus-screen {
+    background: Canvas;
+  }
+}

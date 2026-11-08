@@ -64,6 +64,7 @@ import { uiSettingsControlMethods } from './UISettingsControls.js';
 import { uiHudRefreshMethods } from './UIHudRefresh.js';
 import { uiStatsMethods, STATS_TABS } from './UIStats.js';
 import { uiGhostDuelMethods } from './UIGhostDuel.js';
+import { uiVersusMethods } from './UIVersus.js';
 
 export {
   SPECIAL_ICON_HIGHLIGHT_POSITION,
@@ -114,13 +115,14 @@ export {
  * and keyboard/button event bindings.
  */
 export class UIManager {
-  constructor({ engine, renderer, storageManager, audioManager, gameConfig, ballsConfig }) {
+  constructor({ engine, renderer, storageManager, audioManager, gameConfig, ballsConfig, versusConfigs = null }) {
     this.engine = engine;
     this.renderer = renderer;
     this.storageManager = storageManager;
     this.audioManager = audioManager;
     this.gameConfig = gameConfig;
     this.ballsConfig = ballsConfig;
+    this.versusConfigs = versusConfigs;
 
     this.elements = {
       appShell: document.querySelector('.app-shell'),
@@ -198,11 +200,13 @@ export class UIManager {
       btnModeBlitz: document.getElementById('btn-mode-blitz'),
       btnModeBossRush: document.getElementById('btn-mode-boss-rush'),
       btnModeCascade: document.getElementById('btn-mode-cascade'),
+      btnModeVersus: document.getElementById('btn-mode-versus'),
       arcadeBestClassic: document.getElementById('arcade-best-classic'),
       arcadeBestPuzzle: document.getElementById('arcade-best-puzzle'),
       arcadeBestBlitz: document.getElementById('arcade-best-blitz'),
       arcadeBestBossRush: document.getElementById('arcade-best-boss-rush'),
       arcadeBestCascade: document.getElementById('arcade-best-cascade'),
+      arcadeBestVersus: document.getElementById('arcade-best-versus'),
       puzzleStagesStrip: document.getElementById('puzzle-stages-strip'),
       levelsStarsSummary: document.getElementById('levels-stars-summary'),
       btnLevelsFilterIncomplete: document.getElementById('btn-levels-filter-incomplete'),
@@ -308,7 +312,37 @@ export class UIManager {
       inputGamepadEnabled: document.getElementById('input-gamepad-enabled'),
       selectGamepadDeadzone: document.getElementById('select-gamepad-deadzone'),
       selectGamepadAimSpeed: document.getElementById('select-gamepad-aim-speed'),
-      inputGamepadInvertX: document.getElementById('input-gamepad-invert-x')
+      inputGamepadInvertX: document.getElementById('input-gamepad-invert-x'),
+      modalVersusTiers: document.getElementById('modal-versus-tiers'),
+      versusTierList: document.getElementById('versus-tier-list'),
+      versusTierHint: document.getElementById('versus-tier-hint'),
+      btnVersusTiersBack: document.getElementById('btn-versus-tiers-back'),
+      versusScreen: document.getElementById('versus-screen'),
+      versusBoards: document.querySelector('#versus-screen .versus-boards'),
+      versusBar: document.querySelector('#versus-screen .versus-bar'),
+      versusCanvas0: document.getElementById('versus-canvas-0'),
+      versusCanvas1: document.getElementById('versus-canvas-1'),
+      versusHud0: document.getElementById('versus-hud-0'),
+      versusHud1: document.getElementById('versus-hud-1'),
+      versusRoundOverlay: document.getElementById('versus-round-overlay'),
+      btnVersusPause: document.getElementById('btn-versus-pause'),
+      btnVersusSwap: document.getElementById('btn-versus-swap'),
+      btnVersusPolarity: document.getElementById('btn-versus-polarity'),
+      modalDuelPause: document.getElementById('modal-duel-pause'),
+      btnVersusResume: document.getElementById('btn-versus-resume'),
+      btnVersusRestart: document.getElementById('btn-versus-restart'),
+      btnVersusQuit: document.getElementById('btn-versus-quit'),
+      modalDuelResult: document.getElementById('modal-duel-result'),
+      versusResultTitle: document.getElementById('modal-duel-result-title'),
+      versusResultScore: document.getElementById('versus-result-score'),
+      versusResultTier: document.getElementById('versus-result-tier'),
+      versusResultNeutralised: document.getElementById('versus-result-neutralised'),
+      versusResultPulses: document.getElementById('versus-result-pulses'),
+      versusResultShareFallback: document.getElementById('versus-result-share-fallback'),
+      versusResultShareText: document.getElementById('versus-result-share-text'),
+      btnVersusRematch: document.getElementById('btn-versus-rematch'),
+      btnVersusShare: document.getElementById('btn-versus-share'),
+      btnVersusBack: document.getElementById('btn-versus-back')
     };
 
     this.pendingAnnouncements = [];
@@ -348,6 +382,17 @@ export class UIManager {
     this.duelCardAtStake = false;
     this.ghostLastSide = null;
     this.challengeUrl = null;
+    // The versus screen (null while closed), the scene the game loop drives, and what the UI
+    // routes the gameplay controls to while the screen is open.
+    this.versus = null;
+    this.versusScene = null;
+    this.versusSeedCounter = 0;
+    this.mainScene = { boards: [{ engine, renderer }] };
+    this.versusSceneController = {
+      handleGameplayKey: (event) => this.handleVersusGameplayKey(event),
+      handleGamepadActions: (actions, aimDelta) => this.handleVersusGamepadActions(actions, aimDelta),
+      pause: () => this.pauseVersus()
+    };
   }
 
   detectInitialInputMode() {
@@ -433,6 +478,7 @@ export class UIManager {
     this.buildPowerupButtons();
     this.bindEvents();
     this.bindDuelEvents();
+    this.bindVersusEvents();
     this.updateSoundButton();
     this.updateContrastButton();
     this.updatePatternsButton();
@@ -460,6 +506,7 @@ export class UIManager {
       this.updateResetHintsFeedback();
       this.updateShareButtonLabel();
       this.updateConfirmButtonLabel();
+      this.refreshVersusLanguage();
       this.refreshStatsIfOpen();
       this.refresh(this.engine, this.lastExtra);
     });
@@ -1108,6 +1155,7 @@ export class UIManager {
       })
     );
     this.renderPuzzleStagesStrip();
+    this.refreshVersusCard();
     this.refreshModeLocks(this.getModeAccess());
 
     if (this.elements.levelsStarsSummary) {
@@ -1334,3 +1382,4 @@ installMethods(UIManager, uiSettingsControlMethods);
 installMethods(UIManager, uiHudRefreshMethods);
 installMethods(UIManager, uiStatsMethods);
 installMethods(UIManager, uiGhostDuelMethods);
+installMethods(UIManager, uiVersusMethods);

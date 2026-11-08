@@ -200,6 +200,11 @@
             <span class="arcade-card-desc" data-i18n="modals.levelSelect.arcade.cascadeDesc"></span>
             <span id="arcade-best-cascade" class="arcade-card-best gold-text"></span>
           </button>
+          <button id="btn-mode-versus" type="button" class="arcade-mode-card" aria-haspopup="dialog">
+            <span class="arcade-card-title" data-i18n="versus.card.title"></span>
+            <span class="arcade-card-desc" data-i18n="versus.card.description"></span>
+            <span id="arcade-best-versus" class="arcade-card-best gold-text"></span>
+          </button>
         </div>
         <div id="puzzle-stages-strip" class="puzzle-stages-strip"></div>
       </div>
@@ -219,6 +224,21 @@
       <div class="modal-actions">
         <button id="btn-play-level-modal" type="button" class="modal-btn primary"></button>
         <button id="btn-close-levels" type="button" class="modal-btn" data-i18n="modals.levelSelect.button.close"></button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Polarity Duel: difficulty picker, stacked over the level select -->
+  <div id="modal-versus-tiers" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="modal-versus-tiers-title" aria-describedby="versus-tiers-subtitle versus-tiers-rules">
+    <div class="modal-card">
+      <h2 id="modal-versus-tiers-title" class="modal-title" data-i18n="versus.lobby.title"></h2>
+      <p id="versus-tiers-subtitle" class="modal-subtext" data-i18n="versus.lobby.subtitle"></p>
+      <p id="versus-tiers-rules" class="modal-subtext" data-i18n="versus.lobby.rules"></p>
+      <div id="versus-tier-list" class="versus-tier-list" role="group" data-i18n-aria-label="versus.lobby.pickTier">
+      </div>
+      <p id="versus-tier-hint" class="modal-subtext hidden" role="status" aria-live="polite"></p>
+      <div class="modal-actions">
+        <button id="btn-versus-tiers-back" type="button" class="modal-btn" data-i18n="versus.lobby.back"></button>
       </div>
     </div>
   </div>
@@ -484,6 +504,77 @@
       <div class="modal-actions">
         <button id="btn-confirm-yes" type="button" class="modal-btn danger" data-i18n="modals.confirm.button.confirm"></button>
         <button id="btn-confirm-no" type="button" class="modal-btn primary" data-i18n="modals.confirm.button.cancel"></button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Polarity Duel screen: a layer of its own, the app shell is inert while it is open -->
+  <div id="versus-screen" class="versus-screen hidden" role="group" aria-labelledby="versus-screen-title" data-layout="split">
+    <h2 id="versus-screen-title" class="visually-hidden" data-i18n="versus.mode.name"></h2>
+    <header class="versus-bar">
+      <div id="versus-round-pips" class="versus-round-pips" role="img">
+        <span id="versus-round-label" class="versus-round-label" aria-hidden="true"></span>
+        <span id="versus-pips-player" class="versus-pip-group" aria-hidden="true" data-side="player"></span>
+        <span id="versus-pips-cpu" class="versus-pip-group" aria-hidden="true" data-side="cpu"></span>
+      </div>
+      <span id="versus-sudden-death" class="versus-sudden-death hidden" data-i18n="versus.bar.suddenDeath"></span>
+      <span id="versus-timer" class="versus-timer" role="timer"></span>
+      <button id="btn-versus-pause" type="button" class="nav-btn" data-i18n="versus.bar.pause"></button>
+    </header>
+    <div class="versus-boards">
+      <section class="versus-board" data-board="0">
+        <div id="versus-hud-0" class="versus-hud" role="group">
+          <span class="versus-hud-label"></span>
+          <span class="versus-incoming"></span>
+          <span class="versus-pulse" role="meter" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><span class="versus-pulse-fill"></span></span>
+          <div class="versus-hud-actions">
+            <button id="btn-versus-polarity" type="button" class="versus-action-btn" aria-pressed="false"></button>
+            <button id="btn-versus-swap" type="button" class="versus-action-btn"></button>
+          </div>
+          <div id="versus-specials" class="versus-specials hidden" role="group"></div>
+        </div>
+        <div class="versus-canvas-wrap"><canvas id="versus-canvas-0" role="application" tabindex="0"></canvas></div>
+      </section>
+      <section class="versus-board" data-board="1">
+        <div id="versus-hud-1" class="versus-hud" role="group">
+          <span class="versus-hud-label"></span>
+          <span class="versus-incoming"></span>
+          <span class="versus-pulse" role="meter" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><span class="versus-pulse-fill"></span></span>
+        </div>
+        <div class="versus-canvas-wrap"><canvas id="versus-canvas-1" role="img"></canvas></div>
+      </section>
+    </div>
+    <div id="versus-round-overlay" class="versus-round-overlay hidden" aria-hidden="true"></div>
+  </div>
+
+  <!-- Polarity Duel pause -->
+  <div id="modal-duel-pause" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="modal-duel-pause-title">
+    <div class="modal-card">
+      <h2 id="modal-duel-pause-title" class="modal-title" data-i18n="versus.pause.title"></h2>
+      <div class="modal-actions">
+        <button id="btn-versus-resume" type="button" class="modal-btn primary" data-i18n="versus.pause.resume"></button>
+        <button id="btn-versus-restart" type="button" class="modal-btn" data-i18n="versus.pause.restart"></button>
+        <button id="btn-versus-quit" type="button" class="modal-btn danger" data-i18n="versus.pause.quit"></button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Polarity Duel match result -->
+  <div id="modal-duel-result" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="modal-duel-result-title" aria-describedby="versus-result-score">
+    <div class="modal-card">
+      <h2 id="modal-duel-result-title" class="modal-title"></h2>
+      <p id="versus-result-score" class="modal-stat-line gold-text"></p>
+      <p id="versus-result-tier" class="modal-stat-line"></p>
+      <p id="versus-result-neutralised" class="modal-stat-line"></p>
+      <p id="versus-result-pulses" class="modal-stat-line"></p>
+      <label id="versus-result-share-fallback" class="share-fallback hidden">
+        <span class="share-fallback-label" data-i18n="modals.gameOver.share.field.label"></span>
+        <textarea id="versus-result-share-text" class="share-fallback-text" readonly></textarea>
+      </label>
+      <div class="modal-actions">
+        <button id="btn-versus-rematch" type="button" class="modal-btn primary" data-i18n="versus.result.playAgain"></button>
+        <button id="btn-versus-share" type="button" class="modal-btn" data-i18n="modals.gameOver.button.share"></button>
+        <button id="btn-versus-back" type="button" class="modal-btn" data-i18n="versus.result.backToMenu"></button>
       </div>
     </div>
   </div>

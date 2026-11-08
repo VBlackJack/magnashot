@@ -93,7 +93,17 @@ class Application {
         storageManager,
         audioManager,
         gameConfig,
-        ballsConfig
+        ballsConfig,
+        versusConfigs: {
+          gameConfig,
+          physicsConfig,
+          ballsConfig,
+          obstaclesConfig,
+          levelsConfig,
+          campaignConfig,
+          campaignTuning,
+          fluxConfig
+        }
       });
       uiManager.init();
 
@@ -168,8 +178,8 @@ class Application {
       }
 
       const gameLoop = createGameLoop({
-        engine,
-        renderer,
+        // The run, or the Polarity Duel match while its screen is open.
+        getScene: () => uiManager.getLoopScene(),
         fixedStepMs: physicsConfig.simulation.fixedStepMs,
         maxAccumulatedMs: physicsConfig.simulation.maxAccumulatedMs,
         idleRenderIntervalMs: gameConfig.canvas.idleRenderIntervalMs,

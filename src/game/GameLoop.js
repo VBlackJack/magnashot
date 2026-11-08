@@ -46,15 +46,18 @@ export const SCENE_TIME_SCALE_FIXED = 'fixed';
  * Interpolation alpha is forced to 1 whenever the last update did not advance the
  * simulation (hit-stop, pause, menus, Flux stage transition), because previous positions are only saved by a
  * real physics step. While no board is playing or celebrating a victory, the
- * scene is static and is redrawn at the configured idle interval instead of every frame. Any exception
+ * scene is static (a scene whose isAdvancing() says false counts as static too) and is redrawn at the configured
+ * idle interval instead of every frame. Any exception
  * thrown by update or render stops the loop for good and is reported once.
  *
  * @param {object} options
  * @param {object} [options.engine] - Game engine for the one-board form (update(), state, hitStopFrames, and the
  *   optional getTimeScale() below 1 for slow motion and refreshAimPreview() before a render).
  * @param {object} [options.renderer] - Renderer exposing render(engine, alpha), for the one-board form.
- * @param {Function} [options.getScene] - Returns `{boards: [{engine, renderer}], versus?, timeScale?}`.
- *   Takes precedence over engine and renderer and is read once per frame.
+ * @param {Function} [options.getScene] - Returns `{boards: [{engine, renderer}], versus?, timeScale?, step?, isAdvancing?}`.
+ *   Takes precedence over engine and renderer and is read once per frame. When the scene provides `step`, it is
+ *   called once per fixed step instead of each board's update(); `isAdvancing()` (optional) tells whether that
+ *   step moves the boards, so a held scene is drawn without interpolation.
  * @param {number} options.fixedStepMs - Fixed simulation step in milliseconds.
  * @param {number} options.maxAccumulatedMs - Upper bound of elapsed time per frame.
  * @param {number} options.idleRenderIntervalMs - Redraw interval while not playing.
@@ -108,13 +111,23 @@ export function createGameLoop({
       const timeScale = !fixedTime && typeof leadEngine.getTimeScale === 'function' ? leadEngine.getTimeScale() : 1;
       accumulator += elapsed * timeScale;
 
+      // A scene with its own step() drives its boards itself (match controller: CPU, routing, rounds).
+      const sceneStep = typeof scene.step === 'function' ? scene.step : null;
       while (accumulator >= fixedStepMs) {
+        // A scene that is held (paused, between rounds) says so: its boards keep their last
+        // positions, so interpolating them would swing the picture back and forth.
+        const isSceneAdvancing = sceneStep === null || typeof scene.isAdvancing !== 'function' || scene.isAdvancing();
         for (let i = 0; i < boards.length; i++) {
           const boardEngine = boards[i].engine;
           lastUpdateAdvanced[i] = fixedTime
-            ? boardEngine.state === GAME_STATES.PLAYING && !(boardEngine.stageTransitionFrames > 0)
+            ? isSceneAdvancing && boardEngine.state === GAME_STATES.PLAYING && !(boardEngine.stageTransitionFrames > 0)
             : willSimulationAdvance(boardEngine);
-          boardEngine.update();
+          if (sceneStep === null) {
+            boardEngine.update();
+          }
+        }
+        if (sceneStep !== null) {
+          sceneStep();
         }
         accumulator -= fixedStepMs;
       }
@@ -124,7 +137,9 @@ export function createGameLoop({
         }
       }
 
-      const isLive = boards.some((board) => board.engine.state === GAME_STATES.PLAYING || board.engine.isVictoryCelebrating());
+      // A scene that says it is not advancing (paused, between rounds, behind a dialog) is static: idle redraw.
+      const isSceneHeld = typeof scene.isAdvancing === 'function' && !scene.isAdvancing();
+      const isLive = !isSceneHeld && boards.some((board) => board.engine.state === GAME_STATES.PLAYING || board.engine.isVictoryCelebrating());
       if (isLive || lastRenderTime === null || now - lastRenderTime >= idleRenderIntervalMs) {
         for (let i = 0; i < boards.length; i++) {
           const alpha = lastUpdateAdvanced[i] && fixedStepMs > 0 ? accumulator / fixedStepMs : 1.0;

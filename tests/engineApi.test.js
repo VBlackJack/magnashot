@@ -225,7 +225,32 @@ const EXPECTED_PROTOTYPE_NAMES = [
   'noteVersusBoardClear',
   'noteVersusDrop',
   'noteVersusLink',
-  'startVersusBoard'
+  'startVersusBoard',
+  'applyVersusAimPreview',
+  'advanceVersusCharges',
+  'collideProjectileWithCharges',
+  'deliverVersusCharges',
+  'drainVersusOutput',
+  'fireVersusPulse',
+  'getChargeRadius',
+  'getClusterUndersideY',
+  'getOverchargeCap',
+  'landVersusCharge',
+  'findFreeSecondSpot',
+  'getVersusShotPolarity',
+  'neutraliseChargesBySpecial',
+  'noteVersusBoardLost',
+  'pickChargeColor',
+  'pushVersusEvent',
+  'queueVersusAttack',
+  'receiveFieldPulse',
+  'receiveVersusAttack',
+  'registerNeutralised',
+  'setVersusAimTruncation',
+  'settleVersusTurn',
+  'stepVersusAfter',
+  'stepVersusBefore',
+  'syncVersusChargeView'
 ];
 
 test('GameEngine.prototype exposes exactly the same members after the module split', () => {

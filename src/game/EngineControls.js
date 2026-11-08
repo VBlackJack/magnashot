@@ -264,6 +264,9 @@ export const engineControlsMethods = {
       bonuses.bouncesBonus,
       this.isPolarityFlipped
     );
+    if (this.versus) {
+      this.applyVersusAimPreview();
+    }
   },
 
   /** A bounce against a side wall cracks it; ceiling and obstacle bounces do not. */

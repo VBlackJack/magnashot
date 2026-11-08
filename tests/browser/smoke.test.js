@@ -119,6 +119,29 @@ const PLAYER_FINAL_SCORE = 777;
 const DAILY_RECORD_TO_BEAT = 5000;
 const UNLOCKED_MODE_BUTTONS = Object.freeze(['#btn-daily', ...LOCKED_MODE_BUTTONS]);
 
+/** A player past the level that opens Polarity Duel (a save of schema 1 moves to the current one on load). */
+const VERSUS_PLAYER_STORAGE = Object.freeze({
+  [`${STORAGE_PREFIX}${STORAGE_KEYS.unlockedLevel}`]: String(GAME_CONFIG.modeUnlocks.campaignLevelCleared.versus + 2),
+  [`${STORAGE_PREFIX}${STORAGE_KEYS.schemaVersion}`]: '1'
+});
+/** The arrangement of the two boards that the room of each layout allows (versus.layout). */
+const VERSUS_LAYOUT_BY_VIEWPORT = Object.freeze({
+  desktop: 'split',
+  tablet: 'split',
+  'phone landscape': 'mini',
+  'phone portrait': 'mini',
+  'narrow phone portrait': 'mini'
+});
+/** Frames of the pause between two rounds, plus a margin, as milliseconds at 60 frames per second. */
+const VERSUS_ROUND_BREAK_WAIT_MS =
+  Math.ceil((GAME_CONFIG.versus.roundBreakFrames / GAME_CONFIG.versus.framesPerSecond) * 1000) + 3000;
+/** Wins the player needs in a match. */
+const VERSUS_ROUNDS_TO_WIN = GAME_CONFIG.versus.roundsToWin;
+/** How long the boards are watched to see that they stand still. */
+const VERSUS_HELD_CHECK_MS = 300;
+const VERSUS_PLAYER_BOARD = 0;
+const VERSUS_CPU_BOARD = 1;
+
 let server;
 let browser;
 
@@ -206,6 +229,85 @@ async function captureEngine(page) {
 }
 
 const engineState = (page) => page.evaluate(() => window.__fluxEngine.state);
+
+/**
+ * Records the engines of a Polarity Duel match by board, through a prototype hook like captureEngine
+ * (the versus scene never asks for the time scale, so the main engine hook does not see them).
+ */
+async function captureVersusEngines(page) {
+  await page.evaluate(async () => {
+    const { GameEngine } = await import('/src/game/GameEngine.js');
+    const original = GameEngine.prototype.update;
+    window.__versusBoards = [];
+    window.__versusUpdates = 0;
+    GameEngine.prototype.update = function captureVersusBoard(...args) {
+      if (this.versus) {
+        window.__versusBoards[this.versus.boardIndex] = this;
+        window.__versusUpdates += 1;
+      }
+      return original.apply(this, args);
+    };
+  });
+}
+
+/** Opens the level select, then the difficulty picker of Polarity Duel. */
+async function openVersusTierPicker(page, viewport) {
+  await clickMenuButton(page, viewport, '#btn-levels');
+  await page.click('#btn-mode-versus');
+  await waitShown(page, '#modal-versus-tiers');
+}
+
+/** Starts a match against a tier and waits for the board of the player to be in play. */
+async function startVersusMatch(page, viewport, tier) {
+  await openVersusTierPicker(page, viewport);
+  await page.click(`.versus-tier-btn[data-tier="${tier}"]`);
+  await waitShown(page, '#versus-screen');
+  await page.waitForFunction(() => Boolean(window.__versusBoards?.[0] && window.__versusBoards?.[1]));
+}
+
+/** Ends the round as if the CPU board crossed its danger line (the player wins the round). */
+function winVersusRound(page) {
+  return page.evaluate((reason) => window.__versusBoards[1].triggerGameOver(reason), GAME_OVER_REASONS.LINE_CROSSED);
+}
+
+/** Wins every round of the match; the next round starts by itself after the break. */
+async function winVersusMatch(page) {
+  for (let round = 1; round <= VERSUS_ROUNDS_TO_WIN; round++) {
+    await page.waitForFunction(() => window.__versusBoards[1].state === 'playing');
+    await winVersusRound(page);
+    if (round < VERSUS_ROUNDS_TO_WIN) {
+      await waitShown(page, '#versus-round-overlay');
+      await page.waitForFunction(
+        () => document.querySelector('#versus-round-overlay').classList.contains('hidden'),
+        null,
+        { timeout: VERSUS_ROUND_BREAK_WAIT_MS }
+      );
+    }
+  }
+  await waitShown(page, '#modal-duel-result');
+}
+
+/** Fails when the versus screen scrolls or a board or control leaves the viewport. */
+async function assertVersusFits(page, label) {
+  const fit = await page.evaluate(() => {
+    const screen = document.querySelector('#versus-screen');
+    const inside = (selector) => {
+      const rect = document.querySelector(selector).getBoundingClientRect();
+      return rect.left >= -1 && rect.top >= -1 && rect.right <= innerWidth + 1 && rect.bottom <= innerHeight + 1;
+    };
+    return {
+      pageOverflow: document.documentElement.scrollWidth - window.innerWidth,
+      screenScrollX: screen.scrollWidth - screen.clientWidth,
+      screenScrollY: screen.scrollHeight - screen.clientHeight,
+      outside: ['#versus-canvas-0', '#versus-canvas-1', '#versus-hud-0', '#versus-hud-1', '.versus-bar', '#btn-versus-pause']
+        .filter((selector) => !inside(selector))
+    };
+  });
+  assert.ok(fit.pageOverflow <= OVERFLOW_TOLERANCE_PX, `${label}: the page scrolls sideways`);
+  assert.ok(fit.screenScrollX <= OVERFLOW_TOLERANCE_PX, `${label}: the versus screen scrolls sideways`);
+  assert.ok(fit.screenScrollY <= OVERFLOW_TOLERANCE_PX, `${label}: the versus screen scrolls down`);
+  assert.deepEqual(fit.outside, [], `${label}: parts of the screen are off the viewport`);
+}
 
 const isShown = (page, selector) =>
   page.evaluate((sel) => {
@@ -671,6 +773,59 @@ for (const viewport of VIEWPORTS) {
       });
     }
 
+    test('Polarity Duel takes the layout its room allows, fits, pauses, and ends on a result card', async () => {
+      const { context, page, errors } = await openGame(viewport, { initStorage: VERSUS_PLAYER_STORAGE });
+      try {
+        await captureVersusEngines(page);
+        await openVersusTierPicker(page, viewport);
+        assert.equal(await isMenuItemLocked(page, '.versus-tier-btn[data-tier="hard"]'), true, 'Hard waits for a win on Normal');
+        // A locked tier stays focusable but is not enabled for the pointer: activate it as a keyboard user would.
+        await page.focus('.versus-tier-btn[data-tier="hard"]');
+        await page.keyboard.press('Enter');
+        assert.equal(await isShown(page, '#versus-tier-hint'), true, 'a locked tier says how to unlock it');
+        assert.equal(await isShown(page, '#versus-screen'), false);
+        await page.click('.versus-tier-btn[data-tier="easy"]');
+        await waitShown(page, '#versus-screen');
+        await page.waitForFunction(() => Boolean(window.__versusBoards?.[0] && window.__versusBoards?.[1]));
+
+        const expectedLayout = VERSUS_LAYOUT_BY_VIEWPORT[viewport.name];
+        assert.equal(await page.evaluate(() => document.querySelector('#versus-screen').dataset.layout), expectedLayout);
+        await assertVersusFits(page, `${viewport.name} ${expectedLayout}`);
+        assert.equal(await page.evaluate(() => document.querySelector('.app-shell').inert), true, 'the shell is out of reach');
+        for (const selector of ['#versus-canvas-0', '#versus-canvas-1', '#versus-hud-0 .versus-incoming', '#versus-hud-1 .versus-incoming', '#versus-hud-1 .versus-pulse']) {
+          assert.equal(await isShown(page, selector), true, `${selector} is shown in the ${expectedLayout} layout`);
+        }
+
+        // Escape holds both boards, Escape again lets them go.
+        const updatesOf = () => page.evaluate(() => window.__versusUpdates);
+        await page.keyboard.press('Escape');
+        await waitShown(page, '#modal-duel-pause');
+        const heldAt = await updatesOf();
+        await page.waitForTimeout(VERSUS_HELD_CHECK_MS);
+        assert.equal(await updatesOf(), heldAt, 'both boards stand still under the pause dialog');
+        await page.keyboard.press('Escape');
+        await page.waitForFunction(() => document.querySelector('#modal-duel-pause').classList.contains('hidden'));
+        await page.waitForFunction((count) => window.__versusUpdates > count, heldAt);
+        await page.click('#btn-versus-pause');
+        await waitShown(page, '#modal-duel-pause');
+        await page.click('#btn-versus-resume');
+        await page.waitForFunction(() => document.querySelector('#modal-duel-pause').classList.contains('hidden'));
+
+        await winVersusMatch(page);
+        assert.equal(await isShown(page, '#btn-versus-share'), true);
+        await assertVersusFits(page, `${viewport.name} result`);
+        await page.click('#btn-versus-back');
+        await page.waitForFunction(() => document.querySelector('#versus-screen').classList.contains('hidden'));
+        assert.equal(await page.evaluate(() => document.querySelector('.app-shell').inert), true, 'the held run shows its Pause dialog');
+        await waitShown(page, '#modal-pause');
+        assert.equal(await engineState(page), GAME_STATES.PAUSED, 'the run that was held comes back paused');
+        await assertLayoutFits(page, 'after Polarity Duel');
+        assert.deepEqual(errors, []);
+      } finally {
+        await context.close();
+      }
+    });
+
     test('Pause opens its dialog and Resume closes it', async () => {
       const { context, page, errors } = await openGame(viewport);
       try {
@@ -688,6 +843,161 @@ for (const viewport of VIEWPORTS) {
     });
   });
 }
+
+describe('Polarity Duel (desktop)', () => {
+  const desktop = VIEWPORTS[0];
+  const records = (tiers) => ({ [`${STORAGE_PREFIX}${STORAGE_KEYS.versusRecords}`]: JSON.stringify(tiers) });
+
+  test('a fresh profile finds the mode locked, and a player past level 6 does not', async () => {
+    const fresh = await openGame(desktop);
+    try {
+      await clickMenuButton(fresh.page, desktop, '#btn-levels');
+      assert.equal(await isMenuItemLocked(fresh.page, '#btn-mode-versus'), true);
+      assert.deepEqual(fresh.errors, []);
+    } finally {
+      await fresh.context.close();
+    }
+    const player = await openGame(desktop, { initStorage: VERSUS_PLAYER_STORAGE });
+    try {
+      await clickMenuButton(player.page, desktop, '#btn-levels');
+      assert.equal(await isMenuItemLocked(player.page, '#btn-mode-versus'), false);
+      assert.deepEqual(player.errors, []);
+    } finally {
+      await player.context.close();
+    }
+  });
+
+  test('Hard opens once Normal was won', async () => {
+    const { context, page, errors } = await openGame(desktop, {
+      initStorage: { ...VERSUS_PLAYER_STORAGE, ...records({ normal: { w: 1, l: 0 } }) }
+    });
+    try {
+      await openVersusTierPicker(page, desktop);
+      assert.equal(await isMenuItemLocked(page, '.versus-tier-btn[data-tier="hard"]'), false);
+      await page.keyboard.press('Escape');
+      await page.waitForFunction(() => document.querySelector('#modal-versus-tiers').classList.contains('hidden'));
+      assert.equal(await isShown(page, '#modal-levels'), true, 'Escape closes the picker first, the level select stays');
+      assert.deepEqual(errors, []);
+    } finally {
+      await context.close();
+    }
+  });
+
+  test('quitting a match counts as a quit and brings the paused run back', async () => {
+    const { context, page, errors } = await openGame(desktop, { initStorage: VERSUS_PLAYER_STORAGE });
+    try {
+      await captureVersusEngines(page);
+      await startVersusMatch(page, desktop, 'easy');
+      await page.click('#btn-versus-pause');
+      await waitShown(page, '#modal-duel-pause');
+      await page.click('#btn-versus-quit');
+      await page.waitForFunction(() => document.querySelector('#versus-screen').classList.contains('hidden'));
+      await waitShown(page, '#modal-pause');
+      const stats = await page.evaluate(
+        ({ key }) => JSON.parse(localStorage.getItem(key)),
+        { key: `${STORAGE_PREFIX}${STORAGE_KEYS.playerStats}` }
+      );
+      assert.equal(stats.modes.versus.quits, 1);
+      assert.equal(stats.modes.versus.wins ?? 0, 0);
+      assert.deepEqual(errors, []);
+    } finally {
+      await context.close();
+    }
+  });
+
+  test('a won match is recorded, listed in My stats, and shared as text', async () => {
+    const { context, page, errors } = await openGame(desktop, { initStorage: VERSUS_PLAYER_STORAGE });
+    try {
+      await context.grantPermissions(['clipboard-read', 'clipboard-write'], { origin: server.origin });
+      await captureVersusEngines(page);
+      await startVersusMatch(page, desktop, 'normal');
+      await winVersusMatch(page);
+      assert.equal(await page.evaluate(() => document.querySelector('#modal-duel-result-title').textContent.length > 0), true);
+      assert.equal(await page.evaluate(() => document.activeElement.id), 'btn-versus-rematch', 'focus lands on the main action');
+      const stored = await page.evaluate(
+        (key) => JSON.parse(localStorage.getItem(key)),
+        `${STORAGE_PREFIX}${STORAGE_KEYS.versusRecords}`
+      );
+      assert.equal(stored.normal.w, 1);
+
+      await page.evaluate(() => {
+        delete Navigator.prototype.share;
+        return navigator.clipboard.writeText('');
+      });
+      await page.click('#btn-versus-share');
+      await page.waitForFunction(() => navigator.clipboard.readText().then((text) => text.includes('http')));
+      const shared = await page.evaluate(() => navigator.clipboard.readText());
+      assert.match(shared, new RegExp(`${VERSUS_ROUNDS_TO_WIN} - 0`));
+
+      await page.click('#btn-versus-rematch');
+      await page.waitForFunction(() => document.querySelector('#modal-duel-result').classList.contains('hidden'));
+      assert.equal(await isShown(page, '#versus-screen'), true, 'a rematch stays on the screen');
+      await page.click('#btn-versus-pause');
+      await page.click('#btn-versus-quit');
+      await page.waitForFunction(() => document.querySelector('#versus-screen').classList.contains('hidden'));
+      await page.click('#btn-resume');
+      await clickMenuButton(page, desktop, '#btn-stats');
+      await waitShown(page, '#modal-stats');
+      const statsText = await page.evaluate(() => document.querySelector('#stats-overview-list').textContent);
+      assert.match(statsText, /1/);
+      assert.equal(await page.evaluate(() => document.querySelector('#stats-overview-list').textContent.includes('Duel')), true);
+      assert.deepEqual(errors, []);
+    } finally {
+      await context.close();
+    }
+  });
+
+  test('resizing the window moves the match between the layouts without losing it', async () => {
+    const { context, page, errors } = await openGame(desktop, { initStorage: VERSUS_PLAYER_STORAGE });
+    try {
+      await captureVersusEngines(page);
+      await startVersusMatch(page, desktop, 'easy');
+      const layoutOf = () => page.evaluate(() => document.querySelector('#versus-screen').dataset.layout);
+      assert.equal(await layoutOf(), 'split');
+      const phone = VIEWPORTS.find((v) => v.name === 'phone portrait');
+      await page.setViewportSize({ width: phone.width, height: phone.height });
+      await page.waitForFunction(() => document.querySelector('#versus-screen').dataset.layout === 'mini');
+      await assertVersusFits(page, 'after resizing to a phone');
+      await page.setViewportSize({ width: desktop.width, height: desktop.height });
+      await page.waitForFunction(() => document.querySelector('#versus-screen').dataset.layout === 'split');
+      await assertVersusFits(page, 'after resizing back');
+      assert.equal(await page.evaluate(() => window.__versusBoards[0].state), GAME_STATES.PLAYING, 'the match went on');
+      assert.deepEqual(errors, []);
+    } finally {
+      await context.close();
+    }
+  });
+
+  test('keyboard and pointer steer the player board only', async () => {
+    const { context, page, errors } = await openGame(desktop, { initStorage: VERSUS_PLAYER_STORAGE });
+    try {
+      await captureVersusEngines(page);
+      await startVersusMatch(page, desktop, 'easy');
+      const aims = () => page.evaluate(() => window.__versusBoards.map((engine) => engine.aimAngle));
+      const before = await aims();
+      const box = await page.locator('#versus-canvas-0').boundingBox();
+      await page.mouse.move(box.x + box.width * 0.2, box.y + box.height * 0.3);
+      const afterMouse = await aims();
+      assert.notEqual(afterMouse[VERSUS_PLAYER_BOARD], before[VERSUS_PLAYER_BOARD], 'the pointer aims the player board');
+      assert.equal(afterMouse[VERSUS_CPU_BOARD], before[VERSUS_CPU_BOARD], 'the CPU board is not steered by the pointer');
+      await page.keyboard.press('ArrowLeft');
+      await page.keyboard.press('ArrowLeft');
+      const afterKeys = await aims();
+      assert.notEqual(afterKeys[VERSUS_PLAYER_BOARD], afterMouse[VERSUS_PLAYER_BOARD], 'the arrow keys aim the player');
+      const flipped = () => page.evaluate(() => window.__versusBoards[0].isPolarityFlipped);
+      await page.keyboard.press('KeyF');
+      assert.equal(await flipped(), true);
+      await page.waitForFunction(
+        () => document.querySelector('#btn-versus-polarity').getAttribute('aria-pressed') === 'true',
+        undefined,
+        { timeout: WAIT_TIMEOUT_MS }
+      );
+      assert.deepEqual(errors, []);
+    } finally {
+      await context.close();
+    }
+  });
+});
 
 describe('precise aim (desktop)', () => {
   const desktop = VIEWPORTS[0];

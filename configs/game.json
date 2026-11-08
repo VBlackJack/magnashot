@@ -1541,14 +1541,107 @@
       "maxChargesPerTurn": 6,
       "boardClearCharges": 4,
       "strongChargeRaw": 8
+    },
+    "riseFrames": 360,
+    "turnSettleFrames": 48,
+    "chargeStaggerFrames": 24,
+    "roundBreakFrames": 180,
+    "guardAimOffsetsRad": [0, 0.02, -0.02, 0.05, -0.05],
+    "threatRatio": 0.4,
+    "chargeRadius": 0.9,
+    "strength2RawThreshold": 8,
+    "neutraliseOverchargeGain": 0.09,
+    "guardStreakSize": 3,
+    "framesPerSecond": 60,
+    "fallbackPolarity": 1,
+    "overchargeMaxMultiplier": 5,
+    "suddenDeath": { "startSeconds": 180, "intervalSeconds": 20 },
+    "roundsToWin": 2,
+    "cpu": {
+      "easy": {
+        "thinkFrames": { "mean": 70, "jitter": 20 },
+        "aimNoiseRad": 0.06,
+        "angleSamples": 24,
+        "anglesPerFrame": 8,
+        "policy": "greedy",
+        "guardChance": 0.15,
+        "flipChance": 0
+      },
+      "normal": {
+        "thinkFrames": { "mean": 40, "jitter": 12 },
+        "aimNoiseRad": 0.025,
+        "angleSamples": 40,
+        "anglesPerFrame": 8,
+        "policy": "arsenal",
+        "guardChance": 0.5,
+        "flipChance": 0.5
+      },
+      "hard": {
+        "thinkFrames": { "mean": 22, "jitter": 6 },
+        "aimNoiseRad": 0.008,
+        "angleSamples": 64,
+        "anglesPerFrame": 8,
+        "policy": "arsenal",
+        "guardChance": 0.9,
+        "flipChance": 1
+      }
+    },
+    "render": {
+      "bodyFill": "rgba(30, 36, 52, 0.92)",
+      "plusColor": "#ffd166",
+      "minusColor": "#7ee0ff",
+      "glyphSizeFactor": 0.55,
+      "glyphLineWidth": 4,
+      "outlineWidth": 3,
+      "outlineDash": [6, 5],
+      "strengthRingGap": 5,
+      "strengthRingWidth": 2,
+      "threatOutlineWidth": 6,
+      "threatHaloGap": 9,
+      "threatHaloWidth": 2,
+      "threatHaloAlpha": 0.7,
+      "trailSegments": 4,
+      "trailSpacingFactor": 0.7,
+      "trailAlpha": 0.25,
+      "previewRingRadiusFactor": 1.15,
+      "previewRingWidth": 3,
+      "previewRingDash": [4, 4],
+      "previewGlyphSizeFactor": 0.5,
+      "previewGlyphLineWidth": 3,
+      "previewAlpha": 0.9,
+      "previewOutcomeColor": "#ffffff",
+      "previewOutcomeSizeFactor": 0.45,
+      "previewOutcomeGapFactor": 1.9,
+      "previewOutcomeLineWidth": 3,
+      "launcherGlyphSizeFactor": 0.5,
+      "launcherGlyphLineWidth": 3,
+      "launcherGlyphBackdrop": "rgba(8, 12, 24, 0.85)",
+      "launcherGlyphBackdropExtraWidth": 3,
+      "nextGlyphSizeFactor": 0.45
+    },
+    "layout": {
+      "splitMinBoardWidthPx": 300,
+      "splitMinViewportHeightPx": 520,
+      "miniScale": 0.28,
+      "liteFrameInterval": 2
+    },
+    "ui": {
+      "hudRefreshFrames": 6,
+      "announceWindowFrames": 90,
+      "seedRadix": 36
+    },
+    "records": {
+      "tiers": ["easy", "normal", "hard"],
+      "unlock": { "hard": { "requiresWinsOn": "normal", "wins": 1 } }
     }
   },
   "modeUnlocks": {
-    "order": ["campaign", "daily", "endless", "classic", "puzzle", "blitz", "flux", "cascade", "boss_rush"],
+    "order": ["campaign", "daily", "endless", "classic", "versus", "puzzle", "blitz", "flux", "cascade", "boss_rush"],
     "always": ["campaign", "daily"],
     "campaignLevelCleared": {
       "endless": 3,
       "classic": 4,
+      "versus": 6,
       "puzzle": 5,
       "blitz": 7,
       "flux": 8,
@@ -1562,16 +1655,17 @@
       "blitz": ["blitzHighScore"],
       "flux": ["fluxHighScore", "fluxBestStage"],
       "cascade": ["cascadeHighScore"],
-      "boss_rush": ["bossRushHighScore", "bossRushBestWave"]
+      "boss_rush": ["bossRushHighScore", "bossRushBestWave"],
+      "versus": ["versusRecords"]
     },
-    "introduced": { "classic": 4 },
+    "introduced": { "classic": 4, "versus": 6 },
     "stateNew": "new",
     "stateSeen": "seen",
     "grandfather": {
       "progressKeys": [
         "levelStats", "endlessHighScore", "fluxHighScore", "fluxBestStage", "blitzHighScore",
         "bossRushHighScore", "bossRushBestWave", "cascadeHighScore", "puzzleHighScore",
-        "puzzleBestStage", "classicHighScore", "classicBestStage", "dailyBest", "dailyLastPlayedDate", "coins", "upgrades",
+        "puzzleBestStage", "classicHighScore", "classicBestStage", "versusRecords", "dailyBest", "dailyLastPlayedDate", "coins", "upgrades",
         "achievements", "achievementRecords", "unlockedBallStyles", "runSnapshot", "discoveries"
       ],
       "emptyValues": ["", "0", "{}", "[]", "null", "false"],
@@ -1674,6 +1768,7 @@
       "puzzleBestStage": "puzzle_best_stage",
       "classicHighScore": "classic_high_score",
       "classicBestStage": "classic_best_stage",
+      "versusRecords": "versus_records",
       "dailyBest": "daily_best",
       "dailyBestDate": "daily_best_date",
       "dailyLastPlayedDate": "daily_last_date",
