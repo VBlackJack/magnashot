@@ -79,6 +79,27 @@
 | **Pause / Close Modal** | Click **Pause** or modal backdrop | `Escape` |
 | **Settings** | Click **⚙ Settings**, or open **Pause** | - |
 
+### Controller support
+
+Plug in or pair a gamepad with the standard layout and press any button: the game switches to controller hints and the menus become navigable with the d-pad. Pads with a non-standard layout are ignored. Keyboard, mouse and touch keep working at all times.
+
+| Action | Controller |
+| :--- | :--- |
+| **Aim** | Left stick (right stick for fine aim, left trigger held for precision, d-pad left / right for tiny steps) |
+| **Shoot** | Bottom face button or right trigger |
+| **Swap Sphere** | Left face button |
+| **Flip Polarity** | Top face button |
+| **Unequip Special Sphere** | Right face button |
+| **Previous / next Special Sphere** | Left / right bumper |
+| **Pause / Resume** | Start |
+| **Menu** | Select |
+| **Replay the level hint** | Left stick click |
+| **Aim straight up** | Right stick click |
+| **Menus: move / confirm / back** | D-pad or left stick / bottom face button / right face button |
+| **Menus: previous / next tab** | Left / right bumper |
+
+If the pad disconnects during a run, the game pauses. In **Settings**, the **Controller** row turns controller input on or off and sets the stick deadzone (small, medium, large), the aim speed (slow, normal, fast) and the horizontal aim inversion; the choices are stored locally.
+
 ---
 
 ## Architecture Overview
@@ -100,6 +121,7 @@ The codebase follows a modular, zero-dependency ES module architecture with stri
 │   ├── main.js               # Application bootstrap, pointer input guards & Service Worker registration
 │   ├── core/
 │   │   ├── ConfigRegistry.js # Parallel JSON configuration loader
+│   │   ├── GamepadInput.js   # Pure gamepad reader: deadzone, response curve, press edges, menu auto-repeat, active pad choice
 │   │   ├── Constants.js      # Frozen enums and mathematical constants
 │   │   ├── I18n.js           # Localization service and DOM attribute translator
 │   │   ├── SeededRandom.js   # Deterministic PRNG (Mulberry32) for Daily Challenges and Flux runs
@@ -151,6 +173,7 @@ The codebase follows a modular, zero-dependency ES module architecture with stri
 │       ├── UIManager.js      # UI core: construction, wiring and the modules below
 │       ├── UIHelpers.js      # Pure UI helpers and constants: focus-trap filtering, formatters, share and victory resolvers, shared WeakMaps
 │       ├── UIHudRefresh.js   # UIManager module: HUD and menu refresh
+│       ├── UIGamepad.js      # UIManager module: controller routing, menu focus navigation, Settings controller row
 │       ├── UIInputBindings.js# UIManager module: install, drawer and keyboard bindings
 │       ├── UIModals.js       # UIManager module: dialogs, shop tabs, focus trap and inert handling
 │       ├── UISettingsControls.js # UIManager module: settings controls, Share and the Daily countdown

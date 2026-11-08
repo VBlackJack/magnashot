@@ -79,6 +79,27 @@
 | **Pause / fermer une fenêtre** | Cliquer **Pause** ou le fond de la fenêtre | `Échap` |
 | **Réglages** | Cliquer **⚙ Réglages**, ou ouvrir **Pause** | - |
 
+### Prise en charge de la manette
+
+Branchez ou associez une manette au format standard et appuyez sur un bouton : le jeu passe aux indications de manette et les menus se parcourent à la croix directionnelle. Les manettes au format non standard sont ignorées. Le clavier, la souris et le tactile restent utilisables à tout moment.
+
+| Action | Manette |
+| :--- | :--- |
+| **Viser** | Stick gauche (stick droit pour affiner, gâchette gauche maintenue pour la précision, croix gauche / droite pour de minuscules pas) |
+| **Tirer** | Bouton du bas ou gâchette droite |
+| **Échanger la sphère** | Bouton de gauche |
+| **Inverser la polarité** | Bouton du haut |
+| **Ranger la sphère spéciale** | Bouton de droite |
+| **Sphère spéciale précédente / suivante** | Bumper gauche / droit |
+| **Pause / reprise** | Start |
+| **Menu** | Select |
+| **Rejouer l'indice du niveau** | Clic du stick gauche |
+| **Viser droit devant** | Clic du stick droit |
+| **Menus : se déplacer / valider / retour** | Croix ou stick gauche / bouton du bas / bouton de droite |
+| **Menus : onglet précédent / suivant** | Bumper gauche / droit |
+
+Si la manette se déconnecte pendant une partie, le jeu se met en pause. Dans les **Réglages**, la ligne **Manette** active ou coupe la manette et règle la zone morte des sticks (petite, moyenne, grande), la vitesse de visée (lente, normale, rapide) et l'inversion de la visée horizontale ; les choix sont conservés localement.
+
 ---
 
 ## Architecture
@@ -100,6 +121,7 @@ Le code suit une architecture en modules ES sans dépendance, avec une séparati
 │   ├── main.js               # Démarrage, filtrage des entrées pointeur et enregistrement du Service Worker
 │   ├── core/
 │   │   ├── ConfigRegistry.js # Chargeur parallèle des configurations JSON
+│   │   ├── GamepadInput.js   # Lecteur de manette pur : zone morte, courbe de réponse, fronts d'appui, répétition dans les menus, choix de la manette active
 │   │   ├── Constants.js      # Énumérations figées et constantes mathématiques
 │   │   ├── I18n.js           # Service de traduction et traducteur d'attributs DOM
 │   │   ├── SeededRandom.js   # Générateur pseudo-aléatoire déterministe (Mulberry32) du Défi du jour et du Mode Flux
@@ -151,6 +173,7 @@ Le code suit une architecture en modules ES sans dépendance, avec une séparati
 │       ├── UIManager.js      # Noyau de l'interface : construction, câblage et modules ci-dessous
 │       ├── UIHelpers.js      # Utilitaires et constantes purs de l'interface : filtre du piège de focus, formateurs, résolveurs de partage et de victoire, WeakMap partagées
 │       ├── UIHudRefresh.js   # Module de UIManager : rafraîchissement du HUD et du menu
+│       ├── UIGamepad.js      # Module de UIManager : routage de la manette, navigation du focus dans les menus, ligne Manette des Réglages
 │       ├── UIInputBindings.js# Module de UIManager : liaisons d'installation, du tiroir et du clavier
 │       ├── UIModals.js       # Module de UIManager : fenêtres, onglets de la boutique, piège de focus et inert
 │       ├── UISettingsControls.js # Module de UIManager : commandes des réglages, Partager et compte à rebours du Défi du jour
