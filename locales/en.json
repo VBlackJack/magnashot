@@ -1439,6 +1439,8 @@
   },
   "versus": {
     "local": {
+      "entry": "2 players (same device)",
+      "entryHint": "Needs a wider screen for two boards",
       "lobby": {
         "title": "Two players",
         "subtitle": "Each player picks a device",
@@ -1451,7 +1453,8 @@
         "start": "Start match",
         "back": "Back",
         "needTwo": "Both players must join",
-        "joinKeys": "Keyboard: press {{key}} to join"
+        "joinKeys": "Keyboard: press {{key}} to join",
+        "joinPad": "Controller: press the bottom button to join"
       },
       "device": {
         "pad": "Controller",
@@ -1473,8 +1476,12 @@
         "pulseSent": "Player {{n}} sent a field pulse",
         "padLost": "Player {{n}} controller disconnected. Press any button on a controller to take over, or quit."
       },
+      "bar": {
+        "roundPips": "Round {{round}}. Player 1: {{a}} won. Player 2: {{b}} won."
+      },
       "hud": {
-        "board": "Player {{n}} board"
+        "board": "Player {{n}} board",
+        "label": "Player {{n}} ({{device}})"
       },
       "pause": {
         "tooSmall": "The window is too small for two boards. Make it larger to continue."

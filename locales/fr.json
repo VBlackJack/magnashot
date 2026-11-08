@@ -1439,6 +1439,8 @@
   },
   "versus": {
     "local": {
+      "entry": "2 joueurs (même appareil)",
+      "entryHint": "Nécessite un écran plus large pour deux plateaux",
       "lobby": {
         "title": "Deux joueurs",
         "subtitle": "Chaque joueur choisit son périphérique",
@@ -1451,7 +1453,8 @@
         "start": "Lancer le match",
         "back": "Retour",
         "needTwo": "Les deux joueurs doivent rejoindre",
-        "joinKeys": "Clavier : appuyez sur {{key}} pour rejoindre"
+        "joinKeys": "Clavier : appuyez sur {{key}} pour rejoindre",
+        "joinPad": "Manette : appuyez sur le bouton du bas pour rejoindre"
       },
       "device": {
         "pad": "Manette",
@@ -1473,8 +1476,12 @@
         "pulseSent": "Le joueur {{n}} a envoyé une impulsion de champ",
         "padLost": "Manette du joueur {{n}} déconnectée. Appuyez sur un bouton d'une manette pour la remplacer, ou quittez."
       },
+      "bar": {
+        "roundPips": "Manche {{round}}. Joueur 1 : {{a}} gagnée(s). Joueur 2 : {{b}} gagnée(s)."
+      },
       "hud": {
-        "board": "Plateau du joueur {{n}}"
+        "board": "Plateau du joueur {{n}}",
+        "label": "Joueur {{n}} ({{device}})"
       },
       "pause": {
         "tooSmall": "La fenêtre est trop petite pour deux plateaux. Agrandissez-la pour continuer."
