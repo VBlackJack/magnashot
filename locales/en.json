@@ -238,7 +238,8 @@
         "label": {
           "pointer": "Game board. Aim with the mouse, then fine-tune with the Left/Right arrows (Shift for bigger steps), shoot with a click or Enter, swap with Space.",
           "touch": "Game board. Drag on the board to aim, release to shoot, tap the launcher to swap."
-        }
+        },
+        "labelPad": "Game board. Aim with the left stick (right stick for fine aim), shoot with A or the right trigger, swap with X, flip polarity with Y."
       }
     },
     "announcer": {
@@ -294,6 +295,20 @@
       "side": {
         "ahead": "ahead of",
         "behind": "behind"
+      }
+    },
+    "pad": {
+      "glyph": {
+        "bottom": "A",
+        "right": "B",
+        "left": "X",
+        "top": "Y",
+        "leftBumper": "LB",
+        "rightBumper": "RB",
+        "leftTrigger": "LT",
+        "rightTrigger": "RT",
+        "start": "Start",
+        "select": "Select"
       }
     }
   },
@@ -505,7 +520,8 @@
       "puzzle": "One-Shot Puzzle: study the angles and clear the objective with your fixed ammo queue!",
       "polarity": {
         "pointer": "Click the 🧲 button (or press F) to flip your shot's charge: spheres then pull it the other way, so it curves in the opposite direction.",
-        "touch": "Tap the 🧲 button to flip your shot's charge: spheres then pull it the other way, so it curves in the opposite direction."
+        "touch": "Tap the 🧲 button to flip your shot's charge: spheres then pull it the other way, so it curves in the opposite direction.",
+        "gamepad": "Press Y to flip your shot's charge (the 🧲 button works too): spheres then pull it the other way, so it curves in the opposite direction."
       },
       "bankShot": "Bounce your shot off the walls and bumpers to reach spheres you cannot hit head-on.",
       "specials": {
@@ -1076,7 +1092,8 @@
           "pointer": "Keyboard & Arsenal: Left/Right to fine-tune aim (Shift: faster), Enter to shoot, F (or 🧲) to invert polarity, 1-7 for Special Spheres",
           "touch": "Polarity & Arsenal: tap 🧲 to flip how spheres pull your shot (it curves the other way), or tap a Special Sphere charged by Overcharge"
         },
-        "physics": "Tip: Sever anchor links or unbalance rotors to trigger chain reactions!"
+        "physics": "Tip: Sever anchor links or unbalance rotors to trigger chain reactions!",
+        "pad": "Controller: left stick to aim (right stick for fine aim), A or RT to shoot, X to swap, Y to flip polarity, LB/RB for Special Spheres, Start to pause"
       },
       "button": {
         "resume": "Resume",
@@ -1109,6 +1126,24 @@
       "duelName": {
         "label": "Duel name (optional)",
         "hint": "Letters and digits, 12 max. Shown to friends you challenge."
+      },
+      "controller": {
+        "title": "Controller",
+        "hint": "Use a gamepad to aim, shoot and navigate the menus.",
+        "enabled": "Enable controller",
+        "deadzone": "Stick deadzone",
+        "deadzoneOptions": {
+          "small": "Small",
+          "medium": "Medium",
+          "large": "Large"
+        },
+        "aimSpeed": "Aim speed",
+        "aimSpeedOptions": {
+          "slow": "Slow",
+          "normal": "Normal",
+          "fast": "Fast"
+        },
+        "invertX": "Invert horizontal aim"
       }
     },
     "fluxPerk": {
@@ -1399,5 +1434,11 @@
       "ok": "OK"
     },
     "defaultName": "Ghost"
+  },
+  "toast": {
+    "gamepad": {
+      "connected": "Controller connected",
+      "disconnected": "Controller disconnected"
+    }
   }
 }
