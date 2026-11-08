@@ -91,7 +91,7 @@ const createStubContext = () => {
           target.globalCompositeOperation = saved.globalCompositeOperation;
         };
       }
-      if (prop === 'fillRect' || prop === 'clearRect' || prop === 'translate') {
+      if (prop === 'fillRect' || prop === 'clearRect' || prop === 'translate' || prop === 'strokeRect' || prop === 'setLineDash') {
         return track(prop);
       }
       if (prop === 'createLinearGradient' || prop === 'createRadialGradient') {
@@ -1053,4 +1053,127 @@ test('A shaking frame fills the whole canvas before the shake translate', () => 
   );
   assert.ok(fillIndex >= 0 && fillIndex < translateIndex, 'a full-canvas fill precedes the translate');
   assert.equal(calls[fillIndex].saveDepth, 0, 'the fill happens outside the shaken save scope');
+});
+
+const renderSagFrame = (engine, { patterns, reducedMotion }) => {
+  const renderer = createRenderer();
+  renderer.setColorPatterns(patterns);
+  engine.setReducedMotion(reducedMotion);
+  const ctx = renderer.ctx;
+  for (const alpha of [0.5, 1.0]) {
+    renderer.render(engine, alpha);
+    assert.equal(ctx.saveDepth, 0, 'save/restore depth must return to 0');
+    assert.equal(ctx.restoreUnderflows, 0, 'restore must never run without a save');
+    assert.equal(ctx.globalAlpha, 1, 'globalAlpha must be back to 1');
+  }
+  return { renderer, ctx };
+};
+
+test('The Sag gauge and the lowering offset leave the canvas state balanced in every phase', () => {
+  const engine = createTestEngine();
+  engine.startEndlessMode();
+  const size = engine.getSagState().size;
+  assert.ok(size > 0, 'Survival has a Sag meter');
+  const levels = { calm: 1, warn: size - 1, full: size };
+  for (const [phase, level] of Object.entries(levels)) {
+    engine.sagLevel = level;
+    engine.railLowerFrames = 0;
+    assert.equal(engine.getSagState().phase, phase);
+    for (const patterns of [false, true]) {
+      for (const reducedMotion of [false, true]) {
+        engine.railLowerFrames = gameConfig.sag.lowerFrames;
+        renderSagFrame(engine, { patterns, reducedMotion });
+      }
+    }
+  }
+});
+
+test('The Sag gauge draws one segment per slot and a dashed outline only in warning', () => {
+  const engine = createTestEngine();
+  engine.startEndlessMode();
+  const size = engine.getSagState().size;
+  engine.railLowerFrames = 0;
+  engine.sagLevel = 1;
+  const gauge = gameConfig.sag.gauge;
+  const segments = (calls) => calls.filter(
+    (c) => c.name === 'fillRect' && c.args[2] === gauge.width && c.args[3] === gauge.segmentHeight
+  );
+  const calm = renderSagFrame(engine, { patterns: false, reducedMotion: false }).ctx.calls;
+  assert.equal(segments(calm).length, size * 2, 'one filled rectangle per segment, over two frames');
+  assert.equal(calm.filter((c) => c.name === 'strokeRect').length, 0, 'no outline when calm');
+  engine.sagLevel = size - 1;
+  const warn = renderSagFrame(engine, { patterns: false, reducedMotion: false }).ctx.calls;
+  assert.ok(warn.some((c) => c.name === 'strokeRect'), 'an outline in warning');
+  assert.ok(warn.some((c) => c.name === 'setLineDash' && c.args[0].length > 0), 'the outline is dashed');
+});
+
+test('A Sag step eases the cluster down, and not at all under reduced motion', () => {
+  const engine = createTestEngine();
+  engine.startEndlessMode();
+  const renderer = createRenderer();
+  renderer.isReducedMotion = false;
+  const frames = gameConfig.sag.lowerFrames;
+  engine.railLowerFrames = frames;
+  assert.equal(renderer.getRailLowerOffset(engine), gameConfig.endless.descentStepY, 'a fresh step starts a full step above');
+  engine.railLowerFrames = Math.floor(frames / 2);
+  const mid = renderer.getRailLowerOffset(engine);
+  assert.ok(mid > 0 && mid < gameConfig.endless.descentStepY, 'it eases toward the physical place');
+  engine.railLowerFrames = 0;
+  assert.equal(renderer.getRailLowerOffset(engine), 0);
+  engine.railLowerFrames = frames;
+  renderer.isReducedMotion = true;
+  assert.equal(renderer.getRailLowerOffset(engine), 0, 'no ease under reduced motion');
+});
+
+test('A mode without a Sag meter draws no gauge and no offset', () => {
+  const engine = createTestEngine();
+  engine.startCampaignLevel(1);
+  engine.railLowerFrames = gameConfig.sag.lowerFrames;
+  const { renderer, ctx } = renderSagFrame(engine, { patterns: false, reducedMotion: false });
+  assert.equal(renderer.getRailLowerOffset(engine), 0);
+  const gauge = gameConfig.sag.gauge;
+  assert.equal(
+    ctx.calls.filter((c) => c.name === 'fillRect' && c.args[2] === gauge.width && c.args[3] === gauge.segmentHeight).length,
+    0
+  );
+});
+
+test('The Classic anchor rail is drawn and the frame stays balanced while it lowers', { skip: typeof GameEngine.prototype.startClassicMode !== 'function' && 'startClassicMode is not merged yet' }, () => {
+  const engine = createTestEngine();
+  engine.startClassicMode(1);
+  const size = engine.getSagState().size;
+  for (const level of [0, size - 1, size]) {
+    engine.sagLevel = level;
+    engine.railDrops = 2;
+    engine.railLowerFrames = gameConfig.sag.lowerFrames;
+    const { renderer, ctx } = renderSagFrame(engine, { patterns: true, reducedMotion: false });
+    assert.ok(renderer.getRailLowerOffset(engine) > 0);
+    const rails = ctx.calls.filter((c) => c.name === 'fillRect' && c.args[3] === 6);
+    assert.ok(rails.length > 0, 'the rail bar is drawn');
+  }
+});
+
+test('The lowering offset moves the cluster and the anchor rail, never the fixed obstacles', () => {
+  const engine = createTestEngine();
+  engine.startClassicMode(1);
+  engine.railLowerFrames = gameConfig.sag.lowerFrames;
+  const renderer = createRenderer();
+  renderer.setColorPatterns(false);
+  engine.setReducedMotion(false);
+  const ctx = renderer.ctx;
+  const upwardTranslates = () => ctx.calls.filter((c) => c.name === 'translate' && c.args[1] < 0).length;
+  const seen = {};
+  for (const name of ['drawObstacles', 'drawRails', 'drawAnchorRail', 'drawMagneticBonds']) {
+    const original = renderer[name].bind(renderer);
+    renderer[name] = (...args) => {
+      seen[name] = upwardTranslates();
+      return original(...args);
+    };
+  }
+  renderer.render(engine, 1.0);
+  assert.equal(seen.drawObstacles, 0, 'obstacles are drawn without the lowering offset');
+  assert.equal(seen.drawRails, 0, 'rails are drawn without the lowering offset');
+  assert.equal(seen.drawAnchorRail, 1, 'the anchor rail eases down with the cluster');
+  assert.equal(seen.drawMagneticBonds, 1, 'the bonds ease down with the cluster');
+  assert.equal(ctx.saveDepth, 0);
 });

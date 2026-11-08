@@ -36,6 +36,7 @@ const OUTCOME_MODE_FIELD = Object.freeze({
   [OUTCOME_QUIT]: 'quits'
 });
 const RECORD_KIND_STAGE = 'stage';
+const RECORD_KIND_CLASSIC_STAGE = 'classicStage';
 const RECORD_KIND_WAVE = 'wave';
 // Code points of typographic look-alikes of ASCII, mapped to their plain replacement.
 const ASCII_REPLACEMENTS = new Map([
@@ -264,6 +265,9 @@ function buildBestText(record, translate) {
   const score = clampCount(record?.score);
   if (record?.kind === RECORD_KIND_STAGE && record.stage > 0) {
     return translate('modals.stats.overview.bestStage', { score, stage: record.stage });
+  }
+  if (record?.kind === RECORD_KIND_CLASSIC_STAGE && record.stage > 0) {
+    return translate('modals.stats.overview.bestClassicStage', { score, stage: record.stage });
   }
   if (record?.kind === RECORD_KIND_WAVE && record.wave > 0) {
     return translate('modals.stats.overview.bestWave', { score, wave: record.wave });

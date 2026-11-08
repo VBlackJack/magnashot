@@ -24,6 +24,7 @@ import {
 } from '../core/Constants.js';
 import { t } from '../core/I18n.js';
 import { DISCOVERY_INTERACTIONS } from './Discovery.js';
+import { applyTurn, SAG_STEPS } from './SagMeter.js';
 
 /** Methods of GameEngine that belong to this domain, installed on its prototype. */
 export const engineTurnResolutionMethods = {
@@ -564,9 +565,10 @@ export const engineTurnResolutionMethods = {
     this.impactWave = null;
   },
 
+  /** @returns {number} How many spheres the avalanche dropped. */
   detachAndRewardAvalanche() {
     if (!this.isRunPlaying()) {
-      return;
+      return 0;
     }
     const detached = this.physicsWorld.detachUnanchoredBalls();
     if (detached.length > 0) {
@@ -611,6 +613,7 @@ export const engineTurnResolutionMethods = {
       }
     }
     this.crumbleLooseNeutralAnchors();
+    return detached.length;
   },
 
   /**
@@ -702,8 +705,70 @@ export const engineTurnResolutionMethods = {
     }
   },
 
+  /**
+   * Applies one finished turn to the Sag meter and lowers the cluster when it fills up.
+   * Pure function of the turn outcome: no random draw.
+   * @param {{removed:boolean, dropped:number, frozen:boolean}} outcome
+   */
+  resolveSagTurn(outcome) {
+    const spec = this.getSagSpecCached();
+    if (!spec) {
+      return;
+    }
+    const result = applyTurn({ level: this.sagLevel ?? 0 }, outcome, spec);
+    this.sagLevel = result.level;
+    const canvasCfg = this.gameConfig.canvas;
+    if (result.drained > 0) {
+      this.particleSystem.spawnFloatingText(
+        canvasCfg.launcherX,
+        canvasCfg.launcherY + canvasCfg.launcherPopupOffsetY,
+        t('gameplay.feedback.sag.drained', { amount: result.drained }),
+        this.gameConfig.theme.overchargePopupColor
+      );
+    }
+    if (result.lowered) {
+      const isRail = spec.step === SAG_STEPS.RAIL;
+      // A board emptied by this very turn is about to be paid as a cleared stage: the rail
+      // does not drop on it.
+      if (isRail && this.physicsWorld.balls.length === 0 && !this.physicsWorld.projectile) {
+        return;
+      }
+      if (isRail) {
+        this.lowerAnchorRail();
+      } else {
+        this.spawnEndlessWave();
+        // A wave on a cleared board brings colors back that the first refresh could not
+        // compare against. On a non-empty board the wave only adds balls, so every launcher
+        // color is still present and this second pass draws nothing from the seeded random.
+        this.refreshStaleLauncherColors();
+      }
+      // The step may have ended the run (rail past the danger line): no creak, shake or
+      // text on the end screen, and the cluster stays where it really is.
+      if (!this.isRunPlaying()) {
+        this.railLowerFrames = 0;
+        return;
+      }
+      this.railLowerFrames = this.gameConfig.sag?.lowerFrames ?? 0;
+      this.audioManager.playEffect?.('creak');
+      const shake = this.gameConfig.sag?.lowerShake;
+      if (shake) {
+        this.particleSystem.addScreenShake(shake, this.gameConfig.juice.maxShakeOffset);
+      }
+      if (this.gameConfig.sag) {
+        this.particleSystem.spawnFloatingText(
+          canvasCfg.logicalWidth * MATH_CONSTANTS.HALF,
+          this.gameConfig.endless.startY + canvasCfg.wavePopupOffsetY,
+          t(isRail ? 'gameplay.feedback.sag.lowered' : 'gameplay.feedback.sag.dropped'),
+          this.gameConfig.theme.wavePopupColor
+        );
+      }
+    } else if (result.warned) {
+      this.audioManager.playEffect?.('sagWarn');
+    }
+  },
+
   handlePostTurnCleanup(madeMatch, appliedFreeze = false) {
-    this.detachAndRewardAvalanche();
+    const dropped = this.detachAndRewardAvalanche();
     this.shiftChameleonBalls();
     // A Freeze Core that went off during this turn (the shot or its avalanche) counts as a
     // freeze applied this turn. Read after the avalanche so a core it sets off is consumed here.
@@ -722,16 +787,8 @@ export const engineTurnResolutionMethods = {
       }
     }
 
-    if (this.isSurvivalMode() && !wasFrozen && !madeMatch) {
-      this.shotsUntilWave--;
-      if (this.shotsUntilWave <= 0) {
-        this.spawnEndlessWave();
-        // A wave on a cleared board brings colors back that the first refresh could not
-        // compare against. On a non-empty board the wave only adds balls, so every launcher
-        // color is still present and this second pass draws nothing from the seeded random.
-        this.refreshStaleLauncherColors();
-        this.shotsUntilWave = this.gameConfig.endless.shotsBeforeWave;
-      }
+    if (this.isSurvivalMode() || this.mode === GAME_MODES.CLASSIC) {
+      this.resolveSagTurn({ removed: madeMatch, dropped, frozen: wasFrozen });
     } else if (this.mode === GAME_MODES.CASCADE && !wasFrozen) {
       this.cascadeTurnsUntilDrop--;
       if (this.cascadeTurnsUntilDrop <= 0) {

@@ -1494,11 +1494,46 @@
       }
     }
   },
+  "sag": {
+    "modes": {
+      "endless": { "size": 5, "dropsPerDrain": 4, "maxDrainPerTurn": 1, "step": "wave" },
+      "daily": { "size": 5, "dropsPerDrain": 4, "maxDrainPerTurn": 1, "step": "wave" },
+      "classic": { "size": 3, "dropsPerDrain": 3, "maxDrainPerTurn": 2, "step": "rail" }
+    },
+    "warnAt": 1,
+    "lowerFrames": 18,
+    "lowerShake": 5,
+    "railColor": "#94a3b8",
+    "railWarnColor": "#f59e0b",
+    "railCritColor": "#ef4444",
+    "gauge": { "offsetX": 58, "offsetY": -8, "segmentHeight": 7, "segmentGap": 3, "width": 10 },
+    "render": {
+      "railThickness": 6,
+      "railPulsePeriodMs": 380,
+      "railShadeColor": "#000000",
+      "hatchColor": "rgba(0, 0, 0, 0.55)"
+    }
+  },
+  "classic": {
+    "columns": 10,
+    "startY": 95,
+    "rowSpacingY": 40,
+    "baseRows": 6,
+    "rowsPerStage": 1,
+    "maxRows": 9,
+    "basePalette": 4,
+    "paletteStepStages": 2,
+    "maxPalette": 6,
+    "descentStepY": 48,
+    "stageClearBonusBase": 500,
+    "seedPrefix": "classic"
+  },
   "modeUnlocks": {
-    "order": ["campaign", "daily", "endless", "puzzle", "blitz", "flux", "cascade", "boss_rush"],
+    "order": ["campaign", "daily", "endless", "classic", "puzzle", "blitz", "flux", "cascade", "boss_rush"],
     "always": ["campaign", "daily"],
     "campaignLevelCleared": {
       "endless": 3,
+      "classic": 4,
       "puzzle": 5,
       "blitz": 7,
       "flux": 8,
@@ -1507,19 +1542,21 @@
     },
     "recordKeys": {
       "endless": ["endlessHighScore"],
+      "classic": ["classicHighScore", "classicBestStage"],
       "puzzle": ["puzzleHighScore", "puzzleBestStage"],
       "blitz": ["blitzHighScore"],
       "flux": ["fluxHighScore", "fluxBestStage"],
       "cascade": ["cascadeHighScore"],
       "boss_rush": ["bossRushHighScore", "bossRushBestWave"]
     },
+    "introduced": { "classic": 4 },
     "stateNew": "new",
     "stateSeen": "seen",
     "grandfather": {
       "progressKeys": [
         "levelStats", "endlessHighScore", "fluxHighScore", "fluxBestStage", "blitzHighScore",
         "bossRushHighScore", "bossRushBestWave", "cascadeHighScore", "puzzleHighScore",
-        "puzzleBestStage", "dailyBest", "dailyLastPlayedDate", "coins", "upgrades",
+        "puzzleBestStage", "classicHighScore", "classicBestStage", "dailyBest", "dailyLastPlayedDate", "coins", "upgrades",
         "achievements", "achievementRecords", "unlockedBallStyles", "runSnapshot", "discoveries"
       ],
       "emptyValues": ["", "0", "{}", "[]", "null", "false"],
@@ -1565,6 +1602,8 @@
       "cascadeHighScore": "cascade_high_score",
       "puzzleHighScore": "puzzle_high_score",
       "puzzleBestStage": "puzzle_best_stage",
+      "classicHighScore": "classic_high_score",
+      "classicBestStage": "classic_best_stage",
       "dailyBest": "daily_best",
       "dailyBestDate": "daily_best_date",
       "dailyLastPlayedDate": "daily_last_date",

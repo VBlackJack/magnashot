@@ -99,6 +99,10 @@ const SHARED_FLUX_SEED = 'abc234';
 const LOCKED_MODE_BUTTON = '#btn-endless';
 const LOCKED_MODE_REQUIRED_LEVEL = GAME_CONFIG.modeUnlocks.campaignLevelCleared.endless;
 const LOCKED_MODE_BUTTONS = Object.freeze(['#btn-endless', '#btn-flux', '#btn-weekly']);
+/** The HUD Sag meter, and the Classic card of the level select with the level that opens it. */
+const SAG_METER_SELECTOR = '#hud-sag-meter';
+const CLASSIC_CARD_SELECTOR = '#btn-mode-classic';
+const CLASSIC_REQUIRED_LEVEL = GAME_CONFIG.modeUnlocks.campaignLevelCleared.classic;
 const UNLOCKED_MODE_BUTTONS = Object.freeze(['#btn-daily', ...LOCKED_MODE_BUTTONS]);
 
 let server;
@@ -394,6 +398,80 @@ for (const viewport of VIEWPORTS) {
           await page.evaluate(() => document.querySelector('.app-shell').classList.contains('drawer-open')),
           'the menu stays open'
         );
+        assert.deepEqual(errors, []);
+      } finally {
+        await context.close();
+      }
+    });
+
+    test('Survival shows the Sag meter in the HUD without changing its grid, and a run of misses sets its warning', async () => {
+      const { context, page, errors } = await openGame(viewport, { initStorage: EXISTING_PLAYER_STORAGE });
+      try {
+        await startLevelOne(page);
+        assert.equal(await isShown(page, SAG_METER_SELECTOR), false, 'the campaign has no Sag meter');
+        const campaignTracks = (await hudTrackCount(page)).tracks;
+        await page.evaluate(() => {
+          const engine = window.__fluxEngine;
+          engine.startEndlessMode();
+          engine.notifyUI();
+        });
+        await page.waitForFunction((playing) => window.__fluxEngine.state === playing, GAME_STATES.PLAYING);
+        await waitShown(page, SAG_METER_SELECTOR);
+        const meter = await page.evaluate((selector) => {
+          const el = document.querySelector(selector);
+          const rect = el.getBoundingClientRect();
+          return {
+            role: el.getAttribute('role'),
+            valueText: el.getAttribute('aria-valuetext') || '',
+            max: el.getAttribute('aria-valuemax'),
+            left: rect.left,
+            right: rect.right,
+            width: window.innerWidth
+          };
+        }, SAG_METER_SELECTOR);
+        assert.equal(meter.role, 'meter');
+        assert.ok(meter.valueText.trim().length > 0, 'the meter states its value in words');
+        assert.ok(Number(meter.max) > 0, 'the meter has a range');
+        assert.ok(meter.left >= 0 && meter.right <= meter.width, 'the meter stays inside the window');
+        await assertLayoutFits(page, 'survival');
+        assert.equal((await hudTrackCount(page)).tracks, campaignTracks, 'the HUD grid keeps its columns');
+
+        // One miss short of a drop: the meter warns. Driven through the engine, like the turn resolution does.
+        await page.evaluate(() => {
+          const engine = window.__fluxEngine;
+          const { size } = engine.getSagState();
+          for (let i = 0; i < size - 1; i++) {
+            engine.resolveSagTurn({ removed: false, dropped: 0, frozen: false });
+          }
+          engine.notifyUI();
+        });
+        await page.waitForFunction(
+          (selector) => document.querySelector(selector).classList.contains('warning'),
+          SAG_METER_SELECTOR
+        );
+        await assertLayoutFits(page, 'survival warning');
+        assert.deepEqual(errors, []);
+      } finally {
+        await context.close();
+      }
+    });
+
+    test('a fresh profile finds the Classic card locked; tapping it names the level that opens it', async () => {
+      const { context, page, errors } = await openGame(viewport);
+      try {
+        await clickMenuButton(page, viewport, '#btn-levels');
+        await waitShown(page, '#modal-levels');
+        assert.equal(await isMenuItemLocked(page, CLASSIC_CARD_SELECTOR), true, 'the Classic card is locked');
+        const modeBefore = await page.evaluate(() => window.__fluxEngine.mode);
+        // Playwright refuses to click an aria-disabled button: dispatch the click the player's tap would produce.
+        await page.dispatchEvent(CLASSIC_CARD_SELECTOR, 'click');
+        await page.waitForFunction(() => {
+          const hint = document.querySelector('#levels-chapter-hint');
+          return !hint.classList.contains('hidden') && hint.textContent.trim().length > 0;
+        });
+        assert.match(await page.textContent('#levels-chapter-hint'), new RegExp(`\\b${CLASSIC_REQUIRED_LEVEL}\\b`));
+        assert.equal(await page.evaluate(() => window.__fluxEngine.mode), modeBefore, 'the mode did not change');
+        await assertLayoutFits(page, 'level select with the Classic card');
         assert.deepEqual(errors, []);
       } finally {
         await context.close();
@@ -835,6 +913,25 @@ describe('end of round (desktop)', () => {
         current: (await import('/src/core/StorageManager.js')).CURRENT_SAVE_SCHEMA_VERSION
       }), `${STORAGE_PREFIX}${STORAGE_KEYS.schemaVersion}`);
       assert.equal(saved.version, String(saved.current));
+      assert.deepEqual(errors, []);
+    } finally {
+      await context.close();
+    }
+  });
+
+  test('an existing player starts Classic from the level select', async () => {
+    const { context, page, errors } = await openGame(desktop, { initStorage: EXISTING_PLAYER_STORAGE });
+    try {
+      await clickMenuButton(page, desktop, '#btn-levels');
+      await waitShown(page, '#modal-levels');
+      assert.equal(await isMenuItemLocked(page, CLASSIC_CARD_SELECTOR), false, 'the Classic card is open');
+      await page.click(CLASSIC_CARD_SELECTOR);
+      await page.waitForFunction(
+        ([mode, playing]) => window.__fluxEngine.mode === mode && window.__fluxEngine.state === playing,
+        [GAME_MODES.CLASSIC, GAME_STATES.PLAYING]
+      );
+      await waitShown(page, SAG_METER_SELECTOR);
+      assert.equal(await page.evaluate(() => window.__fluxEngine.classicStage), 1);
       assert.deepEqual(errors, []);
     } finally {
       await context.close();

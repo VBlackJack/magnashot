@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+import { GAME_MODES } from '../core/Constants.js';
 import { i18n, t, formatNumber } from '../core/I18n.js';
 import { SeededRandom } from '../core/SeededRandom.js';
 import { buildShareText, formatDailyCountdown, getMsUntilNextDaily } from '../game/DailyShare.js';
@@ -409,7 +410,8 @@ export const uiSettingsControlMethods = {
         wave: engine.waveCount,
         score: engine.score,
         waveLog: engine.waveLog,
-        stage: engine.fluxStage,
+        stage: engine.mode === GAME_MODES.CLASSIC ? engine.classicStage : engine.fluxStage,
+        drops: engine.classicRailDropsTotal ?? 0,
         puzzleStage: engine.currentPuzzleStage,
         seed: engine.fluxSeed,
         isWeekly: engine.isWeeklyFluxRun === true,

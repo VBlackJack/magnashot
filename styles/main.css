@@ -422,6 +422,72 @@ body {
   transition: width 0.3s ease;
 }
 
+/*
+ * Sag gauge: one segment per missed shot the cluster can take. The state is also carried by
+ * the border (dashed when one miss from a drop, thick when full), not by color alone.
+ */
+.sag-meter {
+  /* Set by the HUD refresh; these defaults draw one empty segment. */
+  --sag-size: 1;
+  --sag-level: 0;
+  position: relative;
+  display: block;
+  box-sizing: border-box;
+  width: 100%;
+  height: 8px;
+  margin-top: 4px;
+  overflow: hidden;
+  background: var(--surface-sunken);
+  border: 1px solid var(--border-subtle);
+  border-radius: 4px;
+}
+
+.sag-meter-fill {
+  display: block;
+  width: calc(var(--sag-level, 0) / var(--sag-size, 1) * 100%);
+  height: 100%;
+  background: var(--accent-blue);
+  transition: width 0.2s ease;
+}
+
+.sag-meter::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: repeating-linear-gradient(
+    90deg,
+    transparent 0,
+    transparent calc(100% / var(--sag-size, 1) - 2px),
+    var(--surface-sunken) calc(100% / var(--sag-size, 1) - 2px),
+    var(--surface-sunken) calc(100% / var(--sag-size, 1))
+  );
+}
+
+.sag-meter.warning {
+  border-style: dashed;
+  border-color: var(--accent-amber);
+  animation: sag-meter-pulse 1.1s ease-in-out infinite;
+}
+
+.sag-meter.warning .sag-meter-fill {
+  background: var(--accent-amber);
+}
+
+.sag-meter.critical {
+  border-width: 2px;
+  border-color: var(--accent-danger);
+}
+
+.sag-meter.critical .sag-meter-fill {
+  background: var(--accent-danger);
+}
+
+@keyframes sag-meter-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 transparent; }
+  50% { box-shadow: 0 0 6px 1px var(--accent-amber-alpha-45); }
+}
+
 /* Slide-in menu controls: visible on all viewports to open and close the burger drawer. */
 .hud-menu-btn,
 .drawer-close-btn {
@@ -2688,6 +2754,10 @@ body {
     height: 8px;
     margin-top: 6px;
   }
+  .sag-meter {
+    height: 10px;
+    margin-top: 6px;
+  }
   .stage-container,
   .stage-column {
     display: contents;
@@ -2909,6 +2979,7 @@ body {
   .ammo-card,
   .overcharge-track,
   .star-meter,
+  .sag-meter,
   .achievement-progress-track,
   .achievement-tier-badge,
   .level-card.unlocked {
@@ -2958,8 +3029,24 @@ body {
   }
   .overcharge-fill,
   .star-meter-fill,
+  .sag-meter-fill,
   .achievement-progress-fill {
     background: Highlight;
+  }
+  .sag-meter::after {
+    background: repeating-linear-gradient(
+      90deg,
+      transparent 0,
+      transparent calc(100% / var(--sag-size, 1) - 2px),
+      Canvas calc(100% / var(--sag-size, 1) - 2px),
+      Canvas calc(100% / var(--sag-size, 1))
+    );
+  }
+  .sag-meter.warning {
+    border: 1px dashed CanvasText;
+  }
+  .sag-meter.critical {
+    border: 2px solid CanvasText;
   }
 }
 

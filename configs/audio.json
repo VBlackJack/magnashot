@@ -18,6 +18,21 @@
     "releaseSec": 0.12
   },
   "effects": {
+    "creak": {
+      "type": "sawtooth",
+      "startFreq": 95,
+      "endFreq": 62,
+      "duration": 0.32,
+      "harmonic": true,
+      "hapticMs": 40
+    },
+    "sagWarn": {
+      "type": "triangle",
+      "startFreq": 300,
+      "endFreq": 260,
+      "duration": 0.09,
+      "hapticMs": 0
+    },
     "shoot": {
       "type": "triangle",
       "startFreq": 240,

@@ -4,6 +4,18 @@ All notable changes to **MagnaShot** are documented in this file.
 
 ## [Unreleased]
 
+### Added
+- **Sag Meter (`SagMeter`, `EngineTurnResolution`, `EngineRoundFlow`, `Renderer`, `UIHudRefresh`)**: Survival, the Daily Challenge and Purist show how close the cluster is to sinking. Every shot that removes nothing fills one segment, a match leaves the meter as it is, and an avalanche caused by your shot that drops four or more spheres lifts it by one (three or more, up to two, in Purist); chain-reaction and in-flight bond-break avalanches do not drain, and a no-match shot that still causes an avalanche no longer counts as a miss. A full meter drops the cluster one step and empties. The HUD box (the former "Next Wave" box, same grid) carries a segmented `role="meter"` with a spoken value, a gauge is drawn beside the launcher, the warning (amber, dashed outline) comes one miss before the drop and is announced once per cycle, and the drop has a creak, a shake (none under reduced motion), a floating text and haptics. Forced colors and reduced motion are handled.
+- **Purist Mode (`EngineModes`, `StorageManager`, `DailyShare`, `UIManager`)**: Pure rules on a fixed ceiling: stages from a seeded stream, 6 rows of 4 colors growing to 9 rows and 6 colors, a fully anchored top row, no special spheres, no Workshop upgrades, no tilt and no shot budget. Misses lower the rail one step; clearing the board pays a stage bonus and starts the next stage. It opens at campaign level 4 (a save from before the update shows it as "New"), keeps its own records (best score and best stage), and its Share result lists the stage, the score and the rail drops. Its card is the first of the arcade strip in the Level Select.
+- **Purist Calibration (`scripts/calibrate-classic.mjs`, `scripts/bot/CampaignBot.js`)**: An offline report of how often the greedy bot clears stage 1 and reaches stage 3 or more.
+- **Save Schema 4 (`StorageManager`)**: Migration 4 marks a mode introduced by an update as "New" for players with progress, once and without downgrading anything.
+
+### Changed
+- **One Clock for Waves (`EngineBoard`, `EngineTurnResolution`, `RunSnapshot`)**: The hidden `shotsUntilWave` counter of Survival and the Daily Challenge is replaced by the Sag meter (size 5, same rules for frozen turns and matches). The easing is new: an avalanche caused by your shot that drops four or more spheres drains one segment (avalanches from chain reactions or from bonds that break mid-flight do not), and a shot that matches nothing but still causes an avalanche no longer counts as a miss. Runs saved by an earlier version restore their position (`sagLevel` is derived from `shotsUntilWave`).
+- **Daily Across the Update**: A Daily Challenge played across this update can differ from one played on the previous version, because avalanches now drain the meter. Seeds, boards and launcher colors are unchanged, and two runs on the same version stay identical.
+- **Cluster Step (`EngineRoundFlow`)**: The shift of the cluster by one row is shared by the wave spawn and the Purist rail drop, with no change to wave positions.
+- **Docs**: README and README.fr describe the Sag meter, Purist and the new files and tests.
+
 ## [1.16.0] - 2026-11-08
 
 ### Added

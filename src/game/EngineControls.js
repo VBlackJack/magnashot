@@ -29,6 +29,9 @@ export const engineControlsMethods = {
    * @returns {boolean} True when the special ball slots belong on screen.
    */
   offersSpecialBalls() {
+    if (this.mode === GAME_MODES.CLASSIC) {
+      return false;
+    }
     if (this.mode !== GAME_MODES.CAMPAIGN) {
       return true;
     }
@@ -38,9 +41,20 @@ export const engineControlsMethods = {
     return grants || holds || Boolean(this.currentBall?.specialType);
   },
 
-  /** True in the Daily Challenge while shop ammo is switched off for fairness. */
+  /** True while shop ammo is switched off: Daily fairness, or the Classic ruleset (no specials). */
   isDailyAmmoLocked() {
+    if (this.mode === GAME_MODES.CLASSIC) {
+      return true;
+    }
     return this.mode === GAME_MODES.DAILY && !this.gameConfig.seededFairness?.dailyAllowsSpecialAmmo;
+  },
+
+  /**
+   * True while the Workshop upgrades count for nothing in the current run: Classic always,
+   * the Daily Challenge while it holds a zero baseline.
+   */
+  areUpgradesNeutralised() {
+    return this.mode === GAME_MODES.CLASSIC || this.areDailyUpgradesNeutralised();
   },
 
   /** True in the Daily Challenge while every Workshop upgrade is held at a zero baseline. */
@@ -265,7 +279,11 @@ export const engineControlsMethods = {
 
   /** True when the device tilt is ignored: Daily and shared-seed Flux runs share one physics. */
   isTiltLocked() {
-    return this.mode === GAME_MODES.DAILY || (this.mode === GAME_MODES.FLUX && this.isSharedFluxRun);
+    return (
+      this.mode === GAME_MODES.DAILY
+      || this.mode === GAME_MODES.CLASSIC
+      || (this.mode === GAME_MODES.FLUX && this.isSharedFluxRun)
+    );
   },
 
   /**

@@ -25,6 +25,7 @@ import {
 } from '../core/Constants.js';
 import { t } from '../core/I18n.js';
 import { SeededRandom } from '../core/SeededRandom.js';
+import { getSagSpec, getSagPhase, SAG_PHASES } from './SagMeter.js';
 
 /** Methods of GameEngine that belong to this domain, installed on its prototype. */
 export const engineRoundFlowMethods = {
@@ -60,6 +61,89 @@ export const engineRoundFlowMethods = {
     return WAVE_TYPES.NORMAL;
   },
 
+  /**
+   * Moves the whole cluster (pivot obstacles and every ball) down one rigid step and strips
+   * the anchor flag from the balls that held it. Fixed fixtures do not move.
+   * @param {number} stepY - Vertical distance of the step.
+   * @returns {object[]} The balls that were anchors before the step.
+   */
+  shiftClusterDown(stepY) {
+    const previousAnchors = [];
+    for (const obs of this.physicsWorld.obstacles) {
+      if (obs.type === OBSTACLE_TYPES.PIVOT) {
+        obs.baseY += stepY;
+        obs.y += stepY;
+        obs.prevY += stepY;
+      }
+    }
+    for (const b of this.physicsWorld.balls) {
+      if (b.pivotRef) {
+        b.y += stepY;
+        b.prevY += stepY;
+        b.anchorY += stepY;
+        continue;
+      }
+      if (b.isAnchor) {
+        previousAnchors.push(b);
+      }
+      b.isAnchor = false;
+      b.y += stepY;
+      b.anchorY += stepY;
+    }
+
+    return previousAnchors;
+  },
+
+  /**
+   * Classic sag step: the whole cluster, ceiling included, drops one step and no row is added.
+   * The balls that held the ceiling keep their anchor flag at the new height.
+   */
+  lowerAnchorRail() {
+    const endlessCfg = this.gameConfig.endless;
+    const stepY = this.gameConfig.classic?.descentStepY ?? endlessCfg.descentStepY;
+    const previousAnchors = this.shiftClusterDown(stepY);
+    for (const anchor of previousAnchors) {
+      anchor.isAnchor = true;
+    }
+    this.railDrops = (this.railDrops ?? 0) + 1;
+    this.classicRailDropsTotal = (this.classicRailDropsTotal ?? 0) + 1;
+    this.checkDangerLineBreach();
+  },
+
+  /**
+   * Sag spec of the current mode, memoised: the renderer and the HUD ask every frame.
+   * Rebuilt when the mode or the config sections change.
+   */
+  getSagSpecCached() {
+    const cache = this.sagSpecCache;
+    const sagCfg = this.gameConfig.sag;
+    const endlessCfg = this.gameConfig.endless;
+    if (cache && cache.mode === this.mode && cache.sagCfg === sagCfg && cache.endlessCfg === endlessCfg) {
+      return cache.spec;
+    }
+    const spec = getSagSpec(this.mode, sagCfg, endlessCfg);
+    this.sagSpecCache = { mode: this.mode, sagCfg, endlessCfg, spec };
+    return spec;
+  },
+
+  /**
+   * Read-only view of the Sag meter for the HUD and the renderer.
+   * @returns {{active:boolean, level:number, size:number, phase:string, railDrops:number}}
+   */
+  getSagState() {
+    const spec = this.getSagSpecCached();
+    const railDrops = this.railDrops ?? 0;
+    if (!spec) {
+      return { active: false, level: 0, size: 0, phase: 'calm', railDrops };
+    }
+    // The meter resets the moment it fills; while the step is still easing in it reads as full.
+    if ((this.railLowerFrames ?? 0) > 0) {
+      return { active: true, level: spec.size, size: spec.size, phase: SAG_PHASES.FULL, railDrops };
+    }
+    const level = this.sagLevel ?? 0;
+    return { active: true, level, size: spec.size, phase: getSagPhase(level, spec, spec.warnAt), railDrops };
+  },
+
   spawnEndlessWave() {
     const endlessCfg = this.gameConfig.endless;
     const waveCfg = this.mode === GAME_MODES.BLITZ ? this.gameConfig.blitz : endlessCfg;
@@ -68,28 +152,7 @@ export const engineRoundFlowMethods = {
     this.waveCount++;
     this.endlessRowParity = (this.endlessRowParity + 1) % 2;
 
-    const previousAnchors = [];
-    for (const obs of this.physicsWorld.obstacles) {
-      if (obs.type === OBSTACLE_TYPES.PIVOT) {
-        obs.baseY += descentStepY;
-        obs.y += descentStepY;
-        obs.prevY += descentStepY;
-      }
-    }
-    for (const b of this.physicsWorld.balls) {
-      if (b.pivotRef) {
-        b.y += descentStepY;
-        b.prevY += descentStepY;
-        b.anchorY += descentStepY;
-        continue;
-      }
-      if (b.isAnchor) {
-        previousAnchors.push(b);
-      }
-      b.isAnchor = false;
-      b.y += descentStepY;
-      b.anchorY += descentStepY;
-    }
+    const previousAnchors = this.shiftClusterDown(descentStepY);
 
     const cols = waveCfg.columns ?? endlessCfg.columns;
     const waveType = this.getWaveType(this.waveCount);
@@ -296,6 +359,10 @@ export const engineRoundFlowMethods = {
         return;
       }
       this.startOutOfShotsGraceIfNeeded();
+    } else if (this.mode === GAME_MODES.CLASSIC) {
+      if (this.physicsWorld.balls.length === 0 && !this.physicsWorld.projectile) {
+        this.completeClassicStage();
+      }
     } else if (this.mode === GAME_MODES.BOSS_RUSH) {
       const bossBall = this.getBossBall();
       if (!bossBall) {
@@ -385,6 +452,8 @@ export const engineRoundFlowMethods = {
     if (this.state === GAME_STATES.GAME_OVER || this.state === GAME_STATES.VICTORY) {
       return;
     }
+    // The final board is shown where it really is: no lowering ease on the end screen.
+    this.railLowerFrames = 0;
     let previousBestScore = 0;
     if (this.mode === GAME_MODES.ENDLESS) {
       previousBestScore = this.storageManager.getEndlessHighScore();
@@ -402,6 +471,8 @@ export const engineRoundFlowMethods = {
       previousBestScore = this.storageManager.getCascadeHighScore?.() || 0;
     } else if (this.mode === GAME_MODES.PUZZLE) {
       previousBestScore = this.storageManager.getPuzzleHighScore?.() || 0;
+    } else if (this.mode === GAME_MODES.CLASSIC) {
+      previousBestScore = this.storageManager.getClassicHighScore?.() || 0;
     }
     const isNewRecord = this.mode !== GAME_MODES.CAMPAIGN && previousBestScore > 0 && this.score > previousBestScore;
     const remainingSpheres = this.physicsWorld.balls.length;

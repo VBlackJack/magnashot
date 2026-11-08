@@ -17,6 +17,7 @@
 import { GAME_MODES, GAME_STATES, SPECIAL_TYPES_ORDER, WAVE_TYPES } from '../core/Constants.js';
 import { Ball } from '../entities/Ball.js';
 import { normalizeShotTimeline } from './ShotTimeline.js';
+import { getSagSpec } from './SagMeter.js';
 
 /** Shape of a week key such as "2026-W45". */
 const WEEK_KEY_PATTERN = /^\d{4}-W\d{2}$/;
@@ -35,7 +36,10 @@ const ENGINE_SCALAR_FIELDS = [
   'shotsRemaining',
   'waveCount',
   'endlessRowParity',
-  'shotsUntilWave',
+  'sagLevel',
+  'railDrops',
+  'classicRailDropsTotal',
+  'classicStage',
   'freezeTurnsRemaining',
   'isCoreFreezeApplied',
   'chainCooldown',
@@ -341,6 +345,24 @@ function restoreSpecialInventory(fallback, saved) {
 }
 
 /**
+ * A run saved before the Sag meter counted waves down with `shotsUntilWave`; the meter counts
+ * up, so the saved countdown maps to the matching fill level.
+ * @param {import('./GameEngine.js').GameEngine} engine
+ * @param {object} snapshot
+ */
+function restoreLegacySagLevel(engine, snapshot) {
+  const saved = snapshot.engine;
+  if (Number.isFinite(saved.sagLevel) || !Number.isFinite(saved.shotsUntilWave)) {
+    return;
+  }
+  const spec = getSagSpec(engine.mode, engine.gameConfig.sag, engine.gameConfig.endless);
+  if (!spec) {
+    return;
+  }
+  engine.sagLevel = Math.max(0, Math.min(spec.size - 1, spec.size - Math.floor(saved.shotsUntilWave)));
+}
+
+/**
  * Rebuilds the board of the snapshot's mode (obstacles, palette, mutators), then
  * replaces its balls and live state with the saved ones. The run resumes paused.
  * @param {import('./GameEngine.js').GameEngine} engine
@@ -363,6 +385,8 @@ export function applyRunSnapshot(engine, snapshot) {
     engine.startBossRushMode(snapshot.engine.bossRushWave || 1);
   } else if (snapshot.mode === GAME_MODES.CASCADE) {
     engine.startCascadeMode();
+  } else if (snapshot.mode === GAME_MODES.CLASSIC) {
+    engine.startClassicMode(snapshot.engine.classicStage || 1);
   } else {
     engine.startEndlessMode();
   }
@@ -423,6 +447,7 @@ export function applyRunSnapshot(engine, snapshot) {
     engine[field] = 0;
   }
   restoreFields(engine, snapshot.engine, ENGINE_SCALAR_FIELDS);
+  restoreLegacySagLevel(engine, snapshot);
   engine.specialInventory = restoreSpecialInventory(engine.specialInventory, snapshot.specialInventory);
   engine.waveLog = restoreWaveLog(engine, snapshot.waveLog);
   // Optional: a run saved before hints could run out holds none, and a damaged list is dropped.

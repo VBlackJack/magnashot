@@ -302,3 +302,19 @@ test('Daily upgrades count as neutralised only in Daily and only at a zero basel
   };
   assert.equal(engine.areDailyUpgradesNeutralised(), false);
 });
+
+test('Classic is as fair as Daily: Workshop levels and shop ammo change nothing', () => {
+  const rich = createTestEngine(maxUpgrades());
+  const plain = createTestEngine(zeroUpgrades());
+  rich.startClassicMode(2);
+  plain.startClassicMode(2);
+  assert.deepEqual(
+    rich.physicsWorld.balls.map((b) => [b.x, b.y, b.colorId, b.isAnchor]),
+    plain.physicsWorld.balls.map((b) => [b.x, b.y, b.colorId, b.isAnchor])
+  );
+  for (const key of Object.keys(gameConfig.upgrades)) {
+    assert.equal(rich.getEffectiveUpgradeLevel(key), 0);
+  }
+  assert.equal(rich.isDailyAmmoLocked(), true);
+  assert.equal(rich.getOverchargeMultiplier(), 0);
+});

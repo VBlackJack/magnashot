@@ -400,6 +400,15 @@ export const uiInputBindingMethods = {
       });
     });
 
+    this.elements.btnModeClassic?.addEventListener('click', () => {
+      this.runIfModeUnlocked(GAME_MODES.CLASSIC, () => {
+        this.requestDestructiveAction(() => {
+          this.hideAllModals();
+          this.engine.startClassicMode();
+        }, () => t('modals.levelSelect.arcade.classic'));
+      });
+    });
+
     this.elements.btnModeBlitz?.addEventListener('click', () => {
       this.runIfModeUnlocked(GAME_MODES.BLITZ, () => {
         this.requestDestructiveAction(() => {

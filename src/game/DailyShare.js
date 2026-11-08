@@ -334,6 +334,23 @@ function buildCascadeShareText({ wave, score, url }) {
 }
 
 /**
+ * Builds the result of a Classic run: mode header, stage reached with score, and the rail drops.
+ * No game address: Classic stages are the same for everyone, there is no seed to share.
+ * @param {object} run
+ * @param {number} run.stage - Classic stage reached.
+ * @param {number} run.score - Final score.
+ * @param {number} run.drops - Times the rail was lowered.
+ * @returns {string}
+ */
+function buildClassicShareText({ stage, score, drops }) {
+  return [
+    t('share.classic.header'),
+    t('share.classic.stats', { stage: formatNumber(stage), score: formatNumber(score) }),
+    t('share.classic.drops', { drops: formatNumber(drops) })
+  ].join(LINE_SEPARATOR);
+}
+
+/**
  * Builds the shareable result of a run in the mode it was played. The campaign never
  * shares, so it is rejected like any unknown mode.
  * @param {object} run - Run summary; `run.mode` is a GAME_MODES value, the other fields
@@ -358,6 +375,8 @@ export function buildShareText(run, shareConfig) {
       return buildBossRushShareText(run);
     case GAME_MODES.CASCADE:
       return buildCascadeShareText(run);
+    case GAME_MODES.CLASSIC:
+      return buildClassicShareText(run);
     default:
       throw new RangeError(`No shareable result for game mode "${run.mode}"`);
   }

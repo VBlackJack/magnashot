@@ -151,11 +151,15 @@ export function renderWorkshopContents() {
 
   // Upgrades are bought as usual but count for nothing in a Daily run that neutralises them:
   // say so, as text, only while such a run is active.
-  if (this.engine.areDailyUpgradesNeutralised() && this.isRunActive()) {
+  if (this.engine.areUpgradesNeutralised() && this.isRunActive()) {
     const baselineNote = document.createElement('p');
     baselineNote.className = 'levels-empty-filter';
     baselineNote.setAttribute('role', 'note');
-    baselineNote.textContent = t('modals.shop.upgrades.dailyBaselineNote');
+    baselineNote.textContent = t(
+      this.engine.mode === GAME_MODES.CLASSIC
+        ? 'modals.shop.upgrades.classicBaselineNote'
+        : 'modals.shop.upgrades.dailyBaselineNote'
+    );
     grid.appendChild(baselineNote);
   }
 
