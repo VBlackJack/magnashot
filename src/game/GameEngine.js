@@ -43,6 +43,7 @@ import { engineDiscoveryMethods } from './EngineDiscovery.js';
 import { engineControlsMethods } from './EngineControls.js';
 import { engineTurnResolutionMethods } from './EngineTurnResolution.js';
 import { engineRoundFlowMethods } from './EngineRoundFlow.js';
+import { engineProgressMethods } from './EngineProgress.js';
 
 /** What a run is measured by when it is compared with the mode's record. */
 export const RUN_BEST_METRICS = Object.freeze({
@@ -1389,3 +1390,4 @@ installMethods(GameEngine, engineDiscoveryMethods);
 installMethods(GameEngine, engineControlsMethods);
 installMethods(GameEngine, engineTurnResolutionMethods);
 installMethods(GameEngine, engineRoundFlowMethods);
+installMethods(GameEngine, engineProgressMethods);

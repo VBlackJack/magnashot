@@ -66,11 +66,21 @@
         "resetHintsAria": "Revoir les indices de découverte",
         "resetHintsCaption": "Indices",
         "resetHintsDone": "✓",
-        "resetHintsDoneCaption": "Réinitialisés ✓"
+        "resetHintsDoneCaption": "Réinitialisés ✓",
+        "weekly": "Flux de la Semaine",
+        "weeklyBonusBadge": "Flux de la Semaine +{{coins}} ⬡",
+        "weeklyBestBadge": "Flux de la Semaine ✓ {{score}}"
       },
       "groups": {
         "modes": "Modes de jeu",
         "round": "Partie en cours"
+      },
+      "locked": {
+        "label": "🔒 {{mode}}",
+        "aria": "{{mode}}, verrouillé. Terminez le niveau {{level}} de la campagne pour le débloquer.",
+        "hint": "Terminez le niveau {{level}} de la campagne pour débloquer {{mode}}.",
+        "newBadge": "Nouveau",
+        "newAria": "{{mode}}, nouvellement débloqué"
       }
     },
     "drawer": {
@@ -79,7 +89,8 @@
       },
       "button": {
         "openAria": "Ouvrir le menu",
-        "closeAria": "Fermer le menu"
+        "closeAria": "Fermer le menu",
+        "stats": "Mes statistiques"
       },
       "stats": {
         "round": "Partie en cours"
@@ -239,7 +250,8 @@
       },
       "flux": {
         "perkChosen": "Atout choisi : {{name}}."
-      }
+      },
+      "modeUnlocked": "Nouveau mode débloqué : {{modes}}"
     },
     "hints": {
       "replayAria": "Réafficher les astuces de ce niveau"
@@ -340,6 +352,9 @@
       },
       "core": {
         "paint": "PEINTURE x{{count}} !"
+      },
+      "weeklyBonus": {
+        "claimed": "BONUS DE LA SEMAINE +{{coins}} ⬡"
       }
     },
     "mutators": {
@@ -537,7 +552,8 @@
         "bossRushDesc": "Titan central • Surcharge -1 bouclier",
         "bossRushRecord": "Vague {{wave}} • Record : {{score}}",
         "cascade": "⬇ Cascade",
-        "cascadeDesc": "Puits haute gravité • Plateformes"
+        "cascadeDesc": "Puits haute gravité • Plateformes",
+        "lockedDesc": "Terminez le niveau {{level}} pour débloquer"
       }
     },
     "shop": {
@@ -931,6 +947,10 @@
         "replay": "Rejouer",
         "levels": "Carte des Niveaux",
         "backToLevels": "Retour aux niveaux"
+      },
+      "unlock": {
+        "single": "Nouveau mode débloqué : {{mode}}. Retrouvez-le dans le menu.",
+        "multiple": "Nouveaux modes débloqués : {{modes}}. Retrouvez-les dans le menu."
       }
     },
     "gameOver": {
@@ -958,7 +978,8 @@
         "sameSeed": "Même Graine (#{{seed}})",
         "levels": "Choisir un Niveau",
         "share": "Partager",
-        "shareCopied": "Copié ✓"
+        "shareCopied": "Copié ✓",
+        "dailyHistory": "Historique"
       },
       "share": {
         "field": {
@@ -1048,6 +1069,58 @@
       },
       "stack": "{{stacks}}/{{max}}",
       "stackAria": "{{stacks}} sur {{max}}"
+    },
+    "stats": {
+      "title": {
+        "main": "Mes statistiques"
+      },
+      "tabs": {
+        "overview": "Aperçu",
+        "daily": "Historique du Défi du Jour"
+      },
+      "overview": {
+        "since": "Enregistré depuis le {{date}}",
+        "playTime": "Temps de jeu",
+        "playTimeValue": "{{hours}} h {{minutes}} min",
+        "shots": "Tirs effectués",
+        "modeRuns": "{{runs}} parties, {{wins}} victoires, {{quits}} abandons",
+        "bestScore": "Record {{score}}",
+        "bestStage": "Record {{score}}, forme {{stage}}",
+        "bestWave": "Record {{score}}, vague {{wave}}",
+        "campaignReach": "Niveau {{level}} atteint, {{stars}} ★",
+        "hardestLevel": "Niveau le plus dur pour vous : {{level}} ({{fails}} échecs)",
+        "mostLeftLevel": "Le plus souvent quitté : niveau {{level}} ({{quits}} fois)",
+        "empty": "Jouez une partie et vos statistiques apparaîtront ici.",
+        "privacy": "Stocké uniquement sur cet appareil. Rien n'est envoyé nulle part."
+      },
+      "button": {
+        "copy": "Copier mes statistiques",
+        "copied": "Copié",
+        "close": "Fermer"
+      },
+      "copy": {
+        "fieldLabel": "Vos statistiques, prêtes à copier :"
+      },
+      "feedback": {
+        "copied": "Statistiques copiées.",
+        "manual": "Sélectionnez le texte ci-dessous pour le copier."
+      },
+      "daily": {
+        "caption": "Vos {{count}} derniers Défis du Jour",
+        "col": {
+          "date": "Date",
+          "challenge": "N°",
+          "mutator": "Mutateur",
+          "score": "Score",
+          "wave": "Vague",
+          "streak": "Série"
+        },
+        "streakValue": "{{streak}} jours",
+        "graceUsed": "{{streak}} jours, jour de grâce utilisé",
+        "unknown": "-",
+        "empty": "Vos résultats du Défi du Jour seront listés ici à partir de maintenant.",
+        "summary": "Joué {{played}} jours sur les {{days}} derniers. Meilleur : {{score}} le {{date}}."
+      }
     }
   },
   "levels": {
@@ -1200,7 +1273,8 @@
       "header": "MagnaShot - Mode Flux",
       "headerWithSeed": "MagnaShot - Mode Flux (#{{seed}})",
       "stats": "Forme {{stage}} - {{score}} pts",
-      "assists": "Aides : Atelier +{{levels}} - Munitions {{ammo}} - Reprise {{continues}}"
+      "assists": "Aides : Atelier +{{levels}} - Munitions {{ammo}} - Reprise {{continues}}",
+      "weeklyHeader": "MagnaShot Flux de la Semaine {{week}} #{{seed}}"
     },
     "puzzle": {
       "header": "MagnaShot - Mode Puzzle",
@@ -1223,6 +1297,18 @@
       "copied": "Résultat copié dans le presse-papiers.",
       "manual": "Copiez le texte sélectionné pour partager votre résultat.",
       "failed": "Le partage a échoué. Copiez plutôt le texte sélectionné."
+    }
+  },
+  "stats": {
+    "copy": {
+      "header": "Statistiques MagnaShot (anonymes, aucune donnée personnelle)",
+      "since": "Enregistré depuis le {{date}}",
+      "playTime": "Temps de jeu : {{hours}} h {{minutes}} min",
+      "shots": "Tirs effectués : {{shots}}",
+      "modeLine": "{{mode}} : {{runs}} parties, {{wins}} victoires, {{quits}} abandons, {{best}}",
+      "campaignLine": "Campagne : niveau {{level}} atteint, {{stars}} ★",
+      "hardestLine": "Niveau le plus dur : {{level}} ({{fails}} échecs)",
+      "schemaLine": "Schéma de sauvegarde {{version}}"
     }
   }
 }

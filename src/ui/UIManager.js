@@ -61,6 +61,7 @@ import { uiInputBindingMethods } from './UIInputBindings.js';
 import { uiModalMethods } from './UIModals.js';
 import { uiSettingsControlMethods } from './UISettingsControls.js';
 import { uiHudRefreshMethods } from './UIHudRefresh.js';
+import { uiStatsMethods } from './UIStats.js';
 
 export {
   SPECIAL_ICON_HIGHLIGHT_POSITION,
@@ -1240,3 +1241,4 @@ installMethods(UIManager, uiInputBindingMethods);
 installMethods(UIManager, uiModalMethods);
 installMethods(UIManager, uiSettingsControlMethods);
 installMethods(UIManager, uiHudRefreshMethods);
+installMethods(UIManager, uiStatsMethods);
