@@ -279,6 +279,9 @@ export function captureRunSnapshot(engine, version) {
     shotTimeline: engine.shotTimeline
       ? { ...engine.shotTimeline, s: [...engine.shotTimeline.s], b: [...engine.shotTimeline.b] }
       : null,
+    // Optional: the Ghost Duel being raced (encoded, re-decoded on restore) and the Daily rematch flag.
+    ghostDuelCode: engine.encodeGhostDuel?.() ?? null,
+    isDailyRematch: Boolean(engine.isDailyRematch),
     currentBall: { colorId: engine.currentBall.colorId, specialType: engine.currentBall.specialType },
     nextBall: { colorId: engine.nextBall.colorId, specialType: engine.nextBall.specialType },
     allowTensionBreak: world.allowTensionBreak,
@@ -470,8 +473,12 @@ export function applyRunSnapshot(engine, snapshot) {
   engine.weeklyWeekKey = isWeekly ? snapshot.weeklyWeekKey : null;
   engine.runBestBaseline = null;
   // Optional: a run saved before timelines existed (or a damaged one) restarts with an empty one.
-  const hasTimeline = snapshot.mode === GAME_MODES.DAILY || isWeekly;
+  const hasTimeline = snapshot.mode === GAME_MODES.DAILY || snapshot.mode === GAME_MODES.FLUX;
   engine.shotTimeline = hasTimeline ? normalizeShotTimeline(snapshot.shotTimeline, engine.gameConfig.shotTimeline) : null;
+  // Optional: a Daily rematch stays a rematch, and the ghost saved with the run is raced again.
+  engine.isDailyRematch = snapshot.mode === GAME_MODES.DAILY && snapshot.isDailyRematch === true;
+  engine.ghostDuel = null;
+  engine.restoreGhostDuel?.(snapshot.ghostDuelCode);
   // Optional: a run saved before the baseline existed (or a damaged one) re-reads the record.
   engine.restoreRunBestBaseline(snapshot.runBestBaseline);
   if (engine.seededRng && Number.isFinite(snapshot.rngState)) {

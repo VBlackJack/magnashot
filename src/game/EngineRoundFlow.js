@@ -487,6 +487,7 @@ export const engineRoundFlowMethods = {
     this.state = GAME_STATES.GAME_OVER;
     // The state the last shot left behind, written as a finished timeline.
     this.sampleShotTimeline(true);
+    this.settleGhostDuel();
     this.persistRunHighScore();
     this.recordRunOutcome('loss');
     this.flushPendingRunCoins();
@@ -522,6 +523,7 @@ export const engineRoundFlowMethods = {
     this.storageManager.setCoins(coins - pack.costCoins);
     this.hasUsedContinue = true;
     this.retractRunOutcome();
+    this.retractGhostDuel();
     this.shotsRemaining = pack.shots;
     this.outOfShotsGraceFrames = 0;
     this.gameOverSummary = null;

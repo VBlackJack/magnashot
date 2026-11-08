@@ -163,12 +163,13 @@ export const engineProgressMethods = {
   },
 
   /**
-   * Records the state after the previous shot (Daily and weekly Flux runs only).
+   * Records the state after the previous shot (Daily and Flux runs). Only Daily and weekly
+   * Flux timelines are persisted; the others feed Ghost Duels.
    * @param {boolean} [isFinal] - True at game over: the timeline is then complete.
    */
   sampleShotTimeline(isFinal = false) {
     const isDaily = this.mode === GAME_MODES.DAILY;
-    if (!isDaily && !this.isWeeklyFluxRun) {
+    if (!isDaily && this.mode !== GAME_MODES.FLUX) {
       return;
     }
     const cfg = this.gameConfig.shotTimeline;

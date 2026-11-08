@@ -586,13 +586,16 @@ export const engineModeMethods = {
    * Starts the Daily Challenge for a seed (today's UTC date key by default).
    * @param {string|null} customSeed - Seed key; restarts pass the running seed so the board stays identical.
    * @param {boolean} isRestart - True when replaying the same seed; the first-play bonus is never re-granted.
+   * @param {{isRematch?: boolean}} [options] - isRematch marks the replay of a past Daily board
+   *   (Ghost Duel): no first-play bonus, and no streak, history or daily high score is written.
    */
-  startDailyChallenge(customSeed = null, isRestart = false) {
+  startDailyChallenge(customSeed = null, isRestart = false, { isRematch = false } = {}) {
     const seed = customSeed || SeededRandom.getTodayDateKey();
     this.initSurvivalRun(GAME_MODES.DAILY, seed);
+    this.isDailyRematch = Boolean(isRematch);
     const dailyCfg = this.gameConfig.daily;
     const bonusCoins = dailyCfg.firstPlayBonusCoins;
-    if (!isRestart && bonusCoins > 0 && this.storageManager.claimDailyPlayBonus(seed, bonusCoins, dailyCfg)) {
+    if (!isRestart && !isRematch && bonusCoins > 0 && this.storageManager.claimDailyPlayBonus(seed, bonusCoins, dailyCfg)) {
       const streak = this.storageManager.getDailyStreak?.(seed) || 1;
       const streakBonus = this.storageManager.computeDailyStreakBonus?.(streak, dailyCfg) || 0;
       const totalCoins = bonusCoins + streakBonus;
