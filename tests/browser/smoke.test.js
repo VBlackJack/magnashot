@@ -27,6 +27,8 @@ import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright';
 
 import { GAME_MODES, GAME_OVER_REASONS, GAME_STATES, SPECIAL_TYPES_ORDER } from '../../src/core/Constants.js';
+import { SeededRandom } from '../../src/core/SeededRandom.js';
+import { decodeGhost, encodeGhost } from '../../src/game/GhostCodec.js';
 import { startStaticServer } from './staticServer.js';
 
 /**
@@ -103,6 +105,18 @@ const LOCKED_MODE_BUTTONS = Object.freeze(['#btn-endless', '#btn-flux', '#btn-we
 const SAG_METER_SELECTOR = '#hud-sag-meter';
 const CLASSIC_CARD_SELECTOR = '#btn-mode-classic';
 const CLASSIC_REQUIRED_LEVEL = GAME_CONFIG.modeUnlocks.campaignLevelCleared.classic;
+const FLUX_CONFIG = JSON.parse(readFileSync(new URL('../../configs/flux.json', import.meta.url), 'utf8'));
+const DUEL_CONFIG = GAME_CONFIG.ghostDuel;
+/** Rival run of the duel links: six shots, cumulative score per shot. */
+const RIVAL_SHOT_SCORES = Object.freeze([200, 500, 800, 1100, 1300, 1500]);
+const RIVAL_NAME = 'Sam';
+/** A past Daily inside the replay window, in days before today. */
+const REMATCH_AGE_DAYS = 3;
+const MS_PER_DAY = 86400000;
+/** Score set on the player's run before it ends, to find it again in the challenge link. */
+const PLAYER_FINAL_SCORE = 777;
+/** A Daily record to beat, so a normal Daily shows its best-run marker in the badge row. */
+const DAILY_RECORD_TO_BEAT = 5000;
 const UNLOCKED_MODE_BUTTONS = Object.freeze(['#btn-daily', ...LOCKED_MODE_BUTTONS]);
 
 let server;
@@ -1167,4 +1181,277 @@ describe('HUD layout and stars', () => {
       await context.close();
     }
   });
+});
+
+/** Decode context of a duel link, built from the real configs (what the game builds at boot). */
+const duelContext = () => ({
+  todayKey: SeededRandom.getTodayDateKey(),
+  epochDateKey: GAME_CONFIG.share.epochDateKey,
+  seed: FLUX_CONFIG.seed,
+  maxPoints: GAME_CONFIG.shotTimeline.maxPoints
+});
+
+/** A rival run on a board: a Daily of a date key or a Flux seed. */
+function rivalGhost(mode, key) {
+  return {
+    mode,
+    key,
+    cv: DUEL_CONFIG.contentVersion,
+    n: RIVAL_SHOT_SCORES.length,
+    step: 1,
+    s: [...RIVAL_SHOT_SCORES],
+    final: RIVAL_SHOT_SCORES[RIVAL_SHOT_SCORES.length - 1],
+    assists: { workshop: 0, ammo: 0, continues: 0, tiltFree: false },
+    alias: RIVAL_NAME
+  };
+}
+
+/** The page address of a duel link for a ghost. */
+function duelPath(ghost) {
+  const payload = encodeGhost(ghost, DUEL_CONFIG, duelContext());
+  assert.ok(payload, 'the test ghost is encodable');
+  const flux = ghost.mode === 'flux' ? `flux=${ghost.key}&` : '';
+  return `/?${flux}${DUEL_CONFIG.queryParam}=${payload}`;
+}
+
+const dateKeyDaysAgo = (days) => new Date(Date.now() - days * MS_PER_DAY).toISOString().slice(0, 10);
+
+const waitDuelRunning = (page, mode) =>
+  page.waitForFunction(
+    ([expectedMode, playing]) => {
+      const engine = window.__fluxEngine;
+      return engine.mode === expectedMode && engine.state === playing && Boolean(engine.ghostDuel);
+    },
+    [mode, GAME_STATES.PLAYING]
+  );
+
+describe('Ghost Duels (desktop)', () => {
+  const desktop = VIEWPORTS.find((v) => v.name === 'desktop');
+
+  test('a duel link on a fresh profile opens the card; Accept starts the Flux duel, unlocks Flux and shows the rival badge', async () => {
+    const { context, page, errors } = await openGame(desktop, { path: duelPath(rivalGhost('flux', SHARED_FLUX_SEED)) });
+    try {
+      await waitShown(page, '#modal-duel');
+      assert.match(await page.textContent('#duel-card-summary'), new RegExp(RIVAL_NAME));
+      assert.equal(await isShown(page, '#btn-duel-accept'), true);
+      assert.equal(await isShown(page, '#btn-duel-ok'), false);
+      await page.click('#btn-duel-accept');
+      await waitDuelRunning(page, GAME_MODES.FLUX);
+      assert.equal(await page.evaluate(() => window.__fluxEngine.fluxSeed), SHARED_FLUX_SEED);
+      assert.equal(await isShown(page, '#modal-duel'), false);
+      await page.waitForFunction(() => document.querySelector('#btn-flux').getAttribute('aria-disabled') !== 'true');
+      await waitShown(page, '#hud-ghost');
+      assert.match(await page.textContent('#hud-ghost'), new RegExp(RIVAL_NAME));
+      assert.equal(await isShown(page, '#hud-best-run'), false, 'the rival badge replaces the best-run marker');
+      assert.equal(new URL(page.url()).searchParams.has(DUEL_CONFIG.queryParam), false, 'the address is cleaned');
+      assert.deepEqual(errors, []);
+    } finally {
+      await context.close();
+    }
+  });
+
+  test('over a saved run, Accept asks for confirmation before the duel starts', async () => {
+    const { context, page, errors } = await openGame(desktop);
+    try {
+      await startLevelOne(page);
+      await page.evaluate(() => {
+        const engine = window.__fluxEngine;
+        engine.dismissDiscovery();
+        engine.hasFiredInRound = true;
+        engine.score = 1234;
+        engine.saveRunSnapshot();
+      });
+      await page.goto(`${server.origin}${duelPath(rivalGhost('flux', SHARED_FLUX_SEED))}`);
+      await captureEngine(page);
+      await waitShown(page, '#modal-duel');
+      await page.click('#btn-duel-accept');
+      await waitShown(page, '#modal-confirm');
+      assert.equal(await page.evaluate(() => Boolean(window.__fluxEngine.ghostDuel)), false, 'nothing started before the confirmation');
+      await page.click('#btn-confirm-yes');
+      await waitDuelRunning(page, GAME_MODES.FLUX);
+      await waitShown(page, '#hud-ghost');
+      assert.deepEqual(errors, []);
+    } finally {
+      await context.close();
+    }
+  });
+
+  test('a damaged duel link shows the error card; OK closes it and the normal boot stays', async () => {
+    const { context, page, errors } = await openGame(desktop, { path: `/?${DUEL_CONFIG.queryParam}=garbage` });
+    try {
+      await waitShown(page, '#modal-duel');
+      assert.equal(await isShown(page, '#btn-duel-ok'), true);
+      assert.equal(await isShown(page, '#btn-duel-accept'), false);
+      assert.ok((await page.textContent('#duel-card-summary')).trim().length > 0, 'the card says what is wrong');
+      await page.click('#btn-duel-ok');
+      await page.waitForFunction(() => document.querySelector('#modal-duel').classList.contains('hidden'));
+      assert.equal(await page.evaluate(() => Boolean(window.__fluxEngine.ghostDuel)), false);
+      assert.equal(await page.evaluate(() => window.__fluxEngine.mode), GAME_MODES.CAMPAIGN, 'the campaign boot is untouched');
+      assert.equal(new URL(page.url()).searchParams.has(DUEL_CONFIG.queryParam), false, 'the address is cleaned');
+      assert.deepEqual(errors, []);
+    } finally {
+      await context.close();
+    }
+  });
+
+  test('a past Daily duel is a rematch: noted on the card, and Accept pays no first-play bonus', async () => {
+    const pastKey = dateKeyDaysAgo(REMATCH_AGE_DAYS);
+    const { context, page, errors } = await openGame(desktop, { path: duelPath(rivalGhost('daily', pastKey)) });
+    try {
+      await waitShown(page, '#modal-duel');
+      await waitShown(page, '#duel-card-notes');
+      const note = await page.evaluate(async () => (await import('/src/core/I18n.js')).t('duel.card.rematch'));
+      assert.ok((await page.textContent('#duel-card-notes')).includes(note), 'the card notes the rematch');
+      const coinsBefore = await page.evaluate(() => window.__fluxEngine.storageManager.getCoins());
+      await page.click('#btn-duel-accept');
+      await waitDuelRunning(page, GAME_MODES.DAILY);
+      assert.equal(await page.evaluate(() => window.__fluxEngine.dailySeedKey), pastKey);
+      assert.equal(await page.evaluate(() => window.__fluxEngine.isDailyRematch), true);
+      assert.equal(
+        await page.evaluate(() => window.__fluxEngine.storageManager.getCoins()),
+        coinsBefore,
+        'no first-play bonus for a past Daily'
+      );
+      assert.deepEqual(errors, []);
+    } finally {
+      await context.close();
+    }
+  });
+
+  test('a duel game over states the result, and Share challenge carries the player\'s own score as a duel link', async () => {
+    const todayKey = SeededRandom.getTodayDateKey();
+    const { context, page, errors } = await openGame(desktop, { path: duelPath(rivalGhost('daily', todayKey)) });
+    try {
+      await context.grantPermissions(['clipboard-read', 'clipboard-write'], { origin: server.origin });
+      await waitShown(page, '#modal-duel');
+      await page.click('#btn-duel-accept');
+      await waitDuelRunning(page, GAME_MODES.DAILY);
+      await page.evaluate((score) => {
+        const engine = window.__fluxEngine;
+        // Desktop browsers may offer a share sheet; removing it exercises the clipboard path.
+        delete Navigator.prototype.share;
+        engine.dismissDiscovery();
+        engine.shoot();
+        engine.score = score;
+      }, PLAYER_FINAL_SCORE);
+      await loseRun(page);
+      await waitShown(page, '#gameover-duel');
+      assert.match(await page.textContent('#gameover-duel'), new RegExp(RIVAL_NAME));
+      const summary = await page.evaluate(() => window.__fluxEngine.gameOverSummary.duel);
+      assert.equal(summary.outcome, 'lost');
+      assert.equal(summary.myScore, PLAYER_FINAL_SCORE);
+
+      await page.evaluate(() => navigator.clipboard.writeText(''));
+      await waitShown(page, '#btn-share-gameover');
+      await page.click('#btn-share-gameover');
+      const queryParam = DUEL_CONFIG.queryParam;
+      await page.waitForFunction((param) => navigator.clipboard.readText().then((text) => text.includes(`?${param}=`)), queryParam);
+      const lines = (await page.evaluate(() => navigator.clipboard.readText())).split(/\r?\n/).filter(Boolean);
+      const url = new URL(lines[lines.length - 1]);
+      const payload = url.searchParams.get(queryParam);
+      assert.ok(payload, 'the last line is a duel link');
+      const decoded = decodeGhost(payload, DUEL_CONFIG, duelContext());
+      assert.equal(decoded.status, 'valid');
+      assert.equal(decoded.ghost.mode, 'daily');
+      assert.equal(decoded.ghost.key, todayKey);
+      assert.equal(decoded.ghost.final, PLAYER_FINAL_SCORE, 'the link carries the player\'s own final score');
+      assert.ok(url.href.length <= DUEL_CONFIG.maxUrlLength, 'the link fits the length budget');
+      assert.deepEqual(errors, []);
+    } finally {
+      await context.close();
+    }
+  });
+});
+
+describe('Ghost Duel HUD layout', () => {
+  /** Geometry of the HUD that a rival badge must not change, and where the badge sits. */
+  const measureHud = (page) =>
+    page.evaluate(() => {
+      const bar = document.querySelector('.hud-bar').getBoundingClientRect();
+      const row = document.querySelector('.hud-badges-row').getBoundingClientRect();
+      const badge = document.querySelector('#hud-ghost');
+      const badgeRect = badge.checkVisibility() ? badge.getBoundingClientRect() : null;
+      return {
+        tracks: getComputedStyle(document.querySelector('.hud-bar')).gridTemplateColumns.split(' ').filter(Boolean).length,
+        barWidth: Math.round(bar.width),
+        barHeight: Math.round(bar.height),
+        rowHeight: Math.round(row.height),
+        badgeInsideBar: badgeRect === null || (badgeRect.left >= bar.left - 1 && badgeRect.right <= bar.right + 1),
+        pageOverflow: document.documentElement.scrollWidth - window.innerWidth
+      };
+    });
+
+  /**
+   * Runs a normal run with its record marker, then the same board as a duel, and returns the
+   * HUD geometry of both. The duel starts from its card, after the saved-run guard if it asks.
+   */
+  async function measureNormalThenDuel(page, startNormal, ghost) {
+    await page.evaluate(startNormal, DAILY_RECORD_TO_BEAT);
+    await page.waitForFunction((playing) => window.__fluxEngine.state === playing, GAME_STATES.PLAYING);
+    const normal = await measureHud(page);
+    await page.goto(`${server.origin}${duelPath(ghost)}`);
+    await captureEngine(page);
+    await waitShown(page, '#modal-duel');
+    await page.click('#btn-duel-accept');
+    const needsConfirm = await page.evaluate(() => !document.querySelector('#modal-confirm').classList.contains('hidden'));
+    if (needsConfirm) {
+      await page.click('#btn-confirm-yes');
+    }
+    await waitDuelRunning(page, ghost.mode === 'daily' ? GAME_MODES.DAILY : GAME_MODES.FLUX);
+    await waitShown(page, '#hud-ghost');
+    assert.equal(await isShown(page, '#hud-best-run'), false, 'the rival badge takes the place of the best-run marker');
+    return { normal, duel: await measureHud(page) };
+  }
+
+  for (const viewport of VIEWPORTS) {
+    test(`${viewport.name}: a Daily duel for today keeps the HUD columns and width, and fits in the badge row`, async () => {
+      const { context, page, errors } = await openGame(viewport);
+      try {
+        const { normal, duel } = await measureNormalThenDuel(
+          page,
+          () => {
+            window.__fluxEngine.startDailyChallenge();
+            window.__fluxEngine.notifyUI();
+          },
+          rivalGhost('daily', SeededRandom.getTodayDateKey())
+        );
+        assert.equal(duel.tracks, normal.tracks, 'the HUD grid keeps its columns');
+        assert.equal(duel.barWidth, normal.barWidth, 'the HUD keeps its width');
+        // A normal Daily has no badge to show, so its badge row is collapsed and the rival fills it.
+        assert.equal(normal.rowHeight, 0, 'the normal Daily has no badge row');
+        assert.ok(duel.rowHeight > 0, 'the rival badge fills the badge row');
+        assert.equal(duel.badgeInsideBar, true, 'the rival badge stays inside the HUD');
+        assert.ok(duel.pageOverflow <= OVERFLOW_TOLERANCE_PX, 'the page does not scroll sideways');
+        assert.deepEqual(errors, []);
+      } finally {
+        await context.close();
+      }
+    });
+
+    test(`${viewport.name}: a Flux duel replaces the best-run marker without changing the HUD or its badge row`, async () => {
+      const { context, page, errors } = await openGame(viewport);
+      try {
+        const { normal, duel } = await measureNormalThenDuel(
+          page,
+          (best) => {
+            const engine = window.__fluxEngine;
+            engine.startFluxRun();
+            engine.runBestBaseline = { metric: 'stage', best };
+            engine.notifyUI();
+          },
+          rivalGhost('flux', SHARED_FLUX_SEED)
+        );
+        assert.ok(normal.rowHeight > 0, 'the best-run marker fills the badge row');
+        assert.equal(duel.tracks, normal.tracks, 'the HUD grid keeps its columns');
+        assert.equal(duel.barWidth, normal.barWidth, 'the HUD keeps its width');
+        assert.ok(duel.barHeight <= normal.barHeight, 'the HUD does not grow');
+        assert.equal(duel.rowHeight, normal.rowHeight, 'the badge row keeps its height');
+        assert.equal(duel.badgeInsideBar, true, 'the rival badge stays inside the HUD');
+        assert.ok(duel.pageOverflow <= OVERFLOW_TOLERANCE_PX, 'the page does not scroll sideways');
+        assert.deepEqual(errors, []);
+      } finally {
+        await context.close();
+      }
+    });
+  }
 });
