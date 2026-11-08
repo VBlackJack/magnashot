@@ -106,7 +106,7 @@ export function formatChapterName(chapter) {
     return t('modals.levelSelect.chapters.tutorial');
   }
   return t('modals.levelSelect.chapters.numbered', {
-    chapter: chapter.index,
+    chapter: formatNumber(chapter.index),
     theme: formatChapterTheme(chapter.featuredMechanics)
   });
 }
@@ -156,7 +156,7 @@ export function renderLevelChapters() {
     if (isLocked) {
       const requiredLevel = Math.max(1, chapter.firstId - 1);
       tab.setAttribute('aria-disabled', 'true');
-      tab.title = t('modals.levelSelect.chapterLockedHint', { level: requiredLevel });
+      tab.title = t('modals.levelSelect.chapterLockedHint', { level: formatNumber(requiredLevel) });
     }
     const ariaKey = isLocked
       ? 'modals.levelSelect.chapters.ariaLocked'
@@ -167,10 +167,10 @@ export function renderLevelChapters() {
       'aria-label',
       t(ariaKey, {
         name,
-        first: chapter.firstId,
-        last: chapter.lastId,
-        stars,
-        maxStars
+        first: formatNumber(chapter.firstId),
+        last: formatNumber(chapter.lastId),
+        stars: formatNumber(stars),
+        maxStars: formatNumber(maxStars)
       })
     );
 
@@ -183,7 +183,7 @@ export function renderLevelChapters() {
       ? t('modals.levelSelect.chapters.locked')
       : t(
           isCompleted ? 'modals.levelSelect.chapters.starsCompleted' : 'modals.levelSelect.chapters.stars',
-          { stars, maxStars }
+          { stars: formatNumber(stars), maxStars: formatNumber(maxStars) }
         );
     tab.append(titleEl, starsEl);
 
@@ -286,8 +286,8 @@ export function renderLevelCards(suggestedLevelId) {
       const starsText = document.createElement('span');
       starsText.className = 'visually-hidden';
       starsText.textContent = t('modals.levelSelect.card.starsAria', {
-        stars: clampedStars,
-        maxStars
+        stars: formatNumber(clampedStars),
+        maxStars: formatNumber(maxStars)
       });
       starsEl.append(starsGlyphs, starsText);
 

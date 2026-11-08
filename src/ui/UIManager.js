@@ -769,6 +769,7 @@ export class UIManager {
     this.levelsFilterIncomplete = false;
     this.autoPausedByOverlay = false;
     this.lastFocusedElement = null;
+    this.wasAnyModalOpen = false;
     this.stackedModalOpener = null;
     this.prevEngineState = null;
     this.isVictoryModalRevealed = false;
@@ -2118,10 +2119,26 @@ export class UIManager {
         modal.removeAttribute('aria-hidden');
       }
     }
-    if (!anyOpen && this.lastFocusedElement && typeof this.lastFocusedElement.focus === 'function') {
-      const target = this.lastFocusedElement;
+    const wasAnyOpen = this.wasAnyModalOpen === true;
+    this.wasAnyModalOpen = anyOpen;
+    if (!anyOpen) {
+      const saved = this.lastFocusedElement;
       this.lastFocusedElement = null;
-      target.focus();
+      const isSavedReachable =
+        Boolean(saved) &&
+        typeof saved.focus === 'function' &&
+        saved.isConnected !== false &&
+        filterFocusTrapCandidates([saved]).length > 0;
+      if (isSavedReachable) {
+        saved.focus();
+      } else if (wasAnyOpen) {
+        // Nothing usable to return to (focus was on the page body, or the opener is now hidden):
+        // the game canvas keeps keyboard focus inside the app instead of dropping to body.
+        const canvas = this.elements.gameCanvas;
+        if (canvas && typeof canvas.focus === 'function') {
+          canvas.focus();
+        }
+      }
     }
     if (anyOpen) {
       this.keepFocusInTopModal(topModal);
@@ -3161,7 +3178,7 @@ export class UIManager {
     setTextIfChanged(
       this.elements.btnShop,
       affordableCount > 0
-        ? t('app.nav.button.shopBadge', { count: affordableCount })
+        ? t('app.nav.button.shopBadge', { count: formatNumber(affordableCount) })
         : t('app.nav.button.shop')
     );
     this.elements.btnShop.classList.toggle('has-affordable', affordableCount > 0);
@@ -3192,7 +3209,7 @@ export class UIManager {
           ? t('app.nav.button.dailyPlayedStreakBadge', { streak: formatNumber(streak) })
           : t('app.nav.button.dailyPlayedBadge');
       } else if (dailyBonusCoins > 0) {
-        dailyLabel = t('app.nav.button.dailyBonusBadge', { coins: dailyBonusCoins });
+        dailyLabel = t('app.nav.button.dailyBonusBadge', { coins: formatNumber(dailyBonusCoins) });
       }
       setTextIfChanged(this.elements.btnDaily, dailyLabel);
       const graceHint = formatStreakGraceText(streak, this.storageManager.getDailyStreakGrace?.(todayKey), todayKey);

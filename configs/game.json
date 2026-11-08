@@ -1521,7 +1521,11 @@
       "unlockedBallStyles": "ball_styles",
       "activeBallStyle": "ball_style"
     },
-    "runSnapshotVersion": 1
+    "runSnapshotVersion": 1,
+    "legacyMigration": {
+      "prefixes": ["flux_spheres_v1_"],
+      "markerKey": "legacy_migrated"
+    }
   },
   "defaults": {
     "language": "fr",

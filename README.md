@@ -113,7 +113,7 @@ The codebase follows a modular, zero-dependency ES module architecture with stri
 │   │   ├── RunSnapshot.js    # In-progress run serialization and reload-resume persistence
 │   │   ├── SpecialBallController.js # Bomb, Lightning, Prism, Anvil, Cryo, Rocket & Brush impact resolution
 │   │   ├── Discovery.js      # First-encounter hints: mechanics on a board, next unknown one, hint text
-│   │   ├── DailyShare.js     # Spoiler-free Daily Challenge result text for the Share button
+│   │   ├── DailyShare.js     # Spoiler-free result text of every non-campaign mode for the Share button
 │   │   └── layouts/
 │   │       ├── LayoutGenerators.js   # Pure shape geometry: pendulum, rings, hexagon, spiral, cross, masks
 │   │       ├── ShapeGenerator.js     # Generated Flux silhouettes: polar curves on the sphere grid, quality filter
@@ -125,7 +125,7 @@ The codebase follows a modular, zero-dependency ES module architecture with stri
 │       ├── UIManager.js      # HUD updates, accessible modals (focus trap + inert) & input modes
 │       └── WorkshopView.js   # Upgrades, in-run Special Ammo refills & achievement progress bars
 ├── styles/main.css           # Responsive layout and design tokens
-├── eslint.config.js          # ESLint 9 flat configuration
+├── eslint.config.js          # ESLint 10 flat configuration
 ├── index.html                # Application shell and static bootstrap error banner
 ├── manifest.webmanifest      # PWA manifest
 ├── sw.js                     # Network-first Service Worker with timeout and versioned offline fallback
