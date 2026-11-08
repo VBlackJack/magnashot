@@ -56,6 +56,9 @@
       "autoFireUrgentRatio": 0.66
     }
   },
+  "renderLite": {
+    "devicePixelRatio": 1
+  },
   "serviceWorker": {
     "scriptPath": "./sw.js",
     "secureProtocol": "https:",

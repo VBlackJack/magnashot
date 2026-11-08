@@ -1177,3 +1177,160 @@ test('The lowering offset moves the cluster and the anchor rail, never the fixed
   assert.equal(seen.drawMagneticBonds, 1, 'the bonds ease down with the cluster');
   assert.equal(ctx.saveDepth, 0);
 });
+
+const createListenerWindow = () => {
+  const log = { added: [], removed: [], observers: [], queries: [] };
+  globalThis.window = {
+    devicePixelRatio: 2,
+    addEventListener: (type, handler) => log.added.push({ type, handler }),
+    removeEventListener: (type, handler) => log.removed.push({ type, handler }),
+    matchMedia(query) {
+      const entry = { query, added: [], removed: [] };
+      log.queries.push(entry);
+      return {
+        addEventListener: (type, handler) => entry.added.push({ type, handler }),
+        removeEventListener: (type, handler) => entry.removed.push({ type, handler })
+      };
+    }
+  };
+  globalThis.ResizeObserver = class {
+    constructor(cb) {
+      this.cb = cb;
+      this.disconnected = 0;
+      log.observers.push(this);
+    }
+    observe() {}
+    disconnect() {
+      this.disconnected++;
+    }
+  };
+  return log;
+};
+
+const restoreListenerWindow = () => {
+  delete globalThis.window;
+  delete globalThis.ResizeObserver;
+};
+
+test('Renderer.dispose removes every window, observer and media query listener, and is idempotent', () => {
+  const log = createListenerWindow();
+  try {
+    const renderer = createRenderer();
+    assert.equal(log.added.length, 2);
+    assert.equal(log.observers.length, 1);
+    assert.equal(log.queries[0].added.length, 1);
+    renderer.dispose();
+    assert.deepEqual(log.removed, log.added, 'each added window listener is removed with the same handler');
+    assert.equal(log.observers[0].disconnected, 1);
+    assert.equal(log.queries[0].removed.length, 1);
+    assert.equal(log.queries[0].removed[0].handler, log.queries[0].added[0].handler);
+    renderer.dispose();
+    assert.equal(log.removed.length, log.added.length, 'a second dispose removes nothing more');
+    assert.equal(log.observers[0].disconnected, 1);
+    assert.equal(log.queries[0].removed.length, 1);
+  } finally {
+    restoreListenerWindow();
+  }
+});
+
+test('Renderer.dispose removes the re-armed media query listener and stops re-arming', () => {
+  const log = createListenerWindow();
+  try {
+    const renderer = createRenderer();
+    log.queries[0].added[0].handler();
+    assert.equal(log.queries.length, 2, 'a change re-arms a new query');
+    renderer.dispose();
+    assert.equal(log.queries[1].removed.length, 1);
+    assert.equal(log.queries[0].removed.length, 0, 'the fired once-listener is not removed again');
+    renderer.watchDevicePixelRatio(() => {});
+    assert.equal(log.queries.length, 2, 'a disposed renderer never arms a new query');
+  } finally {
+    restoreListenerWindow();
+  }
+});
+
+test('Renderer.dispose is safe without a window', () => {
+  const renderer = createRenderer();
+  renderer.dispose();
+  renderer.dispose();
+  assert.equal(renderer.disposed, true);
+});
+
+const LITE_SKIPPED_DRAWS = ['drawParticles', 'drawTrail', 'drawShatteringBalls', 'drawWallCracks', 'drawSlowMoOverlay', 'drawAimTrajectory'];
+
+const renderFrameWithCalls = (renderer, engine, names) => {
+  const called = [];
+  for (const name of names) {
+    const original = renderer[name].bind(renderer);
+    renderer[name] = (...args) => {
+      called.push(name);
+      return original(...args);
+    };
+  }
+  renderer.render(engine, 1.0);
+  return called;
+};
+
+const createLiteRenderer = () => {
+  const renderer = new Renderer(createStubCanvas(), gameConfig, ballsConfig, obstaclesConfig, { lite: true });
+  renderer.createLayerCanvas = () => createStubCanvas();
+  return renderer;
+};
+
+test('Lite renderer fixes the pixel ratio and skips particles, aim preview and slow-motion overlay', () => {
+  createListenerWindow();
+  try {
+    const engine = createTestEngine();
+    engine.startClassicMode(1);
+    engine.setReducedMotion(false);
+    engine.aimPoints = [{ x: 100, y: 100 }, { x: 120, y: 80 }];
+    const lite = createLiteRenderer();
+    const full = createRenderer();
+    assert.equal(lite.dpr, 1, 'window dpr is 2 but the lite renderer stays at 1');
+    assert.equal(full.dpr, 2);
+    const liteCalls = renderFrameWithCalls(lite, engine, LITE_SKIPPED_DRAWS);
+    const fullCalls = renderFrameWithCalls(full, engine, LITE_SKIPPED_DRAWS);
+    for (const name of LITE_SKIPPED_DRAWS) {
+      assert.ok(!liteCalls.includes(name), `lite skips ${name}`);
+    }
+    for (const name of ['drawParticles', 'drawTrail', 'drawShatteringBalls', 'drawWallCracks', 'drawSlowMoOverlay']) {
+      assert.ok(fullCalls.includes(name), `full draws ${name}`);
+    }
+    assert.equal(lite.ctx.saveDepth, 0, 'save/restore stays balanced in lite mode');
+    assert.equal(lite.ctx.restoreUnderflows, 0);
+  } finally {
+    restoreListenerWindow();
+  }
+});
+
+test('Lite renderer still draws the board: balls, rail, danger line and sag gauge', () => {
+  const engine = createTestEngine();
+  engine.startClassicMode(1);
+  const names = ['drawBall', 'drawAnchorRail', 'drawDangerZone', 'drawSagGauge', 'drawMagneticBonds', 'drawLauncher'];
+  const seen = renderFrameWithCalls(createLiteRenderer(), engine, names);
+  for (const name of names) {
+    assert.ok(seen.includes(name), `${name} still runs in lite mode`);
+  }
+});
+
+test('drawVersusCharges runs only when the engine has a versus state', () => {
+  const engine = createTestEngine();
+  engine.startClassicMode(1);
+  assert.ok(!renderFrameWithCalls(createRenderer(), engine, ['drawVersusCharges']).includes('drawVersusCharges'));
+  engine.versus = { charges: [] };
+  const renderer = createRenderer();
+  assert.ok(renderFrameWithCalls(renderer, engine, ['drawVersusCharges']).includes('drawVersusCharges'));
+  assert.equal(renderer.ctx.saveDepth, 0);
+});
+
+test('Single-player render call log is unchanged (golden)', () => {
+  const engine = createTestEngine();
+  engine.startClassicMode(1);
+  engine.setReducedMotion(false);
+  const names = [
+    'drawWallCracks', 'drawLiquid', 'drawCollectorBins', 'drawDangerZone', 'drawObstacles', 'drawRails',
+    'drawAnchorRail', 'drawMagneticBonds', 'drawTethers', 'drawChainLinkOverlays', 'drawShatteringBalls',
+    'drawTrail', 'drawLauncher', 'drawSagGauge', 'drawParticles', 'drawSlowMoOverlay'
+  ];
+  assert.deepEqual(renderFrameWithCalls(createRenderer(), engine, names), names);
+});
