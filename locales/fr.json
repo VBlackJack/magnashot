@@ -251,7 +251,8 @@
       "mechanicNames": {
         "basics": "Pendule magnétique",
         "pivot": "Rotor à inertie"
-      }
+      },
+      "dailyMutator": "Défi du Jour : {{mutator}}. {{effect}}"
     }
   },
   "gameplay": {
@@ -341,7 +342,10 @@
       "hyperGravity": "Hyper-Gravité",
       "turboRotors": "Rotors Turbo",
       "superMagnetism": "Super-Magnétisme",
-      "volatileCluster": "Amas Volatil"
+      "volatileCluster": "Amas Volatil",
+      "portalMatrix": "Matrice de Portails",
+      "bumperPinball": "Flipper Magnétique",
+      "cryoSurge": "Surtension Cryo"
     },
     "flux": {
       "shapes": {
@@ -498,7 +502,9 @@
         "stars": "{{stars}} / {{maxStars}} ★",
         "locked": "🔒 Verrouillé",
         "aria": "{{name}}, niveaux {{first}} à {{last}}, {{stars}} étoiles sur {{maxStars}}",
-        "ariaLocked": "{{name}}, niveaux {{first}} à {{last}}, verrouillé"
+        "ariaLocked": "{{name}}, niveaux {{first}} à {{last}}, verrouillé",
+        "starsCompleted": "{{stars}} / {{maxStars}} ★ ✓",
+        "ariaCompleted": "{{name}}, niveaux {{first}} à {{last}}, terminé avec {{stars}} étoiles sur {{maxStars}}"
       },
       "chapterLockedHint": "Terminez le niveau {{level}} pour débloquer ce chapitre.",
       "cardLockedHint": "Terminez le niveau {{level}} pour débloquer ce niveau.",
@@ -517,7 +523,7 @@
       "arcade": {
         "sectionTitle": "Modes Arcade",
         "puzzle": "🎯 Puzzle",
-        "puzzleDesc": "5 défis à 1-2 tirs • Noyaux 💎",
+        "puzzleDesc": "10 défis à 1-2 tirs • Noyaux 💎",
         "puzzleRecord": "Niveau {{stage}}/{{total}} • Record : {{score}}",
         "puzzleStage": "Puzzle {{stage}}",
         "puzzleStageLocked": "Terminez le Puzzle {{previous}} pour débloquer.",
@@ -623,6 +629,18 @@
           "volatileCluster": {
             "icon": "🛢️",
             "description": "Davantage de Barils Explosifs apparaissent dans l'amas (+30 % de score)."
+          },
+          "portalMatrix": {
+            "icon": "🌀",
+            "description": "Deux Portails Quantiques liés téléportent vos tirs derrière le rotor (+25 % de score)."
+          },
+          "bumperPinball": {
+            "icon": "🔴",
+            "description": "Deux Bumpers Énergétiques encadrent le rotor pour des rebonds rapides (+20 % de score)."
+          },
+          "cryoSurge": {
+            "icon": "❄️",
+            "description": "Davantage de Coeurs de Givre et de Foudre apparaissent dans l'amas (+25 % de score)."
           }
         },
         "modifiers": {
@@ -873,6 +891,10 @@
         "startingShots": {
           "name": "Réserve de Projectiles",
           "description": "Ajoute +{{shots}} sphères au début de chaque manche en Campagne et en Mode Flux par rang."
+        },
+        "collectorMagnet": {
+          "name": "Aimant Collecteur",
+          "description": "Ajoute +{{points}} points bonus et +{{overcharge}} % de Surcharge par sphère d'avalanche dans les collecteurs du bas par rang."
         }
       },
       "feedback": {

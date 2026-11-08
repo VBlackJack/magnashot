@@ -251,7 +251,8 @@
       "mechanicNames": {
         "basics": "Magnetic pendulum",
         "pivot": "Inertia rotor"
-      }
+      },
+      "dailyMutator": "Daily Challenge: {{mutator}}. {{effect}}"
     }
   },
   "gameplay": {
@@ -341,7 +342,10 @@
       "hyperGravity": "Hyper Gravity",
       "turboRotors": "Turbo Rotors",
       "superMagnetism": "Super Magnetism",
-      "volatileCluster": "Volatile Cluster"
+      "volatileCluster": "Volatile Cluster",
+      "portalMatrix": "Portal Matrix",
+      "bumperPinball": "Bumper Pinball",
+      "cryoSurge": "Cryo Surge"
     },
     "flux": {
       "shapes": {
@@ -498,7 +502,9 @@
         "stars": "{{stars}} / {{maxStars}} ★",
         "locked": "🔒 Locked",
         "aria": "{{name}}, levels {{first}} to {{last}}, {{stars}} of {{maxStars}} stars",
-        "ariaLocked": "{{name}}, levels {{first}} to {{last}}, locked"
+        "ariaLocked": "{{name}}, levels {{first}} to {{last}}, locked",
+        "starsCompleted": "{{stars}} / {{maxStars}} ★ ✓",
+        "ariaCompleted": "{{name}}, levels {{first}} to {{last}}, completed with {{stars}} of {{maxStars}} stars"
       },
       "chapterLockedHint": "Complete level {{level}} to unlock this chapter.",
       "cardLockedHint": "Complete level {{level}} to unlock this level.",
@@ -517,7 +523,7 @@
       "arcade": {
         "sectionTitle": "Arcade Modes",
         "puzzle": "🎯 Puzzle",
-        "puzzleDesc": "5 trick-shot stages • Rescue Cores 💎",
+        "puzzleDesc": "10 trick-shot stages • Rescue Cores 💎",
         "puzzleRecord": "Stage {{stage}}/{{total}} • Best: {{score}}",
         "puzzleStage": "Puzzle {{stage}}",
         "puzzleStageLocked": "Clear Puzzle {{previous}} to unlock.",
@@ -623,6 +629,18 @@
           "volatileCluster": {
             "icon": "🛢️",
             "description": "Extra Dormant Barrels spawn inside the cluster (+30% score)."
+          },
+          "portalMatrix": {
+            "icon": "🌀",
+            "description": "Linked Quantum Portals warp shots past the central rotor (+25% score)."
+          },
+          "bumperPinball": {
+            "icon": "🔴",
+            "description": "Twin Energy Bumpers flank the rotor for high-speed bank shots (+20% score)."
+          },
+          "cryoSurge": {
+            "icon": "❄️",
+            "description": "Extra Freeze and Lightning Cores spawn across the cluster (+25% score)."
           }
         },
         "modifiers": {
@@ -873,6 +891,10 @@
         "startingShots": {
           "name": "Projectile Reserve",
           "description": "Adds +{{shots}} starting shots per rank in Campaign and Flux Mode runs."
+        },
+        "collectorMagnet": {
+          "name": "Collector Magnet",
+          "description": "Adds +{{points}} bonus points and +{{overcharge}}% Overcharge per avalanche sphere in the bottom collector bins per rank."
         }
       },
       "feedback": {

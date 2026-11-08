@@ -431,7 +431,7 @@ export class Renderer {
     ctx.drawImage(this.staticLayer, 0, 0, width, height);
     this.drawWallCracks(ctx, engineState.particleSystem);
     this.drawLiquid(ctx, engineState.particleSystem, width, height);
-    this.drawCollectorBins(ctx, width, height, theme);
+    this.drawCollectorBins(ctx, width, height, theme, engineState);
 
     this.drawDangerZone(ctx, width, height, theme, engineState.physicsWorld.balls, now, alpha);
 
@@ -1316,7 +1316,7 @@ export class Renderer {
    * Draws magnetic collector slots along the bottom edge of the board where falling
    * avalanche spheres score extra collector points and overcharge.
    */
-  drawCollectorBins(ctx, width, height, theme) {
+  drawCollectorBins(ctx, width, height, theme, engineState = null) {
     const collectorCfg = this.gameConfig.scoring?.collector;
     if (!collectorCfg || !collectorCfg.zoneHeight || !collectorCfg.slotCount) {
       return;
@@ -1346,9 +1346,10 @@ export class Renderer {
     }
     ctx.stroke();
 
-    if (theme.collectorLabelColor && collectorCfg.bonusPointsPerBall > 0) {
+    const bonusPoints = engineState?.getCollectorBonusPoints?.() ?? collectorCfg.bonusPointsPerBall;
+    if (theme.collectorLabelColor && bonusPoints > 0) {
       const labelText = t('gameplay.feedback.collector.slotLabel', {
-        points: collectorCfg.bonusPointsPerBall
+        points: bonusPoints
       });
       ctx.fillStyle = theme.collectorLabelColor;
       ctx.font = this.collectorLabelFont;

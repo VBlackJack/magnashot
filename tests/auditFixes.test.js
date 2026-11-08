@@ -22,7 +22,7 @@ import { configRegistry } from '../src/core/ConfigRegistry.js';
 import { StorageManager } from '../src/core/StorageManager.js';
 import { Ball } from '../src/entities/Ball.js';
 import { GameEngine } from '../src/game/GameEngine.js';
-import { GAME_MODES, GAME_STATES, SPECIAL_TYPES, CLUSTER_MODIFIERS } from '../src/core/Constants.js';
+import { GAME_MODES, GAME_STATES, SPECIAL_TYPES, CLUSTER_MODIFIERS, DAILY_MUTATORS, OBSTACLE_TYPES } from '../src/core/Constants.js';
 import { applyWorldGeometry } from '../src/core/WorldGeometry.js';
 
 const loadJson = (p) => JSON.parse(fs.readFileSync(p, 'utf8'));
@@ -48,6 +48,12 @@ configRegistry.configs.set('audio', audioConfig);
 const SHOP_TEST_COINS = 500;
 const FLUX_TEST_SEED = 'tilt01';
 const PAST_DAILY_SEED = '2025-01-01';
+const DAILY_SEARCH_MAX_DAYS = 60;
+const DAILY_SEARCH_SEED_PREFIX = '2026-12-';
+const EXPECTED_PAIR_OBSTACLE_COUNT = 2;
+const EXPECTED_PUZZLE_STAGE_COUNT = 10;
+const MIN_PUZZLE_CLUSTER_BALLS = 3;
+const STAGE_10_ROTOR_ANCHORS = 3;
 const FALLING_BALL_Y = 400;
 const FALLING_BALL_X = 150;
 const TILT_TEST_SHARE = 0.5;
@@ -352,4 +358,96 @@ test('Paint Core radius scales with the blast radius multiplier', () => {
 
   engine.destroyClusterBall(core, paintSpec.highlight, true);
   assert.equal(target.colorId, coreColor, 'amplified Paint Core repaints sphere beyond base radius');
+});
+
+test('collectorMagnet upgrade increases collector bin bonus points and overcharge', () => {
+  const engine = createTestEngine();
+  engine.startCampaignLevel(1);
+  const basePts = gameConfig.scoring.collector.bonusPointsPerBall;
+  const baseOc = gameConfig.scoring.collector.overchargePerBall;
+  assert.equal(engine.getCollectorBonusPoints(), basePts);
+  assert.equal(engine.getCollectorOvercharge(), baseOc);
+
+  const spec = gameConfig.upgrades.collectorMagnet;
+  engine.storageManager.safeSetItem(
+    gameConfig.storage.keys.upgrades,
+    JSON.stringify({ collectorMagnet: spec.maxLevel })
+  );
+  engine.storageManager.upgradesCache = null;
+
+  const expectedPts = basePts + spec.maxLevel * spec.pointsBonusPerLevel;
+  const expectedOc = baseOc + spec.maxLevel * spec.overchargeBonusPerLevel;
+  assert.equal(engine.getCollectorBonusPoints(), expectedPts);
+  assert.equal(engine.getCollectorOvercharge(), expectedOc);
+
+  const scoreBefore = engine.score;
+  engine.overcharge = 0;
+  engine.getStepCallbacks().onCollectorBinPass({ x: FALLING_BALL_X });
+  assert.equal(engine.score, scoreBefore + expectedPts);
+  assert.equal(engine.overcharge, expectedOc);
+});
+
+test('Daily Challenge supports portalMatrix, bumperPinball, cryoSurge, and session-first mutator intro banner', () => {
+  const engine = createTestEngine();
+  engine.storageManager.markDiscovered(gameConfig.onboarding.order);
+
+  engine.startDailyChallenge(PAST_DAILY_SEED, false);
+  assert.deepEqual(engine.levelIntro, {
+    dailySeed: PAST_DAILY_SEED,
+    mutatorKey: engine.activeMutatorKey
+  });
+  engine.startDailyChallenge(PAST_DAILY_SEED, false);
+  assert.equal(engine.levelIntro, null, 'same daily seed is only introduced once per session');
+
+  // Verify obstacle mutators by finding seeds that select portalMatrix and bumperPinball, or testing config keys.
+  assert.ok(gameConfig.daily.mutators[DAILY_MUTATORS.PORTAL_MATRIX].portalPair);
+  assert.ok(gameConfig.daily.mutators[DAILY_MUTATORS.BUMPER_PINBALL].bumperPair);
+  assert.ok(gameConfig.daily.mutators[DAILY_MUTATORS.CRYO_SURGE].extraCoreWeight > 0);
+
+  let foundPortal = false;
+  let foundBumper = false;
+  for (let day = 1; day <= DAILY_SEARCH_MAX_DAYS && (!foundPortal || !foundBumper); day++) {
+    const seed = `${DAILY_SEARCH_SEED_PREFIX}${String(day).padStart(EXPECTED_PAIR_OBSTACLE_COUNT, '0')}`;
+    engine.startDailyChallenge(seed, true);
+    if (engine.activeMutatorKey === DAILY_MUTATORS.PORTAL_MATRIX) {
+      const portals = engine.physicsWorld.obstacles.filter((o) => o.type === OBSTACLE_TYPES.PORTAL);
+      assert.equal(portals.length, EXPECTED_PAIR_OBSTACLE_COUNT);
+      foundPortal = true;
+    } else if (engine.activeMutatorKey === DAILY_MUTATORS.BUMPER_PINBALL) {
+      const bumpers = engine.physicsWorld.obstacles.filter((o) => o.type === OBSTACLE_TYPES.BUMPER);
+      assert.equal(bumpers.length, EXPECTED_PAIR_OBSTACLE_COUNT);
+      foundBumper = true;
+    }
+  }
+  assert.ok(foundPortal, 'a daily seed selects portalMatrix and spawns two linked portals');
+  assert.ok(foundBumper, 'a daily seed selects bumperPinball and spawns two bumpers');
+});
+
+test('All 10 Puzzle stages build valid anchored boards and Stage 10 attaches rotor anchors to the pivot obstacle', () => {
+  const engine = createTestEngine();
+  assert.equal(gameConfig.puzzles.length, EXPECTED_PUZZLE_STAGE_COUNT);
+  for (let stage = 1; stage <= gameConfig.puzzles.length; stage++) {
+    engine.startPuzzleMode(stage);
+    assert.equal(engine.currentPuzzleStage, stage);
+    assert.ok(
+      engine.physicsWorld.balls.length >= MIN_PUZZLE_CLUSTER_BALLS,
+      `Puzzle stage ${stage} spawns cluster balls`
+    );
+    const hasPlatform = engine.physicsWorld.obstacles.some((o) => o.type === OBSTACLE_TYPES.PLATFORM);
+    if (!hasPlatform) {
+      assert.equal(
+        engine.physicsWorld.getAnchoredBallIds().size,
+        engine.physicsWorld.balls.length,
+        `Puzzle stage ${stage} anchors all balls at frame 0`
+      );
+    }
+  }
+  const stage10Pivots = engine.physicsWorld.obstacles.filter((o) => o.type === OBSTACLE_TYPES.PIVOT);
+  assert.equal(stage10Pivots.length, 1);
+  const rotorAnchors = engine.physicsWorld.balls.filter((b) => b.pivotRef === stage10Pivots[0]);
+  assert.equal(
+    rotorAnchors.length,
+    STAGE_10_ROTOR_ANCHORS,
+    'Stage 10 attaches its 3 inner anchors to the central rotor'
+  );
 });

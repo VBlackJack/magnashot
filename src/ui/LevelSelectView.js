@@ -142,12 +142,13 @@ export function renderLevelChapters() {
       stars += Math.max(0, Math.min(maxStarsPerLevel, stats[id]?.stars || 0));
     }
     const maxStars = (chapter.lastId - chapter.firstId + 1) * maxStarsPerLevel;
+    const isCompleted = !isLocked && maxStars > 0 && stars >= maxStars;
     const name = this.formatChapterName(chapter);
 
     const tab = document.createElement('button');
     tab.type = 'button';
     tab.id = `${LEVEL_CHAPTER_TAB_ID_PREFIX}${chapter.index}`;
-    tab.className = `level-chapter${isActive ? ' active' : ''}${isLocked ? ' locked' : ''}`;
+    tab.className = `level-chapter${isActive ? ' active' : ''}${isLocked ? ' locked' : ''}${isCompleted ? ' completed' : ''}`;
     tab.setAttribute('role', 'tab');
     tab.setAttribute('aria-selected', String(isActive));
     tab.setAttribute('aria-controls', 'levels-grid');
@@ -157,9 +158,14 @@ export function renderLevelChapters() {
       tab.setAttribute('aria-disabled', 'true');
       tab.title = t('modals.levelSelect.chapterLockedHint', { level: requiredLevel });
     }
+    const ariaKey = isLocked
+      ? 'modals.levelSelect.chapters.ariaLocked'
+      : isCompleted
+        ? 'modals.levelSelect.chapters.ariaCompleted'
+        : 'modals.levelSelect.chapters.aria';
     tab.setAttribute(
       'aria-label',
-      t(isLocked ? 'modals.levelSelect.chapters.ariaLocked' : 'modals.levelSelect.chapters.aria', {
+      t(ariaKey, {
         name,
         first: chapter.firstId,
         last: chapter.lastId,
@@ -175,7 +181,10 @@ export function renderLevelChapters() {
     starsEl.className = 'level-chapter-stars';
     starsEl.textContent = isLocked
       ? t('modals.levelSelect.chapters.locked')
-      : t('modals.levelSelect.chapters.stars', { stars, maxStars });
+      : t(
+          isCompleted ? 'modals.levelSelect.chapters.starsCompleted' : 'modals.levelSelect.chapters.stars',
+          { stars, maxStars }
+        );
     tab.append(titleEl, starsEl);
 
     tab.addEventListener('click', () => {
