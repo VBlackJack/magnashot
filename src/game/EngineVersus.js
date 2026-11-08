@@ -427,6 +427,18 @@ export const engineVersusMethods = {
 
   /** A charge reaches the cluster: it snaps in as one sphere, or two for a strong one. No Sag. */
   landVersusCharge(charge) {
+    this.versus.stats.landed += 1;
+    const placed = this.snapChargeIntoCluster(charge);
+    this.pushVersusEvent(VERSUS_ENGINE_EVENTS.CHARGE_LANDED, { id: charge.id, polarity: charge.polarity, balls: placed.length });
+  },
+
+  /**
+   * Snaps a charge into the nearest settled sphere of the cluster, as one sphere or two for a
+   * strong charge. Shared by every mode that lands charges; it records no mode statistics.
+   * @param {object} charge - The landing charge ({x, y, polarity, strong}).
+   * @returns {Array<Ball>} The spheres it added, empty when the cluster has no settled sphere.
+   */
+  snapChargeIntoCluster(charge) {
     const world = this.physicsWorld;
     const sim = this.physicsConfig.simulation;
     const radius = this.physicsConfig.ball.radius;
@@ -442,13 +454,11 @@ export const engineVersusMethods = {
         target = ball;
       }
     }
-    this.versus.stats.landed += 1;
+    const placed = [];
     if (!target) {
-      this.pushVersusEvent(VERSUS_ENGINE_EVENTS.CHARGE_LANDED, { id: charge.id, polarity: charge.polarity, balls: 0 });
-      return;
+      return placed;
     }
     const spot = world.computeSnapPosition(charge.x, charge.y, 0, STRAIGHT_UP_VY, target.x, target.y, restDist);
-    const placed = [];
     const minX = canvasCfg.wallMargin + radius;
     const maxX = canvasCfg.logicalWidth - canvasCfg.wallMargin - radius;
     const count = landingBalls(charge);
@@ -475,7 +485,7 @@ export const engineVersusMethods = {
       placed.push(ball);
     }
     this.audioManager.playEffect('snap');
-    this.pushVersusEvent(VERSUS_ENGINE_EVENTS.CHARGE_LANDED, { id: charge.id, polarity: charge.polarity, balls: placed.length });
+    return placed;
   },
 
   /**

@@ -516,3 +516,22 @@ test('sudden death lowers both rails on the clock until the round ends', () => {
   assert.ok(received.length >= 2);
   assert.ok(match.getEventLog().some((event) => event.type === MATCH_EVENTS.ROUND_REPLAY), 'identical boards fall on the same pulse');
 });
+
+test('snapChargeIntoCluster adds the spheres and records no versus statistic or event', () => {
+  const engine = createBoard();
+  const knownIds = new Set(engine.physicsWorld.balls.map((ball) => ball.id));
+  const landedBefore = engine.versus.stats.landed;
+  const eventsBefore = engine.versus.events.length;
+  const x = gameConfig.canvas.logicalWidth / 2;
+  const placed = engine.snapChargeIntoCluster({ id: 950, polarity: 1, strength: 2, x, y: engine.getClusterUndersideY() });
+  assert.equal(placed.length, 2);
+  assert.ok(placed.every((ball) => !knownIds.has(ball.id) && engine.physicsWorld.balls.includes(ball)));
+  assert.equal(engine.versus.stats.landed, landedBefore);
+  assert.equal(engine.versus.events.length, eventsBefore);
+});
+
+test('snapChargeIntoCluster places nothing on an empty cluster', () => {
+  const engine = createBoard();
+  engine.physicsWorld.balls.length = 0;
+  assert.deepEqual(engine.snapChargeIntoCluster({ id: 951, polarity: 1, strength: 1, x: 100, y: 100 }), []);
+});
