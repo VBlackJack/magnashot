@@ -45,7 +45,8 @@
     "outOfShotsGraceFrames": 90,
     "maxProjectileBounces": 12,
     "maxProjectilePortalWarps": 6,
-    "maxProjectileFlightSteps": 2700
+    "maxProjectileFlightSteps": 2700,
+    "platformSupportTolerancePx": 4
   },
   "aimPreview": {
     "cachePositionQuantum": 0.25
