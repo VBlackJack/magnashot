@@ -186,7 +186,8 @@
         "hint": "{{icon}} {{name}} : {{desc}} ({{unequip}})",
         "unequip": {
           "pointer": "Recliquer pour ranger",
-          "touch": "Touchez à nouveau pour ranger"
+          "touch": "Touchez à nouveau pour ranger",
+          "gamepad": "Appuyez sur le bouton de droite pour ranger"
         }
       },
       "shortcutFormat": "{{label}} ({{key}})"
@@ -239,7 +240,7 @@
           "pointer": "Plateau de jeu. Visez à la souris, puis affinez avec les flèches gauche/droite (Maj pour aller plus vite), tirez d'un clic ou avec Entrée, échangez avec Espace.",
           "touch": "Plateau de jeu. Glissez sur le plateau pour viser, relâchez pour tirer, touchez le lanceur pour échanger."
         },
-        "labelPad": "Plateau de jeu. Visez avec le stick gauche (stick droit pour affiner), tirez avec A ou la gâchette droite, échangez avec X, inversez la polarité avec Y."
+        "labelPad": "Plateau de jeu. Visez avec le stick gauche (stick droit pour affiner), tirez avec le bouton du bas ou la gâchette droite, échangez avec le bouton de gauche, inversez la polarité avec le bouton du haut."
       }
     },
     "announcer": {
@@ -299,14 +300,14 @@
     },
     "pad": {
       "glyph": {
-        "bottom": "A",
-        "right": "B",
-        "left": "X",
-        "top": "Y",
-        "leftBumper": "LB",
-        "rightBumper": "RB",
-        "leftTrigger": "LT",
-        "rightTrigger": "RT",
+        "bottom": "Bas",
+        "right": "Droite",
+        "left": "Gauche",
+        "top": "Haut",
+        "leftBumper": "Tranche gauche",
+        "rightBumper": "Tranche droite",
+        "leftTrigger": "Gâchette gauche",
+        "rightTrigger": "Gâchette droite",
         "start": "Start",
         "select": "Select"
       }
@@ -521,7 +522,7 @@
       "polarity": {
         "pointer": "Cliquez sur le bouton 🧲 (ou appuyez sur F) pour inverser la charge de votre tir : les sphères l'attirent alors dans l'autre sens, et il courbe de l'autre côté.",
         "touch": "Touchez le bouton 🧲 pour inverser la charge de votre tir : les sphères l'attirent alors dans l'autre sens, et il courbe de l'autre côté.",
-        "gamepad": "Appuyez sur Y pour inverser la charge de votre tir (le bouton 🧲 fonctionne aussi) : les sphères l'attirent alors dans l'autre sens, il courbe donc à l'opposé."
+        "gamepad": "Appuyez sur le bouton du haut pour inverser la charge de votre tir (le bouton 🧲 fonctionne aussi) : les sphères l'attirent alors dans l'autre sens, il courbe donc à l'opposé."
       },
       "bankShot": "Faites rebondir votre tir sur les murs et les bumpers pour atteindre les sphères hors de portée en ligne droite.",
       "specials": {
@@ -1093,7 +1094,7 @@
           "touch": "Polarité & Arsenal : touchez 🧲 pour inverser la façon dont les sphères attirent votre tir (il courbe de l'autre côté), ou sélectionnez une sphère spéciale chargée par la Surcharge"
         },
         "physics": "Astuce : Détachez les ancres ou déséquilibrez les rotors pour créer des réactions en chaîne !",
-        "pad": "Manette : stick gauche pour viser (stick droit pour affiner), A ou RT pour tirer, X pour échanger, Y pour inverser la polarité, LB/RB pour les sphères spéciales, Start pour la pause"
+        "pad": "Manette : stick gauche pour viser (stick droit pour affiner), bouton du bas ou gâchette droite pour tirer, bouton de gauche pour échanger, bouton du haut pour inverser la polarité, boutons de tranche pour les sphères spéciales, Start pour la pause"
       },
       "button": {
         "resume": "Reprendre",
@@ -1150,7 +1151,8 @@
       "title": "Choisissez un atout",
       "subtitle": {
         "pointer": "Prenez un bonus pour la suite de cette partie. Cliquez une carte ou appuyez sur son numéro.",
-        "touch": "Prenez un bonus pour la suite de cette partie. Touchez une carte."
+        "touch": "Prenez un bonus pour la suite de cette partie. Touchez une carte.",
+        "gamepad": "Prenez un bonus pour la suite de cette partie. Allez sur une carte avec la croix directionnelle, puis appuyez sur le bouton du bas."
       },
       "stack": "{{stacks}}/{{max}}",
       "stackAria": "{{stacks}} sur {{max}}"

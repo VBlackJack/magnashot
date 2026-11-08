@@ -17,7 +17,7 @@
 import { GAME_STATES, INPUT_MODES, MATH_CONSTANTS, SPECIAL_TYPES_ORDER } from '../core/Constants.js';
 import { GAMEPAD_ACTIONS, GAMEPAD_EVENTS } from '../core/GamepadInput.js';
 import { t } from '../core/I18n.js';
-import { filterFocusTrapCandidates, MODAL_FOCUSABLE_SELECTOR } from './UIHelpers.js';
+import { filterFocusTrapCandidates, GAMEPAD_HINT_KEYS, MODAL_FOCUSABLE_SELECTOR } from './UIHelpers.js';
 
 const A = GAMEPAD_ACTIONS;
 
@@ -104,19 +104,29 @@ export const uiGamepadMethods = {
     }
   },
 
-  /** Text variant used for hints written per input mode: the controller reads the keyboard wording. */
-  getHintInputMode() {
-    return this.inputMode === INPUT_MODES.GAMEPAD ? INPUT_MODES.POINTER : this.inputMode;
+  /**
+   * Text variant used for hints written per input mode. The controller has its own wording for
+   * the hint keys that list a gamepad variant; every other hint reads the pointer wording.
+   */
+  getHintInputMode(key) {
+    if (this.inputMode !== INPUT_MODES.GAMEPAD) {
+      return this.inputMode;
+    }
+    return GAMEPAD_HINT_KEYS.includes(key) ? INPUT_MODES.GAMEPAD : INPUT_MODES.POINTER;
   },
 
   /** Frame hook (GameLoop beforeFrame): reads the pad and routes what it produced. */
   pollGamepad(now, elapsedMs) {
+    this.dropStalePadFocus();
     const reader = this.gamepadInput;
     if (!reader) {
       return;
     }
     const isMenuOpen = this.isAnyModalOpen() || this.isDrawerOpen;
     const result = reader.poll(elapsedMs, { menuOpen: isMenuOpen });
+    if (result.events.length === 0 && result.actions.length === 0 && !result.active && result.aimDelta === 0) {
+      return;
+    }
     for (const event of result.events) {
       this.handleGamepadEvent(event);
     }
@@ -136,7 +146,7 @@ export const uiGamepadMethods = {
     const message = t(isConnected ? 'toast.gamepad.connected' : 'toast.gamepad.disconnected');
     this.showToast(message);
     this.announce(message);
-    if (!isConnected && this.engine.state === GAME_STATES.PLAYING) {
+    if (event === GAMEPAD_EVENTS.DISCONNECTED && this.engine.state === GAME_STATES.PLAYING) {
       this.engine.togglePause();
     }
   },
@@ -158,7 +168,8 @@ export const uiGamepadMethods = {
   /** Run controls: the same engine entry points the keyboard uses. */
   routeGamepadGameplay(result) {
     const engine = this.engine;
-    if (result.aimDelta !== 0) {
+    // A stick resting slightly off centre must not steer the aim while the mouse or touch is in use.
+    if (result.aimDelta !== 0 && this.inputMode === INPUT_MODES.GAMEPAD) {
       engine.adjustAimByDelta(result.aimDelta);
       this.updateAimState(engine);
     }
@@ -266,6 +277,20 @@ export const uiGamepadMethods = {
     el.classList?.add(PAD_FOCUS_CLASS);
     el.focus();
     el.scrollIntoView?.({ block: 'nearest', inline: 'nearest' });
+  },
+
+  /** Focus left the ringed element (another control, a closed dialog): the ring goes with it. */
+  handlePadFocusOut(event) {
+    if (this.padFocusEl && event?.target === this.padFocusEl) {
+      this.clearPadFocus();
+    }
+  },
+
+  /** Safety net for a dialog that closes without a focusout: the ring never outlives the focus. */
+  dropStalePadFocus() {
+    if (this.padFocusEl && typeof document !== 'undefined' && document.activeElement !== this.padFocusEl) {
+      this.clearPadFocus();
+    }
   },
 
   /** Drops the pad ring once the player goes back to the keyboard or a pointer. */
@@ -377,6 +402,7 @@ export const uiGamepadMethods = {
 
   /** Fills the Settings controller row from storage and wires it to storage and the live reader. */
   setupGamepadControls() {
+    document.addEventListener('focusout', (event) => this.handlePadFocusOut(event));
     const el = this.elements;
     if (!el.inputGamepadEnabled) {
       return;

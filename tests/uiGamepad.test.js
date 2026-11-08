@@ -24,6 +24,7 @@ import { applyWorldGeometry } from '../src/core/WorldGeometry.js';
 import { createGameLoop } from '../src/game/GameLoop.js';
 import { UIManager } from '../src/ui/UIManager.js';
 import { PAD_FOCUS_CLASS, pickSpatialTarget } from '../src/ui/UIGamepad.js';
+import { GAMEPAD_HINT_KEYS } from '../src/ui/UIHelpers.js';
 
 const gameConfig = applyWorldGeometry(JSON.parse(readFileSync('./configs/game.json', 'utf8')));
 
@@ -510,4 +511,126 @@ test('the game loop works without a beforeFrame hook', () => {
     }
   });
   assert.doesNotThrow(() => loop.frame(10));
+});
+
+test('a stick drifting under the activity threshold does not aim while the pointer is in use', () => {
+  const { ui, engine } = makeUi({ poll: () => ({ actions: [], aimDelta: 0.02, active: false, events: [] }) });
+  ui.pollGamepad(0, 16);
+  assert.deepEqual(engine.calls, []);
+  ui.inputMode = INPUT_MODES.TOUCH;
+  ui.pollGamepad(0, 16);
+  assert.deepEqual(engine.calls, []);
+  ui.inputMode = INPUT_MODES.GAMEPAD;
+  ui.pollGamepad(0, 16);
+  assert.deepEqual(engine.calls, [['aim', 0.02]], 'after a real activation the stick aims');
+});
+
+test('a disconnect of a pad that is not in use is announced without pausing the run', () => {
+  const { ui, engine, log } = makeUi({
+    poll: () => ({ actions: [], aimDelta: 0, active: false, events: [GAMEPAD_EVENTS.DISCONNECTED_OTHER] })
+  });
+  ui.pollGamepad(0, 16);
+  assert.deepEqual(engine.calls, []);
+  assert.ok(log.some((entry) => entry.startsWith('announce:')));
+  clearTimeout(ui.toastTimer);
+});
+
+test('a quiet frame returns before any routing', () => {
+  const { ui, engine } = makeUi({ poll: () => ({ actions: [], aimDelta: 0, aimSteps: 0, active: false, events: [] }) });
+  let routed = 0;
+  ui.routeGamepadGameplay = () => { routed += 1; };
+  ui.routeGamepadMenuActions = () => { routed += 1; };
+  ui.handleGamepadEvent = () => { routed += 1; };
+  ui.pollGamepad(0, 16);
+  assert.equal(routed, 0);
+  assert.deepEqual(engine.calls, []);
+});
+
+test('the controller wording is used for the hints that have one, the pointer wording for the rest', () => {
+  const { ui } = makeUi();
+  ui.inputMode = INPUT_MODES.GAMEPAD;
+  for (const key of GAMEPAD_HINT_KEYS) {
+    assert.equal(ui.getHintInputMode(key), INPUT_MODES.GAMEPAD, key);
+  }
+  assert.equal(ui.getHintInputMode('modals.pause.instructions.aim'), INPUT_MODES.POINTER);
+  ui.inputMode = INPUT_MODES.POINTER;
+  assert.equal(ui.getHintInputMode(GAMEPAD_HINT_KEYS[0]), INPUT_MODES.POINTER);
+});
+
+/** Walks a locale tree and returns [path, text] for every string leaf. */
+function localeLeaves(node, path = []) {
+  if (typeof node === 'string') {
+    return [[path.join('.'), node]];
+  }
+  return Object.entries(node).flatMap(([key, child]) => localeLeaves(child, [...path, key]));
+}
+
+for (const lang of ['en', 'fr']) {
+  const locale = JSON.parse(readFileSync(`./locales/${lang}.json`, 'utf8'));
+  const leaves = new Map(localeLeaves(locale));
+
+  test(`${lang}: every hint with a controller wording has it`, () => {
+    for (const key of GAMEPAD_HINT_KEYS) {
+      assert.ok(leaves.get(`${key}.gamepad`), `${key}.gamepad`);
+      assert.ok(leaves.get(`${key}.pointer`), `${key}.pointer`);
+    }
+  });
+
+  test(`${lang}: controller strings name buttons by position, never by a console brand letter`, () => {
+    const padLeaves = [...leaves].filter(([path]) => /pad|controller/i.test(path));
+    assert.ok(padLeaves.length > 10, 'the controller strings were found');
+    const brandToken = /(?<![\p{L}\p{N}])(A|B|X|Y|LB|RB|LT|RT)(?![\p{L}\p{N}])/u;
+    for (const [path, text] of padLeaves) {
+      assert.doesNotMatch(text, brandToken, path);
+    }
+  });
+}
+
+test('the pad ring leaves with the focus: focusout and a closed dialog both clear it', () => {
+  const { ui, log } = makeUi();
+  const item = makeItem('a', 0, 0, { log });
+  const other = makeItem('b', 100, 0, { log });
+  withDocument((doc) => {
+    ui.focusFromPad(item);
+    ui.handlePadFocusOut({ target: other });
+    assert.equal(item.classList.contains(PAD_FOCUS_CLASS), true, 'another element losing focus changes nothing');
+    ui.handlePadFocusOut({ target: item });
+    assert.equal(item.classList.contains(PAD_FOCUS_CLASS), false);
+    assert.equal(ui.padFocusEl, null);
+
+    ui.focusFromPad(item);
+    ui.pollGamepad(0, 16);
+    assert.equal(item.classList.contains(PAD_FOCUS_CLASS), true, 'still focused: kept');
+    doc.activeElement = null; // the dialog closed and the focus went away
+    ui.pollGamepad(0, 16);
+    assert.equal(item.classList.contains(PAD_FOCUS_CLASS), false);
+  });
+});
+
+test('a failing frame hook is reported and the loop keeps running', () => {
+  const errors = [];
+  let rendered = 0;
+  let scheduled = 0;
+  const engine = { state: GAME_STATES.PAUSED, hitStopFrames: 0, update() {}, isVictoryCelebrating: () => false };
+  const loop = createGameLoop({
+    engine,
+    renderer: { render() { rendered += 1; } },
+    fixedStepMs: 16,
+    maxAccumulatedMs: 100,
+    idleRenderIntervalMs: 1000,
+    scheduleFrame() { scheduled += 1; },
+    onFatalError(err) {
+      throw err;
+    },
+    beforeFrame() {
+      throw new Error('pad routing failed');
+    },
+    onHookError: (err) => errors.push(err.message)
+  });
+  loop.frame(10);
+  loop.frame(40);
+  assert.deepEqual(errors, ['pad routing failed', 'pad routing failed']);
+  assert.equal(loop.isStopped(), false);
+  assert.equal(scheduled, 2);
+  assert.ok(rendered >= 1);
 });

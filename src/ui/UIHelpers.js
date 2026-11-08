@@ -118,6 +118,12 @@ export const MODAL_INPUT_HINTS = Object.freeze([
   { elementId: 'modal-flux-perk-subtitle', key: 'modals.fluxPerk.subtitle' }
 ]);
 
+/** Hint keys that also have a controller wording; the others read the pointer wording on a pad. */
+export const GAMEPAD_HINT_KEYS = Object.freeze([
+  'modals.fluxPerk.subtitle',
+  'hud.launcher.specialEquipped.unequip'
+]);
+
 /** Class that makes a control pulse (and outline, for reduced motion) while a hint points at it. */
 export const DISCOVERY_PULSE_CLASS = 'discovery-pulse';
 

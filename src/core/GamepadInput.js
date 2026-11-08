@@ -44,7 +44,9 @@ export const GAMEPAD_ACTIONS = Object.freeze({
 
 export const GAMEPAD_EVENTS = Object.freeze({
   CONNECTED: 'connected',
-  DISCONNECTED: 'disconnected'
+  DISCONNECTED: 'disconnected',
+  /** A pad other than the one in use went away: worth a message, not a pause. */
+  DISCONNECTED_OTHER: 'disconnectedOther'
 });
 
 const STANDARD_MAPPING = 'standard';
@@ -58,6 +60,17 @@ const NAV_ACTIONS = Object.freeze({
   right: A.NAV_RIGHT
 });
 
+/** Shared result of a poll that has nothing to report; never mutated by callers. */
+const NO_EVENTS = Object.freeze([]);
+const IDLE_RESULT = Object.freeze({
+  actions: NO_EVENTS,
+  aimDelta: 0,
+  aimSteps: 0,
+  active: false,
+  padIndex: -1,
+  events: NO_EVENTS
+});
+
 export class GamepadInput {
   /**
    * @param {object} opts
@@ -65,9 +78,15 @@ export class GamepadInput {
    * @param {object} opts.settings {enabled, deadzone, aimSpeed, invertX}; may be a live object
    * @param {Function} [opts.getGamepads] returns the pad list
    * @param {Function} [opts.now] millisecond clock
+   * @param {number} [opts.fineStepRad] D-pad fine aim step, used when the config has none
    */
-  constructor({ config, settings, getGamepads, now } = {}) {
+  constructor({ config, settings, getGamepads, now, fineStepRad } = {}) {
     this.config = config;
+    this.fineStepRad = config.fineStepRad ?? fineStepRad ?? 0;
+    this.analogButtons = new Set(config.analogButtons || []);
+    this.connectedIndexes = new Set();
+    this.hasScanned = false;
+    this.lastScanAt = 0;
     this.settings = settings || {};
     this.getGamepads = getGamepads
       || (() => (typeof navigator !== 'undefined' && navigator.getGamepads ? navigator.getGamepads() : []));
@@ -98,12 +117,35 @@ export class GamepadInput {
   }
 
   _queueEvent(type, e) {
+    if (!this.settings.enabled) return;
     const pad = e && e.gamepad;
     if (pad && pad.mapping !== STANDARD_MAPPING) return;
-    this.pendingEvents.push(type);
-    if (type === GAMEPAD_EVENTS.DISCONNECTED && pad && pad.index === this.activeIndex) {
+    if (type === GAMEPAD_EVENTS.CONNECTED) {
+      if (pad) this.connectedIndexes.add(pad.index);
+      this.pendingEvents.push(type);
+      return;
+    }
+    if (pad) this.connectedIndexes.delete(pad.index);
+    // Only the pad in use going away matters to the run; an unknown active pad counts as in use.
+    const isActive = !pad || this.activeIndex < 0 || pad.index === this.activeIndex;
+    this.pendingEvents.push(isActive ? GAMEPAD_EVENTS.DISCONNECTED : GAMEPAD_EVENTS.DISCONNECTED_OTHER);
+    if (pad && pad.index === this.activeIndex) {
       this.activeIndex = -1;
     }
+  }
+
+  /**
+   * True when a standard pad may be present. Known from connection events and one initial scan;
+   * with none known, the pad list is only re-read at the idle scan interval, so a quiet frame
+   * allocates nothing.
+   */
+  _mayHavePads(nowMs) {
+    if (this.connectedIndexes.size > 0) return true;
+    if (this.hasScanned && nowMs - this.lastScanAt < this.config.idleScanIntervalMs) return false;
+    this.hasScanned = true;
+    this.lastScanAt = nowMs;
+    for (const pad of this._standardPads()) this.connectedIndexes.add(pad.index);
+    return this.connectedIndexes.size > 0;
   }
 
   _standardPads() {
@@ -149,6 +191,10 @@ export class GamepadInput {
     return s;
   }
 
+  _isAnalog(index, btn) {
+    return this.analogButtons.has(index) && typeof btn.value === 'number';
+  }
+
   /** Down state with press/release hysteresis, using the previous state stored under `key`. */
   _isDown(pad, key, indexes) {
     const wasDown = this._state(key).down;
@@ -158,7 +204,9 @@ export class GamepadInput {
       const btn = pad.buttons ? pad.buttons[i] : null;
       if (!btn) continue;
       const v = this._buttonValue(pad, i);
-      if (btn.pressed || (wasDown ? v > threshold : v >= threshold)) return true;
+      const above = wasDown ? v > threshold : v >= threshold;
+      // Analog triggers report `pressed` from a very low value in some browsers: only the value decides.
+      if (this._isAnalog(i, btn) ? above : (btn.pressed || above)) return true;
     }
     return false;
   }
@@ -187,15 +235,19 @@ export class GamepadInput {
     return fire;
   }
 
+  /** A press, or a stick pushed past the activity threshold (a drifting stick is not input). */
   _hasActivity(pad) {
-    const dz = this._deadzone();
+    const threshold = Math.max(this._deadzone(), this.config.activityThreshold);
     const ax = this.config.axes;
-    for (const btn of pad.buttons || []) {
-      if (btn && (btn.pressed || btn.value >= this.config.triggerPress)) return true;
+    const buttons = pad.buttons || [];
+    for (let i = 0; i < buttons.length; i++) {
+      const btn = buttons[i];
+      if (!btn) continue;
+      const isPressed = this._isAnalog(i, btn) ? false : btn.pressed;
+      if (isPressed || btn.value >= this.config.triggerPress) return true;
     }
-    return Math.abs(this._axis(pad, ax.aimX)) > dz
-      || Math.abs(this._axis(pad, ax.menuY)) > dz
-      || Math.abs(this._axis(pad, ax.fineX)) > dz;
+    return Math.hypot(this._axis(pad, ax.aimX), this._axis(pad, ax.menuY)) > threshold
+      || Math.abs(this._axis(pad, ax.fineX)) > threshold;
   }
 
   /** Active pad = the one with input right now, else the previous one, else the first. */
@@ -230,22 +282,32 @@ export class GamepadInput {
    * @returns {{actions: string[], aimDelta: number, aimSteps: number, active: boolean, padIndex: number, events: string[]}}
    */
   poll(elapsedMs, ctx = {}) {
-    const events = this.pendingEvents;
+    const nowMs = this.now();
+    const enabled = Boolean(this.settings.enabled);
+    const hasEvents = enabled && this.pendingEvents.length > 0;
+    const events = hasEvents ? this.pendingEvents : NO_EVENTS;
     this.pendingEvents = [];
-    const out = { actions: [], aimDelta: 0, aimSteps: 0, active: false, padIndex: -1, events };
-    const pads = this.settings.enabled ? this._standardPads() : [];
+    if (!enabled) {
+      this.keyStates.clear();
+      this.activeIndex = -1;
+      this.connectedIndexes.clear();
+      this.hasScanned = false;
+      return IDLE_RESULT;
+    }
+    const pads = this._mayHavePads(nowMs) ? this._standardPads() : [];
     if (pads.length === 0) {
       this.keyStates.clear();
-      if (!this.settings.enabled) this.activeIndex = -1;
-      return out;
+      this.connectedIndexes.clear();
+      if (!hasEvents) return IDLE_RESULT;
+      return { ...IDLE_RESULT, actions: [], events };
     }
+    const out = { actions: [], aimDelta: 0, aimSteps: 0, active: false, padIndex: -1, events };
     const { pad, activity } = this._pickActive(pads);
     out.active = activity;
     out.padIndex = pad.index;
 
     const btns = this.config.buttons;
     const ax = this.config.axes;
-    const nowMs = this.now();
     const push = (action) => out.actions.push(action);
 
     // Edge state is updated for every input on every poll so a press never carries over a context switch.
@@ -320,7 +382,7 @@ export class GamepadInput {
     const sign = this.settings.invertX ? -1 : 1;
     const analog = this._curve(left.x) + this._curve(fine.x) * this.config.fineAimFactor;
     out.aimDelta = sign * analog * this._speed() * dt * precision
-      + steps * (this.config.fineStepRad || 0);
+      + sign * steps * this.fineStepRad;
     return out;
   }
 }

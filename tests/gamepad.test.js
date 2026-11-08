@@ -25,6 +25,9 @@ const CONFIG = {
     triggerPress: 0.5,
     triggerRelease: 0.4,
     precisionTrigger: 0.3,
+    activityThreshold: 0.35,
+    idleScanIntervalMs: 1000,
+    analogButtons: [6, 7],
     aimSpeedRadPerSec: { slow: 1.4, normal: 2.2, fast: 3.2 },
     fineAimFactor: 0.15,
     precisionFactor: 0.25,
@@ -53,8 +56,14 @@ function makePad(index = 0, extra = {}) {
     };
 }
 
+const ANALOG_BUTTONS = [6, 7];
+// Browsers report an analog trigger as pressed from a very low value (about 0.12 in Chromium and Firefox).
+const ANALOG_PRESSED_FROM = 0.12;
+const DIGITAL_PRESSED_FROM = 0.5;
+
 function press(pad, i, value = 1) {
-    pad.buttons[i] = { pressed: value >= 0.5, value };
+    const pressedFrom = ANALOG_BUTTONS.includes(i) ? ANALOG_PRESSED_FROM : DIGITAL_PRESSED_FROM;
+    pad.buttons[i] = { pressed: value >= pressedFrom, value };
 }
 
 function release(pad, i) {
@@ -336,4 +345,155 @@ test('a throwing getGamepads is treated as no pads', () => {
         now: () => 0
     });
     assert.deepEqual(input.poll(16).actions, []);
+});
+
+test('an analog trigger reported as pressed at a low value does not shoot', () => {
+    const { input, pads } = setup();
+    pads[0].buttons[7] = { pressed: true, value: 0.2 };
+    const out = input.poll(16);
+    assert.deepEqual(out.actions, []);
+    assert.equal(out.active, false, 'a light trigger touch is not activity either');
+    pads[0].buttons[7] = { pressed: true, value: 0.55 };
+    assert.deepEqual(input.poll(16).actions, [A.SHOOT]);
+});
+
+test('a digital button still fires from pressed alone', () => {
+    const { input, pads } = setup();
+    pads[0].buttons[0] = { pressed: true, value: 0 };
+    assert.deepEqual(input.poll(16).actions, [A.SHOOT]);
+});
+
+test('connection events are dropped while the controller setting is off', () => {
+    const { input } = setup({ settings: { enabled: false } });
+    const target = new EventTarget();
+    input.attach(target);
+    const evt = (type, gamepad) => Object.assign(new Event(type), { gamepad });
+    target.dispatchEvent(evt('gamepadconnected', makePad(0)));
+    target.dispatchEvent(evt('gamepaddisconnected', makePad(0)));
+    input.settings.enabled = true;
+    assert.deepEqual(input.poll(16).events, []);
+});
+
+test('events queued before the setting is turned off are not reported', () => {
+    const { input } = setup();
+    const target = new EventTarget();
+    input.attach(target);
+    target.dispatchEvent(Object.assign(new Event('gamepadconnected'), { gamepad: makePad(0) }));
+    input.settings.enabled = false;
+    assert.deepEqual(input.poll(16).events, []);
+});
+
+test('only the pad in use going away is a pause-worthy disconnect', () => {
+    const a = makePad(0);
+    const b = makePad(1);
+    const { input } = setup({ pads: [a, b] });
+    const target = new EventTarget();
+    input.attach(target);
+    const evt = (type, gamepad) => Object.assign(new Event(type), { gamepad });
+    press(b, 2);
+    input.poll(16); // b is the active pad
+    release(b, 2);
+    target.dispatchEvent(evt('gamepaddisconnected', a));
+    assert.deepEqual(input.poll(16).events, ['disconnectedOther']);
+    target.dispatchEvent(evt('gamepaddisconnected', b));
+    assert.deepEqual(input.poll(16).events, ['disconnected']);
+});
+
+test('a stick resting between the deadzone and the activity threshold is not activity', () => {
+    const { input, pads } = setup();
+    pads[0].axes[0] = 0.3;
+    let out = input.poll(16);
+    assert.equal(out.active, false);
+    assert.ok(out.aimDelta > 0, 'the aim is still computed; the UI decides whether to apply it');
+    pads[0].axes[0] = 0.5;
+    out = input.poll(16);
+    assert.equal(out.active, true);
+});
+
+test('the activity threshold never drops below the chosen deadzone', () => {
+    const { input, pads } = setup({ settings: { deadzone: 0.5 } });
+    pads[0].axes[0] = 0.45;
+    assert.equal(input.poll(16).active, false);
+    pads[0].axes[0] = 0.6;
+    assert.equal(input.poll(16).active, true);
+});
+
+test('a drifting second pad does not take over the active pad', () => {
+    const a = makePad(0);
+    const b = makePad(1);
+    const { input } = setup({ pads: [a, b] });
+    press(a, 2);
+    input.poll(16);
+    release(a, 2);
+    b.axes[0] = 0.3;
+    assert.equal(input.poll(16).padIndex, 0);
+});
+
+test('D-pad fine steps respect invert X', () => {
+    const { input, pads } = setup({ settings: { invertX: true } });
+    press(pads[0], 15);
+    const out = input.poll(16);
+    assert.equal(out.aimSteps, 1);
+    close(out.aimDelta, -CONFIG.fineStepRad);
+});
+
+test('the fine step falls back to the value given by the caller when the config has none', () => {
+    const { fineStepRad, ...config } = CONFIG;
+    const pad = makePad();
+    const input = new GamepadInput({
+        config, fineStepRad: 0.006, settings: { enabled: true }, getGamepads: () => [pad], now: () => 0
+    });
+    press(pad, 15);
+    close(input.poll(16).aimDelta, 0.006);
+    assert.equal(fineStepRad, 0.01);
+});
+
+test('with no pad connected a poll returns the shared idle result and only rescans at the idle interval', () => {
+    let reads = 0;
+    const time = { t: 0 };
+    const input = new GamepadInput({
+        config: CONFIG, settings: { enabled: true }, getGamepads: () => { reads += 1; return []; }, now: () => time.t
+    });
+    const first = input.poll(16);
+    assert.equal(reads, 1, 'one initial scan');
+    for (time.t = 16; time.t < 900; time.t += 16) {
+        assert.equal(input.poll(16), first, 'same frozen object, nothing allocated');
+    }
+    assert.equal(reads, 1);
+    time.t = 1000;
+    input.poll(16);
+    assert.equal(reads, 2, 'rescans once the interval has passed');
+});
+
+test('a connection event wakes the reader without waiting for the idle scan', () => {
+    const list = [];
+    const time = { t: 0 };
+    const input = new GamepadInput({
+        config: CONFIG, settings: { enabled: true }, getGamepads: () => list, now: () => time.t
+    });
+    const target = new EventTarget();
+    input.attach(target);
+    input.poll(16);
+    const pad = makePad(0);
+    list.push(pad);
+    target.dispatchEvent(Object.assign(new Event('gamepadconnected'), { gamepad: pad }));
+    press(pad, 2);
+    time.t = 16;
+    const out = input.poll(16);
+    assert.deepEqual(out.events, ['connected']);
+    assert.deepEqual(out.actions, [A.SWAP]);
+});
+
+test('the last pad going away is reported and then the reader goes idle', () => {
+    const list = [makePad(0)];
+    const input = new GamepadInput({
+        config: CONFIG, settings: { enabled: true }, getGamepads: () => list, now: () => 0
+    });
+    const target = new EventTarget();
+    input.attach(target);
+    input.poll(16);
+    const gone = list.pop();
+    target.dispatchEvent(Object.assign(new Event('gamepaddisconnected'), { gamepad: gone }));
+    assert.deepEqual(input.poll(16).events, ['disconnected']);
+    assert.deepEqual(input.poll(16).events, []);
 });

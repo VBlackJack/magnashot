@@ -98,6 +98,7 @@ class Application {
 
       const gamepadInput = new GamepadInput({
         config: gameConfig.gamepad,
+        fineStepRad: gameConfig.canvas.keyboardAimFineStepRad,
         settings: {
           enabled: storageManager.getGamepadEnabled(),
           deadzone: storageManager.getGamepadDeadzone(),

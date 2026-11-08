@@ -192,6 +192,8 @@ const EXPECTED_PROTOTYPE_NAMES = [
   'getMenuFocusables',
   'focusFromPad',
   'clearPadFocus',
+  'handlePadFocusOut',
+  'dropStalePadFocus',
   'moveMenuFocus',
   'stepSelect',
   'confirmMenuFocus',
