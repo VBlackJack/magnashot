@@ -65,6 +65,7 @@ import { uiHudRefreshMethods } from './UIHudRefresh.js';
 import { uiStatsMethods, STATS_TABS } from './UIStats.js';
 import { uiGhostDuelMethods } from './UIGhostDuel.js';
 import { uiVersusMethods } from './UIVersus.js';
+import { uiVersusLocalMethods } from './UIVersusLocal.js';
 
 export {
   SPECIAL_ICON_HIGHLIGHT_POSITION,
@@ -317,6 +318,13 @@ export class UIManager {
       versusTierList: document.getElementById('versus-tier-list'),
       versusTierHint: document.getElementById('versus-tier-hint'),
       btnVersusTiersBack: document.getElementById('btn-versus-tiers-back'),
+      btnVersusLocal: document.getElementById('btn-versus-local'),
+      versusLocalEntryHint: document.getElementById('versus-local-entry-hint'),
+      modalVersusLocal: document.getElementById('modal-versus-local'),
+      btnVersusLocalStart: document.getElementById('btn-versus-local-start'),
+      btnVersusLocalBack: document.getElementById('btn-versus-local-back'),
+      versusLocalNeedTwo: document.getElementById('versus-local-need-two'),
+      versusLocalLive: document.getElementById('versus-local-live'),
       versusScreen: document.getElementById('versus-screen'),
       versusBoards: document.querySelector('#versus-screen .versus-boards'),
       versusBar: document.querySelector('#versus-screen .versus-bar'),
@@ -328,6 +336,10 @@ export class UIManager {
       btnVersusPause: document.getElementById('btn-versus-pause'),
       btnVersusSwap: document.getElementById('btn-versus-swap'),
       btnVersusPolarity: document.getElementById('btn-versus-polarity'),
+      btnVersusSwap1: document.getElementById('btn-versus-swap-1'),
+      btnVersusPolarity1: document.getElementById('btn-versus-polarity-1'),
+      versusPauseSizeHint: document.getElementById('versus-pause-size-hint'),
+      versusPausePadHint: document.getElementById('versus-pause-pad-hint'),
       modalDuelPause: document.getElementById('modal-duel-pause'),
       btnVersusResume: document.getElementById('btn-versus-resume'),
       btnVersusRestart: document.getElementById('btn-versus-restart'),
@@ -338,6 +350,9 @@ export class UIManager {
       versusResultTier: document.getElementById('versus-result-tier'),
       versusResultNeutralised: document.getElementById('versus-result-neutralised'),
       versusResultPulses: document.getElementById('versus-result-pulses'),
+      versusResultNeutralisedB: document.getElementById('versus-result-neutralised-b'),
+      versusResultPulsesB: document.getElementById('versus-result-pulses-b'),
+      btnVersusChangePlayers: document.getElementById('btn-versus-change-players'),
       versusResultShareFallback: document.getElementById('versus-result-share-fallback'),
       versusResultShareText: document.getElementById('versus-result-share-text'),
       btnVersusRematch: document.getElementById('btn-versus-rematch'),
@@ -387,6 +402,8 @@ export class UIManager {
     this.versus = null;
     this.versusScene = null;
     this.versusSeedCounter = 0;
+    // The two-player lobby (slots, handicaps) and its key names; created when the lobby is bound.
+    this.versusLocal = null;
     this.mainScene = { boards: [{ engine, renderer }] };
     this.versusSceneController = {
       handleGameplayKey: (event) => this.handleVersusGameplayKey(event),
@@ -479,6 +496,7 @@ export class UIManager {
     this.bindEvents();
     this.bindDuelEvents();
     this.bindVersusEvents();
+    this.bindVersusLocalEvents();
     this.updateSoundButton();
     this.updateContrastButton();
     this.updatePatternsButton();
@@ -507,6 +525,7 @@ export class UIManager {
       this.updateShareButtonLabel();
       this.updateConfirmButtonLabel();
       this.refreshVersusLanguage();
+      this.refreshVersusLocalLanguage();
       this.refreshStatsIfOpen();
       this.refresh(this.engine, this.lastExtra);
     });
@@ -1383,3 +1402,4 @@ installMethods(UIManager, uiHudRefreshMethods);
 installMethods(UIManager, uiStatsMethods);
 installMethods(UIManager, uiGhostDuelMethods);
 installMethods(UIManager, uiVersusMethods);
+installMethods(UIManager, uiVersusLocalMethods);

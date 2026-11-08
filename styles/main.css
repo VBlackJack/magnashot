@@ -3844,3 +3844,166 @@ body {
     background: Canvas;
   }
 }
+
+/* ==========================================================================
+   Polarity Duel, two players on one device: lobby, badges, local HUD.
+   ========================================================================== */
+.modal-btn[aria-disabled='true'] {
+  background: var(--surface-locked);
+  color: var(--text-muted);
+  border-style: dashed;
+  cursor: not-allowed;
+}
+
+.versus-local-slots {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin: 12px 0;
+}
+
+.versus-local-slot {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  background: var(--surface-raised);
+  border: 2px dashed var(--border-strong);
+  border-radius: 12px;
+  min-width: 0;
+}
+
+.versus-local-slot[data-joined='true'] {
+  border-style: solid;
+  border-color: var(--accent-blue);
+}
+
+.versus-local-slot-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: 1rem;
+}
+
+.versus-local-status {
+  margin: 0;
+  font-weight: 700;
+}
+
+.versus-local-join-hint {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+
+.versus-local-slot-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.versus-local-handicap-label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.8rem;
+}
+
+.versus-local-handicap {
+  min-height: var(--touch-target);
+  background: var(--surface-sunken);
+  color: var(--text-main);
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  font: inherit;
+}
+
+.versus-local-slot[data-joined='false'] .versus-local-leave {
+  display: none;
+}
+
+@keyframes versus-join-pulse {
+  from {
+    box-shadow: 0 0 0 0 var(--accent-blue);
+  }
+  to {
+    box-shadow: 0 0 0 10px transparent;
+  }
+}
+
+.versus-local-slot.just-joined {
+  animation: versus-join-pulse 0.5s ease-out;
+}
+
+/* The player is told apart without colour: a round badge for player 1, a square one for player 2. */
+.versus-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.5em;
+  height: 1.5em;
+  border: 2px solid var(--text-main);
+  background: var(--surface-sunken);
+  font-weight: 800;
+  font-size: 0.85rem;
+  line-height: 1;
+}
+
+.versus-badge[data-slot='0'] {
+  border-radius: 50%;
+}
+
+.versus-badge[data-slot='1'] {
+  border-radius: 3px;
+}
+
+.versus-local-slot[data-joined='true'] .versus-badge {
+  border-color: var(--accent-blue);
+}
+
+/* Boards only exist in local play: the second HUD gets its controls; the mouse only steers board 0, so only it shows the crosshair (when player 1 plays keyboard and mouse). */
+.versus-screen:not([data-mode='local']) .versus-hud-actions-local,
+.versus-screen:not([data-mode='local']) #versus-specials-1 {
+  display: none;
+}
+
+.versus-screen[data-mode='local'][data-p1-mouse='true'] #versus-canvas-0 {
+  cursor: crosshair;
+}
+
+/* Too small for two boards: the boards are hidden and the pause dialog says why. */
+.versus-screen[data-too-small='true'] .versus-boards {
+  visibility: hidden;
+}
+
+@media (max-width: 560px) {
+  .versus-local-slots {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (forced-colors: active) {
+  .versus-badge {
+    border-color: CanvasText;
+    background: Canvas;
+    color: CanvasText;
+    forced-color-adjust: none;
+  }
+  .versus-local-slot[data-joined='true'] .versus-badge {
+    border-color: Highlight;
+  }
+  .versus-local-slot {
+    border-color: ButtonText;
+    forced-color-adjust: none;
+    background: Canvas;
+    color: CanvasText;
+  }
+  .versus-local-slot[data-joined='true'] {
+    border-color: Highlight;
+  }
+  .modal-btn[aria-disabled='true'] {
+    color: GrayText;
+    border-color: GrayText;
+  }
+}

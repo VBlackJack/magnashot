@@ -1532,6 +1532,45 @@
     "seedPrefix": "classic"
   },
   "versus": {
+    "local": {
+      "entry": { "minViewportWidthPx": 680, "reservedHeightPx": 122 },
+      "keyboard": {
+        "left": {
+          "aimLeft": ["KeyA"],
+          "aimRight": ["KeyD"],
+          "fine": ["ShiftLeft"],
+          "shoot": ["KeyW"],
+          "swap": ["KeyS"],
+          "polarity": ["KeyQ"],
+          "special": ["KeyE"],
+          "join": ["KeyW"]
+        },
+        "right": {
+          "aimLeft": ["ArrowLeft"],
+          "aimRight": ["ArrowRight"],
+          "fine": ["ShiftRight"],
+          "shoot": ["Enter", "NumpadEnter"],
+          "swap": ["ArrowDown"],
+          "polarity": ["Slash", "NumpadDivide"],
+          "special": ["Period", "NumpadDecimal"],
+          "join": ["ArrowUp"]
+        },
+        "labels": {
+          "KeyA": "A", "KeyD": "D", "KeyW": "W", "KeyS": "S", "KeyQ": "Q", "KeyE": "E",
+          "ShiftLeft": "Shift", "ShiftRight": "Shift",
+          "ArrowLeft": "Left", "ArrowRight": "Right", "ArrowUp": "Up", "ArrowDown": "Down",
+          "Enter": "Enter", "NumpadEnter": "Enter", "Slash": "/", "NumpadDivide": "/",
+          "Period": ".", "NumpadDecimal": "."
+        },
+        "aimRadPerSec": 1.8,
+        "fineFactor": 0.2
+      },
+      "handicap": {
+        "riseMultipliers": [1, 1.25, 1.5],
+        "labelKeys": ["none", "slow", "slower"]
+      },
+      "resultInputGuardMs": 600
+    },
     "attack": {
       "freeDroppedSpheres": 1,
       "dropWeight": 1,
@@ -1769,6 +1808,7 @@
       "classicHighScore": "classic_high_score",
       "classicBestStage": "classic_best_stage",
       "versusRecords": "versus_records",
+      "versusLocalMatches": "versus_local_matches",
       "dailyBest": "daily_best",
       "dailyBestDate": "daily_best_date",
       "dailyLastPlayedDate": "daily_last_date",

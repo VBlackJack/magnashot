@@ -17,6 +17,7 @@
 import { GAME_STATES, INPUT_MODES, MATH_CONSTANTS, SPECIAL_TYPES_ORDER } from '../core/Constants.js';
 import { GAMEPAD_ACTIONS, GAMEPAD_EVENTS } from '../core/GamepadInput.js';
 import { t } from '../core/I18n.js';
+import { slotForPad } from './LocalInput.js';
 import { filterFocusTrapCandidates, GAMEPAD_HINT_KEYS, MODAL_FOCUSABLE_SELECTOR } from './UIHelpers.js';
 
 const A = GAMEPAD_ACTIONS;
@@ -133,8 +134,16 @@ export const uiGamepadMethods = {
   /** Frame hook (GameLoop beforeFrame): reads the pad and routes what it produced. */
   pollGamepad(now, elapsedMs) {
     this.dropStalePadFocus();
+    // The scene's own per-frame upkeep (held keys of the two-player match) needs no controller.
+    const sceneController = this.getSceneController();
+    sceneController?.beforeFrame?.(now, elapsedMs);
     const reader = this.gamepadInput;
     if (!reader) {
+      return;
+    }
+    const isLobby = this.isVersusLocalLobbyOpen?.() === true;
+    if (isLobby || sceneController?.multiPad === true) {
+      this.pollGamepadPerPad(reader, elapsedMs, sceneController, isLobby);
       return;
     }
     const isMenuOpen = this.isAnyModalOpen() || this.isDrawerOpen;
@@ -155,6 +164,52 @@ export const uiGamepadMethods = {
     }
   },
 
+  /**
+   * Frame routing while the two-player lobby is open or a two-player match runs: every pad is read
+   * on its own, so two pads never overwrite each other. In the lobby an unassigned pad joins; in
+   * play each assigned pad steers its own board; with a dialog open each assigned pad moves around it
+   * and an unassigned pad can take over the place of a controller that was lost.
+   */
+  pollGamepadPerPad(reader, elapsedMs, sceneController, isLobby) {
+    const isMenuOpen = this.isAnyModalOpen() || this.isDrawerOpen;
+    const results = reader.pollAll(elapsedMs, { menuOpen: isMenuOpen });
+    const hasInput = results.pads.some((pad) => pad.active || pad.actions.length > 0 || pad.aimDelta !== 0);
+    if (results.events.length === 0 && !hasInput) {
+      return;
+    }
+    for (const event of results.events) {
+      this.handleGamepadEvent(event.type);
+      this.handleLocalPadEvent?.(event);
+    }
+    if (results.pads.some((pad) => pad.active)) {
+      this.setInputMode(INPUT_MODES.GAMEPAD);
+    }
+    if (isLobby) {
+      this.routeVersusLocalLobbyPads(results);
+    } else if (isMenuOpen) {
+      this.routeLocalMenuPads(results);
+    } else {
+      sceneController.handlePadResults(results);
+    }
+  },
+
+  /** Dialog open during a two-player match: only the pads that hold a slot move around it. */
+  routeLocalMenuPads(results) {
+    const slots = this.getVersusLocalSlots?.() ?? [];
+    for (const pad of results.pads) {
+      if (pad.actions.length === 0) {
+        continue;
+      }
+      if (slotForPad(slots, pad.padIndex) === -1) {
+        if (pad.actions.includes(A.CONFIRM) || pad.actions.includes(A.SHOOT)) {
+          this.takeOverLostPad?.(pad.padIndex, pad.id);
+        }
+        continue;
+      }
+      this.routeGamepadMenuActions(pad.actions);
+    }
+  },
+
   /** Toast and live region message for a pad that appeared or went away; a lost pad pauses the run. */
   handleGamepadEvent(event) {
     const isConnected = event === GAMEPAD_EVENTS.CONNECTED;
@@ -165,6 +220,10 @@ export const uiGamepadMethods = {
       return;
     }
     const sceneController = this.getSceneController();
+    if (sceneController?.multiPad === true) {
+      // A two-player match knows which pad went away: handleLocalPadEvent pauses for an assigned one only.
+      return;
+    }
     if (sceneController) {
       sceneController.pause();
     } else if (this.engine.state === GAME_STATES.PLAYING) {

@@ -194,6 +194,96 @@ test('the engine is read at each event, so a swapped engine receives the input',
   assert.equal(second.calls.length, 2);
 });
 
+const AT_AIM = () => toClient(AIM_POINT.x, AIM_POINT.y);
+const perCanvasSetup = (options = {}) => setup({ pointerOwnership: 'perCanvas', ...options });
+const shots = (engine) => names(engine).filter((n) => n === 'shoot').length;
+
+test('perCanvas: a non-primary touch owns the canvas and shoots on release', () => {
+  const { canvas, engine } = perCanvasSetup();
+  canvas.fire('pointerdown', { isPrimary: false, pointerType: 'touch', pointerId: 5, ...AT_AIM() });
+  canvas.fire('pointerup', { isPrimary: false, pointerType: 'touch', pointerId: 5, ...AT_AIM() });
+  assert.equal(shots(engine), 1);
+  assert.deepEqual(canvas.captured, [5]);
+});
+
+test('perCanvas: other pointers are ignored while one is owned', () => {
+  const { canvas, engine } = perCanvasSetup();
+  canvas.fire('pointerdown', { pointerType: 'touch', pointerId: 5, ...AT_AIM() });
+  const before = engine.calls.length;
+  canvas.fire('pointerdown', { pointerType: 'touch', pointerId: 6, ...AT_AIM() });
+  canvas.fire('pointermove', { pointerType: 'mouse', pointerId: 9, ...AT_AIM() });
+  canvas.fire('pointerup', { pointerType: 'touch', pointerId: 6, ...AT_AIM() });
+  assert.equal(engine.calls.length, before);
+  assert.deepEqual(canvas.captured, [5]);
+  canvas.fire('pointerup', { pointerType: 'touch', pointerId: 5, ...AT_AIM() });
+  assert.equal(shots(engine), 1);
+});
+
+test('perCanvas: with no owned pointer only mouse hover moves the aim', () => {
+  const { canvas, engine } = perCanvasSetup();
+  canvas.fire('pointermove', { pointerType: 'touch', pointerId: 5, ...AT_AIM() });
+  canvas.fire('pointermove', { pointerType: 'pen', pointerId: 6, ...AT_AIM() });
+  assert.deepEqual(engine.calls, []);
+  canvas.fire('pointermove', { pointerType: 'mouse', pointerId: 1, ...AT_AIM() });
+  assert.deepEqual(names(engine), ['follow', 'aim']);
+});
+
+test('perCanvas: pointer cancel frees ownership for a new pointer', () => {
+  const { canvas, engine } = perCanvasSetup();
+  canvas.fire('pointerdown', { pointerType: 'touch', pointerId: 5, ...AT_AIM() });
+  canvas.fire('pointercancel', { pointerType: 'touch', pointerId: 6 });
+  canvas.fire('pointerup', { pointerType: 'touch', pointerId: 6, ...AT_AIM() });
+  assert.equal(shots(engine), 0);
+  canvas.fire('pointercancel', { pointerType: 'touch', pointerId: 5 });
+  canvas.fire('pointerdown', { pointerType: 'touch', pointerId: 6, ...AT_AIM() });
+  canvas.fire('pointerup', { pointerType: 'touch', pointerId: 6, ...AT_AIM() });
+  assert.equal(shots(engine), 1);
+});
+
+test('perCanvas: lost pointer capture frees ownership without shooting', () => {
+  const { canvas, engine, aimChanged } = perCanvasSetup();
+  canvas.fire('pointerdown', { pointerType: 'touch', pointerId: 5, ...AT_AIM() });
+  const changed = aimChanged.length;
+  canvas.fire('lostpointercapture', { pointerId: 7 });
+  assert.equal(aimChanged.length, changed);
+  canvas.fire('lostpointercapture', { pointerId: 5 });
+  assert.equal(aimChanged.length, changed + 1);
+  canvas.fire('pointerup', { pointerType: 'touch', pointerId: 5, ...AT_AIM() });
+  assert.equal(shots(engine), 0);
+  canvas.fire('pointerdown', { pointerType: 'touch', pointerId: 8, ...AT_AIM() });
+  assert.deepEqual(canvas.captured, [5, 8]);
+});
+
+test('perCanvas: acceptPointer is honoured and a rejected press claims nothing', () => {
+  const { canvas, engine } = perCanvasSetup({ acceptPointer: (e) => e.pointerType === 'touch' });
+  canvas.fire('pointerdown', { pointerType: 'mouse', pointerId: 1, ...AT_AIM() });
+  canvas.fire('pointermove', { pointerType: 'mouse', pointerId: 1, ...AT_AIM() });
+  assert.deepEqual(engine.calls, []);
+  canvas.fire('pointerdown', { pointerType: 'touch', pointerId: 5, ...AT_AIM() });
+  canvas.fire('pointerup', { pointerType: 'touch', pointerId: 5, ...AT_AIM() });
+  assert.equal(shots(engine), 1);
+});
+
+test('perCanvas: blocked and secondary-button presses claim nothing; unbind removes every listener', () => {
+  let blocked = true;
+  const { canvas, binding } = perCanvasSetup({ isBlocked: () => blocked });
+  canvas.fire('pointerdown', { pointerType: 'touch', pointerId: 5, ...AT_AIM() });
+  blocked = false;
+  canvas.fire('pointerdown', { pointerType: 'mouse', pointerId: 6, button: 2, ...AT_AIM() });
+  canvas.fire('pointerdown', { pointerType: 'touch', pointerId: 7, ...AT_AIM() });
+  assert.deepEqual(canvas.captured, [7]);
+  assert.equal(canvas.listenerCount(), BOUND_EVENT_COUNT + 1);
+  binding.unbind();
+  assert.equal(canvas.listenerCount(), 0);
+});
+
+test('primary ownership binds no lost-capture listener and ignores non-primary pointers', () => {
+  const { canvas, engine } = setup({ pointerOwnership: 'primary' });
+  assert.equal(canvas.listenerCount(), BOUND_EVENT_COUNT);
+  canvas.fire('pointerdown', { isPrimary: false, pointerType: 'touch', pointerId: 5, ...AT_AIM() });
+  assert.deepEqual(engine.calls, []);
+});
+
 test('unbind removes every listener', () => {
   const { canvas, engine, binding } = setup();
   assert.equal(canvas.listenerCount(), BOUND_EVENT_COUNT);

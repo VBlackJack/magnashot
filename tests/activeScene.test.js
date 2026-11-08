@@ -169,3 +169,117 @@ test('a visible page pauses nothing', () => {
     assert.deepEqual(controller.calls, []);
   }, false);
 });
+
+// ---------------------------------------------------------------------------------------------
+// Two players on one device: key releases, window blur, repeated keys
+// ---------------------------------------------------------------------------------------------
+
+function makeLocalController() {
+  const calls = [];
+  return {
+    calls,
+    multiPad: true,
+    handleGameplayKey: (event) => calls.push(['key', event.code, event.repeat]),
+    handleGameplayKeyUp: (event) => calls.push(['keyup', event.code]),
+    releaseAllKeys: () => calls.push(['release']),
+    handlePadResults: (results) => calls.push(['pads', results.pads.length]),
+    beforeFrame: (now, elapsedMs) => calls.push(['frame', now, elapsedMs]),
+    handleGamepadActions: () => calls.push(['single']),
+    pause: () => calls.push(['pause'])
+  };
+}
+
+test('a key release is handed to the scene that tracks held keys, and ignored by one that does not', () => {
+  const { ui, engineCalls } = makeUi();
+  ui.handleKeyUp({ code: 'KeyD' });
+  const controller = makeLocalController();
+  ui.setActiveScene(UI_SCENES.VERSUS, controller);
+  ui.handleKeyUp({ code: 'KeyD' });
+  assert.deepEqual(controller.calls, [['keyup', 'KeyD']]);
+  const plain = makeController();
+  ui.setActiveScene(UI_SCENES.VERSUS, plain);
+  ui.handleKeyUp({ code: 'KeyD' });
+  assert.deepEqual(plain.calls, []);
+  assert.deepEqual(engineCalls, []);
+});
+
+test('the key release reaches the scene even while a dialog is open, so no key stays held', () => {
+  const { ui } = makeUi();
+  ui.isAnyModalOpen = () => true;
+  const controller = makeLocalController();
+  ui.setActiveScene(UI_SCENES.VERSUS, controller);
+  ui.handleKeyUp({ code: 'KeyD' });
+  assert.deepEqual(controller.calls, [['keyup', 'KeyD']]);
+});
+
+test('the window losing focus lets go of every held key', () => {
+  const { ui } = makeUi();
+  ui.handleWindowBlur();
+  const controller = makeLocalController();
+  ui.setActiveScene(UI_SCENES.VERSUS, controller);
+  ui.handleWindowBlur();
+  assert.deepEqual(controller.calls, [['release']]);
+});
+
+test('Escape still pauses in a two-player match, and the keys of the layout reach the scene', () => {
+  withDocument(() => {
+    const { ui } = makeUi();
+    const controller = makeLocalController();
+    ui.setActiveScene(UI_SCENES.VERSUS, controller);
+    const backs = [];
+    ui.handleBackAction = () => backs.push('back');
+    ui.handleKeyDown(key('KeyW'));
+    ui.handleKeyDown(key('Escape'));
+    assert.deepEqual(backs, ['back']);
+    assert.deepEqual(controller.calls, [['key', 'KeyW', false]]);
+  });
+});
+
+test('an auto-repeated key of the layout is still kept from the page, and a repeated Escape never pauses twice', () => {
+  withDocument(() => {
+    const { ui } = makeUi();
+    const controller = makeLocalController();
+    ui.setActiveScene(UI_SCENES.VERSUS, controller);
+    const backs = [];
+    ui.handleBackAction = () => backs.push('back');
+    ui.handleKeyDown({ code: 'Enter', repeat: true, preventDefault() {} });
+    ui.handleKeyDown({ code: 'Escape', repeat: true, preventDefault() {} });
+    ui.handleKeyDown({ code: 'Enter', repeat: true, ctrlKey: true, preventDefault() {} });
+    assert.deepEqual(backs, []);
+    assert.deepEqual(controller.calls, [['key', 'Enter', true], ['key', 'Escape', true]]);
+  });
+});
+
+test('a repeated key reaches only a scene that wants every pad apart, and never while a dialog is open', () => {
+  withDocument(() => {
+    const { ui } = makeUi();
+    const plain = makeController();
+    ui.setActiveScene(UI_SCENES.VERSUS, plain);
+    ui.handleKeyDown({ code: 'Enter', repeat: true, preventDefault() {} });
+    assert.deepEqual(plain.calls, []);
+    const controller = makeLocalController();
+    ui.setActiveScene(UI_SCENES.VERSUS, controller);
+    ui.isAnyModalOpen = () => true;
+    ui.handleKeyDown({ code: 'Enter', repeat: true, preventDefault() {} });
+    assert.deepEqual(controller.calls, []);
+  });
+});
+
+test('a pad lost in a two-player scene is the scene business: the single pad path does not pause for it', () => {
+  const { ui, engineCalls } = makeUi();
+  const controller = makeLocalController();
+  ui.setActiveScene(UI_SCENES.VERSUS, controller);
+  ui.handleGamepadEvent(GAMEPAD_EVENTS.DISCONNECTED);
+  assert.deepEqual(controller.calls, []);
+  assert.deepEqual(engineCalls, []);
+});
+
+test('a hidden page still pauses a two-player scene through its controller', () => {
+  withDocument(() => {
+    const { ui } = makeUi();
+    const controller = makeLocalController();
+    ui.setActiveScene(UI_SCENES.VERSUS, controller);
+    ui.handleVisibilityChange();
+    assert.deepEqual(controller.calls, [['pause']]);
+  }, true);
+});

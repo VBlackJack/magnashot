@@ -4,6 +4,12 @@ All notable changes to **MagnaShot** are documented in this file.
 
 ## [Unreleased]
 
+### Added
+- **Polarity Duel, Two Players on One Device (`LocalInput`, `UIVersusLocal`, `UIVersus`, `VersusHud`, `UIGamepad`, `UIInputBindings`, `UIStats`, `VersusMatch`, `GamepadInput`, `CanvasInput`, `StorageManager`)**: A "2 players (same device)" entry under the difficulty picker, shown on wide screens only, opens a lobby where each player picks a device: the left half of the keyboard (`A` `D` aim, `W` shoot, `S` swap, `Q` polarity, `E` special) with an optional mouse, the right half (arrows, `Enter`, `Down`, `/`, `.`), touch (each board follows its own finger), or a controller that joins with its bottom face button. `W` and `ArrowUp` are quick join keys; key names follow the keyboard layout. Each player has a handicap that slows the charges rising on their board. The match is the same best of 3, with both boards human: the aim follows the keys held down, Start or Select pauses, a controller that is lost pauses the match until another one takes its place, and a window too small for two boards pauses it with an explanation. HUDs, canvases and announcements say "Player 1" and "Player 2" with a round and a square badge, and the result card names the winner, with Play again, Change players and Back to menu (no Share, no CPU tier; the main button ignores presses for a short guard time). A finished match only counts in a new "2P matches" line of My stats.
+- **Per-Pad Controller Reading (`GamepadInput`, `UIGamepad`)**: The reader can follow several pads at once, each with its own edges, instead of merging them; the single pad path is unchanged.
+- **Per-Canvas Pointer Ownership (`CanvasInput`)**: A canvas can own one pointer from press to release and ignore the others, so two fingers on two boards both work.
+- **Browser Smoke Tests**: The lobby with the quick join keys, two stubbed controllers joining and a lost one holding the match, a scripted two-player round to the result card, a window that shrinks below two boards, and the entry hidden at the phone layouts.
+
 ## [1.20.0] - 2026-11-08
 
 ### Added

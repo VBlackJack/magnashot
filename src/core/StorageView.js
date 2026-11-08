@@ -165,6 +165,8 @@ export const VERSUS_STORAGE_POLICY = Object.freeze({
   getVersusTiers: P.EMPTY_ARRAY,
   getVersusRecords: P.EMPTY_OBJECT,
   recordVersusResult: P.NOOP,
+  getVersusLocalMatches: P.ZERO,
+  recordVersusLocalMatch: P.NOOP,
   isVersusTierUnlocked: P.FALSE,
 
   // Economy.

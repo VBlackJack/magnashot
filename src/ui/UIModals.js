@@ -274,6 +274,7 @@ export const uiModalMethods = {
   /** Dialogs opened from the menu over a run, which they pause until they close. */
   getOverlayModals() {
     return [
+      this.elements.modalVersusLocal,
       this.elements.modalVersusTiers,
       this.elements.modalLevels,
       this.elements.modalShop,

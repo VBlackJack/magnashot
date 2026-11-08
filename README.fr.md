@@ -115,6 +115,26 @@ Un mode en tête-à-tête contre l'ordinateur, ouvert au niveau 6 de la campagne
 - **Écrans** : sur grand écran (tablettes, ordinateur) les deux plateaux sont côte à côte ; sur téléphone, le plateau de l'ordinateur devient une mini-vue à côté ou au-dessus du vôtre. Les commandes d'une partie solo fonctionnent, et la manette est prise en charge.
 - **Records** : vos victoires et défaites par difficulté sont conservées localement et affichées dans **Mes statistiques** ; la carte de résultat propose un bouton Partager.
 
+### Deux joueurs sur le même appareil
+
+Sous le choix de difficulté, **2 joueurs (même appareil)** ouvre un salon pour un match entre deux personnes devant le même écran : pas d'ordinateur, les mêmes règles, au meilleur des 3 manches. L'entrée n'est proposée que sur grand écran (au moins 680 px de large et 520 px de haut) ; elle n'apparaît pas sur téléphone, et un match qui rétrécit sous la taille de deux plateaux se met en pause et attend une fenêtre plus grande (la fenêtre de pause l'explique et Reprendre reste inaccessible tant que les plateaux ne tiennent pas).
+
+Chaque joueur choisit son périphérique dans le salon, et appuyer sur une touche de participation ou sur un bouton de manette prend une place libre :
+
+| Périphérique | Joueur | Comment rejoindre | Commandes |
+| :--- | :--- | :--- | :--- |
+| **Moitié gauche du clavier** | 1 | `W` | `A` / `D` visent (maintenez `Maj gauche` pour viser finement), `W` tire, `S` échange, `Q` inverse la polarité, `E` sphère spéciale suivante |
+| **Moitié droite du clavier** | 2 | `Haut` | `Gauche` / `Droite` visent (maintenez `Maj droite` pour viser finement), `Entrée` tire, `Bas` échange, `/` inverse la polarité, `.` sphère spéciale suivante |
+| **Touches de gauche et souris** | 1 | Changer de périphérique | Les touches de gauche ci-dessus, et la souris vise et tire sur le premier plateau |
+| **Tactile** | 1 ou 2 | Changer de périphérique | Glissez sur votre propre plateau ; chaque plateau suit son propre doigt, les deux joueurs peuvent donc toucher en même temps |
+| **Manette** | 1 ou 2 | Bouton du bas | Les commandes d'une partie solo ; Start ou Select met en pause, le bouton de retour libère la place dans le salon |
+
+- La visée suit les touches tant qu'elles sont maintenues, les deux joueurs peuvent donc viser en même temps. Le nom des touches suit la disposition de votre clavier (un clavier AZERTY affiche `Z` là où ce tableau dit `W`) ; les équivalents du pavé numérique pour Entrée, `/` et `.` fonctionnent aussi. Espace, `F` et les chiffres ne font rien dans un match à deux, et Échap met en pause.
+- **Handicap** : chaque joueur peut ralentir la montée des charges qui arrivent sur son propre plateau (normale, x1,25 ou x1,5), pour un match entre niveaux différents.
+- Une manette débranchée pendant le match le met en pause ; appuyez sur le bouton du bas d'une autre manette pour prendre sa place, ou quittez.
+- La carte de résultat nomme le vainqueur et montre le score, les charges neutralisées et les impulsions de chaque joueur, avec **Rejouer** (mêmes périphériques et mêmes handicaps), **Changer de joueurs** et **Retour**. Un match terminé s'ajoute seulement au compteur "Matchs à 2 joueurs" de **Mes statistiques** : aucune statistique personnelle ni aucun record contre l'ordinateur ne change, et il n'y a pas de bouton Partager.
+- Deux points dépendent de votre matériel. De nombreux claviers ne savent pas signaler toutes les combinaisons de touches à la fois (fantômes de touches) : si une touche cesse de répondre quand les deux joueurs en maintiennent plusieurs, utilisez une manette ou le tactile pour l'un des joueurs. Sous Windows, appuyer cinq fois sur Maj ouvre les Touches rémanentes, ce qui peut interrompre les touches de visée fine : désactivez ce raccourci dans les paramètres du système si cela arrive.
+
 ---
 
 ## Architecture
@@ -190,6 +210,7 @@ Le code suit une architecture en modules ES sans dépendance, avec une séparati
 │   └── ui/
 │       ├── CodexView.js      # Rendu de l'onglet illustré Codex et guide
 │       ├── CanvasInput.js    # Visée au pointeur et au toucher sur le canevas, liée au moteur de n'importe quel plateau
+│       ├── LocalInput.js     # Aides pures du mode à deux joueurs : disposition du clavier partagé, places des périphériques, règles du pointeur, test du grand écran
 │       ├── FluxPerkView.js   # Dialogue de choix d'atout Flux et pastilles des atouts actifs
 │       ├── LevelSelectView.js# Chapitres, cartes de niveaux, badges de format et filtre < 3★
 │       ├── UIManager.js      # Noyau de l'interface : construction, câblage et modules ci-dessous
@@ -197,6 +218,7 @@ Le code suit une architecture en modules ES sans dépendance, avec une séparati
 │       ├── UIHudRefresh.js   # Module de UIManager : rafraîchissement du HUD et du menu
 │       ├── UIGamepad.js      # Module de UIManager : routage de la manette, navigation du focus dans les menus, ligne Manette des Réglages
 │       ├── UIVersus.js       # Module de UIManager : choix de difficulté du Duel de polarité, écran, dispositions, pause, résultat et records
+│       ├── UIVersusLocal.js  # Module de UIManager : deux joueurs sur le même appareil, entrée, salon, périphériques et handicap
 │       ├── VersusHud.js      # Interface du Duel de polarité : choix de disposition, annonces, barre du haut, charges entrantes, jauge d'impulsion et commandes
 │       ├── UIInputBindings.js# Module de UIManager : liaisons d'installation, du tiroir et du clavier
 │       ├── UIModals.js       # Module de UIManager : fenêtres, onglets de la boutique, piège de focus et inert
@@ -247,7 +269,7 @@ Les suites de `tests/` couvrent le moteur de jeu, la physique, la boucle de rend
 - `modeUnlocks.test.js`, `weeklyFlux.test.js`, `dailyHistory.test.js`, `playerStats.test.js` et `shotTimeline.test.js` vérifient les seuils de déblocage progressif, les clés et graines de semaine ISO (changements d'année, lundi 00:00 UTC), l'historique du Défi du jour sur 60 jours, les statistiques locales et les chronologies de tirs compactes ; `saveSchema.test.js` couvre aussi les migrations qui conservent tous les modes aux joueurs existants.
 - `sagMeter.test.js`, `classicMode.test.js` et `uiSag.test.js` vérifient les règles de la jauge d'affaissement (ce qui compte comme un raté, remplissage, vidage par avalanche et son plafond, remise à zéro à la chute, phase d'alerte), la Survie et le Défi du jour qui descendent exactement une vague par jauge pleine, les étapes du mode Puriste (ni spéciales ni améliorations, chutes du rail qui déplacent ancres et pivots mais pas les plateformes, étape terminée, ligne franchie), le déterminisme à graine égale, les sauvegardes de partie (y compris l'ancien champ `shotsUntilWave`), la boîte d'affaissement du HUD et ses annonces, ainsi que la carte, les records et le texte de partage du mode Puriste.
 - `ghostCodec.test.js`, `ghostDuel.test.js`, `ghostStorage.test.js`, `ghostEngine.test.js` et `uiGhostDuel.test.js` vérifient le lien de duel (allers-retours, rejet de chaque troncature et de chaque bit inversé, plafonds stricts, fuzzing qui ne lève jamais d'erreur et se ré-encode toujours à l'identique), l'interpolation du fantôme, l'hystérésis des annonces et les résultats, l'historique de duels borné et le nom, le cycle de vie d'un duel (revanche sans bonus ni série, inclinaison verrouillée, relance, rechargement et Continuer), ainsi que la carte de duel, le badge de rival, la ligne de fin de partie et le partage du défi.
-- `versusRules.test.js`, `versusEngine.test.js`, `versusMatch.test.js`, `versusHud.test.js`, `uiVersus.test.js` et `versusRecords.test.js` vérifient le Duel de polarité : la table d'attaque, les règles de polarité et de charge, la montée, les impacts, l'atterrissage et les impulsions de champ, des matchs de CPU identiques à graine égale, les manches et la mort subite, la vue de stockage qui n'écrit rien, l'interface et le choix de disposition, les annonces, les fenêtres et les records. `tests/slow/versusStrength.test.js` (lancé par `npm run test:slow`) joue 50 matchs ensemencés de Difficile contre Facile.
+- `versusRules.test.js`, `versusEngine.test.js`, `versusMatch.test.js`, `versusHud.test.js`, `uiVersus.test.js` et `versusRecords.test.js` vérifient le Duel de polarité (avec `localInput.test.js` et `uiVersusLocal.test.js` pour le mode à deux joueurs) : la table d'attaque, les règles de polarité et de charge, la montée, les impacts, l'atterrissage et les impulsions de champ, des matchs de CPU identiques à graine égale, les manches et la mort subite, la vue de stockage qui n'écrit rien, l'interface et le choix de disposition, les annonces, les fenêtres et les records. `tests/slow/versusStrength.test.js` (lancé par `npm run test:slow`) joue 50 matchs ensemencés de Difficile contre Facile.
 
 Les niveaux générés sont calibrés hors CI par deux bots (`scripts/bot/CampaignBot.js`) :
 

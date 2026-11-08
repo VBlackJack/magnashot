@@ -21,7 +21,7 @@ import fs from 'node:fs';
 import { configRegistry } from '../src/core/ConfigRegistry.js';
 import { StorageManager } from '../src/core/StorageManager.js';
 import { applyWorldGeometry } from '../src/core/WorldGeometry.js';
-import { GAME_STATES } from '../src/core/Constants.js';
+import { GAME_OVER_REASONS, GAME_STATES } from '../src/core/Constants.js';
 import { createVersusMatch, MATCH_EVENTS, MATCH_PHASES } from '../src/game/VersusMatch.js';
 
 const loadJson = (p) => JSON.parse(fs.readFileSync(p, 'utf8'));
@@ -365,5 +365,224 @@ test('a listener passed as onEvent hears the roundStart of round 1', () => {
     assert.equal(heard[0].number, 1);
     match.restart();
     assert.equal(heard.filter((event) => event.type === MATCH_EVENTS.ROUND_START).length, 2, 'later restarts are heard too');
+  });
+});
+
+// Frozen vs-CPU event logs: captured from the code before the local two-player mode.
+const FROZEN_FIXTURE_PATH = './tests/fixtures/versusCpuLogs.v1.20.0.json';
+const FROZEN_REGENERATE_FLAG = 'VERSUS_FIXTURE_REGENERATE';
+const FROZEN_SCENARIOS = Object.freeze([
+  { name: 'cpu-vs-cpu normal/easy det-1', seed: 'det-1', playerBoard: null, cpuTiers: ['normal', 'easy'] },
+  { name: 'cpu-vs-cpu hard/normal flow-1', seed: 'flow-1', playerBoard: null, cpuTiers: ['hard', 'normal'] },
+  { name: 'cpu-vs-cpu easy/hard frozen-3', seed: 'frozen-3', playerBoard: null, cpuTiers: ['easy', 'hard'] },
+  { name: 'idle player 0 vs easy frozen-4', seed: 'frozen-4', playerBoard: 0, cpuTier: 'easy' },
+  { name: 'idle player 1 vs hard frozen-5', seed: 'frozen-5', playerBoard: 1, cpuTier: 'hard' }
+]);
+
+const playFrozenScenario = ({ name, ...options }) => {
+  const match = createVersusMatch({
+    mode: 'cpu',
+    configs,
+    storageManager: createManager(),
+    audioManager: SPY_AUDIO,
+    ...options
+  });
+  const result = match.run(MATCH_FRAME_CAP);
+  return { name, result, log: JSON.parse(JSON.stringify(match.getEventLog())) };
+};
+
+test('vs CPU event logs are unchanged from the frozen fixture', () => {
+  withStorage(createSpyStorage(), () => {
+    const actual = FROZEN_SCENARIOS.map(playFrozenScenario);
+    if (process.env[FROZEN_REGENERATE_FLAG]) {
+      fs.writeFileSync(FROZEN_FIXTURE_PATH, `${JSON.stringify(actual)}\n`);
+    }
+    const frozen = loadJson(FROZEN_FIXTURE_PATH);
+    assert.equal(frozen.length, FROZEN_SCENARIOS.length);
+    for (let i = 0; i < frozen.length; i++) {
+      assert.ok(frozen[i].log.length > 10, `${frozen[i].name} fixture must hold a real log`);
+      assert.deepEqual(actual[i], frozen[i], `${frozen[i].name} must replay the frozen log`);
+    }
+  });
+});
+
+// Local two-player mode.
+
+const LOCAL_RISE_PROBE_CAP = 5000;
+const PROBE_ATTACK = Object.freeze({ count: 1, strength: 1, polarity: 1 });
+
+const createLocalMatch = (seed, extra = {}) =>
+  createVersusMatch({
+    seed,
+    mode: 'local',
+    configs,
+    storageManager: createManager(),
+    audioManager: SPY_AUDIO,
+    ...extra
+  });
+
+/** Ends a board the way the rails do. */
+const dropBoard = (match, board) => {
+  match.engines[board].triggerGameOver(GAME_OVER_REASONS.LINE_CROSSED);
+  match.step();
+};
+
+/** Plays a scripted local match: board 1 falls twice, board 0 wins 2-0. */
+const playScriptedLocalMatch = (match) => {
+  dropBoard(match, 1);
+  match.advance();
+  dropBoard(match, 1);
+};
+
+/** Frame at which a probe charge sent to `board` lands (nobody shoots). */
+const landingFrameOf = (match, board) => {
+  match.engines[board].receiveVersusAttack(PROBE_ATTACK);
+  for (let i = 0; i < LOCAL_RISE_PROBE_CAP; i++) {
+    const landed = match.step().find((event) => event.type === MATCH_EVENTS.CHARGE_LANDED && event.board === board);
+    if (landed) {
+      return landed.frame;
+    }
+  }
+  return null;
+};
+
+test('local mode: two human boards, no player, truncated aim and both boards audible', () => {
+  withStorage(createSpyStorage(), () => {
+    const match = createLocalMatch('local-1');
+    const state = match.getState();
+    assert.equal(state.mode, 'local');
+    assert.deepEqual(state.humanBoards, [0, 1]);
+    assert.equal(state.playerBoard, null);
+    for (const board of state.boards) {
+      assert.equal(board.isHuman, true);
+      assert.equal(board.isCpu, false);
+      assert.equal(board.isPlayer, false);
+      assert.equal(board.tier, null);
+    }
+    for (const engine of match.engines) {
+      assert.equal(engine.versus.isAimTruncated, true);
+    }
+    for (let i = 0; i < 600; i++) {
+      match.step();
+    }
+    assert.equal(match.engines[0].hasFiredInRound, false, 'no bot drives the first board');
+    assert.equal(match.engines[1].hasFiredInRound, false, 'no bot drives the second board');
+    assert.equal(match.getState().phase, MATCH_PHASES.PLAYING);
+  });
+});
+
+test('getState reports the mode and the human boards of cpu and cpuVsCpu matches', () => {
+  withStorage(createSpyStorage(), () => {
+    const cpuVsCpu = createCpuMatch('mode-1', ['easy', 'easy']).getState();
+    assert.equal(cpuVsCpu.mode, 'cpuVsCpu');
+    assert.deepEqual(cpuVsCpu.humanBoards, []);
+    assert.deepEqual(cpuVsCpu.boards.map((board) => board.isHuman), [false, false]);
+    const vsCpu = createVersusMatch({
+      seed: 'mode-2',
+      mode: 'cpu',
+      playerBoard: 1,
+      cpuTier: 'easy',
+      configs,
+      storageManager: createManager(),
+      audioManager: SPY_AUDIO
+    }).getState();
+    assert.equal(vsCpu.mode, 'cpu');
+    assert.deepEqual(vsCpu.humanBoards, [1]);
+    assert.deepEqual(vsCpu.boards.map((board) => board.isHuman), [false, true]);
+  });
+});
+
+test('local mode: only decided events, never won or lost, and no isPlayer flag', () => {
+  withStorage(createSpyStorage(), () => {
+    const match = createLocalMatch('local-2');
+    playScriptedLocalMatch(match);
+    const log = match.getEventLog();
+    const types = log.map((event) => event.type);
+    assert.equal(match.getState().phase, MATCH_PHASES.MATCH_OVER);
+    assert.equal(types.filter((type) => type === MATCH_EVENTS.ROUND_DECIDED).length, 2);
+    assert.equal(types.filter((type) => type === MATCH_EVENTS.MATCH_DECIDED).length, 1);
+    for (const forbidden of [MATCH_EVENTS.ROUND_WON, MATCH_EVENTS.ROUND_LOST, MATCH_EVENTS.MATCH_WON, MATCH_EVENTS.MATCH_LOST]) {
+      assert.ok(!types.includes(forbidden), `${forbidden} must not be emitted in local mode`);
+    }
+    for (const event of log) {
+      assert.ok(!('isPlayer' in event), `${event.type} must not carry isPlayer`);
+    }
+    const firstRound = log.find((event) => event.type === MATCH_EVENTS.ROUND_DECIDED);
+    assert.equal(firstRound.winner, 0);
+    assert.equal(firstRound.loser, 1);
+    assert.deepEqual(firstRound.wins, [1, 0]);
+    const decided = log.find((event) => event.type === MATCH_EVENTS.MATCH_DECIDED);
+    assert.equal(decided.winner, 0);
+    assert.deepEqual(decided.wins, [gameConfig.versus.roundsToWin, 0]);
+  });
+});
+
+test('local mode: a simultaneous loss replays the round and rounds wait for advance()', () => {
+  withStorage(createSpyStorage(), () => {
+    const match = createLocalMatch('local-3');
+    match.engines[0].triggerGameOver(GAME_OVER_REASONS.LINE_CROSSED);
+    match.engines[1].triggerGameOver(GAME_OVER_REASONS.LINE_CROSSED);
+    match.step();
+    assert.ok(match.getEventLog().some((event) => event.type === MATCH_EVENTS.ROUND_REPLAY));
+    assert.equal(match.getState().phase, MATCH_PHASES.ROUND_OVER);
+    for (let i = 0; i < gameConfig.versus.roundBreakFrames * 2; i++) {
+      match.step();
+    }
+    assert.equal(match.getState().phase, MATCH_PHASES.ROUND_OVER, 'a local round never advances by itself');
+    assert.equal(match.advance(), true);
+    assert.equal(match.getState().phase, MATCH_PHASES.PLAYING);
+  });
+});
+
+test('local mode: the rise multiplier delays only the charges that arrive on that board', () => {
+  withStorage(createSpyStorage(), () => {
+    const baseline = [landingFrameOf(createLocalMatch('rise-1'), 0), landingFrameOf(createLocalMatch('rise-1'), 1)];
+    assert.ok(baseline[0] !== null && baseline[1] !== null, 'a probe charge must land');
+    const slowed = [
+      landingFrameOf(createLocalMatch('rise-1', { riseMultipliers: [1.5, 1] }), 0),
+      landingFrameOf(createLocalMatch('rise-1', { riseMultipliers: [1.5, 1] }), 1)
+    ];
+    assert.ok(slowed[0] > baseline[0], 'the handicapped board receives its charges later');
+    assert.equal(slowed[1], baseline[1], 'the other board is untouched');
+    const none = landingFrameOf(createLocalMatch('rise-1', { riseMultipliers: [1, 1] }), 0);
+    assert.equal(none, baseline[0], 'multiplier 1 is no handicap');
+  });
+});
+
+test('local mode: the multiplier survives round changes', () => {
+  withStorage(createSpyStorage(), () => {
+    const match = createLocalMatch('rise-2', { riseMultipliers: [1, 1.25] });
+    dropBoard(match, 0);
+    match.advance();
+    assert.equal(match.engines[1].versusRiseMultiplier, 1.25);
+    assert.equal(match.engines[0].versusRiseMultiplier, 1);
+  });
+});
+
+test('local mode: the same seed gives the same event log twice', () => {
+  withStorage(createSpyStorage(), () => {
+    const play = (seed) => {
+      const match = createLocalMatch(seed, { riseMultipliers: [1, 1.25] });
+      match.engines[0].receiveVersusAttack(PROBE_ATTACK);
+      for (let i = 0; i < 900; i++) {
+        match.step();
+      }
+      playScriptedLocalMatch(match);
+      return JSON.parse(JSON.stringify(match.getEventLog()));
+    };
+    const first = play('local-det');
+    assert.deepEqual(play('local-det'), first);
+    assert.ok(first.length > 4);
+  });
+});
+
+test('local mode: nothing is written to the profile', () => {
+  const storage = createSpyStorage();
+  withStorage(storage, () => {
+    const match = createLocalMatch('local-4');
+    const before = { writes: storage.spy.writes, removals: storage.spy.removals };
+    playScriptedLocalMatch(match);
+    assert.equal(storage.spy.writes, before.writes);
+    assert.equal(storage.spy.removals, before.removals);
   });
 });

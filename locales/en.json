@@ -1438,6 +1438,65 @@
     "defaultName": "Ghost"
   },
   "versus": {
+    "local": {
+      "entry": "2 players (same device)",
+      "entryHint": "Needs a wider screen for two boards",
+      "lobby": {
+        "title": "Two players",
+        "subtitle": "Each player picks a device",
+        "slotPress": "Press to join",
+        "player": "Player {{n}}",
+        "joined": "Player {{n}}: {{device}}",
+        "change": "Change device",
+        "leave": "Leave",
+        "handicap": "Charge rise speed",
+        "start": "Start match",
+        "back": "Back",
+        "needTwo": "Both players must join",
+        "joinKeys": "Keyboard: press {{key}} to join",
+        "joinPad": "Controller: press the bottom button to join"
+      },
+      "device": {
+        "pad": "Controller",
+        "keyboardLeft": "Left keys",
+        "keyboardMouse": "Left keys and mouse",
+        "keyboardRight": "Right keys",
+        "touch": "Touch"
+      },
+      "handicap": {
+        "none": "Normal",
+        "slow": "Slower (x{{factor}})",
+        "slower": "Slowest (x{{factor}})"
+      },
+      "announce": {
+        "joined": "Player {{n}} joined with {{device}}",
+        "left": "Player {{n}} left",
+        "roundWon": "Player {{n}} wins the round",
+        "matchWon": "Player {{n}} wins the match {{a}} to {{b}}",
+        "pulseSent": "Player {{n}} sent a field pulse",
+        "padLost": "Player {{n}} controller disconnected. Press the bottom face button on a controller to take over, or quit."
+      },
+      "bar": {
+        "roundPips": "Round {{round}}. Player 1: {{a}} won. Player 2: {{b}} won."
+      },
+      "hud": {
+        "board": "Player {{n}} board",
+        "label": "Player {{n}} ({{device}})"
+      },
+      "pause": {
+        "tooSmall": "The window is too small for two boards. Make it larger to continue."
+      },
+      "result": {
+        "title": "Player {{n}} wins",
+        "score": "Player 1 {{a}} - {{b}} Player 2",
+        "neutralised": "Player {{n}}: {{count}} charges neutralized",
+        "pulses": "Player {{n}}: {{count}} pulses",
+        "changePlayers": "Change players"
+      },
+      "stats": {
+        "matches": "2P matches: {{count}}"
+      }
+    },
     "stats": {
       "tierLine": "{{tier}}: {{record}}"
     },

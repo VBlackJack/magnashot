@@ -237,8 +237,52 @@
       <div id="versus-tier-list" class="versus-tier-list" role="group" data-i18n-aria-label="versus.lobby.pickTier">
       </div>
       <p id="versus-tier-hint" class="modal-subtext hidden" role="status" aria-live="polite"></p>
+      <p id="versus-local-entry-hint" class="modal-subtext hidden" data-i18n="versus.local.entryHint"></p>
       <div class="modal-actions">
+        <button id="btn-versus-local" type="button" class="modal-btn hidden" aria-haspopup="dialog" data-i18n="versus.local.entry"></button>
         <button id="btn-versus-tiers-back" type="button" class="modal-btn" data-i18n="versus.lobby.back"></button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Polarity Duel, two players on this device: the lobby where each player picks a device -->
+  <div id="modal-versus-local" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="modal-versus-local-title" aria-describedby="versus-local-subtitle">
+    <div class="modal-card wide">
+      <h2 id="modal-versus-local-title" class="modal-title" data-i18n="versus.local.lobby.title"></h2>
+      <p id="versus-local-subtitle" class="modal-subtext" data-i18n="versus.local.lobby.subtitle"></p>
+      <div class="versus-local-slots">
+        <section id="versus-local-slot-0" class="versus-local-slot" data-slot="0" aria-labelledby="versus-local-slot-0-title">
+          <h3 id="versus-local-slot-0-title" class="versus-local-slot-title"><span class="versus-badge" data-slot="0" aria-hidden="true"></span><span class="versus-local-slot-name"></span></h3>
+          <p class="versus-local-status" data-state="empty"></p>
+          <p class="versus-local-join-hint"></p>
+          <div class="versus-local-slot-actions">
+            <button type="button" class="modal-btn versus-local-change" data-slot="0"></button>
+            <button type="button" class="modal-btn versus-local-leave" data-slot="0"></button>
+          </div>
+          <label class="versus-local-handicap-label">
+            <span class="versus-local-handicap-text"></span>
+            <select class="versus-local-handicap" data-slot="0"></select>
+          </label>
+        </section>
+        <section id="versus-local-slot-1" class="versus-local-slot" data-slot="1" aria-labelledby="versus-local-slot-1-title">
+          <h3 id="versus-local-slot-1-title" class="versus-local-slot-title"><span class="versus-badge" data-slot="1" aria-hidden="true"></span><span class="versus-local-slot-name"></span></h3>
+          <p class="versus-local-status" data-state="empty"></p>
+          <p class="versus-local-join-hint"></p>
+          <div class="versus-local-slot-actions">
+            <button type="button" class="modal-btn versus-local-change" data-slot="1"></button>
+            <button type="button" class="modal-btn versus-local-leave" data-slot="1"></button>
+          </div>
+          <label class="versus-local-handicap-label">
+            <span class="versus-local-handicap-text"></span>
+            <select class="versus-local-handicap" data-slot="1"></select>
+          </label>
+        </section>
+      </div>
+      <p id="versus-local-need-two" class="modal-subtext" data-i18n="versus.local.lobby.needTwo"></p>
+      <p id="versus-local-live" class="visually-hidden" role="status" aria-live="polite"></p>
+      <div class="modal-actions">
+        <button id="btn-versus-local-start" type="button" class="modal-btn primary" aria-disabled="true" data-i18n="versus.local.lobby.start"></button>
+        <button id="btn-versus-local-back" type="button" class="modal-btn" data-i18n="versus.local.lobby.back"></button>
       </div>
     </div>
   </div>
@@ -524,6 +568,7 @@
     <div class="versus-boards">
       <section class="versus-board" data-board="0">
         <div id="versus-hud-0" class="versus-hud" role="group">
+          <span class="versus-badge hidden" data-slot="0" aria-hidden="true"></span>
           <span class="versus-hud-label"></span>
           <span class="versus-incoming"></span>
           <span class="versus-pulse" role="meter" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><span class="versus-pulse-fill"></span></span>
@@ -537,9 +582,15 @@
       </section>
       <section class="versus-board" data-board="1">
         <div id="versus-hud-1" class="versus-hud" role="group">
+          <span class="versus-badge hidden" data-slot="1" aria-hidden="true"></span>
           <span class="versus-hud-label"></span>
           <span class="versus-incoming"></span>
           <span class="versus-pulse" role="meter" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><span class="versus-pulse-fill"></span></span>
+          <div class="versus-hud-actions versus-hud-actions-local">
+            <button id="btn-versus-polarity-1" type="button" class="versus-action-btn" aria-pressed="false"></button>
+            <button id="btn-versus-swap-1" type="button" class="versus-action-btn"></button>
+          </div>
+          <div id="versus-specials-1" class="versus-specials hidden" role="group"></div>
         </div>
         <div class="versus-canvas-wrap"><canvas id="versus-canvas-1" role="img"></canvas></div>
       </section>
@@ -551,6 +602,8 @@
   <div id="modal-duel-pause" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="modal-duel-pause-title">
     <div class="modal-card">
       <h2 id="modal-duel-pause-title" class="modal-title" data-i18n="versus.pause.title"></h2>
+      <p id="versus-pause-size-hint" class="modal-subtext hidden" role="status"></p>
+      <p id="versus-pause-pad-hint" class="modal-subtext hidden" role="status"></p>
       <div class="modal-actions">
         <button id="btn-versus-resume" type="button" class="modal-btn primary" data-i18n="versus.pause.resume"></button>
         <button id="btn-versus-restart" type="button" class="modal-btn" data-i18n="versus.pause.restart"></button>
@@ -567,6 +620,8 @@
       <p id="versus-result-tier" class="modal-stat-line"></p>
       <p id="versus-result-neutralised" class="modal-stat-line"></p>
       <p id="versus-result-pulses" class="modal-stat-line"></p>
+      <p id="versus-result-neutralised-b" class="modal-stat-line hidden"></p>
+      <p id="versus-result-pulses-b" class="modal-stat-line hidden"></p>
       <label id="versus-result-share-fallback" class="share-fallback hidden">
         <span class="share-fallback-label" data-i18n="modals.gameOver.share.field.label"></span>
         <textarea id="versus-result-share-text" class="share-fallback-text" readonly></textarea>
@@ -574,6 +629,7 @@
       <div class="modal-actions">
         <button id="btn-versus-rematch" type="button" class="modal-btn primary" data-i18n="versus.result.playAgain"></button>
         <button id="btn-versus-share" type="button" class="modal-btn" data-i18n="modals.gameOver.button.share"></button>
+        <button id="btn-versus-change-players" type="button" class="modal-btn hidden" data-i18n="versus.local.result.changePlayers"></button>
         <button id="btn-versus-back" type="button" class="modal-btn" data-i18n="versus.result.backToMenu"></button>
       </div>
     </div>

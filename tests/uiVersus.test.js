@@ -19,14 +19,22 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
 import { GAME_MODES, GAME_STATES, INPUT_MODES } from '../src/core/Constants.js';
-import { GAMEPAD_ACTIONS as A } from '../src/core/GamepadInput.js';
+import { GAMEPAD_ACTIONS as A, GAMEPAD_EVENTS } from '../src/core/GamepadInput.js';
 import { i18n } from '../src/core/I18n.js';
 import { buildShareText } from '../src/game/DailyShare.js';
 import { createGameLoop } from '../src/game/GameLoop.js';
 import { MATCH_EVENTS } from '../src/game/VersusMatch.js';
+import {
+  DEVICE_TYPES,
+  assignPad,
+  createSlots,
+  createSplitKeyboard,
+  joinSlot,
+  markPadLost
+} from '../src/ui/LocalInput.js';
 import { UIManager } from '../src/ui/UIManager.js';
 import { MODE_NAME_KEYS, ARCADE_CARD_SPECS } from '../src/ui/UIHelpers.js';
-import { buildStatsOverview, formatVersusTierLines } from '../src/ui/UIStats.js';
+import { buildStatsOverview, formatVersusLocalLines, formatVersusTierLines } from '../src/ui/UIStats.js';
 
 const loadJson = (path) => JSON.parse(readFileSync(path, 'utf8'));
 const gameConfig = loadJson('./configs/game.json');
@@ -636,4 +644,490 @@ test('the versus dialogs and screen carry their accessibility roles', () => {
   }
   assert.match(indexHtml, /id="versus-round-pips"[^>]*role="img"/);
   assert.match(indexHtml, /class="versus-pulse" role="meter"/);
+});
+
+// ---------------------------------------------------------------------------------------------
+// Two players on one device
+// ---------------------------------------------------------------------------------------------
+
+const LOCAL_PAD_FIRST = { index: 3, id: 'pad first' };
+const LOCAL_PAD_SECOND = { index: 5, id: 'pad second' };
+const LOCAL_PAD_OUTSIDER = { index: 9, id: 'pad outsider' };
+const LOCAL_AIM_STEP_MS = 100;
+const LOCAL_FRAME_MS = 16;
+
+/** The stub screen of makeUi turned into a local match: two keyboard halves unless slots are given. */
+function makeLocalUi({ phase = 'playing', slots = null, storage = {} } = {}) {
+  const made = makeUi({ phase, storage });
+  const { ui, els, controller } = made;
+  controller.advance = () => controller.log.push('advance');
+  let list = createSlots();
+  list = joinSlot(list, 0, { type: DEVICE_TYPES.KEYBOARD, side: 'left' });
+  list = joinSlot(list, 1, { type: DEVICE_TYPES.KEYBOARD, side: 'right' });
+  Object.assign(ui.versus, {
+    kind: 'local',
+    tier: null,
+    slots: slots ?? list,
+    riseMultipliers: [1, 1],
+    kb: createSplitKeyboard(gameConfig.versus.local.keyboard),
+    tooSmall: false,
+    isTooSmallAnnounced: false,
+    breakFrames: 0,
+    resultGuardTimer: null
+  });
+  for (const name of ['versusPauseSizeHint', 'versusPausePadHint', 'versusResultNeutralisedB', 'versusResultPulsesB', 'btnVersusChangePlayers']) {
+    els[name] = fakeElement();
+  }
+  els.btnVersusShare.classList.remove('hidden');
+  els.btnVersusRematch.classList.remove('hidden');
+  els.versusResultTier.classList.remove('hidden');
+  ui.versus.sceneController = ui.createLocalSceneController();
+  ui.setActiveScene('versus', ui.versus.sceneController);
+  return made;
+}
+
+const press = (code, extra = {}) => ({ code, repeat: false, preventDefault() {}, ...extra });
+const padPad = (pad, actions, aimDelta = 0) => ({ padIndex: pad.index, id: pad.id, actions, aimDelta, aimSteps: 0, active: true });
+
+test('each half of the keyboard acts on its own board, and only the keys of the layout are kept from the page', () => {
+  const { ui, controller } = makeLocalUi();
+  const [first, second] = controller.engines;
+  const prevented = [];
+  const send = (code, extra = {}) => ui.handleLocalGameplayKey(press(code, { preventDefault: () => prevented.push(code), ...extra }));
+  for (const code of ['KeyW', 'KeyS', 'KeyQ', 'Enter', 'ArrowDown', 'Slash']) {
+    send(code);
+  }
+  assert.deepEqual(first.calls, ['shoot', 'swap', 'flip']);
+  assert.deepEqual(second.calls, ['shoot', 'swap', 'flip']);
+  assert.deepEqual(prevented, ['KeyW', 'KeyS', 'KeyQ', 'Enter', 'ArrowDown', 'Slash']);
+  // Space, F and the digits do nothing in a two-player match, and the page keeps them.
+  prevented.length = 0;
+  for (const code of ['Space', 'KeyF', 'Digit1', 'Tab']) {
+    send(code);
+  }
+  assert.deepEqual(prevented, []);
+  assert.equal(first.calls.length, 3);
+  assert.equal(second.calls.length, 3);
+});
+
+test('a held key shoots once per press, the number pad twins work, and a special is cycled with the special key', () => {
+  const { ui, controller } = makeLocalUi();
+  const [first, second] = controller.engines;
+  ui.handleLocalGameplayKey(press('KeyW'));
+  ui.handleLocalGameplayKey(press('KeyW', { repeat: true }));
+  ui.handleLocalGameplayKey(press('KeyW'));
+  assert.equal(first.calls.length, 1, 'a key already down is not a new press');
+  ui.versus.kb.keyUp('KeyW');
+  ui.handleLocalGameplayKey(press('KeyW'));
+  assert.equal(first.calls.length, 2);
+  ui.handleLocalGameplayKey(press('NumpadEnter'));
+  assert.deepEqual(second.calls, ['shoot']);
+  const [firstType] = Object.keys(loadJson('./configs/balls.json').specialTypes);
+  second.specialInventory[firstType] = 2;
+  ui.handleLocalGameplayKey(press('Period'));
+  assert.deepEqual(second.calls.at(-1), ['equip', firstType]);
+  assert.deepEqual(first.calls.filter((call) => Array.isArray(call)), [], 'the other player is left alone');
+});
+
+test('the keys do nothing while the match is paused, between rounds, over, or a dialog is open', () => {
+  const held = makeLocalUi();
+  held.controller.pause();
+  held.ui.handleLocalGameplayKey(press('KeyW'));
+  assert.deepEqual(held.player.calls, []);
+  for (const phase of ['roundOver', 'matchOver']) {
+    const other = makeLocalUi({ phase });
+    other.ui.handleLocalGameplayKey(press('KeyW'));
+    assert.deepEqual(other.player.calls, [], phase);
+  }
+  const dialog = makeLocalUi();
+  dialog.els.modalDuelPause.classList.remove('hidden');
+  dialog.ui.handleLocalGameplayKey(press('KeyW'));
+  assert.deepEqual(dialog.player.calls, []);
+});
+
+test('the aim follows the keys held down, each side on its own board, with the fine key slowing it', () => {
+  const { ui, controller } = makeLocalUi();
+  const [first, second] = controller.engines;
+  const { aimRadPerSec, fineFactor } = gameConfig.versus.local.keyboard;
+  ui.handleLocalGameplayKey(press('KeyD'));
+  ui.handleLocalGameplayKey(press('ArrowLeft'));
+  ui.applyLocalHeldAim(LOCAL_AIM_STEP_MS);
+  assert.deepEqual(first.calls, [['aim', aimRadPerSec * 0.1]]);
+  assert.deepEqual(second.calls, [['aim', -aimRadPerSec * 0.1]]);
+  ui.handleLocalGameplayKey(press('ShiftLeft'));
+  ui.applyLocalHeldAim(LOCAL_AIM_STEP_MS);
+  assert.deepEqual(first.calls.at(-1), ['aim', aimRadPerSec * fineFactor * 0.1]);
+  assert.deepEqual(second.calls.at(-1), ['aim', -aimRadPerSec * 0.1], 'the fine key of the left half does not slow the right half');
+  // A key released stops the aim; a window blur releases every key.
+  ui.versus.sceneController.handleGameplayKeyUp({ code: 'KeyD' });
+  ui.versus.sceneController.handleGameplayKeyUp({ code: 'ShiftLeft' });
+  ui.applyLocalHeldAim(LOCAL_AIM_STEP_MS);
+  const firstCalls = first.calls.length;
+  const secondCalls = second.calls.length;
+  assert.equal(firstCalls, 2, 'the released side no longer aims');
+  assert.equal(secondCalls, 3, 'the side still held keeps aiming');
+  ui.versus.sceneController.releaseAllKeys();
+  ui.applyLocalHeldAim(LOCAL_AIM_STEP_MS);
+  assert.equal(first.calls.length, firstCalls);
+  assert.equal(second.calls.length, secondCalls, 'nothing is held after the release');
+});
+
+test('the held aim does not move a board that is paused or between rounds', () => {
+  const held = makeLocalUi();
+  held.ui.handleLocalGameplayKey(press('KeyD'));
+  held.controller.pause();
+  held.ui.applyLocalHeldAim(LOCAL_AIM_STEP_MS);
+  assert.deepEqual(held.player.calls, []);
+  const between = makeLocalUi({ phase: 'roundOver' });
+  between.ui.handleLocalGameplayKey(press('KeyD'));
+  between.ui.applyLocalHeldAim(LOCAL_AIM_STEP_MS);
+  assert.deepEqual(between.player.calls, []);
+});
+
+test('the scene controller of a local match reads every pad on its own and exposes the hooks the page calls', () => {
+  const { ui } = makeLocalUi();
+  const scene = ui.versus.sceneController;
+  assert.equal(scene.multiPad, true);
+  for (const hook of ['handleGameplayKey', 'handleGameplayKeyUp', 'releaseAllKeys', 'handlePadResults', 'beforeFrame', 'pause']) {
+    assert.equal(typeof scene[hook], 'function', hook);
+  }
+  assert.equal(ui.getSceneController(), scene);
+  scene.beforeFrame(0, LOCAL_FRAME_MS);
+});
+
+test('each controller steers the board of its own place; a controller with no place does nothing', () => {
+  let slots = createSlots();
+  slots = assignPad(slots, LOCAL_PAD_FIRST.index, LOCAL_PAD_FIRST.id);
+  slots = assignPad(slots, LOCAL_PAD_SECOND.index, LOCAL_PAD_SECOND.id);
+  const { ui, controller } = makeLocalUi({ slots });
+  const [first, second] = controller.engines;
+  ui.handleLocalPadResults({
+    pads: [
+      padPad(LOCAL_PAD_SECOND, [A.SHOOT, A.POLARITY], 0.25),
+      padPad(LOCAL_PAD_FIRST, [A.SWAP]),
+      padPad(LOCAL_PAD_OUTSIDER, [A.SHOOT, A.SWAP], 0.5)
+    ],
+    events: []
+  });
+  assert.deepEqual(second.calls, [['aim', 0.25], 'shoot', 'flip']);
+  assert.deepEqual(first.calls, ['swap']);
+});
+
+test('the aim of a pad needs no pointer mode: the stick steers its board even after the mouse was used', () => {
+  let slots = createSlots();
+  slots = assignPad(slots, LOCAL_PAD_FIRST.index, LOCAL_PAD_FIRST.id);
+  slots = assignPad(slots, LOCAL_PAD_SECOND.index, LOCAL_PAD_SECOND.id);
+  const { ui, controller } = makeLocalUi({ slots });
+  ui.inputMode = INPUT_MODES.POINTER;
+  ui.handleLocalPadResults({ pads: [padPad(LOCAL_PAD_FIRST, [], 0.1)], events: [] });
+  assert.deepEqual(controller.engines[0].calls, [['aim', 0.1]]);
+});
+
+test('Start or Select on a controller of the match pauses both boards', () => {
+  let slots = createSlots();
+  slots = assignPad(slots, LOCAL_PAD_FIRST.index, LOCAL_PAD_FIRST.id);
+  slots = assignPad(slots, LOCAL_PAD_SECOND.index, LOCAL_PAD_SECOND.id);
+  const { ui, controller, els } = makeLocalUi({ slots });
+  ui.handleLocalPadResults({ pads: [padPad(LOCAL_PAD_SECOND, [A.PAUSE])], events: [] });
+  assert.deepEqual(controller.log, ['pause']);
+  assert.equal(els.modalDuelPause.classList.contains('hidden'), false);
+  const outsider = makeLocalUi({ slots });
+  outsider.ui.handleLocalPadResults({ pads: [padPad(LOCAL_PAD_OUTSIDER, [A.PAUSE, A.MENU])], events: [] });
+  assert.deepEqual(outsider.controller.log, [], 'a controller with no place cannot pause');
+});
+
+test('a controller that is lost pauses the match, keeps Resume out of reach, and says whose it was', () => {
+  let slots = createSlots();
+  slots = assignPad(slots, LOCAL_PAD_FIRST.index, LOCAL_PAD_FIRST.id);
+  slots = assignPad(slots, LOCAL_PAD_SECOND.index, LOCAL_PAD_SECOND.id);
+  const { ui, controller, els } = makeLocalUi({ slots });
+  ui.handleLocalPadEvent({ type: GAMEPAD_EVENTS.DISCONNECTED, padIndex: LOCAL_PAD_SECOND.index, id: LOCAL_PAD_SECOND.id });
+  assert.deepEqual(controller.log, ['pause']);
+  assert.equal(ui.versus.slots[1].padLost, true);
+  assert.equal(els.modalDuelPause.classList.contains('hidden'), false);
+  assert.equal(els.btnVersusResume.getAttribute('aria-disabled'), 'true');
+  assert.equal(els.versusPausePadHint.classList.contains('hidden'), false);
+  assert.match(els.versusPausePadHint.textContent, /Player 2 controller disconnected/);
+  assert.ok(ui.announcements.some((message) => /Player 2 controller disconnected/.test(message)));
+  ui.resumeVersus();
+  assert.deepEqual(controller.log, ['pause'], 'Resume does nothing while a controller is missing');
+  // A controller that was never in the match going away changes nothing.
+  ui.handleLocalPadEvent({ type: GAMEPAD_EVENTS.DISCONNECTED, padIndex: LOCAL_PAD_OUTSIDER.index, id: LOCAL_PAD_OUTSIDER.id });
+  assert.equal(ui.versus.slots[0].padLost, false);
+});
+
+test('a controller that was not in the match takes over the lost place with its bottom button, then Resume opens', () => {
+  let slots = createSlots();
+  slots = assignPad(slots, LOCAL_PAD_FIRST.index, LOCAL_PAD_FIRST.id);
+  slots = assignPad(slots, LOCAL_PAD_SECOND.index, LOCAL_PAD_SECOND.id);
+  const { ui, controller, els } = makeLocalUi({ slots });
+  assert.equal(ui.takeOverLostPad(LOCAL_PAD_OUTSIDER.index, LOCAL_PAD_OUTSIDER.id), false, 'nothing is lost yet');
+  ui.handleLocalPadEvent({ type: GAMEPAD_EVENTS.DISCONNECTED, padIndex: LOCAL_PAD_FIRST.index, id: LOCAL_PAD_FIRST.id });
+  assert.equal(ui.takeOverLostPad(LOCAL_PAD_OUTSIDER.index, LOCAL_PAD_OUTSIDER.id), true);
+  assert.equal(ui.versus.slots[0].device.padIndex, LOCAL_PAD_OUTSIDER.index);
+  assert.equal(ui.versus.slots[0].padLost, false);
+  assert.equal(ui.versus.slots[1].device.padIndex, LOCAL_PAD_SECOND.index, 'the other player is untouched');
+  assert.equal(els.btnVersusResume.getAttribute('aria-disabled'), 'false');
+  assert.equal(els.versusPausePadHint.classList.contains('hidden'), true);
+  ui.resumeVersus();
+  assert.deepEqual(controller.log, ['pause', 'resume']);
+});
+
+test('with a dialog open, only the controllers of the match move around it; an outsider can take over a lost place', () => {
+  let slots = createSlots();
+  slots = assignPad(slots, LOCAL_PAD_FIRST.index, LOCAL_PAD_FIRST.id);
+  slots = assignPad(slots, LOCAL_PAD_SECOND.index, LOCAL_PAD_SECOND.id);
+  const { ui } = makeLocalUi({ slots });
+  const routed = [];
+  ui.routeGamepadMenuActions = (actions) => routed.push(actions);
+  ui.handleLocalPadEvent({ type: GAMEPAD_EVENTS.DISCONNECTED, padIndex: LOCAL_PAD_SECOND.index, id: LOCAL_PAD_SECOND.id });
+  ui.routeLocalMenuPads({
+    pads: [padPad(LOCAL_PAD_FIRST, [A.NAV_DOWN]), padPad(LOCAL_PAD_OUTSIDER, [A.NAV_UP]), padPad(LOCAL_PAD_FIRST, [])],
+    events: []
+  });
+  assert.deepEqual(routed, [[A.NAV_DOWN]]);
+  assert.equal(ui.versus.slots[1].padLost, true, 'a stick does not take a place over');
+  ui.routeLocalMenuPads({ pads: [padPad(LOCAL_PAD_OUTSIDER, [A.CONFIRM])], events: [] });
+  assert.equal(ui.versus.slots[1].device.padIndex, LOCAL_PAD_OUTSIDER.index);
+  assert.equal(ui.versus.slots[1].padLost, false);
+});
+
+test('a pad that comes back at the same place after a loss is trusted again', () => {
+  let slots = createSlots();
+  slots = assignPad(slots, LOCAL_PAD_FIRST.index, LOCAL_PAD_FIRST.id);
+  slots = assignPad(slots, LOCAL_PAD_SECOND.index, LOCAL_PAD_SECOND.id);
+  const { ui, els } = makeLocalUi({ slots });
+  ui.handleLocalPadEvent({ type: GAMEPAD_EVENTS.DISCONNECTED, padIndex: LOCAL_PAD_FIRST.index, id: LOCAL_PAD_FIRST.id });
+  ui.handleLocalPadEvent({ type: GAMEPAD_EVENTS.CONNECTED, padIndex: LOCAL_PAD_FIRST.index, id: LOCAL_PAD_FIRST.id });
+  assert.equal(ui.versus.slots[0].padLost, false);
+  assert.equal(els.btnVersusResume.getAttribute('aria-disabled'), 'false');
+});
+
+test('a window too small for two boards holds the match, says why, and lets Resume go once it fits again', () => {
+  const { ui, controller, els } = makeLocalUi();
+  ui.versus.tooSmall = true;
+  ui.applyLocalSizeState(false);
+  assert.equal(els.versusScreen.dataset.tooSmall, 'true');
+  assert.deepEqual(controller.log, ['pause']);
+  assert.equal(els.modalDuelPause.classList.contains('hidden'), false);
+  assert.equal(els.versusPauseSizeHint.classList.contains('hidden'), false);
+  assert.equal(els.versusPauseSizeHint.textContent, 'The window is too small for two boards. Make it larger to continue.');
+  assert.equal(els.btnVersusResume.getAttribute('aria-disabled'), 'true');
+  assert.equal(ui.announcements.filter((message) => /too small/.test(message)).length, 1);
+  ui.applyLocalSizeState(true);
+  assert.equal(ui.announcements.filter((message) => /too small/.test(message)).length, 1, 'it is said once');
+  ui.resumeVersus();
+  assert.deepEqual(controller.log, ['pause'], 'Resume does nothing while the boards do not fit');
+  ui.versus.tooSmall = false;
+  ui.applyLocalSizeState(true);
+  assert.equal(els.versusScreen.dataset.tooSmall, 'false');
+  assert.equal(els.versusPauseSizeHint.classList.contains('hidden'), true);
+  assert.equal(els.btnVersusResume.getAttribute('aria-disabled'), 'false');
+  assert.deepEqual(controller.log, ['pause'], 'the match stays paused until the player resumes');
+  ui.resumeVersus();
+  assert.deepEqual(controller.log, ['pause', 'resume']);
+});
+
+test('the match does not open a second pause dialog when it shrinks while already paused', () => {
+  const { ui, controller, els } = makeLocalUi();
+  ui.pauseVersus();
+  ui.versus.tooSmall = true;
+  ui.applyLocalSizeState(false);
+  assert.deepEqual(controller.log, ['pause']);
+  assert.equal(els.versusPauseSizeHint.classList.contains('hidden'), false);
+  assert.equal(els.btnVersusResume.getAttribute('aria-disabled'), 'true');
+});
+
+test('a round won names the winner, and the next round starts by itself after the round break', () => {
+  const { ui, els, controller } = makeLocalUi();
+  ui.handleVersusEvent({ type: MATCH_EVENTS.ROUND_DECIDED, winner: 1, loser: 0, wins: [0, 1] });
+  assert.equal(ui.versus.phase, 'roundOver');
+  assert.equal(els.versusRoundOverlay.classList.contains('hidden'), false);
+  assert.equal(els.versusRoundOverlay.textContent, 'Player 2 wins the round');
+  const breakFrames = gameConfig.versus.roundBreakFrames;
+  for (let frame = 1; frame < breakFrames; frame++) {
+    ui.advanceLocalRound(ui.versus);
+  }
+  assert.deepEqual(controller.log, [], 'the break is not over yet');
+  ui.advanceLocalRound(ui.versus);
+  assert.deepEqual(controller.log, ['advance']);
+  ui.handleVersusEvent({ type: MATCH_EVENTS.ROUND_START });
+  assert.equal(ui.versus.phase, 'playing');
+  assert.equal(ui.versus.breakFrames, 0);
+  ui.advanceLocalRound(ui.versus);
+  assert.deepEqual(controller.log, ['advance'], 'nothing advances while a round is being played');
+  ui.handleVersusEvent({ type: MATCH_EVENTS.ROUND_REPLAY });
+  assert.equal(els.versusRoundOverlay.textContent, 'Both boards fell. The round is replayed.');
+});
+
+test('a match without CPU never takes the round break of a match against the CPU into the controller', () => {
+  const cpu = makeUi();
+  cpu.controller.advance = () => cpu.controller.log.push('advance');
+  cpu.ui.handleVersusEvent({ type: MATCH_EVENTS.ROUND_WON });
+  for (let frame = 0; frame < gameConfig.versus.roundBreakFrames + 1; frame++) {
+    cpu.ui.advanceLocalRound(cpu.ui.versus);
+  }
+  assert.deepEqual(cpu.controller.log, [], 'the CPU match advances inside the controller itself');
+});
+
+test('a finished match is counted once, names the winner, shows both players, and records nothing else', () => {
+  let counted = 0;
+  const { ui, els, recorded } = makeLocalUi({ storage: { recordVersusLocalMatch: () => (counted += 1) } });
+  ui.handleVersusEvent({ type: MATCH_EVENTS.MATCH_DECIDED, winner: 0, wins: [2, 1] });
+  assert.equal(ui.versus.phase, 'matchOver');
+  assert.equal(counted, 1);
+  assert.deepEqual(recorded.results, [], 'no record against a CPU tier');
+  assert.deepEqual(recorded.stats, [], 'no personal statistics');
+  assert.equal(els.modalDuelResult.classList.contains('hidden'), false);
+  assert.equal(els.versusResultTitle.textContent, 'Player 1 wins');
+  assert.equal(els.versusResultScore.textContent, 'Player 1 2 - 1 Player 2');
+  assert.equal(els.versusResultNeutralised.textContent, 'Player 1: 14 charges neutralized');
+  assert.equal(els.versusResultNeutralisedB.textContent, 'Player 2: 5 charges neutralized');
+  assert.equal(els.versusResultPulses.textContent, 'Player 1: 3 pulses');
+  assert.equal(els.versusResultPulsesB.textContent, 'Player 2: 1 pulses');
+  assert.equal(els.versusResultTier.classList.contains('hidden'), true, 'no CPU tier line');
+  assert.equal(els.btnVersusShare.classList.contains('hidden'), true, 'no Share button');
+  assert.equal(els.btnVersusChangePlayers.classList.contains('hidden'), false);
+  assert.equal(globalThis.document.activeElement, els.btnVersusRematch);
+  clearTimeout(ui.versus.resultGuardTimer);
+});
+
+test('the main button of the result card ignores presses until the guard time is over', (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  const { ui, els } = makeLocalUi();
+  ui.handleVersusEvent({ type: MATCH_EVENTS.MATCH_DECIDED, winner: 1, wins: [0, 2] });
+  assert.equal(els.btnVersusRematch.getAttribute('aria-disabled'), 'true');
+  t.mock.timers.tick(gameConfig.versus.local.resultInputGuardMs - 1);
+  assert.equal(els.btnVersusRematch.getAttribute('aria-disabled'), 'true');
+  t.mock.timers.tick(1);
+  assert.equal(els.btnVersusRematch.getAttribute('aria-disabled'), null);
+});
+
+test('the result card of a CPU match is unchanged after a local one (tier line and Share come back)', () => {
+  const { ui, els } = makeLocalUi();
+  ui.fillVersusResult({ kind: 'local', winner: 1, wins: [0, 2], players: [{ neutralised: 0, pulses: 0 }, { neutralised: 1, pulses: 1 }] });
+  assert.equal(els.versusResultTitle.textContent, 'Player 2 wins');
+  ui.fillVersusResult({ won: true, tier: 'hard', wins: [2, 0], neutralised: 3, pulses: 1 });
+  assert.equal(els.versusResultTitle.textContent, 'Match won');
+  assert.equal(els.versusResultTier.classList.contains('hidden'), false);
+  assert.equal(els.btnVersusShare.classList.contains('hidden'), false);
+  assert.equal(els.btnVersusChangePlayers.classList.contains('hidden'), true);
+  assert.equal(els.versusResultNeutralisedB.classList.contains('hidden'), true);
+});
+
+test('a match on one device cannot be shared', async () => {
+  const { ui } = makeLocalUi();
+  ui.versus.result = { kind: 'local', winner: 0, wins: [2, 0], players: [] };
+  let delivered = 0;
+  ui.deliverShareText = () => {
+    delivered += 1;
+  };
+  await ui.shareVersusResult();
+  assert.equal(delivered, 0);
+});
+
+test('restarting or quitting a match on one device records nothing and counts no quit', () => {
+  const { ui, recorded, controller } = makeLocalUi();
+  let left = 0;
+  ui.leaveVersus = () => {
+    left += 1;
+  };
+  ui.restartVersus();
+  assert.deepEqual(recorded.stats, [], 'a restart is not a quit here');
+  assert.deepEqual(controller.log.at(-1)[0], 'restart');
+  assert.deepEqual(ui.versus.slots.map((slot) => slot.device.type), [DEVICE_TYPES.KEYBOARD, DEVICE_TYPES.KEYBOARD], 'a rematch keeps the devices');
+  ui.quitVersus();
+  assert.deepEqual(recorded.stats, []);
+  assert.equal(left, 1);
+});
+
+test('a rematch while a controller is still missing waits in the pause dialog', () => {
+  let slots = createSlots();
+  slots = assignPad(slots, LOCAL_PAD_FIRST.index, LOCAL_PAD_FIRST.id);
+  slots = assignPad(slots, LOCAL_PAD_SECOND.index, LOCAL_PAD_SECOND.id);
+  const { ui, controller, els } = makeLocalUi({ slots });
+  ui.versus.slots = markPadLost(ui.versus.slots, LOCAL_PAD_FIRST.index);
+  ui.restartVersus();
+  assert.deepEqual(controller.log.map((entry) => (Array.isArray(entry) ? entry[0] : entry)), ['restart', 'pause']);
+  assert.equal(els.modalDuelPause.classList.contains('hidden'), false);
+});
+
+test('Change players leaves the screen and opens the lobby again with the same devices', () => {
+  const { ui } = makeLocalUi();
+  const steps = [];
+  ui.leaveVersus = () => steps.push('leave');
+  ui.openVersusTierPicker = () => steps.push('tiers');
+  ui.openVersusLocalLobby = (options) => steps.push(['lobby', options]);
+  ui.changeVersusPlayers();
+  assert.deepEqual(steps, ['leave', 'tiers', ['lobby', { keep: true }]]);
+  const cpu = makeUi();
+  cpu.ui.leaveVersus = () => steps.push('cpu leave');
+  cpu.ui.changeVersusPlayers();
+  assert.equal(steps.includes('cpu leave'), false, 'a CPU match has no players to change');
+});
+
+test('Change players hands the live match slots (takeovers, lost pads) to the lobby', () => {
+  const { ui } = makeLocalUi();
+  ui.versusLocal = { slots: [{ device: null, padLost: false }, { device: null, padLost: false }], handicaps: [0, 0] };
+  ui.versus.slots = [
+    { device: { type: DEVICE_TYPES.PAD, padIndex: 3, id: 'taken over' }, padLost: false },
+    { device: { type: DEVICE_TYPES.PAD, padIndex: 5, id: 'lost' }, padLost: true }
+  ];
+  ui.leaveVersus = () => {};
+  ui.openVersusTierPicker = () => {};
+  let opened = null;
+  ui.openVersusLocalLobby = (options) => {
+    opened = options;
+  };
+  ui.changeVersusPlayers();
+  assert.deepEqual(opened, { keep: true });
+  assert.equal(ui.versusLocal.slots[0].device.id, 'taken over');
+  assert.equal(ui.versusLocal.slots[1].padLost, true, 'the lobby then frees the lost pad');
+});
+
+test('opening a dialog or pausing lets go of every held key', () => {
+  const { ui, controller } = makeLocalUi();
+  ui.handleLocalGameplayKey(press('KeyD'));
+  ui.pauseVersus();
+  ui.hideVersusModal(ui.elements.modalDuelPause);
+  controller.resume();
+  ui.applyLocalHeldAim(LOCAL_AIM_STEP_MS);
+  assert.deepEqual(controller.engines[0].calls, [], 'no key stayed held under the dialog');
+});
+
+test('the match announces round and match results with names, and nothing else', () => {
+  const { ui } = makeLocalUi();
+  ui.versus.queue = ui.createVersusQueue(ui.versus);
+  ui.handleVersusEvent({ type: MATCH_EVENTS.CHARGE_INCOMING, count: 3, board: 0 });
+  ui.handleVersusEvent({ type: MATCH_EVENTS.ROUND_DECIDED, winner: 0, loser: 1, wins: [1, 0] });
+  ui.handleVersusEvent({ type: MATCH_EVENTS.PULSE_SENT, board: 1, target: 0 });
+  ui.handleVersusEvent({ type: MATCH_EVENTS.MATCH_DECIDED, winner: 0, wins: [2, 1] });
+  assert.deepEqual(ui.announcements, [
+    'Player 1 wins the round',
+    'Player 2 sent a field pulse',
+    'Player 1 wins the match 2 to 1'
+  ]);
+  clearTimeout(ui.versus.resultGuardTimer);
+});
+
+test('the My stats overview lists the matches played between two players', () => {
+  const translate = (keyName, params) => i18n.t(keyName, params);
+  assert.deepEqual(formatVersusLocalLines(3, translate, String), ['2P matches: 3']);
+  assert.deepEqual(formatVersusLocalLines(0, translate, String), []);
+  assert.deepEqual(formatVersusLocalLines(undefined, translate, String), []);
+  i18n.currentLocale = 'fr';
+  assert.deepEqual(formatVersusLocalLines(2, translate, String), ['Matchs à 2 joueurs : 2']);
+  i18n.currentLocale = 'en';
+  const overview = buildStatsOverview(
+    { modes: {} },
+    { campaign: { level: 0, stars: 0 }, modes: {}, versus: {}, versusLocalMatches: 4 },
+    { translate, format: String, modeOrder: ['versus'], locale: 'en' }
+  );
+  assert.deepEqual(overview.modes[0].details, ['2P matches: 4'], 'a player who only played locally still sees the line');
+  const none = buildStatsOverview(
+    { modes: {} },
+    { campaign: { level: 0, stars: 0 }, modes: {}, versus: {}, versusLocalMatches: 0 },
+    { translate, format: String, modeOrder: ['versus'], locale: 'en' }
+  );
+  assert.equal(none.modes.length, 0);
 });

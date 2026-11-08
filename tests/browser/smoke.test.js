@@ -1987,3 +1987,316 @@ describe('browser smoke: controller', () => {
     });
   }
 });
+
+/*
+ * Polarity Duel, two players on one device. The lobby is opened from the difficulty picker,
+ * players join with W and ArrowUp (keyboard halves) or a button of a controller, and both boards
+ * are human. A round is ended by dropping a board through its engine, as the CPU duel does.
+ */
+const LOCAL_CFG = GAME_CONFIG.versus.local;
+const LOCAL_WIDE_VIEWPORT = Object.freeze({ width: 1300, height: 850, isTouch: false, hasDrawer: true });
+const LOCAL_RESULT_GUARD_WAIT_MS = LOCAL_CFG.resultInputGuardMs + 400;
+/** Time a movement key is held to see the aim change. */
+const LOCAL_AIM_HOLD_MS = 300;
+/** A window too narrow for two boards. */
+const LOCAL_TOO_SMALL_VIEWPORT = Object.freeze({ width: 600, height: 850 });
+/** Layouts that cannot host two boards side by side (the entry stays hidden there). */
+const LOCAL_ENTRY_HIDDEN_VIEWPORTS = Object.freeze(['phone landscape', 'phone portrait', 'narrow phone portrait']);
+/** Short desktop windows around the height where two boards stop fitting. */
+const LOCAL_SHORT_DESKTOP_WIDTH = 1366;
+const LOCAL_SHORT_DESKTOP_HEIGHTS = Object.freeze([600, 650]);
+const LOCAL_SHORT_DESKTOP_FITS_FROM = 650;
+const LOCAL_PAD_BOTTOM_BUTTON = 0;
+const LOCAL_PAD_START_BUTTON = 9;
+/** The assertions below read English texts: the profile is pinned to English whatever the browser language. */
+const LOCAL_PLAYER_STORAGE = Object.freeze({
+  ...VERSUS_PLAYER_STORAGE,
+  [`${STORAGE_PREFIX}${STORAGE_KEYS.language}`]: 'en'
+});
+
+/** Two stubbed standard pads: window.__setPads(list of pressed button lists, null for a pad that is gone). */
+function installTwoPadStub() {
+  window.__pads = [];
+  window.__frame = 0;
+  const countFrame = () => {
+    window.__frame += 1;
+    requestAnimationFrame(countFrame);
+  };
+  requestAnimationFrame(countFrame);
+  navigator.getGamepads = () => window.__pads;
+  const makePad = (index, pressed) => ({
+    index,
+    id: `stub standard pad ${index}`,
+    mapping: 'standard',
+    connected: true,
+    timestamp: performance.now(),
+    buttons: Array.from({ length: 17 }, (_, i) => ({ pressed: pressed.includes(i), value: pressed.includes(i) ? 1 : 0 })),
+    axes: [0, 0, 0, 0]
+  });
+  window.__setPads = (lists) => {
+    window.__pads = lists.map((pressed, index) => (pressed === null ? null : makePad(index, pressed)));
+  };
+  window.__connectPads = () => {
+    for (const pad of window.__pads) {
+      if (pad) {
+        const event = new Event('gamepadconnected');
+        event.gamepad = pad;
+        window.dispatchEvent(event);
+      }
+    }
+  };
+}
+
+/** Opens the level select, the difficulty picker, and the two-player lobby. */
+async function openVersusLocalLobby(page, viewport) {
+  await openVersusTierPicker(page, viewport);
+  await waitShown(page, '#btn-versus-local');
+  await page.click('#btn-versus-local');
+  await waitShown(page, '#modal-versus-local');
+}
+
+const localStatusOf = (page, slot) =>
+  page.evaluate((index) => document.querySelector(`#versus-local-slot-${index} .versus-local-status`).textContent, slot);
+
+const localStartState = (page) => page.evaluate(() => document.querySelector('#btn-versus-local-start').getAttribute('aria-disabled'));
+
+/** Joins both players with the quick keys and starts the match. */
+async function startLocalMatchWithKeys(page, viewport) {
+  await openVersusLocalLobby(page, viewport);
+  await page.keyboard.press('KeyW');
+  await page.keyboard.press('ArrowUp');
+  await page.click('#btn-versus-local-start');
+  await waitShown(page, '#versus-screen');
+  await page.waitForFunction(() => Boolean(window.__versusBoards?.[0] && window.__versusBoards?.[1]));
+}
+
+/** Ends the round as if the given board crossed its danger line. */
+function dropVersusBoard(page, board) {
+  return page.evaluate(
+    ({ index, reason }) => window.__versusBoards[index].triggerGameOver(reason),
+    { index: board, reason: GAME_OVER_REASONS.LINE_CROSSED }
+  );
+}
+
+describe('Polarity Duel, two players (desktop)', () => {
+  const desktop = LOCAL_WIDE_VIEWPORT;
+
+  test('both players join with their quick keys, start, steer their own board, and reach the result card', async () => {
+    const { context, page, errors } = await openGame(desktop, { initStorage: LOCAL_PLAYER_STORAGE });
+    try {
+      await captureVersusEngines(page);
+      await openVersusLocalLobby(page, desktop);
+      assert.equal(await page.evaluate(() => document.activeElement.className.includes('versus-local-change')), true, 'focus starts on the first Change');
+      assert.equal(await localStartState(page), 'true');
+      assert.match(await localStatusOf(page, 0), /Press to join/);
+      await page.keyboard.press('KeyW');
+      assert.match(await localStatusOf(page, 0), /Player 1: Left keys/);
+      assert.equal(await localStartState(page), 'true', 'one player is not enough');
+      await page.keyboard.press('ArrowUp');
+      assert.match(await localStatusOf(page, 1), /Player 2: Right keys/);
+      assert.equal(await localStartState(page), 'false');
+      await page.click('#btn-versus-local-start');
+      await waitShown(page, '#versus-screen');
+      await page.waitForFunction(() => Boolean(window.__versusBoards?.[0] && window.__versusBoards?.[1]));
+
+      assert.equal(await page.evaluate(() => document.querySelector('#versus-screen').dataset.mode), 'local');
+      assert.equal(await page.evaluate(() => document.querySelector('#versus-screen').dataset.layout), 'split');
+      await assertVersusFits(page, 'two players');
+      for (const selector of ['#versus-canvas-0', '#versus-canvas-1', '#btn-versus-polarity', '#btn-versus-polarity-1', '#btn-versus-swap-1']) {
+        assert.equal(await isShown(page, selector), true, `${selector} is shown`);
+      }
+      const labels = await page.evaluate(() => ({
+        first: document.querySelector('#versus-canvas-0').getAttribute('aria-label'),
+        second: document.querySelector('#versus-canvas-1').getAttribute('aria-label'),
+        badges: Array.from(document.querySelectorAll('#versus-screen .versus-badge')).map((badge) => badge.textContent)
+      }));
+      assert.equal(labels.first, 'Player 1 board');
+      assert.equal(labels.second, 'Player 2 board');
+      assert.deepEqual(labels.badges, ['1', '2']);
+
+      // Held keys steer one board each.
+      const aims = () => page.evaluate(() => window.__versusBoards.map((board) => board.aimAngle));
+      const before = await aims();
+      await page.keyboard.down('KeyD');
+      await page.waitForTimeout(LOCAL_AIM_HOLD_MS);
+      await page.keyboard.up('KeyD');
+      const afterFirst = await aims();
+      assert.ok(afterFirst[0] > before[0], 'D turns the first board to the right');
+      assert.equal(afterFirst[1], before[1], 'the second board did not move');
+      await page.keyboard.down('ArrowLeft');
+      await page.waitForTimeout(LOCAL_AIM_HOLD_MS);
+      await page.keyboard.up('ArrowLeft');
+      const afterSecond = await aims();
+      assert.ok(afterSecond[1] < afterFirst[1], 'the left arrow turns the second board to the left');
+      assert.equal(afterSecond[0], afterFirst[0], 'the first board did not move');
+      // Keys outside the two layouts do nothing here.
+      await page.keyboard.press('Space');
+      await page.keyboard.press('Digit1');
+      assert.deepEqual(await aims(), afterSecond);
+
+      // The first player wins two rounds.
+      for (let round = 1; round <= VERSUS_ROUNDS_TO_WIN; round++) {
+        await page.waitForFunction(() => window.__versusBoards[1].state === 'playing');
+        await dropVersusBoard(page, 1);
+        if (round < VERSUS_ROUNDS_TO_WIN) {
+          await waitShown(page, '#versus-round-overlay');
+          assert.match(await page.evaluate(() => document.querySelector('#versus-round-overlay').textContent), /Player 1 wins the round/);
+          await page.waitForFunction(() => document.querySelector('#versus-round-overlay').classList.contains('hidden'), null, {
+            timeout: VERSUS_ROUND_BREAK_WAIT_MS
+          });
+        }
+      }
+      await waitShown(page, '#modal-duel-result');
+      assert.equal(await page.evaluate(() => document.querySelector('#modal-duel-result-title').textContent), 'Player 1 wins');
+      assert.equal(
+        await page.evaluate(() => document.querySelector('#versus-result-score').textContent),
+        `Player 1 ${VERSUS_ROUNDS_TO_WIN} - 0 Player 2`
+      );
+      assert.equal(await isShown(page, '#btn-versus-share'), false, 'no Share for a match on one device');
+      assert.equal(await isShown(page, '#versus-result-tier'), false, 'no CPU tier line');
+      assert.equal(await isShown(page, '#btn-versus-change-players'), true);
+      assert.equal(
+        await page.evaluate(() => document.querySelector('#btn-versus-rematch').getAttribute('aria-disabled')),
+        'true',
+        'the main button waits out its guard time'
+      );
+      await page.waitForFunction(() => document.querySelector('#btn-versus-rematch').getAttribute('aria-disabled') === null, null, {
+        timeout: LOCAL_RESULT_GUARD_WAIT_MS
+      });
+      const stored = await page.evaluate(
+        ({ matches, stats }) => ({ matches: localStorage.getItem(matches), stats: localStorage.getItem(stats) }),
+        { matches: `${STORAGE_PREFIX}${STORAGE_KEYS.versusLocalMatches}`, stats: `${STORAGE_PREFIX}${STORAGE_KEYS.playerStats}` }
+      );
+      assert.equal(stored.matches, '1', 'the finished match is counted');
+      assert.equal(stored.stats, null, 'the personal statistics are untouched');
+      await assertVersusFits(page, 'two players result');
+
+      // Change players returns to the lobby with the same devices.
+      await page.click('#btn-versus-change-players');
+      await waitShown(page, '#modal-versus-local');
+      assert.match(await localStatusOf(page, 0), /Player 1: Left keys/);
+      assert.match(await localStatusOf(page, 1), /Player 2: Right keys/);
+      assert.deepEqual(errors, []);
+    } finally {
+      await context.close();
+    }
+  });
+
+  test('two controllers join the lobby with their bottom button, and a lost one holds the match', async () => {
+    const { context, page, errors } = await openGame(desktop, { initStorage: LOCAL_PLAYER_STORAGE, initScript: installTwoPadStub });
+    try {
+      await captureVersusEngines(page);
+      await page.evaluate(() => {
+        window.__setPads([[], []]);
+        window.__connectPads();
+      });
+      await waitFrames(page, PAD_FRAMES_PER_STEP);
+      await openVersusLocalLobby(page, desktop);
+      await waitFrames(page, PAD_FRAMES_PER_STEP);
+      const tap = async (padIndex, button) => {
+        await page.evaluate(
+          ({ index, pressed }) => window.__setPads([0, 1].map((i) => (i === index ? [pressed] : []))),
+          { index: padIndex, pressed: button }
+        );
+        await waitFrames(page, PAD_FRAMES_PER_STEP);
+        await page.evaluate(() => window.__setPads([[], []]));
+        await waitFrames(page, PAD_FRAMES_PER_STEP);
+      };
+      await tap(1, LOCAL_PAD_BOTTOM_BUTTON);
+      assert.match(await localStatusOf(page, 0), /Player 1: Controller/, 'the first press takes the first free place');
+      await tap(0, LOCAL_PAD_BOTTOM_BUTTON);
+      assert.match(await localStatusOf(page, 1), /Player 2: Controller/);
+      assert.equal(await localStartState(page), 'false');
+      await page.click('#btn-versus-local-start');
+      await waitShown(page, '#versus-screen');
+      await page.waitForFunction(() => Boolean(window.__versusBoards?.[0] && window.__versusBoards?.[1]));
+      await waitFrames(page, PAD_FRAMES_PER_STEP);
+      // Pad 1 holds the first place: its Start button pauses the match.
+      await tap(1, LOCAL_PAD_START_BUTTON);
+      await waitShown(page, '#modal-duel-pause');
+      // The pad of the first place goes away: the match stays paused and Resume is out of reach.
+      await page.evaluate(() => {
+        const lost = window.__pads[1];
+        window.__setPads([[], null]);
+        const event = new Event('gamepaddisconnected');
+        event.gamepad = lost;
+        window.dispatchEvent(event);
+      });
+      await page.waitForFunction(() => !document.querySelector('#versus-pause-pad-hint').classList.contains('hidden'));
+      assert.equal(await page.evaluate(() => document.querySelector('#btn-versus-resume').getAttribute('aria-disabled')), 'true');
+      assert.deepEqual(errors, []);
+    } finally {
+      await context.close();
+    }
+  });
+
+  test('a window that shrinks below two boards pauses the match, says why, and keeps Resume out of reach', async () => {
+    const { context, page, errors } = await openGame(desktop, { initStorage: LOCAL_PLAYER_STORAGE });
+    try {
+      await captureVersusEngines(page);
+      await startLocalMatchWithKeys(page, desktop);
+      await page.setViewportSize(LOCAL_TOO_SMALL_VIEWPORT);
+      await page.waitForFunction(() => document.querySelector('#versus-screen').dataset.tooSmall === 'true');
+      await waitShown(page, '#modal-duel-pause');
+      assert.equal(await isShown(page, '#versus-pause-size-hint'), true);
+      assert.equal(await page.evaluate(() => document.querySelector('#versus-screen').dataset.layout), 'split', 'two boards never fall back to the mini-view');
+      assert.equal(await page.evaluate(() => document.querySelector('#btn-versus-resume').getAttribute('aria-disabled')), 'true');
+      await page.click('#btn-versus-resume', { force: true });
+      assert.equal(await isShown(page, '#modal-duel-pause'), true, 'a press on the disabled Resume does nothing');
+      await page.setViewportSize({ width: desktop.width, height: desktop.height });
+      await page.waitForFunction(() => document.querySelector('#versus-screen').dataset.tooSmall === 'false');
+      assert.equal(await isShown(page, '#versus-pause-size-hint'), false, 'the hint clears once the boards fit');
+      assert.equal(await page.evaluate(() => document.querySelector('#btn-versus-resume').getAttribute('aria-disabled')), 'false');
+      assert.equal(await isShown(page, '#modal-duel-pause'), true, 'the match stays paused');
+      await page.click('#btn-versus-resume');
+      await page.waitForFunction(() => document.querySelector('#modal-duel-pause').classList.contains('hidden'));
+      assert.deepEqual(errors, []);
+    } finally {
+      await context.close();
+    }
+  });
+});
+
+describe('Polarity Duel, two players entry by layout', () => {
+  for (const viewport of VIEWPORTS) {
+    const isHidden = LOCAL_ENTRY_HIDDEN_VIEWPORTS.includes(viewport.name);
+    test(`the two-player entry is ${isHidden ? 'hidden' : 'offered'} on ${viewport.name}`, async () => {
+      const { context, page, errors } = await openGame(viewport, { initStorage: LOCAL_PLAYER_STORAGE });
+      try {
+        await openVersusTierPicker(page, viewport);
+        assert.equal(await isShown(page, '#btn-versus-local'), !isHidden);
+        assert.deepEqual(errors, []);
+      } finally {
+        await context.close();
+      }
+    });
+  }
+
+  // A short desktop window: the entry is offered exactly when the split layout fits.
+  for (const height of LOCAL_SHORT_DESKTOP_HEIGHTS) {
+    test(`on a ${LOCAL_SHORT_DESKTOP_WIDTH}x${height} window the entry matches what the match can show`, async () => {
+      const viewport = { ...LOCAL_WIDE_VIEWPORT, width: LOCAL_SHORT_DESKTOP_WIDTH, height };
+      const { context, page, errors } = await openGame(viewport, { initStorage: LOCAL_PLAYER_STORAGE });
+      try {
+        await captureVersusEngines(page);
+        await openVersusTierPicker(page, viewport);
+        const isOffered = await isShown(page, '#btn-versus-local');
+        assert.equal(isOffered, height >= LOCAL_SHORT_DESKTOP_FITS_FROM, 'the entry follows the split layout requirement');
+        if (isOffered) {
+          await page.click('#btn-versus-local');
+          await waitShown(page, '#modal-versus-local');
+          await page.keyboard.press('KeyW');
+          await page.keyboard.press('ArrowUp');
+          await page.click('#btn-versus-local-start');
+          await waitShown(page, '#versus-screen');
+          await page.waitForFunction(() => Boolean(window.__versusBoards?.[0] && window.__versusBoards?.[1]));
+          assert.equal(await page.evaluate(() => document.querySelector('#versus-screen').dataset.tooSmall), 'false');
+          assert.equal(await isShown(page, '#modal-duel-pause'), false, 'the match opens running, not held');
+        }
+        assert.deepEqual(errors, []);
+      } finally {
+        await context.close();
+      }
+    });
+  }
+});

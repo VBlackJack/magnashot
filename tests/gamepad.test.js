@@ -497,3 +497,193 @@ test('the last pad going away is reported and then the reader goes idle', () => 
     assert.deepEqual(input.poll(16).events, ['disconnected']);
     assert.deepEqual(input.poll(16).events, []);
 });
+
+// ---- poll() equivalence and pollAll() ----
+
+// [time, frame ms, menuOpen, [[kind, pad, index, value]], pad removed]; kind b = button, a = axis.
+const SCRIPT = [
+    [0, 16, false, [], null],
+    [16, 16, false, [['b', 0, 0, 1]], null],
+    [32, 16, false, [['b', 0, 0, 0], ['a', 0, 0, 1]], null],
+    [48, 16, false, [['a', 0, 0, -0.6], ['b', 0, 2, 1]], null],
+    [64, 16, false, [['b', 0, 3, 1], ['b', 0, 6, 0.6], ['a', 0, 0, 0.9]], null],
+    [80, 16, false, [['b', 0, 3, 0], ['b', 0, 6, 0], ['b', 0, 14, 1]], null],
+    [96, 16, false, [['b', 0, 14, 1]], null],
+    [500, 16, false, [['b', 0, 14, 0], ['b', 0, 9, 1], ['b', 0, 4, 1], ['a', 0, 2, 0.7]], null],
+    [516, 16, true, [['b', 0, 9, 0], ['b', 0, 4, 0], ['a', 0, 2, 0], ['b', 1, 0, 0]], null],
+    [532, 16, true, [['b', 0, 13, 1], ['b', 0, 0, 1]], null],
+    [900, 16, true, [['b', 0, 13, 1]], null],
+    [1020, 16, true, [['b', 0, 13, 1], ['b', 0, 1, 1], ['b', 0, 5, 1]], null],
+    [1100, 16, true, [['b', 0, 13, 0], ['b', 0, 1, 0], ['b', 0, 5, 0], ['a', 0, 0, 0.9]], null],
+    [1116, 16, false, [['a', 0, 0, 0], ['b', 1, 2, 1], ['b', 1, 10, 1], ['b', 1, 11, 1]], null],
+    [1132, 16, false, [['b', 1, 2, 0], ['b', 1, 10, 0], ['b', 1, 11, 0], ['b', 1, 8, 1]], null],
+    [1148, 16, false, [['b', 1, 8, 0]], 0],
+    [1164, 16, false, [['b', 1, 0, 1]], null],
+    [1180, 16, false, [['b', 1, 0, 0]], 1],
+    [1196, 16, false, [], null],
+    [3000, 16, false, [], null]
+];
+
+// Captured from poll() before pollAll() and _readPad() were extracted.
+const POLL_BASELINE = JSON.parse('[{"actions":[],"aimDelta":0,"aimSteps":0,"active":false,"padIndex":0,"events":[]},{"actions":["shoot"],"aimDelta":0,"aimSteps":0,"active":true,"padIndex":0,"events":[]},{"actions":[],"aimDelta":0.0352,"aimSteps":0,"active":true,"padIndex":0,"events":[]},{"actions":["swap"],"aimDelta":-0.009234503271861984,"aimSteps":0,"active":true,"padIndex":0,"events":[]},{"actions":["polarity"],"aimDelta":0.006784533016061867,"aimSteps":0,"active":true,"padIndex":0,"events":[]},{"actions":[],"aimDelta":0.01713813206424747,"aimSteps":-1,"active":true,"padIndex":0,"events":[]},{"actions":[],"aimDelta":0.027138132064247467,"aimSteps":0,"active":true,"padIndex":0,"events":[]},{"actions":["pause","specialPrev"],"aimDelta":0.02926143961927424,"aimSteps":0,"active":true,"padIndex":0,"events":[]},{"actions":["navRight"],"aimDelta":0,"aimSteps":0,"active":true,"padIndex":0,"events":[]},{"actions":["navDown","confirm"],"aimDelta":0,"aimSteps":0,"active":true,"padIndex":0,"events":[]},{"actions":["navDown","navRight"],"aimDelta":0,"aimSteps":0,"active":true,"padIndex":0,"events":[]},{"actions":["navDown","navRight","back","tabNext"],"aimDelta":0,"aimSteps":0,"active":true,"padIndex":0,"events":[]},{"actions":[],"aimDelta":0,"aimSteps":0,"active":true,"padIndex":0,"events":[]},{"actions":[],"aimDelta":0,"aimSteps":0,"active":true,"padIndex":0,"events":[]},{"actions":[],"aimDelta":0,"aimSteps":0,"active":true,"padIndex":0,"events":[]},{"actions":[],"aimDelta":0,"aimSteps":0,"active":false,"padIndex":1,"events":["disconnected"]},{"actions":["shoot"],"aimDelta":0,"aimSteps":0,"active":true,"padIndex":1,"events":[]},{"actions":[],"aimDelta":0,"aimSteps":0,"active":false,"padIndex":-1,"events":["disconnected"]},{"actions":[],"aimDelta":0,"aimSteps":0,"active":false,"padIndex":-1,"events":[]},{"actions":[],"aimDelta":0,"aimSteps":0,"active":false,"padIndex":-1,"events":[]}]');
+
+test('poll() output over a scripted two-pad sequence matches the pre-extraction implementation', () => {
+    const time = { t: 0 };
+    const list = [makePad(0), makePad(1)];
+    const input = new GamepadInput({
+        config: CONFIG,
+        settings: { enabled: true, deadzone: 0.18, aimSpeed: 'normal', invertX: false },
+        getGamepads: () => list,
+        now: () => time.t
+    });
+    const target = new EventTarget();
+    input.attach(target);
+    const outs = [];
+    for (const [t, dt, menuOpen, muts, gone] of SCRIPT) {
+        time.t = t;
+        for (const [kind, p, i, v] of muts) {
+            const pad = list.find((x) => x.index === p);
+            if (!pad) continue;
+            if (kind === 'b') {
+                const from = ANALOG_BUTTONS.includes(i) ? ANALOG_PRESSED_FROM : DIGITAL_PRESSED_FROM;
+                pad.buttons[i] = { pressed: v >= from, value: v };
+            } else {
+                pad.axes[i] = v;
+            }
+        }
+        if (gone !== null) {
+            const at = list.findIndex((x) => x.index === gone);
+            if (at >= 0) {
+                const g = list.splice(at, 1)[0];
+                target.dispatchEvent(Object.assign(new Event('gamepaddisconnected'), { gamepad: g }));
+            }
+        }
+        outs.push(input.poll(dt, { menuOpen }));
+    }
+    assert.deepEqual(JSON.parse(JSON.stringify(outs)), POLL_BASELINE);
+});
+
+const byIndex = (res, index) => res.pads.find((p) => p.padIndex === index);
+
+test('pollAll primes a new pad: a button held on the first read produces no edge', () => {
+    const { input, pads } = setup({ pads: [makePad(0)] });
+    press(pads[0], 0);
+    const first = input.pollAll(16);
+    assert.deepEqual(byIndex(first, 0).actions, []);
+    assert.deepEqual(input.pollAll(16).pads[0].actions, []);
+    release(pads[0], 0);
+    input.pollAll(16);
+    press(pads[0], 0);
+    assert.deepEqual(input.pollAll(16).pads[0].actions, [A.SHOOT]);
+});
+
+test('pollAll keeps independent edges per pad', () => {
+    const { input, pads } = setup({ pads: [makePad(0), makePad(1)] });
+    input.pollAll(16);
+    press(pads[0], 0);
+    let res = input.pollAll(16);
+    assert.deepEqual(byIndex(res, 0).actions, [A.SHOOT]);
+    assert.deepEqual(byIndex(res, 1).actions, []);
+    press(pads[1], 2);
+    res = input.pollAll(16);
+    assert.deepEqual(byIndex(res, 0).actions, []);
+    assert.deepEqual(byIndex(res, 1).actions, [A.SWAP]);
+});
+
+test('pollAll reports a per-pad aim delta, activity and id', () => {
+    const { input, pads } = setup({ pads: [makePad(0, { id: 'Pad A' }), makePad(1, { id: 'Pad B' })] });
+    input.pollAll(16);
+    pads[1].axes[0] = 1;
+    const res = input.pollAll(1000);
+    assert.equal(byIndex(res, 0).aimDelta, 0);
+    assert.equal(byIndex(res, 0).active, false);
+    close(byIndex(res, 1).aimDelta, CONFIG.aimSpeedRadPerSec.normal);
+    assert.equal(byIndex(res, 1).active, true);
+    assert.equal(byIndex(res, 0).id, 'Pad A');
+    assert.equal(byIndex(res, 1).id, 'Pad B');
+});
+
+test('pollAll menu navigation and confirm are tracked per pad', () => {
+    const { input, pads, time } = setup({ pads: [makePad(0), makePad(1)] });
+    input.pollAll(16, { menuOpen: true });
+    press(pads[0], 13);
+    time.t = 100;
+    let res = input.pollAll(16, { menuOpen: true });
+    assert.deepEqual(byIndex(res, 0).actions, [A.NAV_DOWN]);
+    assert.deepEqual(byIndex(res, 1).actions, []);
+    press(pads[1], 0);
+    time.t = 116;
+    res = input.pollAll(16, { menuOpen: true });
+    assert.deepEqual(byIndex(res, 0).actions, []);
+    assert.deepEqual(byIndex(res, 1).actions, [A.CONFIRM]);
+});
+
+test('pollAll events carry the pad index and id, and a returning pad is primed again', () => {
+    const list = [makePad(0, { id: 'Pad A' }), makePad(1, { id: 'Pad B' })];
+    const input = new GamepadInput({
+        config: CONFIG, settings: { enabled: true }, getGamepads: () => list, now: () => 0
+    });
+    const target = new EventTarget();
+    input.attach(target);
+    input.pollAll(16);
+    const gone = list.splice(1, 1)[0];
+    target.dispatchEvent(Object.assign(new Event('gamepaddisconnected'), { gamepad: gone }));
+    let res = input.pollAll(16);
+    assert.deepEqual(res.events, [{ type: 'disconnected', padIndex: 1, id: 'Pad B' }]);
+    assert.equal(res.pads.length, 1);
+    press(gone, 0);
+    list.push(gone);
+    target.dispatchEvent(Object.assign(new Event('gamepadconnected'), { gamepad: gone }));
+    res = input.pollAll(16);
+    assert.deepEqual(res.events, [{ type: 'connected', padIndex: 1, id: 'Pad B' }]);
+    assert.deepEqual(byIndex(res, 1).actions, []);
+    assert.deepEqual(input.pollAll(16).events, []);
+});
+
+test('pollAll is idle when disabled or with no pad', () => {
+    const off = setup({ settings: { enabled: false } });
+    assert.deepEqual(off.input.pollAll(16), { pads: [], events: [] });
+    const empty = setup({ pads: [] });
+    assert.deepEqual(empty.input.pollAll(16), { pads: [], events: [] });
+});
+
+test('pollAll ignores non-standard pads', () => {
+    const { input } = setup({ pads: [makePad(0, { mapping: '' })] });
+    assert.deepEqual(input.pollAll(16).pads, []);
+});
+
+test('a button held across a poll to pollAll switch emits no edge', () => {
+    const { input, pads } = setup({ pads: [makePad(0)] });
+    input.poll(16);
+    press(pads[0], 0);
+    assert.deepEqual(input.poll(16).actions, [A.SHOOT]);
+    assert.deepEqual(input.pollAll(16).pads[0].actions, []);
+    assert.deepEqual(input.pollAll(16).pads[0].actions, []);
+    release(pads[0], 0);
+    input.pollAll(16);
+    press(pads[0], 0);
+    assert.deepEqual(input.pollAll(16).pads[0].actions, [A.SHOOT]);
+});
+
+test('a button held across a pollAll to poll switch emits no edge', () => {
+    const { input, pads } = setup({ pads: [makePad(0)] });
+    input.pollAll(16);
+    press(pads[0], 0);
+    assert.deepEqual(input.pollAll(16).pads[0].actions, [A.SHOOT]);
+    assert.deepEqual(input.poll(16).actions, []);
+    assert.deepEqual(input.poll(16).actions, []);
+    release(pads[0], 0);
+    input.poll(16);
+    press(pads[0], 0);
+    assert.deepEqual(input.poll(16).actions, [A.SHOOT]);
+});
+
+test('reopening the per-pad mode re-primes the pads', () => {
+    const { input, pads } = setup({ pads: [makePad(0)] });
+    input.poll(16);
+    press(pads[0], 0);
+    input.poll(16);
+    input.pollAll(16);
+    input.poll(16);
+    assert.deepEqual(input.pollAll(16).pads[0].actions, []);
+});
