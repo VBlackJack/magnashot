@@ -527,12 +527,16 @@ export const engineModeMethods = {
   /**
    * Starts a Flux run: an endless chain of generated shapes sharing one shot reserve.
    * @param {string|null} seed - Run seed; a fresh random seed when omitted.
-   * @param {{isShared?: boolean}} [options] - isShared marks a run started from a shared
-   *   seed link, which locks the device tilt so every player gets the same physics.
+   * @param {{isShared?: boolean, weekKey?: string}} [options] - isShared marks a run started
+   *   from a shared seed link, which locks the device tilt so every player gets the same
+   *   physics; weekKey is the week a weekly restart belongs to (this week by default).
    */
-  startFluxRun(seed = null, { isShared = false } = {}) {
-    this.initFluxRun(seed || this.createFluxSeed());
+  startFluxRun(seed = null, { isShared = false, weekKey = undefined } = {}) {
+    const runSeed = seed || this.createFluxSeed();
+    this.initFluxRun(runSeed);
     this.isSharedFluxRun = Boolean(isShared);
+    // A run on this week's seed is the weekly run, however it was started.
+    this.detectWeeklyFlux(runSeed, weekKey);
     this.buildFluxStage({ persist: false });
     this.currentBall = this.createRandomLauncherBall();
     this.nextBall = this.createRandomLauncherBall();

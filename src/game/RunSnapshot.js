@@ -16,6 +16,10 @@
 
 import { GAME_MODES, GAME_STATES, SPECIAL_TYPES_ORDER, WAVE_TYPES } from '../core/Constants.js';
 import { Ball } from '../entities/Ball.js';
+import { normalizeShotTimeline } from './ShotTimeline.js';
+
+/** Shape of a week key such as "2026-W45". */
+const WEEK_KEY_PATTERN = /^\d{4}-W\d{2}$/;
 
 /** Sentinel stored in place of an obstacle index when a ball has no pivot. */
 const NO_PIVOT_INDEX = -1;
@@ -265,6 +269,12 @@ export function captureRunSnapshot(engine, version) {
     fluxPerkOffer: engine.fluxPerkOffer ? [...engine.fluxPerkOffer] : null,
     // The record the run started against, so a reloaded run does not compare with itself.
     runBestBaseline: engine.getRunBestBaseline?.() ?? null,
+    // Optional fields: runs saved before weekly Flux and shot timelines hold neither.
+    isWeeklyFluxRun: Boolean(engine.isWeeklyFluxRun),
+    weeklyWeekKey: engine.weeklyWeekKey ?? null,
+    shotTimeline: engine.shotTimeline
+      ? { ...engine.shotTimeline, s: [...engine.shotTimeline.s], b: [...engine.shotTimeline.b] }
+      : null,
     currentBall: { colorId: engine.currentBall.colorId, specialType: engine.currentBall.specialType },
     nextBall: { colorId: engine.nextBall.colorId, specialType: engine.nextBall.specialType },
     allowTensionBreak: world.allowTensionBreak,
@@ -426,6 +436,17 @@ export function applyRunSnapshot(engine, snapshot) {
     engine.fluxPerks = restoreFluxPerks(engine, snapshot.fluxPerks);
     engine.fluxPerkOffer = restoreFluxPerkOffer(engine, snapshot.fluxPerkOffer);
   }
+  // Optional: the weekly flag and its week key are those captured when the run started.
+  const isWeekly = snapshot.mode === GAME_MODES.FLUX
+    && snapshot.isWeeklyFluxRun === true
+    && typeof snapshot.weeklyWeekKey === 'string'
+    && WEEK_KEY_PATTERN.test(snapshot.weeklyWeekKey);
+  engine.isWeeklyFluxRun = isWeekly;
+  engine.weeklyWeekKey = isWeekly ? snapshot.weeklyWeekKey : null;
+  engine.runBestBaseline = null;
+  // Optional: a run saved before timelines existed (or a damaged one) restarts with an empty one.
+  const hasTimeline = snapshot.mode === GAME_MODES.DAILY || isWeekly;
+  engine.shotTimeline = hasTimeline ? normalizeShotTimeline(snapshot.shotTimeline, engine.gameConfig.shotTimeline) : null;
   // Optional: a run saved before the baseline existed (or a damaged one) re-reads the record.
   engine.restoreRunBestBaseline(snapshot.runBestBaseline);
   if (engine.seededRng && Number.isFinite(snapshot.rngState)) {

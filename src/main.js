@@ -100,6 +100,7 @@ class Application {
       // The run itself is stored too: mobile browsers discard hidden tabs without warning.
       const persistOnLeave = () => {
         engine.persistRunHighScore();
+        engine.flushPlayerStats();
         engine.saveRunSnapshot();
       };
       window.addEventListener('pagehide', persistOnLeave);

@@ -223,6 +223,7 @@ export const engineRoundFlowMethods = {
         this.unlockAchievementTiers('starCollector', this.storageManager.getTotalStars());
         this.state = GAME_STATES.VICTORY;
         this.persistRunHighScore();
+        this.recordRunOutcome('win');
         this.storageManager.clearRunSnapshot();
         this.audioManager.playEffect('victory');
         this.victorySummary = {
@@ -232,7 +233,8 @@ export const engineRoundFlowMethods = {
           isNewRecord,
           nextStarTarget,
           nextStarNumber,
-          pointsToNextStar
+          pointsToNextStar,
+          unlockedModes: this.storageManager.syncEarnedModeUnlocks?.() ?? []
         };
         this.victoryCelebrationFrames = this.gameConfig.victory.celebrationFrames;
         this.particleSystem.spawnFloatingText(
@@ -264,6 +266,7 @@ export const engineRoundFlowMethods = {
         this.flushPendingRunCoins();
         this.state = GAME_STATES.VICTORY;
         this.persistRunHighScore();
+        this.recordRunOutcome('win');
         this.storageManager.clearRunSnapshot();
         this.audioManager.playEffect('victory');
         this.victorySummary = {
@@ -387,6 +390,8 @@ export const engineRoundFlowMethods = {
       previousBestScore = this.storageManager.getEndlessHighScore();
     } else if (this.mode === GAME_MODES.DAILY) {
       previousBestScore = this.storageManager.getDailyHighScore(this.dailySeedKey || SeededRandom.getTodayDateKey());
+    } else if (this.mode === GAME_MODES.FLUX && this.isWeeklyFluxRun) {
+      previousBestScore = this.storageManager.getWeeklyFluxBest?.(this.weeklyWeekKey)?.score || 0;
     } else if (this.mode === GAME_MODES.FLUX) {
       previousBestScore = this.storageManager.getFluxHighScore();
     } else if (this.mode === GAME_MODES.BLITZ) {
@@ -409,7 +414,10 @@ export const engineRoundFlowMethods = {
       nearMiss: this.computeNearMiss()
     };
     this.state = GAME_STATES.GAME_OVER;
+    // The state the last shot left behind, written as a finished timeline.
+    this.sampleShotTimeline(true);
     this.persistRunHighScore();
+    this.recordRunOutcome('loss');
     this.flushPendingRunCoins();
     this.storageManager.clearRunSnapshot();
     this.audioManager.playEffect('gameOver');
@@ -442,6 +450,7 @@ export const engineRoundFlowMethods = {
     }
     this.storageManager.setCoins(coins - pack.costCoins);
     this.hasUsedContinue = true;
+    this.retractRunOutcome();
     this.shotsRemaining = pack.shots;
     this.outOfShotsGraceFrames = 0;
     this.gameOverSummary = null;

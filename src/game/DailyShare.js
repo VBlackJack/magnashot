@@ -221,12 +221,30 @@ function buildSurvivalShareText({ wave, score, waveLog, url }, shareConfig) {
  * @param {number} [run.workshopLevels] - Owned Workshop levels (an assist).
  * @param {number} [run.ammoBought] - Special balls bought during the run (an assist).
  * @param {number} [run.continues] - Continues used (an assist).
+ * @param {boolean} [run.isWeekly] - True for the Weekly Flux run (needs run.weekKey and run.seed).
+ * @param {string} [run.weekKey] - Week key of the weekly run, such as "2026-W45".
  * @param {string} run.url - Game address appended on the last line.
  * @returns {string}
  */
-function buildFluxShareText({ stage, score, seed, workshopLevels = 0, ammoBought = 0, continues = 0, url }) {
+function buildFluxShareText({
+  stage,
+  score,
+  seed,
+  workshopLevels = 0,
+  ammoBought = 0,
+  continues = 0,
+  isWeekly = false,
+  weekKey = null,
+  url
+}) {
+  let header = t('share.flux.header');
+  if (isWeekly && weekKey && seed) {
+    header = t('share.flux.weeklyHeader', { week: weekKey, seed });
+  } else if (seed) {
+    header = t('share.flux.headerWithSeed', { seed });
+  }
   const lines = [
-    seed ? t('share.flux.headerWithSeed', { seed }) : t('share.flux.header'),
+    header,
     t('share.flux.stats', { stage: formatNumber(stage), score: formatNumber(score) })
   ];
   if (workshopLevels + ammoBought + continues > 0) {
