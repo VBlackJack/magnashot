@@ -84,6 +84,24 @@ export function formatModeBest(record, translate, format) {
 }
 
 /**
+ * One line per CPU tier that was played in Polarity Duel: "Hard: 2 won, 1 lost".
+ * @param {Object<string, {w: number, l: number}>|undefined} records - Storage getVersusRecords(), easiest tier first.
+ * @param {(key: string, params?: object) => string} translate - Translation function.
+ * @param {(n: number) => string} format - Number formatter.
+ * @returns {string[]}
+ */
+export function formatVersusTierLines(records, translate, format) {
+  return Object.entries(records ?? {})
+    .filter(([, entry]) => (Number(entry?.w) || 0) + (Number(entry?.l) || 0) > 0)
+    .map(([tier, entry]) =>
+      translate('versus.stats.tierLine', {
+        tier: translate(`versus.tier.${tier}`),
+        record: translate('versus.tier.record', { wins: format(entry.w), losses: format(entry.l) })
+      })
+    );
+}
+
+/**
  * Display model of the Overview tab.
  * @param {object} stats - Local statistics (storage getPlayerStats()).
  * @param {object} records - Bests from storage: {campaign: {level, stars}, modes: {[mode]: record}}.
@@ -99,7 +117,8 @@ export function buildStatsOverview(stats, records, context) {
     const entry = modeStats[mode];
     const runs = Number(entry?.runs) || 0;
     const best = formatModeBest(records?.modes?.[mode], translate, format);
-    if (runs <= 0 && !best) {
+    const details = mode === GAME_MODES.VERSUS ? formatVersusTierLines(records?.versus, translate, format) : [];
+    if (runs <= 0 && !best && details.length === 0) {
       continue;
     }
     const nameKey = STATS_EXTRA_MODE_NAME_KEYS[mode] ?? MODE_NAME_KEYS[mode];
@@ -114,7 +133,8 @@ export function buildStatsOverview(stats, records, context) {
               quits: format(entry.quits)
             })
           : '',
-      best
+      best,
+      ...(details.length > 0 ? { details } : {})
     });
   }
   const { hours, minutes } = splitPlayTime(stats?.playMs);
@@ -299,6 +319,7 @@ export const uiStatsMethods = {
     const dailyBest = (storage.getDailyHistory?.() ?? []).reduce((top, entry) => Math.max(top, entry.s), 0);
     return {
       campaign: { level: hasCampaignProgress ? unlockedLevel : 0, stars: totalStars },
+      versus: storage.getVersusRecords?.() ?? {},
       modes: {
         [GAME_MODES.ENDLESS]: { score: storage.getEndlessHighScore?.() ?? 0 },
         [GAME_MODES.DAILY]: { score: dailyBest },
@@ -351,9 +372,9 @@ export const uiStatsMethods = {
       for (const { label, value } of overview.general) {
         rows.push(this.createStatsTerm(label), this.createStatsDetail(value));
       }
-      for (const { name, runs, best } of overview.modes) {
+      for (const { name, runs, best, details = [] } of overview.modes) {
         rows.push(this.createStatsTerm(name));
-        for (const text of [runs, best]) {
+        for (const text of [runs, best, ...details]) {
           if (text) {
             rows.push(this.createStatsDetail(text));
           }

@@ -589,7 +589,8 @@ export const MODE_NAME_KEYS = Object.freeze({
   [GAME_MODES.BLITZ]: 'modals.levelSelect.arcade.blitz',
   [GAME_MODES.FLUX]: 'app.nav.button.flux',
   [GAME_MODES.CASCADE]: 'modals.levelSelect.arcade.cascade',
-  [GAME_MODES.BOSS_RUSH]: 'modals.levelSelect.arcade.bossRush'
+  [GAME_MODES.BOSS_RUSH]: 'modals.levelSelect.arcade.bossRush',
+  [GAME_MODES.VERSUS]: 'versus.mode.name'
 });
 
 /** Menu buttons (UIManager.elements keys) of each gated mode. Weekly Flux follows Flux. */
@@ -629,6 +630,12 @@ export const ARCADE_CARD_SPECS = Object.freeze({
     best: 'arcadeBestCascade',
     titleKey: 'modals.levelSelect.arcade.cascade',
     descKey: 'modals.levelSelect.arcade.cascadeDesc'
+  }),
+  [GAME_MODES.VERSUS]: Object.freeze({
+    card: 'btnModeVersus',
+    best: 'arcadeBestVersus',
+    titleKey: 'versus.card.title',
+    descKey: 'versus.card.description'
   })
 });
 

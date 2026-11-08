@@ -1438,6 +1438,9 @@
     "defaultName": "Ghost"
   },
   "versus": {
+    "stats": {
+      "tierLine": "{{tier}}: {{record}}"
+    },
     "mode": {
       "name": "Polarity Duel"
     },
@@ -1464,6 +1467,7 @@
       "roundPips": "Round {{round}}. You: {{player}} won. CPU: {{cpu}} won.",
       "roundLabel": "Round {{round}}",
       "timer": "Time {{time}}",
+      "suddenDeath": "Sudden death",
       "pause": "Pause"
     },
     "hud": {
@@ -1474,7 +1478,8 @@
       "cpuBoard": "CPU board",
       "cpuBoardTier": "CPU board ({{tier}})",
       "swap": "Swap spheres",
-      "polarity": "Flip polarity"
+      "polarity": "Flip polarity",
+      "specials": "Special spheres"
     },
     "announce": {
       "chargeIncoming": "{{count}} charged spheres incoming.",

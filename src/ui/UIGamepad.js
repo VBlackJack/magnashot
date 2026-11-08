@@ -245,8 +245,7 @@ export const uiGamepadMethods = {
    * Steps through the specials the player can equip right now (stocked or already loaded),
    * with "no special" as one more stop. The Shop is never opened from the pad.
    */
-  cycleSpecialBall(step) {
-    const engine = this.engine;
+  cycleSpecialBall(step, engine = this.engine) {
     const equipped = engine.currentBall?.specialType ?? null;
     const stops = [null, ...SPECIAL_TYPES_ORDER].filter(
       (type) => type === null || type === equipped || (engine.specialInventory?.[type] || 0) > 0
@@ -277,6 +276,8 @@ export const uiGamepadMethods = {
         this.cycleMenuTab(-1);
       } else if (action === A.TAB_NEXT) {
         this.cycleMenuTab(1);
+      } else if (action === A.PAUSE && this.isVersusPauseTop()) {
+        this.resumeVersus();
       } else if (action === A.PAUSE && this.isPauseDialogTop()) {
         this.engine.togglePause();
       } else if (action === A.MENU && this.isDrawerOpen && !this.isAnyModalOpen()) {

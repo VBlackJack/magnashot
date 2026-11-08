@@ -614,6 +614,10 @@ export const uiInputBindingMethods = {
       this.dismissDuelCard();
       return;
     }
+    // The Polarity Duel layers (difficulty picker, match pause and result) unwind before anything under them.
+    if (this.handleVersusBack()) {
+      return;
+    }
     if (!this.elements.modalLevels.classList.contains('hidden')) {
       this.closeOverlayModal(this.elements.modalLevels);
       return;

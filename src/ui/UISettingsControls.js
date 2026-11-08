@@ -434,6 +434,23 @@ export const uiSettingsControlMethods = {
       },
       shareConfig
     );
+    await this.deliverShareText(text, {
+      onCopied: () => {
+        this.shareCopied = true;
+        this.updateShareButtonLabel?.();
+      },
+      showFallback: (fallbackText) => this.showShareFallback(fallbackText)
+    });
+  },
+
+  /**
+   * Hands a share text out: the system share sheet when there is one, else the clipboard, else
+   * the caller's read-only field. The outcome is announced.
+   * @param {string} text - The text to share.
+   * @param {{onCopied: () => void, showFallback: (text: string) => void}} handlers - What the caller shows
+   *   once the text is on the clipboard, and how it offers the text for a manual copy.
+   */
+  async deliverShareText(text, { onCopied, showFallback }) {
     if (typeof navigator.share === 'function') {
       try {
         await navigator.share({ text });
@@ -449,15 +466,14 @@ export const uiSettingsControlMethods = {
     if (typeof navigator.clipboard?.writeText === 'function') {
       try {
         await navigator.clipboard.writeText(text);
-        this.shareCopied = true;
-        this.updateShareButtonLabel?.();
+        onCopied();
         this.announce(t('share.feedback.copied'));
         return;
       } catch {
         feedbackKey = 'share.feedback.failed';
       }
     }
-    this.showShareFallback(text);
+    showFallback(text);
     this.announce(t(feedbackKey));
   },
 

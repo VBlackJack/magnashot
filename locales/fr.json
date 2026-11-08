@@ -1438,6 +1438,9 @@
     "defaultName": "Fantôme"
   },
   "versus": {
+    "stats": {
+      "tierLine": "{{tier}} : {{record}}"
+    },
     "mode": {
       "name": "Duel de polarité"
     },
@@ -1464,6 +1467,7 @@
       "roundPips": "Manche {{round}}. Vous : {{player}} gagnée(s). Ordinateur : {{cpu}} gagnée(s).",
       "roundLabel": "Manche {{round}}",
       "timer": "Temps {{time}}",
+      "suddenDeath": "Mort subite",
       "pause": "Pause"
     },
     "hud": {
@@ -1474,7 +1478,8 @@
       "cpuBoard": "Plateau de l'ordinateur",
       "cpuBoardTier": "Plateau de l'ordinateur ({{tier}})",
       "swap": "Échanger les sphères",
-      "polarity": "Inverser la polarité"
+      "polarity": "Inverser la polarité",
+      "specials": "Sphères spéciales"
     },
     "announce": {
       "chargeIncoming": "{{count}} sphères chargées arrivent.",

@@ -377,6 +377,30 @@ function buildClassicShareText({ stage, score, drops }) {
 }
 
 /**
+ * Builds the result of a Polarity Duel match against the CPU: one sentence (outcome, tier, score,
+ * charges neutralised, pulses sent), then the game address.
+ * @param {object} run
+ * @param {boolean} run.won - True when the player won the match.
+ * @param {string} run.tier - Translated name of the CPU tier.
+ * @param {string} run.score - Rounds won, as written in the player's language.
+ * @param {number} run.neutralised - Charges the player neutralised.
+ * @param {number} run.pulses - Field pulses the player sent.
+ * @param {string} run.url - Game address appended on the last line.
+ * @returns {string}
+ */
+function buildVersusShareText({ won, tier, score, neutralised, pulses, url }) {
+  return [
+    t(won ? 'versus.share.won' : 'versus.share.lost', {
+      tier,
+      score,
+      neutralised: formatNumber(neutralised),
+      pulses: formatNumber(pulses)
+    }),
+    url
+  ].join(LINE_SEPARATOR);
+}
+
+/**
  * Builds the shareable result of a run in the mode it was played. The campaign never
  * shares, so it is rejected like any unknown mode.
  * @param {object} run - Run summary; `run.mode` is a GAME_MODES value, the other fields
@@ -403,6 +427,8 @@ export function buildShareText(run, shareConfig) {
       return buildCascadeShareText(run);
     case GAME_MODES.CLASSIC:
       return buildClassicShareText(run);
+    case GAME_MODES.VERSUS:
+      return buildVersusShareText(run);
     default:
       throw new RangeError(`No shareable result for game mode "${run.mode}"`);
   }

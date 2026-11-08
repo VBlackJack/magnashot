@@ -1621,7 +1621,13 @@
     "layout": {
       "splitMinBoardWidthPx": 300,
       "splitMinViewportHeightPx": 520,
-      "miniScale": 0.28
+      "miniScale": 0.28,
+      "liteFrameInterval": 2
+    },
+    "ui": {
+      "hudRefreshFrames": 6,
+      "announceWindowFrames": 90,
+      "seedRadix": 36
     },
     "records": {
       "tiers": ["easy", "normal", "hard"],
