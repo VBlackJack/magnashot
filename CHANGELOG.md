@@ -12,7 +12,7 @@ All notable changes to **MagnaShot** are documented in this file.
 
 ### Changed
 - **Daily Challenge Is the Same Game for Everyone (`GameEngine`)**: The Daily Challenge no longer applies Workshop upgrades and no longer allows buying special ammo in the shop, so every player faces the same rules; the intro line and the Workshop note say so.
-- **Same Launcher Colours on a Seed (`EngineLauncher`)**: The launcher colour queue and random special sphere grants of Daily and Flux runs now come from the seed, so every player on the same seed gets the same shots in the same order.
+- **Same Launcher Colours on a Seed (`EngineLauncher`)**: The launcher colour queue and random special sphere grants of Daily and Flux runs now come from the seed, so the launcher colour rolls are the same for every player on a seed. The pick follows the colours left on the board, so two players who cleared different colours can still see different launcher colours.
 - **Engine and Interface Split Into Domain Modules (`GameEngine`, `UIManager`, `src/core/installMethods.js`)**: The two large classes now install their methods from `src/game/Engine*.js` and `src/ui/UI*.js` modules. Behaviour is unchanged; `tests/engineApi.test.js` and `tests/uiApi.test.js` guard the prototype API.
 - **Docs**: README and README.fr describe the deploy pipeline, the release script, the save schema, the fairness rules and the new file layout.
 
