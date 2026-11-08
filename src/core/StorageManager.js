@@ -52,6 +52,7 @@ export class StorageManager {
   constructor() {
     this.storageConfig = null;
     this.defaultsConfig = null;
+    this.gamepadConfig = null;
     this.upgradesConfig = null;
     this.achievementsConfig = null;
     this.dailyConfig = null;
@@ -73,6 +74,7 @@ export class StorageManager {
     const campaignConfig = configRegistry.get('campaign');
     this.storageConfig = gameConfig.storage;
     this.defaultsConfig = gameConfig.defaults;
+    this.gamepadConfig = gameConfig.gamepad || {};
     this.upgradesConfig = gameConfig.upgrades;
     this.achievementsConfig = gameConfig.achievements || {};
     this.dailyConfig = gameConfig.daily || {};
@@ -349,6 +351,56 @@ export class StorageManager {
 
   setReducedMotion(enabled) {
     this.safeSetItem(this.storageConfig.keys.reducedMotion, Boolean(enabled));
+  }
+
+  /** @returns {boolean} Whether controller input is on (default on). */
+  getGamepadEnabled() {
+    const raw = this.safeGetItem(this.storageConfig.keys.gamepadEnabled);
+    return raw === null ? true : raw === 'true';
+  }
+
+  setGamepadEnabled(enabled) {
+    this.safeSetItem(this.storageConfig.keys.gamepadEnabled, Boolean(enabled));
+  }
+
+  /** @returns {number} Stick deadzone, always one of the configured options. */
+  getGamepadDeadzone() {
+    const fallback = this.gamepadConfig.defaultDeadzone;
+    const raw = this.safeGetItem(this.storageConfig.keys.gamepadDeadzone);
+    if (raw === null) {
+      return fallback;
+    }
+    const num = Number.parseFloat(raw);
+    return this.gamepadConfig.deadzoneOptions.includes(num) ? num : fallback;
+  }
+
+  /** @param {number} value - Ignored unless it is one of the configured deadzone options. */
+  setGamepadDeadzone(value) {
+    if (this.gamepadConfig.deadzoneOptions.includes(value)) {
+      this.safeSetItem(this.storageConfig.keys.gamepadDeadzone, value);
+    }
+  }
+
+  /** @returns {string} Aim speed name, always one of the configured speeds. */
+  getGamepadAimSpeed() {
+    const fallback = this.gamepadConfig.defaultAimSpeed;
+    const raw = this.safeGetItem(this.storageConfig.keys.gamepadAimSpeed);
+    return Object.hasOwn(this.gamepadConfig.aimSpeedRadPerSec, raw) ? raw : fallback;
+  }
+
+  /** @param {string} speed - Ignored unless it is a configured aim speed name. */
+  setGamepadAimSpeed(speed) {
+    if (Object.hasOwn(this.gamepadConfig.aimSpeedRadPerSec, speed)) {
+      this.safeSetItem(this.storageConfig.keys.gamepadAimSpeed, speed);
+    }
+  }
+
+  getGamepadInvertX() {
+    return this.safeGetItem(this.storageConfig.keys.gamepadInvertX) === 'true';
+  }
+
+  setGamepadInvertX(enabled) {
+    this.safeSetItem(this.storageConfig.keys.gamepadInvertX, Boolean(enabled));
   }
 
   /**
