@@ -15,10 +15,10 @@
     "test:browser": "node --test --test-concurrency=1 \"tests/browser/*.test.js\""
   },
   "devDependencies": {
-    "@eslint/js": "9.39.5",
-    "eslint": "9.39.5",
+    "@eslint/js": "^10.0.1",
+    "eslint": "^10.14.0",
     "globals": "17.14.0",
-    "playwright": "1.64.0"
+    "playwright": "^1.64.1"
   },
   "overrides": {
     "minimatch": "^11.0.1"

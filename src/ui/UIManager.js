@@ -3210,7 +3210,7 @@ export class UIManager {
     setTextIfChanged(this.elements.overchargePct, t('hud.stats.overcharge.pct', { pct: overchargePct }));
     this.elements.overchargeFill.style.width = `${overchargePct}%`;
 
-    let bestScore = 0;
+    let bestScore;
     if (engine.mode === GAME_MODES.CAMPAIGN) {
       bestScore = this.storageManager.getLevelStats()[engine.currentLevelId]?.bestScore || 0;
     } else if (engine.mode === GAME_MODES.DAILY) {

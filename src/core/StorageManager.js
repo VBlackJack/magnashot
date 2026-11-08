@@ -123,7 +123,7 @@ export class StorageManager {
     if (!raw) {
       return {};
     }
-    let parsed = null;
+    let parsed;
     try {
       parsed = JSON.parse(raw);
     } catch {
