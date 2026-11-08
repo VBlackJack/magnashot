@@ -290,6 +290,12 @@ export class SpecialBallController {
     if (targetColor) {
       for (const target of targetsInRadius) {
         const isRust = target.clusterModifier === CLUSTER_MODIFIERS.RUST;
+        if (!isRust && target.colorId === targetColor) {
+          // Already the unifying color: nothing changed, so it neither scores nor
+          // overcharges, but it still joins the delayed chain check.
+          physicsWorld.pendingChainCandidateIds.add(target.id);
+          continue;
+        }
         if (isRust) {
           target.clusterModifier = null;
         }

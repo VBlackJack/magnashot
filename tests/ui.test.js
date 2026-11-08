@@ -2529,3 +2529,47 @@ test('Daily mutator intro banner, completed chapter tabs, and collectorMagnet up
     i18n.currentLocale = previous;
   }
 });
+
+test('closing the last dialog falls back to the game canvas when no opener can take focus', () => {
+  const prevDoc = globalThis.document;
+  const noop = () => {};
+  const state = { hidden: true };
+  const modal = {
+    classList: { contains: (name) => name === 'hidden' && state.hidden },
+    inert: false,
+    setAttribute: noop,
+    removeAttribute: noop
+  };
+  const canvas = { focusCalls: 0, focus() { this.focusCalls += 1; } };
+  const hiddenOpener = { focusCalls: 0, focus() { this.focusCalls += 1; }, hidden: true };
+  globalThis.document = { activeElement: null, body: {}, documentElement: {} };
+  try {
+    const ui = Object.create(UIManager.prototype);
+    ui.elements = { gameCanvas: canvas, appShell: { inert: false, setAttribute: noop, removeAttribute: noop } };
+    ui.getModalsByPriority = () => [modal];
+    ui.getActiveTopModal = () => (state.hidden ? null : modal);
+    ui.keepFocusInTopModal = noop;
+    ui.lastFocusedElement = null;
+
+    ui.syncModalInertState();
+    assert.equal(canvas.focusCalls, 0, 'no focus change while no dialog was ever open');
+
+    state.hidden = false;
+    ui.syncModalInertState();
+    assert.equal(canvas.focusCalls, 0, 'still open: nothing restored');
+
+    state.hidden = true;
+    ui.syncModalInertState();
+    assert.equal(canvas.focusCalls, 1, 'nothing saved: the canvas takes focus');
+
+    state.hidden = false;
+    ui.syncModalInertState();
+    ui.lastFocusedElement = hiddenOpener;
+    state.hidden = true;
+    ui.syncModalInertState();
+    assert.equal(hiddenOpener.focusCalls, 0, 'a hidden opener is not focused');
+    assert.equal(canvas.focusCalls, 2, 'a hidden opener falls back to the canvas');
+  } finally {
+    globalThis.document = prevDoc;
+  }
+});

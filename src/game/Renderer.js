@@ -420,8 +420,14 @@ export class Renderer {
     const now = this.isReducedMotion ? REDUCED_MOTION_CLOCK_MS : performance.now();
 
     ctx.setTransform(this.scaleX, 0, 0, this.scaleY, 0, 0);
-    ctx.save();
     const shake = engineState.particleSystem.shakeIntensity;
+    if (shake > 0) {
+      // The shaken static layer no longer covers the edges: paint them first so no strip of
+      // the previous frame shows through.
+      ctx.fillStyle = theme.backgroundTop;
+      ctx.fillRect(0, 0, width, height);
+    }
+    ctx.save();
     if (shake > 0) {
       const dx = (Math.random() - MATH_CONSTANTS.HALF) * 2 * shake;
       const dy = (Math.random() - MATH_CONSTANTS.HALF) * 2 * shake;

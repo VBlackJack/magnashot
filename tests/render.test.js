@@ -51,13 +51,48 @@ configRegistry.configs.set('audio', audioConfig);
 const FIXED_STEP_MS = 10;
 const MAX_ACCUMULATED_MS = 100;
 
-/** Canvas 2D context stub: every method is a no-op, gradients accept color stops. */
+/**
+ * Canvas 2D context stub: drawing methods are no-ops, gradients accept color stops. It
+ * tracks the save/restore stack (restoring globalAlpha and globalCompositeOperation like a
+ * real context) and records the calls the tests assert on, so a state leak is detectable.
+ */
 const createStubContext = () => {
-  const state = {};
+  const state = {
+    globalAlpha: 1,
+    globalCompositeOperation: 'source-over',
+    saveDepth: 0,
+    restoreUnderflows: 0,
+    calls: []
+  };
+  const stack = [];
+  const track = (name) => (...args) => {
+    state.calls.push({ name, args, saveDepth: state.saveDepth });
+  };
   return new Proxy(state, {
     get(target, prop) {
       if (prop in target) {
         return target[prop];
+      }
+      if (prop === 'save') {
+        return () => {
+          stack.push({ globalAlpha: target.globalAlpha, globalCompositeOperation: target.globalCompositeOperation });
+          target.saveDepth++;
+        };
+      }
+      if (prop === 'restore') {
+        return () => {
+          const saved = stack.pop();
+          if (!saved) {
+            target.restoreUnderflows++;
+            return;
+          }
+          target.saveDepth--;
+          target.globalAlpha = saved.globalAlpha;
+          target.globalCompositeOperation = saved.globalCompositeOperation;
+        };
+      }
+      if (prop === 'fillRect' || prop === 'clearRect' || prop === 'translate') {
+        return track(prop);
       }
       if (prop === 'createLinearGradient' || prop === 'createRadialGradient') {
         return (...args) => {
@@ -961,4 +996,58 @@ test('renderer config values that replaced literal fallbacks are finite numbers'
   for (const [name, value] of Object.entries(values)) {
     assert.ok(Number.isFinite(value), `${name} must be a finite number, got ${value}`);
   }
+});
+
+const renderAndCheckBalance = (engine, label) => {
+  const renderer = createRenderer();
+  const ctx = renderer.ctx;
+  for (const alpha of [0.5, 1.0]) {
+    renderer.render(engine, alpha);
+    assert.equal(ctx.saveDepth, 0, `${label}: save/restore depth must return to 0`);
+    assert.equal(ctx.restoreUnderflows, 0, `${label}: restore must never run without a save`);
+    assert.equal(ctx.globalAlpha, 1, `${label}: globalAlpha must be back to 1`);
+    assert.equal(ctx.globalCompositeOperation, 'source-over', `${label}: composite operation must be back to source-over`);
+  }
+};
+
+test('Rendering leaves the canvas state balanced across representative frames', () => {
+  for (const reducedMotion of [false, true]) {
+    const engine = createTestEngine();
+    engine.startCampaignLevel(1);
+    engine.setReducedMotion(reducedMotion);
+    const particles = engine.particleSystem;
+    const spot = gameConfig.canvas.launcherX;
+    particles.spawnBurst(spot, spot, '#ffffff');
+    particles.spawnShockwave(spot, spot, '#ffffff');
+    particles.spawnFloatingText(spot, spot, 'text', '#ffffff');
+    particles.addScreenShake(gameConfig.juice.matchShake);
+    renderAndCheckBalance(engine, `reducedMotion=${reducedMotion} with effects`);
+
+    const bomb = engine.createRandomLauncherBall('bomb');
+    const target = engine.physicsWorld.balls.find((b) => !b.isAnchor) || engine.physicsWorld.balls[0];
+    bomb.x = target.x;
+    bomb.y = target.y + physicsConfig.ball.radius;
+    engine.physicsWorld.addBall(bomb);
+    engine.handleProjectileSnapped(bomb, target);
+    renderAndCheckBalance(engine, `reducedMotion=${reducedMotion} after an explosion`);
+  }
+});
+
+test('A shaking frame fills the whole canvas before the shake translate', () => {
+  const engine = createTestEngine();
+  engine.startCampaignLevel(1);
+  engine.setReducedMotion(false);
+  engine.particleSystem.addScreenShake(gameConfig.juice.matchShake);
+  assert.ok(engine.particleSystem.shakeIntensity > 0);
+  const renderer = createRenderer();
+  renderer.render(engine, 1.0);
+  const calls = renderer.ctx.calls;
+  const translateIndex = calls.findIndex((c) => c.name === 'translate');
+  assert.ok(translateIndex > 0, 'the shake translate is applied');
+  const fillIndex = calls.findIndex(
+    (c) => c.name === 'fillRect' && c.args[0] === 0 && c.args[1] === 0
+      && c.args[2] === renderer.logicalWidth && c.args[3] === renderer.logicalHeight
+  );
+  assert.ok(fillIndex >= 0 && fillIndex < translateIndex, 'a full-canvas fill precedes the translate');
+  assert.equal(calls[fillIndex].saveDepth, 0, 'the fill happens outside the shaken save scope');
 });

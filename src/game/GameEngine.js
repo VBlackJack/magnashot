@@ -183,6 +183,7 @@ export class GameEngine {
     this.activeMutatorKey = null;
     this.dailySeedKey = null;
     this.seededRng = null;
+    this.scopedRng = null;
     this.fluxSeed = null;
     this.fluxStage = 0;
     this.fluxFamily = null;
@@ -223,7 +224,30 @@ export class GameEngine {
   }
 
   random() {
-    return this.seededRng ? this.seededRng.next() : Math.random();
+    const source = this.scopedRng || this.seededRng;
+    return source ? source.next() : Math.random();
+  }
+
+  /**
+   * Runs `build` with board generation drawing from its own deterministic stream, so a
+   * shared seed gives the same stage or wave whatever shots were played before it.
+   * Unseeded runs keep drawing from the ambient source.
+   * @param {string|null} streamKey - Stream suffix derived from seed + index; null disables scoping.
+   * @param {() => T} build - Generation callback.
+   * @returns {T} The callback result.
+   * @template T
+   */
+  withScopedRandom(streamKey, build) {
+    if (!this.seededRng || !streamKey) {
+      return build();
+    }
+    const previous = this.scopedRng;
+    this.scopedRng = new SeededRandom(streamKey);
+    try {
+      return build();
+    } finally {
+      this.scopedRng = previous;
+    }
   }
 
   isSurvivalMode() {
@@ -605,6 +629,7 @@ export class GameEngine {
     this.activeMutatorKey = null;
     this.dailySeedKey = null;
     this.seededRng = null;
+    this.scopedRng = null;
     this.waveLog = [];
     this.stashedRegularColorId = null;
     this.fluxSeed = null;
@@ -1438,7 +1463,9 @@ export class GameEngine {
     for (const obsDef of shiftObstacleDefsX(stageDef.obstacles, contentOffsetX)) {
       this.physicsWorld.obstacles.push(new Obstacle(obsDef, this.obstaclesConfig));
     }
-    const balls = this.materializeLayout(shiftSpecX(stageDef.spec, contentOffsetX), stageDef.modifierWeights);
+    const balls = this.withScopedRandom(`${this.fluxSeed}:board:${this.fluxStage}`, () =>
+      this.materializeLayout(shiftSpecX(stageDef.spec, contentOffsetX), stageDef.modifierWeights)
+    );
     this.makeBossCore(balls, stageDef.bossBallIndex);
     this.physicsWorld.rebuildInitialBonds();
 
@@ -1643,10 +1670,13 @@ export class GameEngine {
     }
 
     const r = this.physicsConfig.ball.radius;
-    for (let row = 0; row < endlessCfg.initialRows; row++) {
-      const y = endlessCfg.startY + row * endlessCfg.rowSpacingY;
-      this.spawnEndlessRow(y, row % 2, row === 0, () => this.rollEndlessModifier());
-    }
+    const initialBoardStream = mode === GAME_MODES.DAILY ? `${seed}:wave:${this.waveCount}` : null;
+    this.withScopedRandom(initialBoardStream, () => {
+      for (let row = 0; row < endlessCfg.initialRows; row++) {
+        const y = endlessCfg.startY + row * endlessCfg.rowSpacingY;
+        this.spawnEndlessRow(y, row % 2, row === 0, () => this.rollEndlessModifier());
+      }
+    });
 
     if (mode === GAME_MODES.DAILY) {
       const singMargin = r * dailyCfg.singularityMarginRadiusFactor;
@@ -2760,7 +2790,8 @@ export class GameEngine {
     this.anvilCrushCount = 0;
     this.stashedRegularColorId = null;
     this.currentBall = this.nextBall;
-    this.nextBall = this.createRandomLauncherBall(null, this.takeUpcomingColor());
+    const upcoming = this.takeUpcomingBall();
+    this.nextBall = this.createRandomLauncherBall(upcoming.specialType, upcoming.colorId);
 
     if (this.usesShotBudget()) {
       this.shotsRemaining = Math.max(0, this.shotsRemaining - 1);
@@ -2849,7 +2880,13 @@ export class GameEngine {
     if (this.physicsWorld.hasBrokenBondThisStep) {
       this.physicsWorld.hasBrokenBondThisStep = false;
       this.detachAndRewardAvalanche();
-      this.evaluateRoundEnd();
+      this.discardBetweenTurnsCoreFreeze();
+      // A board cleared by a bond break must not end the round with the shot frozen
+      // mid-air: the post-turn cleanup of that shot comes back to evaluateRoundEnd.
+      const isShotHoldingRoundEnd = Boolean(this.physicsWorld.projectile) && this.isClearBasedMode();
+      if (!isShotHoldingRoundEnd) {
+        this.evaluateRoundEnd();
+      }
       this.saveRunSnapshot();
       this.notifyUI();
     }
@@ -2878,6 +2915,7 @@ export class GameEngine {
         if (this.chainCooldown >= this.physicsConfig.simulation.chainCheckCooldownFrames) {
           this.chainCooldown = 0;
           this.evaluateAutomaticChainReactions();
+          this.discardBetweenTurnsCoreFreeze();
         }
       }
 
@@ -3018,6 +3056,21 @@ export class GameEngine {
    * queued again so the next cluster goes off one cooldown later: a cascade plays out step
    * by step instead of in a single frame.
    */
+  /** Modes whose round is won by clearing the board (Campaign, Puzzle, Flux). */
+  isClearBasedMode() {
+    return this.mode === GAME_MODES.CAMPAIGN || this.mode === GAME_MODES.PUZZLE || this.mode === GAME_MODES.FLUX;
+  }
+
+  /**
+   * A Freeze Core that goes off between turns (no shot in flight) must not skip the next
+   * shot's countdown: only a core set off during a turn is covered by that turn's cleanup.
+   */
+  discardBetweenTurnsCoreFreeze() {
+    if (!this.physicsWorld.projectile) {
+      this.isCoreFreezeApplied = false;
+    }
+  }
+
   evaluateAutomaticChainReactions() {
     const candidates = this.physicsWorld.consumeChainCandidates();
     if (candidates.length === 0) {
@@ -3621,14 +3674,26 @@ export class GameEngine {
 
   /** Color of the next ball to load from the queue; the queue is topped up behind it. */
   takeUpcomingColor() {
+    return this.takeUpcomingBall().colorId;
+  }
+
+  /**
+   * Next ball to load from the queue: its color and, for a scripted puzzle queue, its
+   * special type. The queue is topped up behind it outside Puzzle mode.
+   * @returns {{colorId: string, specialType: string|null}}
+   */
+  takeUpcomingBall() {
     if (this.mode === GAME_MODES.PUZZLE) {
       const nextSpec = this.puzzleQueue.shift();
       const nextColor = this.upcomingColorIds.shift();
-      return nextSpec?.colorId || nextColor || this.activePalette[0];
+      return {
+        colorId: nextSpec?.colorId || nextColor || this.activePalette[0],
+        specialType: nextSpec?.specialType || null
+      };
     }
     const color = this.upcomingColorIds.shift() || this.pickLauncherColor();
     this.fillUpcomingColors();
-    return color;
+    return { colorId: color, specialType: null };
   }
 
   /**
@@ -3658,11 +3723,12 @@ export class GameEngine {
   }
 
   handlePostTurnCleanup(madeMatch, appliedFreeze = false) {
-    // A Freeze Core that went off during this turn counts as a freeze applied this turn.
-    const freezeAppliedThisTurn = appliedFreeze || this.isCoreFreezeApplied;
-    this.isCoreFreezeApplied = false;
     this.detachAndRewardAvalanche();
     this.shiftChameleonBalls();
+    // A Freeze Core that went off during this turn (the shot or its avalanche) counts as a
+    // freeze applied this turn. Read after the avalanche so a core it sets off is consumed here.
+    const freezeAppliedThisTurn = appliedFreeze || this.isCoreFreezeApplied;
+    this.isCoreFreezeApplied = false;
 
     this.refreshStaleLauncherColors();
 
@@ -3786,17 +3852,20 @@ export class GameEngine {
     let remainingGoldCores = isGoldRushWave ? endlessCfg.goldRushCoinCoreCount : 0;
     let bossCorePlaced = false;
 
-    const newRowBalls = this.spawnEndlessRow(startY, this.endlessRowParity, true, (col) => {
-      if (isBossWave && !bossCorePlaced && col >= Math.floor(cols * MATH_CONSTANTS.HALF)) {
-        bossCorePlaced = true;
-        return CLUSTER_MODIFIERS.BOSS_CORE;
-      }
-      if (remainingGoldCores > 0) {
-        remainingGoldCores--;
-        return CLUSTER_MODIFIERS.COIN_CORE;
-      }
-      return this.rollEndlessModifier();
-    });
+    const waveStream = this.mode === GAME_MODES.DAILY ? `${this.dailySeedKey}:wave:${this.waveCount}` : null;
+    const newRowBalls = this.withScopedRandom(waveStream, () =>
+      this.spawnEndlessRow(startY, this.endlessRowParity, true, (col) => {
+        if (isBossWave && !bossCorePlaced && col >= Math.floor(cols * MATH_CONSTANTS.HALF)) {
+          bossCorePlaced = true;
+          return CLUSTER_MODIFIERS.BOSS_CORE;
+        }
+        if (remainingGoldCores > 0) {
+          remainingGoldCores--;
+          return CLUSTER_MODIFIERS.COIN_CORE;
+        }
+        return this.rollEndlessModifier();
+      })
+    );
     const newRowIds = new Set(newRowBalls.map((b) => b.id));
 
     this.physicsWorld.rebuildInitialBonds();

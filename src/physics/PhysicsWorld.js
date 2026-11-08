@@ -18,7 +18,6 @@ import { OBSTACLE_TYPES, SPECIAL_TYPES, CLUSTER_MODIFIERS, MATH_CONSTANTS, SEPAR
 import { SpatialHashGrid } from './SpatialHashGrid.js';
 
 const NOT_FOUND_INDEX = -1;
-const PLATFORM_SUPPORT_TOLERANCE_PX = 4;
 
 /** A bond touching a chained ball is a chain link: stretching never breaks it. */
 export function isChainLink(a, b) {
@@ -840,7 +839,7 @@ export class PhysicsWorld {
       }
       const shelfTopY = obs.y - obs.height * MATH_CONSTANTS.HALF;
       const ballBottom = ball.y + ballRadius;
-      if (ballBottom >= shelfTopY - PLATFORM_SUPPORT_TOLERANCE_PX && ballBottom <= shelfTopY + obs.height + ballRadius) {
+      if (ballBottom >= shelfTopY - this.physicsConfig.simulation.platformSupportTolerancePx && ballBottom <= shelfTopY + obs.height + ballRadius) {
         return true;
       }
     }
