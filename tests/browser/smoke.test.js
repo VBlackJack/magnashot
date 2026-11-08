@@ -138,8 +138,9 @@ after(async () => {
  * carries no test-only entry point.
  * initStorage: localStorage entries seeded before the game starts (a fresh profile when null).
  * path: page address relative to the server, for shared links.
+ * initScript: function run in the page before the game's own scripts (e.g. a stubbed controller).
  */
-async function openGame(viewport, { initStorage = null, path = '/' } = {}) {
+async function openGame(viewport, { initStorage = null, path = '/', initScript = null } = {}) {
   const context = await browser.newContext({
     viewport: { width: viewport.width, height: viewport.height },
     hasTouch: viewport.isTouch,
@@ -162,6 +163,9 @@ async function openGame(viewport, { initStorage = null, path = '/' } = {}) {
         window.localStorage.setItem(key, value);
       }
     }, initStorage);
+  }
+  if (initScript) {
+    await page.addInitScript(initScript);
   }
   await page.goto(`${server.origin}${path}`);
   await captureEngine(page);
@@ -1456,6 +1460,178 @@ describe('Ghost Duel HUD layout', () => {
         assert.equal(duel.rowHeight, normal.rowHeight, 'the badge row keeps its height');
         assert.equal(duel.badgeInsideBar, true, 'the rival badge stays inside the HUD');
         assert.ok(duel.pageOverflow <= OVERFLOW_TOLERANCE_PX, 'the page does not scroll sideways');
+        assert.deepEqual(errors, []);
+      } finally {
+        await context.close();
+      }
+    });
+  }
+});
+
+/*
+ * Controller support. A standard-layout pad is stubbed before the game loads
+ * (navigator.getGamepads reads window.__pads) and announced with a gamepadconnected event.
+ */
+const PAD_BUTTONS = Object.freeze({ bottom: 0, select: 8, start: 9, dpadUp: 12, dpadDown: 13 });
+/** Animation frames to wait so the game loop sees a press, then its release. */
+const PAD_FRAMES_PER_STEP = 3;
+
+function installPadStub() {
+  window.__pads = [];
+  navigator.getGamepads = () => window.__pads;
+  window.__setPad = (pressed = []) => {
+    window.__pads = [
+      {
+        index: 0,
+        id: 'stub standard pad',
+        mapping: 'standard',
+        connected: true,
+        timestamp: performance.now(),
+        buttons: Array.from({ length: 17 }, (_, i) => ({ pressed: pressed.includes(i), value: pressed.includes(i) ? 1 : 0 })),
+        axes: [0, 0, 0, 0]
+      }
+    ];
+  };
+  window.__connectPad = () => {
+    window.__setPad([]);
+    const event = new Event('gamepadconnected');
+    event.gamepad = window.__pads[0];
+    window.dispatchEvent(event);
+  };
+}
+
+const waitFrames = (page, count) =>
+  page.evaluate(
+    (frames) =>
+      new Promise((resolve) => {
+        let left = frames;
+        const tick = () => (--left <= 0 ? resolve() : requestAnimationFrame(tick));
+        requestAnimationFrame(tick);
+      }),
+    count
+  );
+
+async function connectPad(page) {
+  await page.evaluate(() => window.__connectPad());
+  await waitFrames(page, PAD_FRAMES_PER_STEP);
+}
+
+/** Presses a button for a few frames, then releases it. */
+async function tapPad(page, button) {
+  await page.evaluate((index) => window.__setPad([index]), button);
+  await waitFrames(page, PAD_FRAMES_PER_STEP);
+  await page.evaluate(() => window.__setPad([]));
+  await waitFrames(page, PAD_FRAMES_PER_STEP);
+}
+
+const focusedId = (page) => page.evaluate(() => document.activeElement?.id ?? '');
+
+describe('browser smoke: controller', () => {
+  for (const viewport of VIEWPORTS.filter((v) => v.name === 'desktop' || v.name === 'phone portrait')) {
+    test(`${viewport.name}: the bottom button shoots, Start opens Pause, and the d-pad with the bottom button drives the dialog`, async () => {
+      const { context, page, errors } = await openGame(viewport, { initScript: installPadStub });
+      try {
+        await startLevelOne(page);
+        await page.evaluate(() => {
+          const engine = window.__fluxEngine;
+          const original = engine.shoot;
+          window.__shotCalls = 0;
+          engine.shoot = function countShots(...args) {
+            window.__shotCalls += 1;
+            return original.apply(this, args);
+          };
+        });
+        await connectPad(page);
+        await tapPad(page, PAD_BUTTONS.bottom);
+        assert.equal(await page.evaluate(() => window.__shotCalls), 1, 'the bottom button fires one shot');
+        assert.equal(
+          await page.evaluate(() => document.documentElement.dataset.input),
+          'gamepad',
+          'pad activity switches the input mode'
+        );
+
+        await startLevelOne(page);
+        await tapPad(page, PAD_BUTTONS.start);
+        await waitShown(page, '#modal-pause');
+        assert.equal(await engineState(page), GAME_STATES.PAUSED);
+        assert.equal(await focusedId(page), 'btn-resume', 'Pause opens on Resume');
+
+        await tapPad(page, PAD_BUTTONS.dpadDown);
+        assert.notEqual(await focusedId(page), 'btn-resume', 'the d-pad moves focus off Resume');
+        assert.equal(
+          await page.evaluate(() => document.activeElement.classList.contains('pad-focus')),
+          true,
+          'the pad focus ring is on the focused control'
+        );
+        await tapPad(page, PAD_BUTTONS.dpadUp);
+        assert.equal(await focusedId(page), 'btn-resume');
+        await tapPad(page, PAD_BUTTONS.bottom);
+        await page.waitForFunction((playing) => window.__fluxEngine.state === playing, GAME_STATES.PLAYING);
+        assert.equal(await isShown(page, '#modal-pause'), false, 'Resume closes the dialog');
+        assert.deepEqual(errors, []);
+      } finally {
+        await context.close();
+      }
+    });
+  }
+
+  for (const viewport of VIEWPORTS) {
+    test(`${viewport.name}: controller hints replace the key hints without overflowing the layout`, async () => {
+      const { context, page, errors } = await openGame(viewport, { initScript: installPadStub });
+      try {
+        await startLevel(page, 2);
+        await connectPad(page);
+        // Any pad activity switches the input mode; a pressed face button on the board would
+        // shoot, so a held trigger-free button that does nothing in play is used instead.
+        await page.evaluate(() => window.__setPad([11]));
+        await waitFrames(page, PAD_FRAMES_PER_STEP);
+        await page.evaluate(() => window.__setPad([]));
+        await page.waitForFunction(() => document.documentElement.dataset.input === 'gamepad');
+
+        const hints = await page.evaluate(() => {
+          const buttons = ['#btn-swap-ball', '#btn-polarity'].map((selector) => {
+            const button = document.querySelector(selector);
+            const glyph = button.querySelector('.pad-glyph');
+            const box = button.getBoundingClientRect();
+            const glyphBox = glyph.getBoundingClientRect();
+            return {
+              selector,
+              glyphShown: glyph.checkVisibility(),
+              inside:
+                glyphBox.left >= box.left - 1 &&
+                glyphBox.right <= box.right + 1 &&
+                glyphBox.top >= box.top - 1 &&
+                glyphBox.bottom <= box.bottom + 1
+            };
+          });
+          const keyHintsShown = [...document.querySelectorAll('.powerup-key')].some((el) => el.checkVisibility());
+          return { buttons, keyHintsShown };
+        });
+        for (const button of hints.buttons) {
+          assert.equal(button.glyphShown, true, `${button.selector} shows its controller glyph`);
+          assert.equal(button.inside, true, `${button.selector} keeps its glyph inside the button`);
+        }
+        assert.equal(hints.keyHintsShown, false, 'the key hints are hidden');
+        await assertLayoutFits(page, 2);
+        const hudOverflow = await page.evaluate(() => {
+          const bar = document.querySelector('.hud-bar');
+          return bar.scrollWidth - bar.clientWidth;
+        });
+        assert.ok(hudOverflow <= OVERFLOW_TOLERANCE_PX, 'the HUD does not overflow');
+
+        await page.evaluate(() => window.__fluxEngine.togglePause());
+        await waitShown(page, '#modal-pause');
+        const pauseHints = await page.evaluate(() => {
+          const card = document.querySelector('#modal-pause .modal-card');
+          return {
+            pad: document.getElementById('pause-instruction-pad').checkVisibility(),
+            keys: document.getElementById('pause-instruction-keyboard').checkVisibility(),
+            overflow: card.scrollWidth - card.clientWidth
+          };
+        });
+        assert.equal(pauseHints.pad, true, 'Pause lists the controller');
+        assert.equal(pauseHints.keys, false, 'Pause hides the keyboard line');
+        assert.ok(pauseHints.overflow <= OVERFLOW_TOLERANCE_PX, 'the Pause card does not overflow');
         assert.deepEqual(errors, []);
       } finally {
         await context.close();
