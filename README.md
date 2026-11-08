@@ -21,8 +21,8 @@
 - **8 Game Modes (Burger Menu `☰`, Interactive HUD Mode Pill `▾` & Mode Cards)**:
   - **Campaign**: 24 handcrafted levels introducing pendulums, inertia rotors, repulsors, oscillating barriers, quantum locks, linked portals, Boss Cores, neutral anchors no match can break, chained spheres, bubbles, freeze, lightning and paint cores, rail anchors, thrusters, long tethers and rust. Then 800 generated levels (25 to 824), in 20 chapters of 40: the first 12 each feature one of those mechanics, the last 8 a pair of them. More colors, spheres and modifiers, and a tighter shot margin as they go. Each block of 10 levels mixes formats: standard levels, two twists that add a mechanic from another chapter, a precision level (a small board, a tight shot count and a single bomb), an arsenal level (a big board, fewer shots and twice the special spheres) and a landmark (a drawn shape or a pair, and a Boss Core). A level's name and card badge (`Boss`, `Precision`, `Arsenal`, `Twist`) show its format. Each level is rebuilt from its number alone. The level select shows one chapter at a time, with the stars won in each, opens on the chapter being played, and offers a `< 3★` filter to show only unfinished unlocked levels (when active, the victory window's main button also jumps straight to the next `< 3★` level).
   - **Survival (Endless)**: Infinite wave defense with Gold Rush waves and Boss anomalies.
-  - **Daily Challenge**: Deterministic daily seed (every player gets the same starting board and the same waves that day) with rotating physics mutators (*Hyper Gravity*, *Turbo Rotors*, *Super Magnetism*, *Volatile Cluster*, *Portal Matrix*, *Bumper Pinball*, *Cryo Surge*), a daily coin reward, and an escalating consecutive-day **Daily Streak** bonus (`+15 ⬡/day`, up to `+90 ⬡`). When the run ends, **Share** sends a spoiler-free result (challenge number, mutator, wave, score, one symbol per wave passed with gold rush and boss waves marked) through the system share sheet, or copies it to the clipboard. Survival and Flux runs share their wave or shape and score the same way. The Daily game over says when the next challenge starts, and the menu marks a challenge already played today. One missed day is forgiven, but only once every 7 days: a single break does not reset the streak, a second one within 7 days does. The game over says whether the grace day is available, says it was used only on the day it was, and otherwise says when it comes back.
-  - **Flux Mode**: An endless chain of procedurally generated shapes sharing one shot reserve. Three stages in four draw a generated silhouette among more than 1,200 distinct shapes: stars, flowers, gears, polygons, crescents and hearts, solid or hollow, of several sizes and proportions, named after their shape ("7-Point Star", "Hollow 5-Petal Flower"). The others draw a parametric rotor or pendulum, a hand-drawn silhouette (heart, crown, bell, lighthouse, ship anchor...), some held by neutral anchors, or a pair of small shapes, never the same family twice in a row. A difficulty budget adds bumpers, portals, repulsors and singularities as the run goes on, every fifth stage hides a Boss Core, later stages add chains, bubbles and freeze, lightning and paint cores, and clearing a shape refills shots. Runs are seeded, so a reload resumes on the same shape, a finished run can be replayed on the same seed (`Same Seed`), every player on the same seed gets the same shapes and boards, shared links (`?flux=<seed>`) open directly on that seed (asking first when another run is saved), and the Level Select toolbar lets players enter or paste any Flux seed code or share text directly. After every third cleared shape the run pauses on a **perk choice**: pick one of three offered perks (keys `1` to `3`, or tap a card), each stackable up to three times for the rest of the run. The six perks are **Reserve** (extra shots now), **Refill** (extra shots on every later shape clear), **Blast** (wider special sphere blasts), **Surge** (faster Overcharge), **Arsenal** (random special spheres now, among the special spheres you start with) and **Golden** (extra coins on every later shape clear). Held perks show as chips in the HUD and the menu, and restarting a run past the first shape asks for confirmation.
+  - **Daily Challenge**: Deterministic daily seed (every player gets the same starting board, the same waves and the same launcher colours that day, with the same rules for all: no Workshop upgrades and no shop ammo) with rotating physics mutators (*Hyper Gravity*, *Turbo Rotors*, *Super Magnetism*, *Volatile Cluster*, *Portal Matrix*, *Bumper Pinball*, *Cryo Surge*), a daily coin reward, and an escalating consecutive-day **Daily Streak** bonus (`+15 ⬡/day`, up to `+90 ⬡`). When the run ends, **Share** sends a spoiler-free result (challenge number, mutator, wave, score, one symbol per wave passed with gold rush and boss waves marked) through the system share sheet, or copies it to the clipboard. Survival and Flux runs share their wave or shape and score the same way; a Flux result also lists the assists used (Workshop levels, ammo bought, continue), when any. The Daily game over says when the next challenge starts, and the menu marks a challenge already played today. One missed day is forgiven, but only once every 7 days: a single break does not reset the streak, a second one within 7 days does. The game over says whether the grace day is available, says it was used only on the day it was, and otherwise says when it comes back.
+  - **Flux Mode**: An endless chain of procedurally generated shapes sharing one shot reserve. Three stages in four draw a generated silhouette among more than 1,200 distinct shapes: stars, flowers, gears, polygons, crescents and hearts, solid or hollow, of several sizes and proportions, named after their shape ("7-Point Star", "Hollow 5-Petal Flower"). The others draw a parametric rotor or pendulum, a hand-drawn silhouette (heart, crown, bell, lighthouse, ship anchor...), some held by neutral anchors, or a pair of small shapes, never the same family twice in a row. A difficulty budget adds bumpers, portals, repulsors and singularities as the run goes on, every fifth stage hides a Boss Core, later stages add chains, bubbles and freeze, lightning and paint cores, and clearing a shape refills shots. Runs are seeded, so a reload resumes on the same shape, a finished run can be replayed on the same seed (`Same Seed`), every player on the same seed gets the same shapes, boards and launcher colours, shared links (`?flux=<seed>`) open directly on that seed (asking first when another run is saved), and the Level Select toolbar lets players enter or paste any Flux seed code or share text directly. After every third cleared shape the run pauses on a **perk choice**: pick one of three offered perks (keys `1` to `3`, or tap a card), each stackable up to three times for the rest of the run. The six perks are **Reserve** (extra shots now), **Refill** (extra shots on every later shape clear), **Blast** (wider special sphere blasts), **Surge** (faster Overcharge), **Arsenal** (random special spheres now, among the special spheres you start with) and **Golden** (extra coins on every later shape clear). Held perks show as chips in the HUD and the menu, and restarting a run past the first shape asks for confirmation.
   - **Arcade Modes (via the Interactive HUD Mode Pill `▾` and Level Select Cards)**:
     - **Puzzle Mode**: 10 deterministic trick-shot stages with a fixed launcher queue (`1` or `2` shots), a direct stage selector (`P1` to `P10`) in the Levels modal (with polite unlock hints on locked stages), and **Core Rescue** (`💎`) objectives where freeing all Rescue Cores shatters the remaining cluster into an instant avalanche.
     - **Blitz 90s**: 90-second Time Attack with unlimited shots, live wave tracking in the HUD mode banner, rapid automatic wave descent, and a 3-second hesitation auto-fire timer displayed as a countdown ring around the launcher.
@@ -85,6 +85,8 @@ The codebase follows a modular, zero-dependency ES module architecture with stri
 ├── locales/                  # Bilingual translation dictionaries (fr.json, en.json)
 ├── scripts/
 │   ├── calibrate-campaign.mjs# Offline campaign level calibration CLI
+│   ├── pages-artifact.mjs    # Builds the GitHub Pages artifact (_site/) with only the runtime files
+│   ├── release.mjs           # Release preparation: bumps versions and promotes the CHANGELOG Unreleased section
 │   └── bot/
 │       └── CampaignBot.js    # Greedy and arsenal calibration bots
 ├── src/
@@ -94,7 +96,8 @@ The codebase follows a modular, zero-dependency ES module architecture with stri
 │   │   ├── Constants.js      # Frozen enums and mathematical constants
 │   │   ├── I18n.js           # Localization service and DOM attribute translator
 │   │   ├── SeededRandom.js   # Deterministic PRNG (Mulberry32) for Daily Challenges and Flux runs
-│   │   ├── StorageManager.js # Cached localStorage persistence with in-memory fallback and a one-time merge of pre-rename saves
+│   │   ├── StorageManager.js # Cached localStorage persistence with in-memory fallback, versioned save schema (ordered migrations, legacy prefix merge)
+│   │   ├── installMethods.js # Installs a domain module's methods on a class prototype
 │   │   ├── WorldGeometry.js  # Launcher, danger line and content offset derived from the world size
 │   │   └── AudioManager.js   # Procedural Web Audio API synthesizer
 │   ├── entities/
@@ -105,7 +108,14 @@ The codebase follows a modular, zero-dependency ES module architecture with stri
 │   │   ├── PhysicsWorld.js   # Substepped spring-constraint solver, raycaster & BFS avalanche
 │   │   └── SpatialHashGrid.js# Collision-free 2D spatial hash grid for neighbor queries
 │   ├── game/
-│   │   ├── GameEngine.js     # Game state machine, wave spawner, scoring & achievements
+│   │   ├── GameEngine.js     # Game state machine core (constructor, state, scoring & achievements); domain methods live in the Engine*.js modules
+│   │   ├── EngineBoard.js    # GameEngine module: level layouts, endless rows & cluster modifiers
+│   │   ├── EngineControls.js # GameEngine module: special slots, shop ammo, launcher swap & comfort settings
+│   │   ├── EngineDiscovery.js# GameEngine module: first-encounter hints
+│   │   ├── EngineLauncher.js # GameEngine module: launcher queue, seeded colour stream & random special grants
+│   │   ├── EngineModes.js    # GameEngine module: starting Campaign, Survival, Puzzle, Blitz & Boss Rush runs
+│   │   ├── EngineRoundFlow.js# GameEngine module: wave types, round end checks, game over & continue pack
+│   │   ├── EngineTurnResolution.js # GameEngine module: cluster resolution, chain reactions & avalanche
 │   │   ├── GameLoop.js       # Fixed-step loop with interpolation, idle throttling and fatal error stop
 │   │   ├── ImpactPreview.js  # What a shot would destroy, shared by the aim preview and the calibration bot
 │   │   ├── LevelCatalog.js   # Authored and generated campaign level builder and fingerprint
@@ -122,7 +132,12 @@ The codebase follows a modular, zero-dependency ES module architecture with stri
 │       ├── CodexView.js      # Illustrated Codex & Guide tab rendering
 │       ├── FluxPerkView.js   # Flux perk choice dialog and active perk chips
 │       ├── LevelSelectView.js# Campaign chapters, level cards, format badges & < 3★ filter
-│       ├── UIManager.js      # HUD updates, accessible modals (focus trap + inert) & input modes
+│       ├── UIManager.js      # UI core: construction, wiring and the modules above
+│       ├── UIHelpers.js      # UIManager module: shared scheduling helper
+│       ├── UIHudRefresh.js   # UIManager module: HUD and menu refresh
+│       ├── UIInputBindings.js# UIManager module: install, drawer and keyboard bindings
+│       ├── UIModals.js       # UIManager module: dialogs, focus trap and inert handling
+│       ├── UISettingsControls.js # UIManager module: settings controls
 │       └── WorkshopView.js   # Upgrades, in-run Special Ammo refills & achievement progress bars
 ├── styles/main.css           # Responsive layout and design tokens
 ├── eslint.config.js          # ESLint 10 flat configuration
@@ -152,7 +167,7 @@ npm run lint
 npm run test:browser
 ```
 
-The suites in `tests/` cover the game engine, physics, rendering loop, UI helpers, the calibration tooling, and seven repository guards:
+The suites in `tests/` cover the game engine, physics, rendering loop, UI helpers, the calibration tooling, and the repository guards:
 
 - `typography.test.js` rejects typographic look-alikes of ASCII characters (long dashes, curly quotes, ellipsis, special spaces, ligatures) in every text file.
 - `pwa.test.js` checks that every file under `src/`, `configs/`, `locales/` and `icons/` is precached by `sw.js`, that `index.html` declares a `Content-Security-Policy` without `'unsafe-inline'` styles, that the Service Worker cache version matches `package.json`, and, by running `sw.js` in a sandbox, that activation deletes only this app's own caches.
@@ -161,6 +176,7 @@ The suites in `tests/` cover the game engine, physics, rendering loop, UI helper
 - `campaign.test.js` checks that the 800 generated levels are playable boards rebuilt the same from their number, that difficulty climbs from chapter to chapter, that a landmark comes every 10 levels, that each level is named in both languages, and that each one is calibrated for the board it is: a change to the generator, the Flux shapes or the campaign curve fails it until the levels are measured again.
 - `world.test.js` checks that every campaign level (generated ones included), Flux stage (1 to 60) and the Survival grid fit between the walls, and that a world of the design width builds every level at its authored positions.
 - `bot.test.js` checks the calibration bots (what a shot is worth, when the arsenal bot plays a special, that the greedy one never does) and the command line of `scripts/calibrate-campaign.mjs`.
+- `pagesArtifact.test.js` checks that the GitHub Pages artifact holds only runtime files, `engineApi.test.js` and `uiApi.test.js` snapshot the public prototype API of `GameEngine` and `UIManager` so a module split cannot lose a method, `saveSchema.test.js` checks the ordered, idempotent save migrations, `release.test.js` checks the version bump and CHANGELOG promotion of `scripts/release.mjs`, and `fairness.test.js` checks that a seed gives every player the same launcher queue and that Daily applies no Workshop upgrades or shop ammo.
 
 The generated levels are calibrated outside CI by two bots (`scripts/bot/CampaignBot.js`):
 
@@ -175,7 +191,7 @@ Star thresholds come from the median score of the bot named by `calibration.star
 
 `tests/browser/smoke.test.js` opens the real page in headless Chromium at the four supported layouts (desktop, portrait tablet, landscape and portrait phones). It fails on any console error, sideways scrolling or clipped control label, checks the layout on level 1 (no special sphere) and level 2 (special spheres), checks that the level select opens on the chapter of the current level and switches chapters, checks that the Settings, Levels, Workshop and Pause dialogs pause and resume the run, walks through the victory, game over and reload-resume paths, checks that Campaign game over offers no Share while Daily Challenge, Survival and Flux Mode copy their result to the clipboard, and checks that a mouse tremor keeps a keyboard-tuned aim. CI runs it as a separate job.
 
-When adding a runtime file, list it in `PRECACHE_ASSETS` in `sw.js`. When releasing, bump `APP_VERSION` in `sw.js` together with `package.json`.
+When adding a runtime file, list it in `PRECACHE_ASSETS` in `sw.js`. To release, move the notes under `## [Unreleased]` in `CHANGELOG.md` as needed, then run `npm run release -- <patch|minor|major|X.Y.Z>` (add `--dry-run` to preview): it bumps `package.json`, `package-lock.json` and `APP_VERSION` in `sw.js` and promotes the Unreleased section, but never commits, tags or pushes. Deployment to GitHub Pages happens from CI, after the test and browser jobs pass on `master`.
 
 ---
 

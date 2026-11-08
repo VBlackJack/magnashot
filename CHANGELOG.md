@@ -4,6 +4,18 @@ All notable changes to **MagnaShot** are documented in this file.
 
 ## [Unreleased]
 
+### Added
+- **CI-Gated GitHub Pages Deploy (`.github/workflows/ci.yml`, `scripts/pages-artifact.mjs`)**: A `deploy` job publishes the game to GitHub Pages only after the test and browser jobs pass on `master` (or on a manual run). It uploads a `_site/` artifact holding the runtime files and nothing else.
+- **Release Script (`scripts/release.mjs`)**: `npm run release -- <patch|minor|major|X.Y.Z> [--dry-run]` bumps `package.json`, `package-lock.json` and `APP_VERSION` in `sw.js`, and promotes the CHANGELOG Unreleased section. It never commits, tags or pushes.
+- **Versioned Save Schema (`StorageManager`)**: Saves carry a `schema_version` key and are upgraded by ordered, idempotent migrations; version 1 is the former merge of pre-rename saves. Existing progress is kept.
+- **Assists in Shared Flux Results (`DailyShare`)**: A shared Flux result lists the assists behind the run (Workshop levels, ammo bought, continue) when there were any.
+
+### Changed
+- **Daily Challenge Is the Same Game for Everyone (`GameEngine`)**: The Daily Challenge no longer applies Workshop upgrades and no longer allows buying special ammo in the shop, so every player faces the same rules; the intro line and the Workshop note say so.
+- **Same Launcher Colours on a Seed (`EngineLauncher`)**: The launcher colour queue and random special sphere grants of Daily and Flux runs now come from the seed, so every player on the same seed gets the same shots in the same order.
+- **Engine and Interface Split Into Domain Modules (`GameEngine`, `UIManager`, `src/core/installMethods.js`)**: The two large classes now install their methods from `src/game/Engine*.js` and `src/ui/UI*.js` modules. Behaviour is unchanged; `tests/engineApi.test.js` and `tests/uiApi.test.js` guard the prototype API.
+- **Docs**: README and README.fr describe the deploy pipeline, the release script, the save schema, the fairness rules and the new file layout.
+
 ## [1.14.1] - 2026-11-08
 
 ### Fixed
