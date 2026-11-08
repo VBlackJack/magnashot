@@ -858,3 +858,32 @@ test('a scene that does not ask for every pad keeps the single reading (poll), b
   assert.deepEqual(calls, [['poll', 16, { menuOpen: false }]]);
   assert.deepEqual(sceneCalls, [[[A.SHOOT], 0]]);
 });
+
+test('rumbleGamepad sends the configured effect only when vibration is on and motion is not reduced', () => {
+  const { ui } = makeUi();
+  const sent = [];
+  ui.gamepadInput = { settings: {}, rumble: (index, effect) => { sent.push([index, effect]); return true; } };
+  let rumbleOn = true;
+  let reducedMotion = false;
+  ui.storageManager = { getGamepadRumble: () => rumbleOn, getReducedMotion: () => reducedMotion };
+
+  assert.equal(ui.rumbleGamepad('pulse', 1), true);
+  assert.deepEqual(sent, [[1, gameConfig.gamepad.rumble.effects.pulse]]);
+
+  rumbleOn = false;
+  assert.equal(ui.rumbleGamepad('pulse', 1), false);
+  rumbleOn = true;
+  reducedMotion = true;
+  assert.equal(ui.rumbleGamepad('pulse', 1), false);
+  reducedMotion = false;
+  assert.equal(ui.rumbleGamepad('pulse', -1), false);
+  assert.equal(ui.rumbleGamepad('unknown', 1), false);
+  assert.equal(sent.length, 1);
+});
+
+test('the Vibration setting is handed to the live reader', () => {
+  const { ui } = makeUi();
+  ui.gamepadInput = { settings: { rumble: true } };
+  ui.updateGamepadSettings({ rumble: false });
+  assert.equal(ui.gamepadInput.settings.rumble, false);
+});

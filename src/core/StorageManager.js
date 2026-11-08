@@ -406,6 +406,16 @@ export class StorageManager {
     this.safeSetItem(this.storageConfig.keys.gamepadInvertX, Boolean(enabled));
   }
 
+  /** @returns {boolean} Whether the controller may vibrate (default on). */
+  getGamepadRumble() {
+    const raw = this.safeGetItem(this.storageConfig.keys.gamepadRumble);
+    return raw === null ? true : raw === 'true';
+  }
+
+  setGamepadRumble(enabled) {
+    this.safeSetItem(this.storageConfig.keys.gamepadRumble, Boolean(enabled));
+  }
+
   /**
    * @returns {number} Stored animation speed multiplier, or the configured default (1x).
    */
@@ -957,6 +967,18 @@ export class StorageManager {
       return;
     }
     this.safeSetItem(key, this.getVersusLocalMatches() + 1);
+  }
+
+  /** @returns {boolean} Whether the first-duel tutorial was shown (and closed or skipped) once. */
+  getVersusTutorialSeen() {
+    return this.safeGetItem(this.storageConfig?.keys?.versusTutorialSeen) === 'true';
+  }
+
+  setVersusTutorialSeen(seen = true) {
+    const key = this.storageConfig?.keys?.versusTutorialSeen;
+    if (key) {
+      this.safeSetItem(key, Boolean(seen));
+    }
   }
 
   /** @returns {boolean} True when the CPU tier can be picked (a tier may require wins on another). */

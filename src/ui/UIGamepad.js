@@ -25,6 +25,9 @@ const A = GAMEPAD_ACTIONS;
 /** Class that keeps a visible focus ring on an element focused by the controller. */
 export const PAD_FOCUS_CLASS = 'pad-focus';
 
+/** Settings checkbox of the Vibration option (looked up here so the shared element map stays untouched). */
+const GAMEPAD_RUMBLE_INPUT_ID = 'input-gamepad-rumble';
+
 /** Role of the container that holds the tabs of a dialog (Workshop, chapters, stats). */
 const TABLIST_SELECTOR = '[role="tablist"]';
 const TAB_SELECTOR = '[role="tab"]';
@@ -129,6 +132,25 @@ export const uiGamepadMethods = {
       return this.inputMode;
     }
     return GAMEPAD_HINT_KEYS.includes(key) ? INPUT_MODES.GAMEPAD : INPUT_MODES.POINTER;
+  },
+
+  /**
+   * Short vibration on a pad for a match moment (configured under gamepad.rumble.effects).
+   * Silent when the Vibration setting is off, reduced motion is on, or the pad cannot vibrate.
+   * @param {string} kind - Key of gamepad.rumble.effects: charge, pulse or roundLost.
+   * @param {number} padIndex - Pad to vibrate; a negative index means no pad.
+   * @returns {boolean} True when an effect was sent.
+   */
+  rumbleGamepad(kind, padIndex) {
+    const reader = this.gamepadInput;
+    const effect = this.gameConfig.gamepad.rumble?.effects?.[kind];
+    if (!reader || !effect || !(padIndex >= 0)) {
+      return false;
+    }
+    if (!this.storageManager.getGamepadRumble?.() || this.storageManager.getReducedMotion?.()) {
+      return false;
+    }
+    return reader.rumble(padIndex, effect);
   },
 
   /** Frame hook (GameLoop beforeFrame): reads the pad and routes what it produced. */
@@ -518,6 +540,11 @@ export const uiGamepadMethods = {
       this.storageManager.setGamepadInvertX(el.inputGamepadInvertX.checked);
       this.updateGamepadSettings({ invertX: el.inputGamepadInvertX.checked });
     });
+    el.inputGamepadRumble = document.getElementById?.(GAMEPAD_RUMBLE_INPUT_ID) ?? null;
+    el.inputGamepadRumble?.addEventListener('change', () => {
+      this.storageManager.setGamepadRumble(el.inputGamepadRumble.checked);
+      this.updateGamepadSettings({ rumble: el.inputGamepadRumble.checked });
+    });
     this.updateGamepadControls();
   },
 
@@ -531,6 +558,9 @@ export const uiGamepadMethods = {
     el.inputGamepadEnabled.checked = this.storageManager.getGamepadEnabled();
     if (el.inputGamepadInvertX) {
       el.inputGamepadInvertX.checked = this.storageManager.getGamepadInvertX();
+    }
+    if (el.inputGamepadRumble) {
+      el.inputGamepadRumble.checked = this.storageManager.getGamepadRumble();
     }
     const fill = (select, entries, selectedValue) => {
       if (!select) {
