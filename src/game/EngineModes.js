@@ -527,16 +527,17 @@ export const engineModeMethods = {
   /**
    * Starts a Flux run: an endless chain of generated shapes sharing one shot reserve.
    * @param {string|null} seed - Run seed; a fresh random seed when omitted.
-   * @param {{isShared?: boolean, weekKey?: string}} [options] - isShared marks a run started
-   *   from a shared seed link, which locks the device tilt so every player gets the same
-   *   physics; weekKey is the week a weekly restart belongs to (this week by default).
+   * @param {{isShared?: boolean, weekKey?: string, isRestart?: boolean}} [options] - isShared
+   *   marks a run started from a shared seed link, which locks the device tilt so every player
+   *   gets the same physics; weekKey is the week a weekly restart belongs to (this week by
+   *   default); isRestart marks a restart, which never pays the weekly bonus.
    */
-  startFluxRun(seed = null, { isShared = false, weekKey = undefined } = {}) {
+  startFluxRun(seed = null, { isShared = false, weekKey = undefined, isRestart = false } = {}) {
     const runSeed = seed || this.createFluxSeed();
     this.initFluxRun(runSeed);
     this.isSharedFluxRun = Boolean(isShared);
     // A run on this week's seed is the weekly run, however it was started.
-    this.detectWeeklyFlux(runSeed, weekKey);
+    const isWeekly = this.detectWeeklyFlux(runSeed, weekKey);
     this.buildFluxStage({ persist: false });
     this.currentBall = this.createRandomLauncherBall();
     this.nextBall = this.createRandomLauncherBall();
@@ -544,6 +545,9 @@ export const engineModeMethods = {
     this.state = GAME_STATES.PLAYING;
     const canvasCfg = this.gameConfig.canvas;
     this.updateAim(canvasCfg.launcherX, canvasCfg.launcherY + canvasCfg.initialAimOffsetY);
+    if (isWeekly && !isRestart && !this.isRestoringRun) {
+      this.payWeeklyFluxBonus(this.weeklyWeekKey);
+    }
     this.notifyUI();
   },
 

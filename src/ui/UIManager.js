@@ -688,6 +688,8 @@ export class UIManager {
       this.autoPausedByOverlay = true;
       this.engine.state = GAME_STATES.PAUSED;
     }
+    // Another tab may have unlocked a mode since the last refresh.
+    this.refreshModeLocks(this.getModeAccess());
     this.syncDrawerState();
     if (this.elements.btnCloseDrawer) {
       this.elements.btnCloseDrawer.focus();

@@ -1505,6 +1505,14 @@
       "cascade": 10,
       "boss_rush": 12
     },
+    "recordKeys": {
+      "endless": ["endlessHighScore"],
+      "puzzle": ["puzzleHighScore", "puzzleBestStage"],
+      "blitz": ["blitzHighScore"],
+      "flux": ["fluxHighScore", "fluxBestStage"],
+      "cascade": ["cascadeHighScore"],
+      "boss_rush": ["bossRushHighScore", "bossRushBestWave"]
+    },
     "stateNew": "new",
     "stateSeen": "seen",
     "grandfather": {

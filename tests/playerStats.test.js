@@ -266,3 +266,26 @@ test('typographic characters inside translated labels are replaced by ASCII', ()
   assert.equal(text.includes(dash), false);
   assert.equal(text.includes(quote), false);
 });
+
+test('summary text leaves out the best of a mode that has no record', () => {
+  const dictionaries = { en: loadJson('./locales/en.json'), fr: loadJson('./locales/fr.json') };
+  let stats = createPlayerStats(NOW_MS);
+  stats = applyRunOutcome(stats, { mode: FLUX, outcome: 'loss' });
+  stats = applyRunOutcome(stats, { mode: CAMPAIGN, levelId: 2, outcome: 'win' });
+  const records = { campaign: { level: 2, stars: 3 }, modes: { [FLUX]: { score: 0, kind: 'stage', stage: 0 } } };
+  for (const lang of ['en', 'fr']) {
+    i18n.dictionaries.set(lang, dictionaries[lang]);
+    i18n.currentLocale = lang;
+    const text = buildPlayerStatsText(stats, records, {
+      schemaVersion: CURRENT_SAVE_SCHEMA_VERSION,
+      modeOrder: [CAMPAIGN, FLUX],
+      modeLabels: { [CAMPAIGN]: 'Campaign', [FLUX]: 'Flux' }
+    }, (key, params) => i18n.t(key, params));
+    const fluxLine = text.split('\n').find((line) => line.startsWith('Flux'));
+    const bestWord = i18n.t('modals.stats.overview.bestScore', { score: 0 });
+    assert.ok(fluxLine, lang);
+    assert.equal(fluxLine.includes(bestWord), false, `${lang}: ${fluxLine}`);
+    assert.equal(/,\s*$/.test(fluxLine), false, `${lang}: no dangling separator`);
+    assert.equal(/\{\{/.test(text), false, lang);
+  }
+});

@@ -164,6 +164,7 @@ const EXPECTED_PROTOTYPE_NAMES = [
   'startEndlessMode',
   'startFluxRun',
   'startWeeklyFlux',
+  'payWeeklyFluxBonus',
   'startImpactWave',
   'countPlayTimeForStats',
   'countShotForStats',

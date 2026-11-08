@@ -1550,6 +1550,8 @@ function makeDrawerUi({ state = 'playing' } = {}) {
     ui.elements.modalSettings
   ];
   ui.getOverlayModals = () => [ui.elements.modalLevels, ui.elements.modalShop, ui.elements.modalSettings];
+  // Opening the menu re-reads the mode locks; this harness has no gated buttons.
+  ui.refreshModeLocks = () => {};
   return { ui, focusLog };
 }
 

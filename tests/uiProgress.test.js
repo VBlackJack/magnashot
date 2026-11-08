@@ -29,6 +29,7 @@ import {
   describeModeLock,
   formatUnlockedModesText,
   isAriaDisabled,
+  isCurrentWeeklyRun,
   isModeUnlocked,
   plainModeName,
   setModeLabel
@@ -618,4 +619,62 @@ test('the overlay list holds the stats window and Escape closes it', () => {
   });
   assert.ok(ui.getOverlayModals().includes(ui.elements.modalStats));
   assert.equal(ui.isAnyOverlayModalOpen(), true);
+});
+
+test('the drawer decides on the live mode access, not on a stale aria-disabled', () => {
+  const makeCase = (liveUnlocked, staleDisabled) => {
+    const button = fakeElement();
+    button.setAttribute('aria-disabled', String(staleDisabled));
+    let handler = null;
+    button.addEventListener = (type, fn) => { handler = fn; };
+    const closes = [];
+    const ui = makeUi({
+      access: { [GAME_MODES.ENDLESS]: { unlocked: liveUnlocked } },
+      elements: { drawer: { querySelectorAll: () => [button] }, btnEndless: button, btnMenu: null, drawerBackdrop: null, btnCloseDrawer: null }
+    });
+    ui.closeDrawer = (options) => closes.push(options);
+    ui.bindDrawerEvents();
+    handler();
+    return closes;
+  };
+  assert.deepEqual(makeCase(true, true), [{ resume: false }], 'another tab unlocked it: the menu closes');
+  assert.deepEqual(makeCase(false, false), [], 'still locked live: the menu stays open');
+});
+
+test('only the weekly run of the current week lights the Weekly button', () => {
+  const week = getUtcIsoWeekKey(Date.now());
+  const run = { mode: GAME_MODES.FLUX, isWeeklyFluxRun: true, weeklyWeekKey: week };
+  assert.equal(isCurrentWeeklyRun(run, week), true);
+  assert.equal(isCurrentWeeklyRun({ ...run, weeklyWeekKey: '2020-W01' }, week), false);
+  assert.equal(isCurrentWeeklyRun({ ...run, isWeeklyFluxRun: false }, week), false);
+  assert.equal(isCurrentWeeklyRun({ ...run, mode: GAME_MODES.ENDLESS }, week), false);
+});
+
+test('Daily history rows carry explicit table roles that survive the narrow layout', () => {
+  const html = readFileSync('./index.html', 'utf8');
+  assert.match(html, /<table class="stats-table" role="table">/);
+  assert.equal((html.match(/role="columnheader"/g) || []).length, 6);
+  const makeNode = (tag) => {
+    const node = {
+      tag, attrs: {}, dataset: {}, children: [],
+      setAttribute(k, v) { node.attrs[k] = v; },
+      appendChild(c) { node.children.push(c); }
+    };
+    return node;
+  };
+  const body = { replaceChildren: (...rows) => { body.rows = rows; } };
+  const previous = globalThis.document;
+  globalThis.document = { createElement: makeNode };
+  try {
+    const ui = makeUi({
+      storage: { getDailyHistory: () => [{ d: '2026-11-07', s: 5200, w: 6, m: null, k: 4, g: false }] },
+      elements: { statsDailyBody: body }
+    });
+    ui.renderDailyHistory();
+  } finally {
+    globalThis.document = previous;
+  }
+  const [row] = body.rows;
+  assert.equal(row.attrs.role, 'row');
+  assert.deepEqual(row.children.map((cell) => cell.attrs.role), ['rowheader', 'cell', 'cell', 'cell', 'cell', 'cell']);
 });

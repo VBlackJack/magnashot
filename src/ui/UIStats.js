@@ -410,6 +410,9 @@ export const uiStatsMethods = {
       els.statsDailyBody.replaceChildren(
         ...rows.map((row) => {
           const tr = document.createElement('tr');
+          // Narrow screens turn the table into blocks (see styles/main.css), which drops the
+          // native table semantics: explicit roles keep them.
+          tr.setAttribute('role', 'row');
           const cells = [row.date, row.challenge, row.mutator, row.score, row.wave, row.streak];
           const columnKeys = ['date', 'challenge', 'mutator', 'score', 'wave', 'streak'];
           cells.forEach((text, index) => {
@@ -417,6 +420,7 @@ export const uiStatsMethods = {
             if (index === 0) {
               cell.scope = 'row';
             }
+            cell.setAttribute('role', index === 0 ? 'rowheader' : 'cell');
             cell.textContent = text;
             // Below the narrow breakpoint each cell prints its column name (see styles/main.css).
             cell.dataset.label = t(`modals.stats.daily.col.${columnKeys[index]}`);

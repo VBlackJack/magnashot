@@ -322,7 +322,7 @@ test('restartCurrent on a weekly run keeps the seed and does not pay again', () 
   });
 });
 
-test('any start on the weekly seed is the weekly run, without a bonus', () => {
+test('any start on the weekly seed is the weekly run and pays the bonus once', () => {
   withEngine((engine, storage) => {
     const weekKey = getUtcIsoWeekKey(Date.now());
     const seed = getWeeklyFluxSeed(weekKey, fluxConfig.seed, gameConfig.weeklyFlux.seedSalt);
@@ -330,11 +330,33 @@ test('any start on the weekly seed is the weekly run, without a bonus', () => {
     engine.startFluxRun(seed);
     assert.equal(engine.isWeeklyFluxRun, true);
     assert.equal(engine.isSharedFluxRun, true);
-    assert.equal(storage.getCoins(), coins);
+    assert.equal(storage.getCoins(), coins + WEEKLY_BONUS);
+    engine.startFluxRun(seed);
+    assert.equal(storage.getCoins(), coins + WEEKLY_BONUS, 'a second start in the same week pays nothing');
     engine.startFluxRun('abc123');
     assert.equal(engine.isWeeklyFluxRun, false);
     assert.equal(engine.weeklyWeekKey, null);
     assert.equal(engine.isSharedFluxRun, false);
+    assert.equal(storage.getCoins(), coins + WEEKLY_BONUS);
+  });
+});
+
+test('a seed link start pays once, a restart and a restore never pay', () => {
+  withEngine((engine, storage) => {
+    const weekKey = getUtcIsoWeekKey(Date.now());
+    const seed = getWeeklyFluxSeed(weekKey, fluxConfig.seed, gameConfig.weeklyFlux.seedSalt);
+    const coins = storage.getCoins();
+    engine.startFluxRun(seed, { isShared: true });
+    assert.equal(storage.getCoins(), coins + WEEKLY_BONUS);
+    fireShots(engine, 1);
+    const snapshot = JSON.parse(JSON.stringify(captureRunSnapshot(engine, storage.getRunSnapshotVersion())));
+    // Forget the claim, so only the restart and restore guards can prevent a payment.
+    storage.safeSetItem(gameConfig.storage.keys.weeklyFluxClaimedWeek, '');
+    engine.restartCurrent();
+    assert.equal(storage.getCoins(), coins + WEEKLY_BONUS, 'restart does not pay');
+    engine.startEndlessMode();
+    assert.ok(applyRunSnapshot(engine, snapshot));
+    assert.equal(storage.getCoins(), coins + WEEKLY_BONUS, 'restore does not pay');
   });
 });
 

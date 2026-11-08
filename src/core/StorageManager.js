@@ -1106,7 +1106,24 @@ export class StorageManager {
    *   Access of every mode: stored entries plus the live campaign rule.
    */
   getModeAccess() {
-    return resolveModeAccess(this.getModeUnlocks(), this.getClearedCampaignLevel(), this.modeUnlocksConfig);
+    const access = resolveModeAccess(this.getModeUnlocks(), this.getClearedCampaignLevel(), this.modeUnlocksConfig);
+    // A mode with a record of its own was played, so it is open (a profile rolled back to an
+    // older version and updated again has records but no stored unlock).
+    for (const [mode, keyNames] of Object.entries(this.modeUnlocksConfig?.recordKeys || {})) {
+      if (access[mode] && !access[mode].unlocked && this.hasModeRecord(keyNames)) {
+        access[mode] = { ...access[mode], unlocked: true };
+      }
+    }
+    return access;
+  }
+
+  /** @returns {boolean} True when one of the stored record keys holds a positive number. */
+  hasModeRecord(keyNames) {
+    const keys = this.storageConfig.keys;
+    return (Array.isArray(keyNames) ? keyNames : []).some((name) => {
+      const suffix = keys[name];
+      return typeof suffix === 'string' && Number.parseInt(this.safeGetItem(suffix), 10) > 0;
+    });
   }
 
   /**
@@ -1265,11 +1282,17 @@ export class StorageManager {
 
   /**
    * Keeps the best Weekly Flux score and stage of the week (single slot, replaced when the week
-   * changes). The timeline follows the score.
+   * changes). The timeline follows the score. A write for a week older than the stored one
+   * (a stale tab, a restored run of last week) is ignored: week keys are zero padded, so they
+   * compare correctly as strings.
    * @returns {{week: string, seed: string, score: number, stage: number, tl?: object}} The stored best.
    */
   setWeeklyFluxBest(weekKey, seed, score, stage, tl = null) {
     const key = this.storageConfig.keys.weeklyFluxBest;
+    const storedWeek = key ? this.readJsonObject(key).week : null;
+    if (typeof storedWeek === 'string' && typeof weekKey === 'string' && weekKey < storedWeek) {
+      return this.getWeeklyFluxBest(storedWeek);
+    }
     const cleanScore = Math.max(0, Math.floor(Number(score) || 0));
     const cleanStage = Math.max(0, Math.floor(Number(stage) || 0));
     const timeline = normalizeShotTimeline(tl, this.shotTimelineConfig);

@@ -1306,6 +1306,7 @@
       "playTime": "Temps de jeu : {{hours}} h {{minutes}} min",
       "shots": "Tirs effectués : {{shots}}",
       "modeLine": "{{mode}} : {{runs}} parties, {{wins}} victoires, {{quits}} abandons, {{best}}",
+      "modeLineNoBest": "{{mode}} : {{runs}} parties, {{wins}} victoires, {{quits}} abandons",
       "campaignLine": "Campagne : niveau {{level}} atteint, {{stars}} ★",
       "hardestLine": "Niveau le plus dur : {{level}} ({{fails}} échecs)",
       "schemaLine": "Schéma de sauvegarde {{version}}"

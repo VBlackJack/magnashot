@@ -131,30 +131,35 @@ export const engineProgressMethods = {
   },
 
   /**
-   * Starts the Flux run of this week, and pays the one-time weekly bonus.
+   * Starts the Flux run of this week. The one-time weekly bonus is paid by startFluxRun, so
+   * every way of starting this week's seed pays the same way.
    * @param {{isRestart?: boolean}} [options] - A restart keeps the running week and never pays.
    */
   startWeeklyFlux({ isRestart = false } = {}) {
     const weeklyCfg = this.gameConfig.weeklyFlux;
     const weekKey = isRestart && this.weeklyWeekKey ? this.weeklyWeekKey : getUtcIsoWeekKey(Date.now());
     const seed = getWeeklyFluxSeed(weekKey, this.fluxConfig.seed, weeklyCfg.seedSalt);
-    this.startFluxRun(seed, { isShared: true, weekKey });
-    const bonusCoins = weeklyCfg.firstPlayBonusCoins;
-    if (
-      !isRestart
-      && !this.isRestoringRun
-      && bonusCoins > 0
-      && this.storageManager.claimWeeklyFluxBonus?.(weekKey, bonusCoins)
-    ) {
-      this.audioManager.playEffect('achievement');
-      this.particleSystem.spawnFloatingText(
-        this.gameConfig.canvas.logicalWidth * MATH_CONSTANTS.HALF,
-        this.gameConfig.canvas.launcherY + this.gameConfig.canvas.launcherPopupOffsetY,
-        t('gameplay.feedback.weeklyBonus.claimed', { coins: bonusCoins }),
-        this.gameConfig.theme.coinPopupColor
-      );
-      this.notifyUI();
+    this.startFluxRun(seed, { isShared: true, weekKey, isRestart });
+  },
+
+  /**
+   * Pays the once-per-week bonus of the first start of this week's Flux seed, with a floating text.
+   * @param {string} weekKey - Week of the run just started.
+   * @returns {boolean} True when the bonus was paid now.
+   */
+  payWeeklyFluxBonus(weekKey) {
+    const bonusCoins = this.gameConfig.weeklyFlux?.firstPlayBonusCoins;
+    if (!(bonusCoins > 0) || !this.storageManager.claimWeeklyFluxBonus?.(weekKey, bonusCoins)) {
+      return false;
     }
+    this.audioManager.playEffect('achievement');
+    this.particleSystem.spawnFloatingText(
+      this.gameConfig.canvas.logicalWidth * MATH_CONSTANTS.HALF,
+      this.gameConfig.canvas.launcherY + this.gameConfig.canvas.launcherPopupOffsetY,
+      t('gameplay.feedback.weeklyBonus.claimed', { coins: bonusCoins }),
+      this.gameConfig.theme.coinPopupColor
+    );
+    return true;
   },
 
   /**

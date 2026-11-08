@@ -187,3 +187,16 @@ test('at an equal weekly score a complete timeline replaces a partial one', () =
     assert.equal(manager.getWeeklyFluxBest(WEEK).tl.n, 4);
   });
 });
+
+test('a write for an older week never replaces a newer weekly best', () => {
+  withManager((manager) => {
+    const seed = getWeeklyFluxSeed(OTHER_WEEK, SEED_CFG, seedSalt);
+    manager.setWeeklyFluxBest(OTHER_WEEK, seed, 700, 4);
+    const stale = manager.setWeeklyFluxBest(WEEK, 'aaaaaa', 9000, 9);
+    assert.equal(stale.week, OTHER_WEEK);
+    assert.deepEqual(manager.getWeeklyFluxBest(OTHER_WEEK), { week: OTHER_WEEK, seed, score: 700, stage: 4 });
+    assert.equal(manager.getWeeklyFluxBest(WEEK), null);
+    manager.setWeeklyFluxBest('2027-W01', 'bbbbbb', 5, 1);
+    assert.equal(manager.getWeeklyFluxBest('2027-W01').score, 5, 'a newer week still replaces the slot');
+  });
+});

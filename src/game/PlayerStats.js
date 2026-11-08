@@ -259,6 +259,7 @@ export function splitPlayTime(playMs) {
   return { hours: Math.floor(totalMinutes / MINUTES_PER_HOUR), minutes: totalMinutes % MINUTES_PER_HOUR };
 }
 
+/** The best result of a mode as text, or an empty string when the mode has no record yet. */
 function buildBestText(record, translate) {
   const score = clampCount(record?.score);
   if (record?.kind === RECORD_KIND_STAGE && record.stage > 0) {
@@ -267,7 +268,7 @@ function buildBestText(record, translate) {
   if (record?.kind === RECORD_KIND_WAVE && record.wave > 0) {
     return translate('modals.stats.overview.bestWave', { score, wave: record.wave });
   }
-  return translate('modals.stats.overview.bestScore', { score });
+  return score > 0 ? translate('modals.stats.overview.bestScore', { score }) : '';
 }
 
 /**
@@ -291,12 +292,13 @@ export function buildPlayerStatsText(stats, records, meta, translate) {
     if (!entry || entry.runs <= 0) {
       continue;
     }
-    lines.push(translate('stats.copy.modeLine', {
+    const best = buildBestText(records?.modes?.[mode], translate);
+    lines.push(translate(best ? 'stats.copy.modeLine' : 'stats.copy.modeLineNoBest', {
       mode: meta?.modeLabels?.[mode] ?? mode,
       runs: entry.runs,
       wins: entry.wins,
       quits: entry.quits,
-      best: buildBestText(records?.modes?.[mode], translate)
+      best
     }));
   }
   if (records?.campaign?.level > 0) {

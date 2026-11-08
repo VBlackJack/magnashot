@@ -389,19 +389,19 @@
         <p id="stats-daily-summary" class="modal-subtext hidden"></p>
         <p id="stats-daily-empty" class="modal-subtext hidden" data-i18n="modals.stats.daily.empty"></p>
         <div id="stats-daily-wrap" class="stats-table-wrap">
-          <table class="stats-table">
+          <table class="stats-table" role="table">
             <caption id="stats-daily-caption"></caption>
-            <thead>
-              <tr>
-                <th scope="col" data-i18n="modals.stats.daily.col.date"></th>
-                <th scope="col" data-i18n="modals.stats.daily.col.challenge"></th>
-                <th scope="col" data-i18n="modals.stats.daily.col.mutator"></th>
-                <th scope="col" data-i18n="modals.stats.daily.col.score"></th>
-                <th scope="col" data-i18n="modals.stats.daily.col.wave"></th>
-                <th scope="col" data-i18n="modals.stats.daily.col.streak"></th>
+            <thead role="rowgroup">
+              <tr role="row">
+                <th scope="col" role="columnheader" data-i18n="modals.stats.daily.col.date"></th>
+                <th scope="col" role="columnheader" data-i18n="modals.stats.daily.col.challenge"></th>
+                <th scope="col" role="columnheader" data-i18n="modals.stats.daily.col.mutator"></th>
+                <th scope="col" role="columnheader" data-i18n="modals.stats.daily.col.score"></th>
+                <th scope="col" role="columnheader" data-i18n="modals.stats.daily.col.wave"></th>
+                <th scope="col" role="columnheader" data-i18n="modals.stats.daily.col.streak"></th>
               </tr>
             </thead>
-            <tbody id="stats-daily-body"></tbody>
+            <tbody id="stats-daily-body" role="rowgroup"></tbody>
           </table>
         </div>
       </div>

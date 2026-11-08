@@ -25,6 +25,7 @@ import {
   MODE_BUTTON_KEYS,
   MODE_NAME_KEYS,
   MODE_LOCK_BUTTON_KEYS,
+  isCurrentWeeklyRun,
   ARCADE_CARD_SPECS,
   MODE_LOCKED_CLASS,
   MODE_NEW_CLASS,
@@ -84,9 +85,12 @@ export const uiHudRefreshMethods = {
     }
     // A Weekly Flux run highlights its own button, not the plain Flux one.
     const isWeeklyRun = engine.mode === GAME_MODES.FLUX && engine.isWeeklyFluxRun === true;
+    // Only the run of the current week lights the Weekly button: a run of last week, still
+    // open after Monday 00:00 UTC, is plain Flux for the menu.
+    const isCurrentWeekRun = isCurrentWeeklyRun(engine, getUtcIsoWeekKey(Date.now()));
     for (const [elementKey, isActive] of [
-      ['btnFlux', engine.mode === GAME_MODES.FLUX && !isWeeklyRun],
-      ['btnWeekly', isWeeklyRun]
+      ['btnFlux', engine.mode === GAME_MODES.FLUX && !isCurrentWeekRun],
+      ['btnWeekly', isCurrentWeekRun]
     ]) {
       const button = this.elements[elementKey];
       if (button) {
@@ -688,7 +692,7 @@ export const uiHudRefreshMethods = {
   /** Best score of the given Weekly Flux week (this week when none is given), 0 when none yet. */
   getWeeklyFluxBestScore(weekKey) {
     const key = weekKey || getUtcIsoWeekKey(Date.now());
-    return this.storageManager.getWeeklyFluxBest?.(key)?.score || 0;
+    return this.storageManager?.getWeeklyFluxBest?.(key)?.score || 0;
   },
 
   /** Weekly Flux menu label: this week's best once played, the bonus until it is claimed. */
@@ -699,7 +703,7 @@ export const uiHudRefreshMethods = {
       return t('app.nav.button.weeklyBestBadge', { score: formatNumber(bestScore) });
     }
     const bonusCoins = this.gameConfig.weeklyFlux?.firstPlayBonusCoins || 0;
-    const isClaimed = this.storageManager.hasClaimedWeeklyFluxBonus?.(weekKey) === true;
+    const isClaimed = this.storageManager?.hasClaimedWeeklyFluxBonus?.(weekKey) === true;
     if (bonusCoins > 0 && !isClaimed) {
       return t('app.nav.button.weeklyBonusBadge', { coins: formatNumber(bonusCoins) });
     }

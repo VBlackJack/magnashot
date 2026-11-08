@@ -180,3 +180,26 @@ test('storage: corrupt or foreign unlock values are ignored', () => {
     assert.deepEqual(manager.getModeUnlocks(), {});
   });
 });
+
+test('storage: a mode with a record of its own is open without a stored unlock', () => {
+  assert.deepEqual(Object.keys(cfg.recordKeys).sort(), Object.keys(THRESHOLDS).sort());
+  for (const [mode, keyNames] of Object.entries(cfg.recordKeys)) {
+    for (const keyName of keyNames) {
+      assert.equal(typeof keys[keyName], 'string', `${mode}: ${keyName} is a real storage key`);
+    }
+  }
+  withManager(null, (manager, storage) => {
+    assert.equal(manager.getModeAccess()[GAME_MODES.BLITZ].unlocked, false);
+    assert.equal(manager.getModeAccess()[GAME_MODES.BOSS_RUSH].unlocked, false);
+    storage.setItem(`${prefix}${keys.blitzHighScore}`, '1200');
+    storage.setItem(`${prefix}${keys.bossRushBestWave}`, '3');
+    manager.memoryFallback.clear();
+    const access = manager.getModeAccess();
+    assert.equal(access[GAME_MODES.BLITZ].unlocked, true);
+    assert.equal(access[GAME_MODES.BOSS_RUSH].unlocked, true);
+    assert.equal(access[GAME_MODES.ENDLESS].unlocked, false, 'a mode without a record stays locked');
+    storage.setItem(`${prefix}${keys.endlessHighScore}`, '0');
+    manager.memoryFallback.clear();
+    assert.equal(manager.getModeAccess()[GAME_MODES.ENDLESS].unlocked, false, 'a zero record unlocks nothing');
+  });
+});

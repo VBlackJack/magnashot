@@ -1306,6 +1306,7 @@
       "playTime": "Play time: {{hours}} h {{minutes}} min",
       "shots": "Shots fired: {{shots}}",
       "modeLine": "{{mode}}: {{runs}} runs, {{wins}} wins, {{quits}} left, {{best}}",
+      "modeLineNoBest": "{{mode}}: {{runs}} runs, {{wins}} wins, {{quits}} left",
       "campaignLine": "Campaign: level {{level}} reached, {{stars}} ★",
       "hardestLine": "Hardest level: {{level}} ({{fails}} failed attempts)",
       "schemaLine": "Save schema {{version}}"

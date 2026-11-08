@@ -23,9 +23,24 @@ import {
   shouldIgnoreRepeatedKey,
   isBrowserShortcut,
   resolveNextCampaignTarget,
-  isAriaDisabled
+  isAriaDisabled,
+  isModeUnlocked,
+  MODE_LOCK_BUTTON_KEYS
 } from './UIHelpers.js';
 import { STATS_TABS } from './UIStats.js';
+
+/**
+ * True when a menu button starts a mode that is still locked. A gated mode is judged on the
+ * live storage, like runIfModeUnlocked, so a stale aria-disabled never disagrees with it.
+ */
+function isDrawerButtonLocked(ui, button) {
+  for (const [mode, elementKeys] of Object.entries(MODE_LOCK_BUTTON_KEYS)) {
+    if (elementKeys.some((elementKey) => ui.elements[elementKey] === button)) {
+      return !isModeUnlocked(ui.getModeAccess(), mode);
+    }
+  }
+  return isAriaDisabled(button);
+}
 
 /** Methods installed on UIManager.prototype by UIManager.js. */
 export const uiInputBindingMethods = {
@@ -74,7 +89,7 @@ export const uiInputBindingMethods = {
       for (const button of this.elements.drawer.querySelectorAll('[data-closes-drawer]')) {
         button.addEventListener('click', () => {
           // A locked mode starts nothing: the menu stays open and shows what to do.
-          if (isAriaDisabled(button)) {
+          if (isDrawerButtonLocked(this, button)) {
             return;
           }
           this.closeDrawer({ resume: false });

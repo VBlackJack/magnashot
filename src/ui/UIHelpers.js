@@ -633,11 +633,24 @@ export function plainModeName(label) {
 }
 
 /**
+ * True when the engine runs the weekly Flux of the given (current) week. A run of an older
+ * week, still open after Monday 00:00 UTC, is not highlighted as the Weekly button.
+ * @param {{mode?: string, isWeeklyFluxRun?: boolean, weeklyWeekKey?: string|null}} engine - Game engine.
+ * @param {string} currentWeekKey - Week key of now.
+ * @returns {boolean}
+ */
+export function isCurrentWeeklyRun(engine, currentWeekKey) {
+  return engine?.mode === GAME_MODES.FLUX
+    && engine.isWeeklyFluxRun === true
+    && engine.weeklyWeekKey === currentWeekKey;
+}
+
+/**
  * True unless the access table says the mode is locked. A missing entry (always-open modes,
  * or storage that cannot say) never blocks a start.
  * @param {Object<string, {unlocked?: boolean}>|null|undefined} access - Storage getModeAccess().
  * @param {string} mode - Mode id.
- * @returns {boolean}
+ * @returns {boolean} False only when the access table says the mode is locked.
  */
 export function isModeUnlocked(access, mode) {
   return access?.[mode]?.unlocked !== false;
