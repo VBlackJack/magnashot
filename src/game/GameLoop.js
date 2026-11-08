@@ -53,8 +53,10 @@ export const SCENE_TIME_SCALE_FIXED = 'fixed';
  * @param {object} [options.engine] - Game engine for the one-board form (update(), state, hitStopFrames, and the
  *   optional getTimeScale() below 1 for slow motion and refreshAimPreview() before a render).
  * @param {object} [options.renderer] - Renderer exposing render(engine, alpha), for the one-board form.
- * @param {Function} [options.getScene] - Returns `{boards: [{engine, renderer}], versus?, timeScale?}`.
- *   Takes precedence over engine and renderer and is read once per frame.
+ * @param {Function} [options.getScene] - Returns `{boards: [{engine, renderer}], versus?, timeScale?, step?, isAdvancing?}`.
+ *   Takes precedence over engine and renderer and is read once per frame. When the scene provides `step`, it is
+ *   called once per fixed step instead of each board's update(); `isAdvancing()` (optional) tells whether that
+ *   step moves the boards, so a held scene is drawn without interpolation.
  * @param {number} options.fixedStepMs - Fixed simulation step in milliseconds.
  * @param {number} options.maxAccumulatedMs - Upper bound of elapsed time per frame.
  * @param {number} options.idleRenderIntervalMs - Redraw interval while not playing.
@@ -108,13 +110,23 @@ export function createGameLoop({
       const timeScale = !fixedTime && typeof leadEngine.getTimeScale === 'function' ? leadEngine.getTimeScale() : 1;
       accumulator += elapsed * timeScale;
 
+      // A scene with its own step() drives its boards itself (match controller: CPU, routing, rounds).
+      const sceneStep = typeof scene.step === 'function' ? scene.step : null;
       while (accumulator >= fixedStepMs) {
+        // A scene that is held (paused, between rounds) says so: its boards keep their last
+        // positions, so interpolating them would swing the picture back and forth.
+        const isSceneAdvancing = sceneStep === null || typeof scene.isAdvancing !== 'function' || scene.isAdvancing();
         for (let i = 0; i < boards.length; i++) {
           const boardEngine = boards[i].engine;
           lastUpdateAdvanced[i] = fixedTime
-            ? boardEngine.state === GAME_STATES.PLAYING && !(boardEngine.stageTransitionFrames > 0)
+            ? isSceneAdvancing && boardEngine.state === GAME_STATES.PLAYING && !(boardEngine.stageTransitionFrames > 0)
             : willSimulationAdvance(boardEngine);
-          boardEngine.update();
+          if (sceneStep === null) {
+            boardEngine.update();
+          }
+        }
+        if (sceneStep !== null) {
+          sceneStep();
         }
         accumulator -= fixedStepMs;
       }
