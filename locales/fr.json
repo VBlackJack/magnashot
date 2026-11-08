@@ -1437,6 +1437,78 @@
     },
     "defaultName": "Fantôme"
   },
+  "versus": {
+    "mode": {
+      "name": "Duel de polarité"
+    },
+    "tier": {
+      "easy": "Facile",
+      "normal": "Normal",
+      "hard": "Difficile",
+      "hardLocked": "Battez le niveau Normal une fois pour débloquer Difficile.",
+      "record": "{{wins}} gagnées, {{losses}} perdues"
+    },
+    "card": {
+      "title": "Duel de polarité",
+      "description": "Affrontez l'ordinateur. Vos combos envoient des sphères chargées sur son plateau : neutralisez celles qu'on vous envoie.",
+      "best": "Bilan : {{wins}} gagnées, {{losses}} perdues"
+    },
+    "lobby": {
+      "title": "Duel de polarité",
+      "subtitle": "Choisissez un adversaire. Le premier à gagner deux manches remporte le match.",
+      "pickTier": "Choisissez une difficulté",
+      "start": "Lancer le match",
+      "back": "Retour"
+    },
+    "bar": {
+      "roundPips": "Manche {{round}}. Vous : {{player}} gagnée(s). Ordinateur : {{cpu}} gagnée(s).",
+      "roundLabel": "Manche {{round}}",
+      "timer": "Temps {{time}}",
+      "pause": "Pause"
+    },
+    "hud": {
+      "incoming": "Charges entrantes : {{count}}",
+      "incomingShort": "Reçues : {{count}}",
+      "pulse": "Jauge d'impulsion : {{percent}} %",
+      "playerBoard": "Votre plateau",
+      "cpuBoard": "Plateau de l'ordinateur",
+      "cpuBoardTier": "Plateau de l'ordinateur ({{tier}})",
+      "swap": "Échanger les sphères",
+      "polarity": "Inverser la polarité"
+    },
+    "announce": {
+      "chargeIncoming": "{{count}} sphères chargées arrivent.",
+      "chargeNeutralised": "Charge neutralisée.",
+      "pulseSent": "Impulsion envoyée : le rail de l'ordinateur descend.",
+      "pulseReceived": "Impulsion reçue : votre rail descend.",
+      "roundWon": "Manche gagnée.",
+      "roundLost": "Manche perdue.",
+      "roundDraw": "Les deux plateaux sont tombés. La manche est rejouée.",
+      "matchWon": "Match gagné, {{player}} à {{cpu}}.",
+      "matchLost": "Match perdu, {{player}} à {{cpu}}.",
+      "suddenDeath": "Mort subite : les deux rails descendent désormais toutes les {{seconds}} secondes."
+    },
+    "pause": {
+      "title": "Match en pause",
+      "resume": "Reprendre",
+      "restart": "Relancer le match",
+      "quit": "Quitter"
+    },
+    "result": {
+      "wonTitle": "Match gagné",
+      "lostTitle": "Match perdu",
+      "score": "{{player}} - {{cpu}}",
+      "neutralised": "Charges neutralisées : {{count}}",
+      "pulses": "Impulsions envoyées : {{count}}",
+      "tier": "Ordinateur {{tier}}",
+      "playAgain": "Rejouer",
+      "backToMenu": "Retour au menu"
+    },
+    "share": {
+      "won": "MagnaShot Duel de polarité : victoire contre l'ordinateur {{tier}} {{score}}, {{neutralised}} charges neutralisées, {{pulses}} impulsions",
+      "lost": "MagnaShot Duel de polarité : défaite contre l'ordinateur {{tier}} {{score}}, {{neutralised}} charges neutralisées, {{pulses}} impulsions"
+    }
+  },
   "toast": {
     "gamepad": {
       "connected": "Manette connectée",
