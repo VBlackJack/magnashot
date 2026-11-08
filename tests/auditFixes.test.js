@@ -23,6 +23,8 @@ import { StorageManager } from '../src/core/StorageManager.js';
 import { Ball } from '../src/entities/Ball.js';
 import { GameEngine } from '../src/game/GameEngine.js';
 import { GAME_MODES, GAME_STATES, SPECIAL_TYPES, CLUSTER_MODIFIERS, DAILY_MUTATORS, OBSTACLE_TYPES } from '../src/core/Constants.js';
+import { SeededRandom } from '../src/core/SeededRandom.js';
+import { captureRunSnapshot, isValidRunSnapshot, applyRunSnapshot } from '../src/game/RunSnapshot.js';
 import { applyWorldGeometry } from '../src/core/WorldGeometry.js';
 
 const loadJson = (p) => JSON.parse(fs.readFileSync(p, 'utf8'));
@@ -450,4 +452,136 @@ test('All 10 Puzzle stages build valid anchored boards and Stage 10 attaches rot
     STAGE_10_ROTOR_ANCHORS,
     'Stage 10 attaches its 3 inner anchors to the central rotor'
   );
+});
+
+const CRYO_SAMPLE_SIZE = 3000;
+const CORE_TEST_SEED = 'cryo-sample';
+const FREEZE_TEST_TURNS = 3;
+const SNAPSHOT_TEST_VERSION = 1;
+const NEGATIVE_COUNT = -1;
+const FRACTIONAL_COUNT = 1.5;
+const INVENTORY_TEST_COUNT = 2;
+
+test('cryoSurge mutator makes Freeze and Lightning cores more frequent', () => {
+  const countCores = (mutatorKey) => {
+    const engine = createTestEngine();
+    engine.seededRng = new SeededRandom(CORE_TEST_SEED);
+    engine.activeMutatorKey = mutatorKey;
+    let cores = 0;
+    for (let i = 0; i < CRYO_SAMPLE_SIZE; i++) {
+      const modifier = engine.rollEndlessModifier();
+      if (modifier === CLUSTER_MODIFIERS.FREEZE_CORE || modifier === CLUSTER_MODIFIERS.LIGHTNING_CORE) {
+        cores++;
+      }
+    }
+    return cores;
+  };
+  assert.ok(countCores(DAILY_MUTATORS.CRYO_SURGE) > countCores(null));
+});
+
+test('a Freeze Core set off between turns counts down like one set off during a shot', () => {
+  const inShot = createTestEngine();
+  inShot.startEndlessMode();
+  inShot.freezeTurnsRemaining = FREEZE_TEST_TURNS;
+  inShot.isCoreFreezeApplied = true;
+  inShot.handlePostTurnCleanup(true);
+  assert.equal(inShot.freezeTurnsRemaining, FREEZE_TEST_TURNS, 'the turn it goes off does not count');
+
+  const betweenTurns = createTestEngine();
+  betweenTurns.startEndlessMode();
+  betweenTurns.freezeTurnsRemaining = FREEZE_TEST_TURNS;
+  betweenTurns.isCoreFreezeApplied = true;
+  betweenTurns.discardBetweenTurnsCoreFreeze();
+  assert.equal(betweenTurns.isCoreFreezeApplied, false);
+  betweenTurns.handlePostTurnCleanup(true);
+  assert.equal(betweenTurns.freezeTurnsRemaining, FREEZE_TEST_TURNS - 1, 'the next shot already counts');
+
+  const inFlight = createTestEngine();
+  inFlight.startEndlessMode();
+  inFlight.physicsWorld.projectile = {};
+  inFlight.isCoreFreezeApplied = true;
+  inFlight.discardBetweenTurnsCoreFreeze();
+  assert.equal(inFlight.isCoreFreezeApplied, true, 'a core set off while a shot flies stays flagged');
+});
+
+test('run snapshot validates the special inventory and tolerates a damaged bond list', () => {
+  const engine = createTestEngine();
+  engine.startEndlessMode();
+  const reference = { ...engine.specialInventory };
+  const base = JSON.parse(JSON.stringify(captureRunSnapshot(engine, SNAPSHOT_TEST_VERSION)));
+
+  const restoreWith = (inventory, mutate) => {
+    const snapshot = JSON.parse(JSON.stringify(base));
+    snapshot.specialInventory = inventory;
+    if (mutate) {
+      mutate(snapshot);
+    }
+    const fresh = createTestEngine();
+    assert.equal(applyRunSnapshot(fresh, snapshot), true);
+    return fresh;
+  };
+
+  const valid = restoreWith({ [SPECIAL_TYPES.BOMB]: INVENTORY_TEST_COUNT });
+  assert.equal(valid.specialInventory[SPECIAL_TYPES.BOMB], INVENTORY_TEST_COUNT);
+  for (const damaged of [
+    { unknownType: 1 },
+    { [SPECIAL_TYPES.BOMB]: NEGATIVE_COUNT },
+    { [SPECIAL_TYPES.BOMB]: FRACTIONAL_COUNT },
+    { [SPECIAL_TYPES.BOMB]: '2' },
+    [INVENTORY_TEST_COUNT]
+  ]) {
+    assert.deepEqual(restoreWith(damaged).specialInventory, reference);
+  }
+  assert.doesNotThrow(() =>
+    restoreWith(reference, (snapshot) => {
+      snapshot.balls[0].bonds = null;
+    })
+  );
+  assert.ok(isValidRunSnapshot(base, SNAPSHOT_TEST_VERSION));
+});
+
+test('puzzle queue keeps the special type of every entry', () => {
+  const engine = createTestEngine();
+  engine.startPuzzleMode(1);
+  const [firstColor] = engine.activePalette;
+  engine.puzzleQueue = [
+    { colorId: firstColor, specialType: SPECIAL_TYPES.BOMB },
+    { colorId: firstColor, specialType: null },
+    { colorId: firstColor, specialType: SPECIAL_TYPES.FREEZE }
+  ];
+  engine.upcomingColorIds = engine.puzzleQueue.map((item) => item.colorId);
+  assert.deepEqual(engine.takeUpcomingBall(), { colorId: firstColor, specialType: SPECIAL_TYPES.BOMB });
+  assert.deepEqual(engine.takeUpcomingBall(), { colorId: firstColor, specialType: null });
+  assert.deepEqual(engine.takeUpcomingBall(), { colorId: firstColor, specialType: SPECIAL_TYPES.FREEZE });
+});
+
+test('a bond break that empties the board does not end Campaign, Puzzle or Flux rounds while a shot flies', () => {
+  const setups = [
+    (engine) => engine.startCampaignLevel(1),
+    (engine) => engine.startPuzzleMode(1),
+    (engine) => engine.startFluxRun(FLUX_TEST_SEED)
+  ];
+  for (const setup of setups) {
+    const engine = createTestEngine();
+    setup(engine);
+    const world = engine.physicsWorld;
+    // Every ball loses its anchor: the break below drops the whole board.
+    for (const ball of world.balls) {
+      ball.isAnchor = false;
+      ball.pivotRef = null;
+    }
+    const projectile = makeProjectile();
+    world.projectile = projectile;
+    world.hasBrokenBondThisStep = true;
+    engine.update();
+
+    assert.equal(world.balls.length, 0, `${engine.mode}: the board was released`);
+    assert.equal(world.projectile, projectile, `${engine.mode}: the shot in flight survives`);
+    assert.equal(engine.state, GAME_STATES.PLAYING, `${engine.mode}: no round end while the shot flies`);
+
+    world.projectile = null;
+    engine.handlePostTurnCleanup(false);
+    const hasEnded = engine.mode === GAME_MODES.FLUX ? engine.stageTransitionFrames > 0 : engine.state !== GAME_STATES.PLAYING;
+    assert.ok(hasEnded, `${engine.mode}: the round ends once the shot has resolved`);
+  }
 });
