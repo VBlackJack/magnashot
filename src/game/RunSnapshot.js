@@ -133,13 +133,13 @@ const isCompatibleValue = (current, saved) => {
   return typeof saved === typeof current;
 };
 
+const FAIRNESS_COUNTER_FIELDS = ['launcherDrawIndex', 'specialGrantIndex', 'specialAmmoBoughtInRun'];
+
 /**
  * Copies saved fields onto a live object and throws on a value of the wrong type, so a
  * snapshot that still parses but holds, say, a text score is discarded instead of being
  * concatenated into the run.
  */
-const FAIRNESS_COUNTER_FIELDS = ['launcherDrawIndex', 'specialGrantIndex', 'specialAmmoBoughtInRun'];
-
 const restoreFields = (target, source, fields) => {
   for (const field of fields) {
     if (source[field] === undefined) {
