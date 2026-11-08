@@ -4,6 +4,20 @@ All notable changes to **MagnaShot** are documented in this file.
 
 ## [Unreleased]
 
+## [1.14.0] - 2026-11-08
+
+### Added
+- **Daily Challenge Mutators (`Constants`, `GameEngine`, `configs/game.json`, `locales`)**: Added three new rotating Daily Challenge mutators: *Portal Matrix* (`portalMatrix`, linked Quantum Portals warping shots past the central rotor, `+25%` score), *Bumper Pinball* (`bumperPinball`, twin Energy Bumpers flanking the rotor for bank shots, `+20%` score), and *Cryo Surge* (`cryoSurge`, extra Freeze and Lightning Cores in the cluster, `+25%` score), all documented in the Codex (#53).
+- **Daily Challenge Mutator Intro Banner (`GameEngine.buildDailyIntro`, `UIManager.buildLevelIntroText`, `UIManager.updateLevelIntro`)**: The first play of a Daily Challenge seed in a session now shows a non-blocking banner naming the active mutator and its Codex rule, announced once to screen readers and dismissed on the first shot or via its close button (#53).
+- **Puzzle Mode Stages 6 to 10 (`configs/game.json`, `GameEngine.startPuzzleMode`)**: Expanded Puzzle Mode from 5 to 10 deterministic trick-shot stages (`P1` to `P10`) covering Quantum Portals, Quantum Locks + Laser Barriers, Paint Core + Rust, Dormant Barrel chains, and Inertia Rotor + Chained + Rocket, with rotor anchor attachment (`pivotIndex`) (#53).
+- **Collector Magnet Workshop Upgrade (`configs/game.json`, `GameEngine`, `Renderer.drawCollectorBins`, `WorkshopView`)**: Added a fifth permanent Workshop upgrade, *Collector Magnet* (`collectorMagnet`), adding `+15` bonus points and `+1%` Overcharge per rank to the five bottom avalanche collector bins and updating the live `+XX` slot labels on the board (#53).
+- **Completed Chapter Badge in Level Select (`LevelSelectView.renderLevelChapters`, `styles/main.css`, `locales`)**: Chapters where every star has been earned now display a gold completion badge and border (`.level-chapter.completed`) with a dedicated accessible label (#53).
+
+### Fixed
+- **Resume Current Level From Pause -> Level Select (`UIManager.js`)**: Clicking the primary Resume button in Level Select when opened from the Pause modal now unpauses the engine before closing the overlay so the Pause modal does not reappear and keyboard focus returns to the canvas (#48).
+- **Paint Core Blast Radius Upgrade Scaling (`GameEngine.destroyClusterBall`, `locales`)**: Destroying a cluster Paint Core now passes `getBlastRadiusMultiplier()` to `triggerPaint`, matching Freeze Core, Dormant Bomb, and the Brush special sphere (#48).
+- **Puzzle Stage Frame-0 Anchor Connectivity (`configs/game.json`)**: Tightened horizontal spacing on Puzzle Stage 1 so all six spheres form initial magnetic bonds within the bond creation distance at frame 0 (#53).
+
 ## [1.13.0] - 2026-11-05
 
 ### Added
