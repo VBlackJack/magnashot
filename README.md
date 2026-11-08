@@ -99,7 +99,7 @@ Plug in or pair a gamepad with the standard layout and press any button: the gam
 | **Menus: move / confirm / back** | D-pad or left stick / bottom face button / right face button |
 | **Menus: previous / next tab** | Left / right bumper |
 
-If the pad disconnects during a run, the game pauses. In **Settings**, the **Controller** row turns controller input on or off and sets the stick deadzone (small, medium, large), the aim speed (slow, normal, fast) and the horizontal aim inversion; the choices are stored locally.
+If the pad disconnects during a run, the game pauses. In **Settings**, the **Controller** row turns controller input on or off and sets the stick deadzone (small, medium, large), the aim speed (slow, normal, fast) and the horizontal aim inversion; the choices are stored locally. A **Vibration** option (on by default) lets a pad that supports it shake when a charge lands on your board, when a field pulse hits you and when you lose a round; it stays silent with reduced motion.
 
 ---
 
@@ -113,6 +113,8 @@ A head-to-head mode against the CPU, opened at campaign level 6 from its card in
 - **Field pulse**: neutralising charges fills the Overcharge meter; a full meter fires a field pulse that lowers the opponent's anchor rail one step.
 - **Match**: best of 3 rounds; a round is lost when a board crosses its danger line. If both fall together the round is replayed. After 3 minutes **sudden death** lowers both rails every 20 seconds.
 - **Screens**: on wide screens (tablets, desktop) the two boards sit side by side; on phones the CPU board becomes a mini-view next to or above yours. The same controls as a single player run work, and a controller is supported.
+- **First duel tutorial**: the first time you start a duel on a device, a short dialog explains charges, the polarity guard and the field pulse in three steps while the match waits. Skip it at any step (Escape, the Skip button or the controller's back button); it is not shown again.
+- **Sound**: each board plays on its own side of the stereo field (the first board on the left, the second on the right).
 - **Records**: your wins and losses per difficulty are kept locally and shown in **My stats**; the result card has a Share button.
 
 ### Two players on one device
@@ -148,6 +150,7 @@ The codebase follows a modular, zero-dependency ES module architecture with stri
 ├── scripts/
 │   ├── calibrate-campaign.mjs# Offline campaign level calibration CLI
 │   ├── calibrate-classic.mjs # Offline report of how hard Purist is for the greedy bot (prints, never writes)
+│   ├── calibrate-versus.mjs  # CPU tier gate: Hard and Normal must beat Easy, pulses per round stay in range (`npm run calibrate:versus`, run by CI)
 │   ├── pages-artifact.mjs    # Builds the GitHub Pages artifact (_site/) with only the runtime files
 │   ├── release.mjs           # Release preparation: bumps versions and promotes the CHANGELOG Unreleased section
 │   └── bot/
