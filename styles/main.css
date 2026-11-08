@@ -644,6 +644,17 @@ body {
   border: 1px solid var(--border-strong);
 }
 
+/* Magnetar telegraph: the glyph and the words carry the warning, the dashed border backs them up. */
+.hud-badge.magnetar {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  background: var(--surface-raised);
+  color: var(--text-gold-soft);
+  border: 2px dashed var(--accent-amber);
+}
+
 .hud-badge.ghost.is-ahead {
   background: var(--accent-blue-alpha-22);
   color: var(--text-info-soft);
@@ -3019,6 +3030,7 @@ body {
   .achievement-progress-track,
   .achievement-tier-badge,
   .hud-badge.ghost,
+  .hud-badge.magnetar,
   .level-card.unlocked {
     border: 1px solid ButtonText;
   }

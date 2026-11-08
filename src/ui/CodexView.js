@@ -16,6 +16,7 @@
 
 import { OBSTACLE_TYPES_ORDER, SPECIAL_TYPES_ORDER } from '../core/Constants.js';
 import { t } from '../core/I18n.js';
+import { MAGNETAR_BEHAVIOURS } from '../game/MagnetarRules.js';
 
 /** Where the light catches a special ball icon, as a radial-gradient position. */
 export const SPECIAL_ICON_HIGHLIGHT_POSITION = '30% 30%';
@@ -228,4 +229,41 @@ export function buildCodexPane() {
     mechGrid.appendChild(card);
   }
   pane.appendChild(mechGrid);
+  const patternsHeading = document.createElement('h3');
+  patternsHeading.className = 'modal-subtitle';
+  patternsHeading.textContent = t('modals.shop.codex.magnetarPatterns.title');
+  pane.appendChild(patternsHeading);
+
+  const patternsGrid = document.createElement('div');
+  patternsGrid.className = 'codex-grid';
+  patternsGrid.dataset.codexSection = 'magnetarPatterns';
+  for (const patternId of Object.values(MAGNETAR_BEHAVIOURS)) {
+    const card = document.createElement('div');
+    card.className = 'codex-card';
+    card.dataset.magnetarPattern = patternId;
+
+    const badge = document.createElement('div');
+    badge.className = 'codex-badge';
+    const patternColor = this.gameConfig.theme.collectorLabelColor || this.gameConfig.theme.wavePopupColor;
+    badge.style.borderColor = patternColor;
+    badge.style.background = specialIconBackground({
+      highlight: patternColor,
+      fill: this.gameConfig.theme.launcherBaseColor
+    });
+    badge.textContent = t(`modals.shop.codex.magnetarPatterns.patterns.${patternId}.icon`);
+
+    const info = document.createElement('div');
+    info.className = 'codex-info';
+    const title = document.createElement('div');
+    title.className = 'codex-title';
+    title.textContent = t(`modals.shop.codex.magnetarPatterns.patterns.${patternId}.name`);
+    const desc = document.createElement('div');
+    desc.className = 'codex-desc';
+    desc.textContent = t(`modals.shop.codex.magnetarPatterns.patterns.${patternId}.description`);
+    info.append(title, desc);
+
+    card.append(badge, info);
+    patternsGrid.appendChild(card);
+  }
+  pane.appendChild(patternsGrid);
 }

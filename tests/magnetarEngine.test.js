@@ -311,6 +311,8 @@ test('Regrow is repeatable: the same key and step give the same slots and colour
     clearOuterRing(engine);
     arm(engine, MAGNETAR_BEHAVIOURS.REGROW);
     const slots = engine.getMagnetarView().regrowSlots;
+    // The board palette follows the (unseeded) Boss Rush layout: pin it, the draw is what is under test.
+    engine.activePalette = ballsConfig.standardColors.map((c) => c.id);
     const before = engine.physicsWorld.balls.length;
     endTurn(engine);
     return { slots, colours: engine.physicsWorld.balls.slice(before).map((b) => b.colorId) };
