@@ -24,6 +24,7 @@ import { Ball } from '../src/entities/Ball.js';
 import { Obstacle } from '../src/entities/Obstacle.js';
 import { GameEngine } from '../src/game/GameEngine.js';
 import { GAME_MODES, GAME_STATES, SPECIAL_TYPES, CLUSTER_MODIFIERS, OBSTACLE_TYPES, WAVE_TYPES } from '../src/core/Constants.js';
+import { getSagSpec } from '../src/game/SagMeter.js';
 import { applyWorldGeometry } from '../src/core/WorldGeometry.js';
 
 const loadJson = (p) => JSON.parse(fs.readFileSync(p, 'utf8'));
@@ -440,8 +441,7 @@ test('An anvil that crushes nothing breaks the combo and counts toward the next 
   world.ballMap.clear();
   world.addBall(makeBoardBall(OTHER_POSITION, FAR_POSITION, { isAnchor: true }));
   engine.combo = 3;
-  engine.shotsUntilWave = engine.gameConfig.endless.shotsBeforeWave;
-  const wavesBefore = engine.shotsUntilWave;
+  engine.sagLevel = 0;
   const anvil = new Ball({
     x: FAR_POSITION,
     y: engine.gameConfig.canvas.launcherY,
@@ -461,7 +461,7 @@ test('An anvil that crushes nothing breaks the combo and counts toward the next 
 
   assert.equal(world.projectile, null, 'the anvil leaves the board');
   assert.equal(engine.combo, 0);
-  assert.equal(engine.shotsUntilWave, wavesBefore - 1);
+  assert.equal(engine.sagLevel, 1);
 });
 
 test('A Survival wave on a cleared board leaves no launcher color missing from the new board', () => {
@@ -479,7 +479,7 @@ test('A Survival wave on a cleared board leaves no launcher color missing from t
   engine.upcomingColorIds = engine.upcomingColorIds.map(() => staleColor);
   assert.ok(engine.upcomingColorIds.length > 0, 'the upcoming queue is part of the check');
   engine.freezeTurnsRemaining = 0;
-  engine.shotsUntilWave = 1;
+  engine.sagLevel = getSagSpec(engine.mode, engine.gameConfig.sag, engine.gameConfig.endless).size - 1;
   const wavesBefore = engine.waveCount;
 
   engine.handlePostTurnCleanup(false);
@@ -1195,4 +1195,181 @@ test('Boss Rush respawns inner guard ring when only the Boss Core remains on the
   engine.physicsWorld.bonds = [];
   engine.evaluateRoundEnd();
   assert.ok(engine.physicsWorld.balls.length > 1, 'stranded Boss Core respawns its inner guard ring');
+});
+
+const GOLDEN_DAILY_DATE = '2025-03-14';
+const GOLDEN_WAVES = 2;
+const GOLDEN_COORD_DECIMALS = 3;
+// Captured from spawnEndlessWave before the shiftClusterDown extraction: [x, y, anchorY, isAnchor, colorId].
+const GOLDEN_WAVE_BALLS = [
+  [53.2, 171, 171, 0, "crimson"],
+  [93.6, 171, 171, 0, "crimson"],
+  [134, 171, 171, 0, "violet"],
+  [174.4, 171, 171, 0, "emerald"],
+  [214.8, 171, 171, 0, "violet"],
+  [255.2, 171, 171, 0, "crimson"],
+  [295.6, 171, 171, 0, "cobalt"],
+  [336, 171, 171, 0, "violet"],
+  [376.4, 171, 171, 0, "violet"],
+  [416.8, 171, 171, 0, "emerald"],
+  [63.2, 211, 211, 0, "amber"],
+  [103.6, 211, 211, 0, "violet"],
+  [144, 211, 211, 0, "crimson"],
+  [184.4, 211, 211, 0, "crimson"],
+  [224.8, 211, 211, 0, "violet"],
+  [265.2, 211, 211, 0, "crimson"],
+  [305.6, 211, 211, 0, "cobalt"],
+  [346, 211, 211, 0, "crimson"],
+  [386.4, 211, 211, 0, "cobalt"],
+  [426.8, 211, 211, 0, "violet"],
+  [53.2, 251, 251, 0, "amber"],
+  [93.6, 251, 251, 0, "cobalt"],
+  [134, 251, 251, 0, "cobalt"],
+  [174.4, 251, 251, 0, "emerald"],
+  [214.8, 251, 251, 0, "crimson"],
+  [255.2, 251, 251, 0, "cobalt"],
+  [295.6, 251, 251, 0, "violet"],
+  [336, 251, 251, 0, "crimson"],
+  [376.4, 251, 251, 0, "cobalt"],
+  [416.8, 251, 251, 0, "crimson"],
+  [63.2, 291, 291, 0, "cobalt"],
+  [103.6, 291, 291, 0, "violet"],
+  [144, 291, 291, 0, "emerald"],
+  [184.4, 291, 291, 0, "amber"],
+  [224.8, 291, 291, 0, "amber"],
+  [265.2, 291, 291, 0, "violet"],
+  [305.6, 291, 291, 0, "cobalt"],
+  [346, 291, 291, 0, "emerald"],
+  [386.4, 291, 291, 0, "crimson"],
+  [426.8, 291, 291, 0, "cobalt"],
+  [53.2, 331, 331, 0, "violet"],
+  [93.6, 331, 331, 0, "cobalt"],
+  [134, 331, 331, 0, "cobalt"],
+  [174.4, 331, 331, 0, "violet"],
+  [214.8, 331, 331, 0, "emerald"],
+  [255.2, 331, 331, 0, "crimson"],
+  [295.6, 331, 331, 0, "emerald"],
+  [336, 331, 331, 0, "cobalt"],
+  [376.4, 331, 331, 0, "emerald"],
+  [416.8, 331, 331, 0, "crimson"],
+  [283, 421, 421, 1, "violet"],
+  [259, 462.569, 462.569, 1, "crimson"],
+  [211, 462.569, 462.569, 1, "emerald"],
+  [187, 421, 421, 1, "crimson"],
+  [211, 379.431, 379.431, 1, "amber"],
+  [259, 379.431, 379.431, 1, "amber"],
+  [63.2, 133, 133, 0, "cobalt"],
+  [103.6, 133, 133, 0, "violet"],
+  [144, 133, 133, 0, "crimson"],
+  [184.4, 133, 133, 0, "emerald"],
+  [224.8, 133, 133, 0, "amber"],
+  [265.2, 133, 133, 0, "amber"],
+  [305.6, 133, 133, 0, "emerald"],
+  [346, 133, 133, 0, "crimson"],
+  [386.4, 133, 133, 0, "crimson"],
+  [426.8, 133, 133, 0, "cobalt"],
+  [53.2, 95, 95, 0, "crimson"],
+  [93.6, 95, 95, 0, "amber"],
+  [134, 95, 95, 1, "crimson"],
+  [174.4, 95, 95, 0, "violet"],
+  [214.8, 95, 95, 0, "violet"],
+  [255.2, 95, 95, 1, "crimson"],
+  [295.6, 95, 95, 0, null],
+  [336, 95, 95, 0, "emerald"],
+  [376.4, 95, 95, 1, "amber"],
+  [416.8, 95, 95, 0, "cobalt"]
+];
+const GOLDEN_WAVE_OBSTACLES = [["singularity", 575, 575], ["singularity", 575, 575], ["pivot", 421, 421], ["portal", 510, 510], ["portal", 88, 88]];
+
+test('spawnEndlessWave produces the same board before and after the shiftClusterDown extraction', () => {
+  const engine = createTestEngine();
+  engine.startDailyChallenge(GOLDEN_DAILY_DATE, true);
+  for (let i = 0; i < GOLDEN_WAVES; i++) {
+    engine.spawnEndlessWave();
+  }
+  const scale = 10 ** GOLDEN_COORD_DECIMALS;
+  const round = (v) => Math.round(v * scale) / scale;
+  const balls = engine.physicsWorld.balls.map((b) => [round(b.x), round(b.y), round(b.anchorY), b.isAnchor ? 1 : 0, b.colorId]);
+  const obstacles = engine.physicsWorld.obstacles.map((o) => [o.type, round(o.y), round(o.baseY ?? 0)]);
+  assert.deepEqual(balls, GOLDEN_WAVE_BALLS);
+  assert.deepEqual(obstacles, GOLDEN_WAVE_OBSTACLES);
+});
+
+test('Survival: a full run of whiffs spawns exactly one wave and resets the meter', () => {
+  const engine = createTestEngine();
+  engine.startEndlessMode();
+  engine.freezeTurnsRemaining = 0;
+  const { size } = getSagSpec(engine.mode, engine.gameConfig.sag, engine.gameConfig.endless);
+  const wavesBefore = engine.waveCount;
+  for (let i = 0; i < size - 1; i++) {
+    engine.handlePostTurnCleanup(false);
+    assert.equal(engine.waveCount, wavesBefore);
+  }
+  engine.handlePostTurnCleanup(false);
+  assert.equal(engine.waveCount, wavesBefore + 1);
+  assert.equal(engine.sagLevel, 0);
+});
+
+test('A match is neutral for the Sag meter', () => {
+  const engine = createTestEngine();
+  engine.startEndlessMode();
+  engine.freezeTurnsRemaining = 0;
+  engine.sagLevel = 2;
+  engine.handlePostTurnCleanup(true);
+  assert.equal(engine.sagLevel, 2);
+});
+
+test('Survival avalanche drains the meter when the sag config enables it', () => {
+  const sagCfg = { modes: { endless: { size: 5, dropsPerDrain: 4, maxDrainPerTurn: 1, step: 'wave' } }, warnAt: 1 };
+  const engine = createTestEngine({ ...gameConfig, sag: sagCfg });
+  engine.startEndlessMode();
+  engine.freezeTurnsRemaining = 0;
+  engine.sagLevel = 3;
+  const world = engine.physicsWorld;
+  world.balls.length = 0;
+  world.ballMap.clear();
+  world.addBall(makeBoardBall(OTHER_POSITION, FAR_POSITION, { isAnchor: true }));
+  const dropCount = 4;
+  for (let i = 0; i < dropCount; i++) {
+    world.addBall(makeBoardBall(OTHER_POSITION + 50 * i, FAR_POSITION + 200, { isAnchor: false }));
+  }
+  engine.handlePostTurnCleanup(false);
+  assert.equal(engine.sagLevel, 2);
+});
+
+test('lowerAnchorRail moves the cluster by one step, keeps the ceiling anchored and leaves fixtures alone', () => {
+  const engine = createTestEngine();
+  engine.startEndlessMode();
+  const world = engine.physicsWorld;
+  const anchorsBefore = world.balls.filter((b) => b.isAnchor).map((b) => [b.id, b.y]);
+  const platform = new Obstacle({ type: OBSTACLE_TYPES.PLATFORM, x: 100, y: 300 }, obstaclesConfig);
+  world.obstacles.push(platform);
+  const platformY = platform.y;
+  const stepY = engine.gameConfig.classic?.descentStepY ?? engine.gameConfig.endless.descentStepY;
+  engine.lowerAnchorRail();
+  assert.equal(engine.railDrops, 1);
+  assert.equal(platform.y, platformY);
+  assert.ok(anchorsBefore.length > 0);
+  for (const [id, y] of anchorsBefore) {
+    const ball = world.ballMap.get(id);
+    assert.equal(ball.y, y + stepY);
+    assert.equal(ball.isAnchor, true);
+  }
+  assert.equal(engine.getSagState().railDrops, 1);
+});
+
+test('Daily sag timelines are identical across two runs of the same seed', () => {
+  const run = () => {
+    const engine = createTestEngine();
+    engine.startDailyChallenge(GOLDEN_DAILY_DATE, true);
+    engine.freezeTurnsRemaining = 0;
+    const timeline = [];
+    const turns = 12;
+    for (let i = 0; i < turns; i++) {
+      engine.handlePostTurnCleanup(i % 4 === 3);
+      timeline.push([engine.sagLevel, engine.waveCount, engine.score]);
+    }
+    return timeline;
+  };
+  assert.deepEqual(run(), run());
 });

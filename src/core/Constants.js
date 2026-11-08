@@ -45,7 +45,8 @@ export const GAME_MODES = Object.freeze({
   PUZZLE: 'puzzle',
   BLITZ: 'blitz',
   BOSS_RUSH: 'boss_rush',
-  CASCADE: 'cascade'
+  CASCADE: 'cascade',
+  CLASSIC: 'classic'
 });
 
 export const OBJECTIVE_TYPES = Object.freeze({

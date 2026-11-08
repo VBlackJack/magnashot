@@ -40,7 +40,8 @@ export const engineBoardMethods = {
     this.seededRng = seed ? new SeededRandom(seed) : null;
     this.waveCount = 1;
     this.endlessRowParity = 0;
-    this.shotsUntilWave = endlessCfg.shotsBeforeWave;
+    this.sagLevel = 0;
+    this.railDrops = 0;
     this.specialInventory = { ...endlessCfg.initialSpecialCounts };
 
     this.activePalette = this.ballsConfig.standardColors
