@@ -87,7 +87,7 @@ function buildPerkCard(engine, perkId, position, inputMode) {
   card.type = 'button';
   card.className = 'flux-perk-card';
   card.dataset.perkId = perkId;
-  if (inputMode !== INPUT_MODES.TOUCH) {
+  if (inputMode === INPUT_MODES.POINTER) {
     card.setAttribute('aria-keyshortcuts', String(position + 1));
   }
 

@@ -570,6 +570,44 @@ export const uiInputBindingMethods = {
     });
   },
 
+  /**
+   * Unwinds the topmost layer: Confirm, duel card, a dialog, the menu, then the run's pause.
+   * Shared by Escape and the controller's back button.
+   */
+  handleBackAction() {
+    if (this.elements.modalConfirm && !this.elements.modalConfirm.classList.contains('hidden')) {
+      this.dismissConfirm();
+      return;
+    }
+    if (this.isDuelCardOpen()) {
+      this.dismissDuelCard();
+      return;
+    }
+    if (!this.elements.modalLevels.classList.contains('hidden')) {
+      this.closeOverlayModal(this.elements.modalLevels);
+      return;
+    }
+    if (!this.elements.modalShop.classList.contains('hidden')) {
+      this.closeOverlayModal(this.elements.modalShop);
+      return;
+    }
+    if (this.elements.modalSettings && !this.elements.modalSettings.classList.contains('hidden')) {
+      this.closeOverlayModal(this.elements.modalSettings);
+      return;
+    }
+    if (this.elements.modalStats && !this.elements.modalStats.classList.contains('hidden')) {
+      this.closeOverlayModal(this.elements.modalStats);
+      return;
+    }
+    if (this.isDrawerOpen) {
+      this.closeDrawer({ resume: true });
+      return;
+    }
+    if (this.engine.state === GAME_STATES.PLAYING || this.engine.state === GAME_STATES.PAUSED) {
+      this.engine.togglePause();
+    }
+  },
+
   /** Global keyboard shortcuts: Escape unwinds the topmost layer, the rest steer the run. */
   handleKeyDown(e) {
     this.setInputMode(INPUT_MODES.POINTER);
@@ -587,37 +625,7 @@ export const uiInputBindingMethods = {
     }
 
     if (e.code === 'Escape') {
-      if (this.elements.modalConfirm && !this.elements.modalConfirm.classList.contains('hidden')) {
-        this.dismissConfirm();
-        return;
-      }
-      if (this.isDuelCardOpen()) {
-        this.dismissDuelCard();
-        return;
-      }
-      if (!this.elements.modalLevels.classList.contains('hidden')) {
-        this.closeOverlayModal(this.elements.modalLevels);
-        return;
-      }
-      if (!this.elements.modalShop.classList.contains('hidden')) {
-        this.closeOverlayModal(this.elements.modalShop);
-        return;
-      }
-      if (this.elements.modalSettings && !this.elements.modalSettings.classList.contains('hidden')) {
-        this.closeOverlayModal(this.elements.modalSettings);
-        return;
-      }
-      if (this.elements.modalStats && !this.elements.modalStats.classList.contains('hidden')) {
-        this.closeOverlayModal(this.elements.modalStats);
-        return;
-      }
-      if (this.isDrawerOpen) {
-        this.closeDrawer({ resume: true });
-        return;
-      }
-      if (this.engine.state === GAME_STATES.PLAYING || this.engine.state === GAME_STATES.PAUSED) {
-        this.engine.togglePause();
-      }
+      this.handleBackAction();
       return;
     }
 

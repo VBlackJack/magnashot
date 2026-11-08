@@ -186,7 +186,8 @@
         "hint": "{{icon}} {{name}}: {{desc}} ({{unequip}})",
         "unequip": {
           "pointer": "Click again to unequip",
-          "touch": "Tap again to unequip"
+          "touch": "Tap again to unequip",
+          "gamepad": "Press the right face button to unequip"
         }
       },
       "shortcutFormat": "{{label}} ({{key}})"
@@ -238,7 +239,8 @@
         "label": {
           "pointer": "Game board. Aim with the mouse, then fine-tune with the Left/Right arrows (Shift for bigger steps), shoot with a click or Enter, swap with Space.",
           "touch": "Game board. Drag on the board to aim, release to shoot, tap the launcher to swap."
-        }
+        },
+        "labelPad": "Game board. Aim with the left stick (right stick for fine aim), shoot with the bottom face button or the right trigger, swap with the left face button, flip polarity with the top face button."
       }
     },
     "announcer": {
@@ -294,6 +296,20 @@
       "side": {
         "ahead": "ahead of",
         "behind": "behind"
+      }
+    },
+    "pad": {
+      "glyph": {
+        "bottom": "Bottom",
+        "right": "Right",
+        "left": "Left",
+        "top": "Top",
+        "leftBumper": "Left bumper",
+        "rightBumper": "Right bumper",
+        "leftTrigger": "Left trigger",
+        "rightTrigger": "Right trigger",
+        "start": "Start",
+        "select": "Select"
       }
     }
   },
@@ -505,7 +521,8 @@
       "puzzle": "One-Shot Puzzle: study the angles and clear the objective with your fixed ammo queue!",
       "polarity": {
         "pointer": "Click the 🧲 button (or press F) to flip your shot's charge: spheres then pull it the other way, so it curves in the opposite direction.",
-        "touch": "Tap the 🧲 button to flip your shot's charge: spheres then pull it the other way, so it curves in the opposite direction."
+        "touch": "Tap the 🧲 button to flip your shot's charge: spheres then pull it the other way, so it curves in the opposite direction.",
+        "gamepad": "Press the top face button to flip your shot's charge (the 🧲 button works too): spheres then pull it the other way, so it curves in the opposite direction."
       },
       "bankShot": "Bounce your shot off the walls and bumpers to reach spheres you cannot hit head-on.",
       "specials": {
@@ -1076,7 +1093,8 @@
           "pointer": "Keyboard & Arsenal: Left/Right to fine-tune aim (Shift: faster), Enter to shoot, F (or 🧲) to invert polarity, 1-7 for Special Spheres",
           "touch": "Polarity & Arsenal: tap 🧲 to flip how spheres pull your shot (it curves the other way), or tap a Special Sphere charged by Overcharge"
         },
-        "physics": "Tip: Sever anchor links or unbalance rotors to trigger chain reactions!"
+        "physics": "Tip: Sever anchor links or unbalance rotors to trigger chain reactions!",
+        "pad": "Controller: left stick to aim (right stick for fine aim), bottom face button or right trigger to shoot, left face button to swap, top face button to flip polarity, bumpers for Special Spheres, Start to pause"
       },
       "button": {
         "resume": "Resume",
@@ -1109,13 +1127,32 @@
       "duelName": {
         "label": "Duel name (optional)",
         "hint": "Letters and digits, 12 max. Shown to friends you challenge."
+      },
+      "controller": {
+        "title": "Controller",
+        "hint": "Use a gamepad to aim, shoot and navigate the menus.",
+        "enabled": "Enable controller",
+        "deadzone": "Stick deadzone",
+        "deadzoneOptions": {
+          "small": "Small",
+          "medium": "Medium",
+          "large": "Large"
+        },
+        "aimSpeed": "Aim speed",
+        "aimSpeedOptions": {
+          "slow": "Slow",
+          "normal": "Normal",
+          "fast": "Fast"
+        },
+        "invertX": "Invert horizontal aim"
       }
     },
     "fluxPerk": {
       "title": "Choose a Perk",
       "subtitle": {
         "pointer": "Pick one bonus for the rest of this run. Click a card or press its number key.",
-        "touch": "Pick one bonus for the rest of this run. Tap a card."
+        "touch": "Pick one bonus for the rest of this run. Tap a card.",
+        "gamepad": "Pick one bonus for the rest of this run. Move to a card with the directional pad, then press the bottom face button."
       },
       "stack": "{{stacks}}/{{max}}",
       "stackAria": "{{stacks}} of {{max}}"
@@ -1399,5 +1436,11 @@
       "ok": "OK"
     },
     "defaultName": "Ghost"
+  },
+  "toast": {
+    "gamepad": {
+      "connected": "Controller connected",
+      "disconnected": "Controller disconnected"
+    }
   }
 }

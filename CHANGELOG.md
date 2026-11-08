@@ -4,6 +4,10 @@ All notable changes to **MagnaShot** are documented in this file.
 
 ## [Unreleased]
 
+### Added
+- **Controller Support (`GamepadInput`, `UIGamepad`, `GameLoop`, `UIInputBindings`, `StorageManager`)**: Play with any gamepad that uses the standard layout. The left stick aims (right stick for fine aim, left trigger for precision, d-pad for tiny steps), the bottom face button or right trigger shoots, the left and top face buttons swap and flip polarity, the right face button unequips a Special Sphere, the bumpers cycle the stocked ones, Start pauses and Select opens the menu. In dialogs and the menu the d-pad or left stick moves focus between controls, the bottom face button activates, the right face button goes back and the bumpers switch tabs. The game loop gains a `beforeFrame` hook for polling and the Escape chain is extracted into `handleBackAction`, shared with the pad. Pad activity switches the hints to generic controller glyphs (no brand artwork) and hides the key hints; a connection toast, a live region message and a pause on disconnect are included. A Controller row in Settings sets the enabled state, the stick deadzone, the aim speed and the horizontal inversion. Keyboard, mouse and touch are unchanged.
+- **Browser Smoke Tests**: A stubbed pad shoots, opens Pause and drives its dialog on desktop and portrait phone, and the controller hints fit all five layouts without overflow.
+
 ## [1.18.0] - 2026-11-08
 
 ### Added

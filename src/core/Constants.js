@@ -89,7 +89,8 @@ export const GAME_OVER_REASONS = Object.freeze({
 /** How the player is currently driving the game; selects touch or mouse/keyboard hints. */
 export const INPUT_MODES = Object.freeze({
   POINTER: 'pointer',
-  TOUCH: 'touch'
+  TOUCH: 'touch',
+  GAMEPAD: 'gamepad'
 });
 
 export const SPECIAL_TYPES = Object.freeze({

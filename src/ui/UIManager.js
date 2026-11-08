@@ -57,6 +57,7 @@ import {
   setTextIfChanged,
   setAttributeIfChanged
 } from './UIHelpers.js';
+import { uiGamepadMethods } from './UIGamepad.js';
 import { uiInputBindingMethods } from './UIInputBindings.js';
 import { uiModalMethods } from './UIModals.js';
 import { uiSettingsControlMethods } from './UISettingsControls.js';
@@ -302,7 +303,12 @@ export class UIManager {
       statsDuelsRecord: document.getElementById('stats-duels-record'),
       statsDuelsEmpty: document.getElementById('stats-duels-empty'),
       statsDuelsList: document.getElementById('stats-duels-list'),
-      srAnnouncer: document.getElementById('sr-announcer')
+      srAnnouncer: document.getElementById('sr-announcer'),
+      toast: document.getElementById('toast'),
+      inputGamepadEnabled: document.getElementById('input-gamepad-enabled'),
+      selectGamepadDeadzone: document.getElementById('select-gamepad-deadzone'),
+      selectGamepadAimSpeed: document.getElementById('select-gamepad-aim-speed'),
+      inputGamepadInvertX: document.getElementById('input-gamepad-invert-x')
     };
 
     this.pendingAnnouncements = [];
@@ -330,6 +336,9 @@ export class UIManager {
     this.victoryStarsLabel = null;
     this.scoreCountUpFrame = null;
     this.inputMode = this.detectInitialInputMode();
+    this.gamepadInput = null;
+    this.padFocusEl = null;
+    this.toastTimer = null;
     this.isDrawerOpen = false;
     this.drawerStarParts = null;
     this.activeStatsTab = STATS_TABS.OVERVIEW;
@@ -366,13 +375,17 @@ export class UIManager {
     if (typeof document !== 'undefined' && document.documentElement) {
       document.documentElement.dataset[INPUT_MODE_DATASET_KEY] = this.inputMode;
     }
+    if (this.inputMode !== INPUT_MODES.GAMEPAD) {
+      this.clearPadFocus();
+    }
     this.updateInputHints();
   }
 
   /** A launcher label, followed by its keyboard shortcut only when a keyboard is in use. */
   formatLauncherLabel(labelKey, shortcutKey) {
     const label = t(labelKey);
-    if (this.inputMode === INPUT_MODES.TOUCH) {
+    // The keyboard shortcut is wrong for touch and for a controller (which shows its own glyph).
+    if (this.inputMode !== INPUT_MODES.POINTER) {
       return label;
     }
     return t('hud.launcher.shortcutFormat', { label, key: t(shortcutKey) });
@@ -401,7 +414,7 @@ export class UIManager {
       'hud.launcher.swap.caption'
     );
     for (const { elementId, key } of MODAL_INPUT_HINTS) {
-      setTextIfChanged(document.getElementById(elementId), t(`${key}.${this.inputMode}`));
+      setTextIfChanged(document.getElementById(elementId), t(`${key}.${this.getHintInputMode(key)}`));
     }
     setAttributeIfChanged(
       this.elements.modeBanner,
@@ -409,7 +422,8 @@ export class UIManager {
       t(this.inputMode === INPUT_MODES.TOUCH ? 'hud.stats.mode.switchHintTouch' : 'hud.stats.mode.switchHint')
     );
     for (const { elementId, key } of INPUT_ARIA_HINTS) {
-      setAttributeIfChanged(document.getElementById(elementId), 'aria-label', t(`${key}.${this.inputMode}`));
+      const labelKey = this.inputMode === INPUT_MODES.GAMEPAD ? `${key}Pad` : `${key}.${this.inputMode}`;
+      setAttributeIfChanged(document.getElementById(elementId), 'aria-label', t(labelKey));
     }
   }
 
@@ -425,6 +439,7 @@ export class UIManager {
     this.setupTiltControl();
     this.updateMotionButton();
     this.updateAnimSpeedButton();
+    this.setupGamepadControls();
     this.setupFullscreenControl();
     this.updateLanguageButton();
     this.bindInstallEvents();
@@ -439,6 +454,7 @@ export class UIManager {
       this.updateTiltButton();
       this.updateMotionButton();
       this.updateAnimSpeedButton();
+      this.updateGamepadControls();
       this.updateFullscreenButton();
       this.updateLanguageButton();
       this.updateResetHintsFeedback();
@@ -1311,6 +1327,7 @@ export class UIManager {
 
 }
 
+installMethods(UIManager, uiGamepadMethods);
 installMethods(UIManager, uiInputBindingMethods);
 installMethods(UIManager, uiModalMethods);
 installMethods(UIManager, uiSettingsControlMethods);

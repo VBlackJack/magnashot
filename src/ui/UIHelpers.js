@@ -21,7 +21,7 @@ import { formatLevelName } from './LevelSelectView.js';
 
 /** Elements a modal focus trap may cycle through (inactive tabs use tabindex="-1"). */
 export const MODAL_FOCUSABLE_SELECTOR =
-  'button:not(:disabled):not([tabindex="-1"]), input:not(:disabled):not([tabindex="-1"]), textarea:not([tabindex="-1"]), [href]:not([tabindex="-1"]), [tabindex]:not([tabindex="-1"])';
+  'button:not(:disabled):not([tabindex="-1"]), input:not(:disabled):not([tabindex="-1"]), select:not(:disabled):not([tabindex="-1"]), textarea:not([tabindex="-1"]), [href]:not([tabindex="-1"]), [tabindex]:not([tabindex="-1"])';
 
 /** Ancestors that remove an element from the interactive tree. */
 export const NON_INTERACTIVE_ANCESTOR_SELECTOR = '.hidden, [hidden], [inert]';
@@ -116,6 +116,12 @@ export const MODAL_INPUT_HINTS = Object.freeze([
   { elementId: 'pause-instruction-cancel', key: 'modals.pause.instructions.cancel' },
   { elementId: 'pause-instruction-keyboard', key: 'modals.pause.instructions.keyboard' },
   { elementId: 'modal-flux-perk-subtitle', key: 'modals.fluxPerk.subtitle' }
+]);
+
+/** Hint keys that also have a controller wording; the others read the pointer wording on a pad. */
+export const GAMEPAD_HINT_KEYS = Object.freeze([
+  'modals.fluxPerk.subtitle',
+  'hud.launcher.specialEquipped.unequip'
 ]);
 
 /** Class that makes a control pulse (and outline, for reduced motion) while a hint points at it. */

@@ -46,6 +46,9 @@ export function willSimulationAdvance(engine) {
  * @param {number} options.idleRenderIntervalMs - Redraw interval while not playing.
  * @param {Function} options.scheduleFrame - requestAnimationFrame-like scheduler.
  * @param {Function} options.onFatalError - Called once with the thrown error.
+ * @param {Function} [options.beforeFrame] - Called with (now, elapsedMs) at the start of every frame, also while
+ *   the game is idle or paused (input polling). Defaults to a no-op. A throw is reported and the loop goes on.
+ * @param {Function} [options.onHookError] - Called with the error thrown by beforeFrame. Defaults to console.error.
  * @returns {{start: Function, frame: Function, isStopped: Function}}
  */
 export function createGameLoop({
@@ -55,7 +58,9 @@ export function createGameLoop({
   maxAccumulatedMs,
   idleRenderIntervalMs,
   scheduleFrame,
-  onFatalError
+  onFatalError,
+  beforeFrame = () => {},
+  onHookError = (err) => console.error('Frame hook failed:', err)
 }) {
   let lastTime = null;
   let accumulator = 0;
@@ -70,6 +75,12 @@ export function createGameLoop({
     try {
       const elapsed = lastTime === null ? 0 : Math.min(maxAccumulatedMs, Math.max(0, now - lastTime));
       lastTime = now;
+      // A failing input hook must not stop the simulation or the rendering.
+      try {
+        beforeFrame(now, elapsed);
+      } catch (hookErr) {
+        onHookError(hookErr);
+      }
       // Slow motion: fewer fixed steps per real second; interpolation keeps it smooth.
       const timeScale = typeof engine.getTimeScale === 'function' ? engine.getTimeScale() : 1;
       accumulator += elapsed * timeScale;
