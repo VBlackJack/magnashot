@@ -134,3 +134,29 @@ test('a snapshot saved before the optional fields existed still restores', () =>
   assert.equal(fresh.isCoreFreezeApplied, false);
   assert.equal(fresh.physicsWorld.balls.length, snapshot.balls.length);
 });
+
+test('a Classic stage board is identical for every run whatever was played before it', () => {
+  const buildStageTwo = (draws) => {
+    const engine = createTestEngine();
+    engine.startClassicMode(2);
+    burnRunDraws(engine, draws);
+    engine.buildClassicStage(2);
+    return boardSignature(engine);
+  };
+  const a = buildStageTwo(FEW_DRAWS);
+  const b = buildStageTwo(MANY_DRAWS);
+  assert.ok(a.length > 0);
+  assert.deepEqual(a, b);
+});
+
+test('a Classic run restores the launcher stream it was saved with', () => {
+  const engine = createTestEngine();
+  engine.startClassicMode();
+  burnRunDraws(engine, FEW_DRAWS);
+  const snapshot = JSON.parse(JSON.stringify(captureRunSnapshot(engine, SNAPSHOT_VERSION)));
+  assert.ok(isValidRunSnapshot(snapshot, SNAPSHOT_VERSION));
+  const fresh = createTestEngine();
+  assert.equal(applyRunSnapshot(fresh, snapshot), true);
+  assert.equal(fresh.mode, GAME_MODES.CLASSIC);
+  assert.equal(fresh.seededRng.state, engine.seededRng.state);
+});

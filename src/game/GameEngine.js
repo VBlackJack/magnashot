@@ -112,7 +112,11 @@ export class GameEngine {
     this.waveCount = 1;
     this.waveLog = [];
     this.endlessRowParity = 0;
-    this.shotsUntilWave = 0;
+    // Sag meter: whiffs so far toward the next step, plus the Classic rail state.
+    this.sagLevel = 0;
+    this.railDrops = 0;
+    this.railLowerFrames = 0;
+    this.classicStage = 0;
     this.freezeTurnsRemaining = 0;
     this.chainCooldown = 0;
     this.pendingRunCoins = 0;
@@ -182,6 +186,10 @@ export class GameEngine {
     this.specialAmmoBoughtInRun = 0;
     this.fluxSeed = null;
     this.fluxStage = 0;
+    this.sagLevel = 0;
+    this.railDrops = 0;
+    this.railLowerFrames = 0;
+    this.classicStage = 0;
     this.fluxFamily = null;
     this.fluxPreviousFamily = null;
     this.fluxShapeIds = [];
@@ -359,6 +367,8 @@ export class GameEngine {
       case GAME_MODES.FLUX:
         // A weekly run is measured against the week's best (same metric as the Flux record).
         return { metric: RUN_BEST_METRICS.STAGE, current: this.fluxStage };
+      case GAME_MODES.CLASSIC:
+        return { metric: RUN_BEST_METRICS.STAGE, current: this.classicStage };
       case GAME_MODES.BOSS_RUSH:
         return { metric: RUN_BEST_METRICS.WAVE, current: this.bossRushWave };
       case GAME_MODES.ENDLESS:
@@ -390,6 +400,8 @@ export class GameEngine {
       best = storage.getWeeklyFluxBest?.(this.weeklyWeekKey)?.stage || 0;
     } else if (this.mode === GAME_MODES.FLUX) {
       best = storage.getFluxBestStage?.() || 0;
+    } else if (this.mode === GAME_MODES.CLASSIC) {
+      best = storage.getClassicBestStage?.() || 0;
     } else if (this.mode === GAME_MODES.BOSS_RUSH) {
       best = storage.getBossRushBestWave?.() || 0;
     } else if (this.mode === GAME_MODES.ENDLESS) {
@@ -489,6 +501,8 @@ export class GameEngine {
           this.shotTimeline
         );
       }
+    } else if (this.mode === GAME_MODES.CLASSIC) {
+      this.storageManager.setClassicRecord?.(this.score, this.classicStage);
     } else if (this.mode === GAME_MODES.BLITZ) {
       this.storageManager.setBlitzHighScore?.(this.score);
     } else if (this.mode === GAME_MODES.BOSS_RUSH) {
@@ -764,6 +778,10 @@ export class GameEngine {
    * @returns {number}
    */
   getEffectiveUpgradeLevel(upgradeKey) {
+    // Classic is the pure ruleset: the Workshop does not count.
+    if (this.mode === GAME_MODES.CLASSIC) {
+      return 0;
+    }
     if (this.mode === GAME_MODES.DAILY) {
       return this.gameConfig.seededFairness?.dailyUpgradeLevels?.[upgradeKey] ?? 0;
     }
@@ -777,6 +795,10 @@ export class GameEngine {
   }
 
   getOverchargeMultiplier() {
+    // Classic has no specials, so nothing may charge toward one.
+    if (this.mode === GAME_MODES.CLASSIC) {
+      return 0;
+    }
     const lvl = this.getEffectiveUpgradeLevel('overchargeRate');
     const spec = this.gameConfig.upgrades.overchargeRate;
     return 1 + lvl * spec.rateMultiplierPerLevel + this.getFluxPerkBonus(FLUX_PERK_IDS.OVERCHARGE);
@@ -1205,6 +1227,9 @@ export class GameEngine {
       return;
     }
     this.countPlayTimeForStats(this.physicsConfig.simulation?.fixedStepMs || 0);
+    if (this.railLowerFrames > 0) {
+      this.railLowerFrames--;
+    }
     if (this.isAwaitingPerk()) {
       this.particleSystem.update(this.gameConfig.juice.shakeDecay);
       return;
@@ -1417,6 +1442,8 @@ export class GameEngine {
       this.startBossRushMode(1);
     } else if (this.mode === GAME_MODES.CASCADE) {
       this.startCascadeMode();
+    } else if (this.mode === GAME_MODES.CLASSIC) {
+      this.startClassicMode(1);
     } else {
       this.startEndlessMode();
     }
