@@ -175,3 +175,12 @@ test('canHostLocalDuel checks width and height thresholds', () => {
   assert.equal(canHostLocalDuel(679, 800, LAYOUT, LOCAL), false);
   assert.equal(canHostLocalDuel(1200, 479, LAYOUT, LOCAL), false);
 });
+
+test('canHostLocalDuel with the canvas section needs a split board of the minimum width', () => {
+  const layout = { ...LAYOUT, splitMinBoardWidthPx: 300 };
+  const local = { entry: { ...LOCAL.entry, reservedHeightPx: 122 } };
+  const canvas = { logicalWidth: 470, logicalHeight: 820 };
+  assert.equal(canHostLocalDuel(1366, 650, layout, local, canvas), true);
+  assert.equal(canHostLocalDuel(1366, 600, layout, local, canvas), false);
+  assert.equal(canHostLocalDuel(1366, 600, layout, local), true, 'without the canvas section only the thresholds count');
+});

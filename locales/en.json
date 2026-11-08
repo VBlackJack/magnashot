@@ -1465,8 +1465,8 @@
       },
       "handicap": {
         "none": "Normal",
-        "slow": "Slower (x1.25)",
-        "slower": "Slowest (x1.5)"
+        "slow": "Slower (x{{factor}})",
+        "slower": "Slowest (x{{factor}})"
       },
       "announce": {
         "joined": "Player {{n}} joined with {{device}}",
@@ -1474,7 +1474,7 @@
         "roundWon": "Player {{n}} wins the round",
         "matchWon": "Player {{n}} wins the match {{a}} to {{b}}",
         "pulseSent": "Player {{n}} sent a field pulse",
-        "padLost": "Player {{n}} controller disconnected. Press any button on a controller to take over, or quit."
+        "padLost": "Player {{n}} controller disconnected. Press the bottom face button on a controller to take over, or quit."
       },
       "bar": {
         "roundPips": "Round {{round}}. Player 1: {{a}} won. Player 2: {{b}} won."

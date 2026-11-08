@@ -299,6 +299,9 @@ export const uiVersusMethods = {
     }
 
     this.elements.versusScreen.dataset.mode = v.kind;
+    if (isLocal) {
+      this.elements.versusScreen.dataset.p1Mouse = String(v.slots[0]?.device?.type === DEVICE_TYPES.KEYBOARD_MOUSE);
+    }
     this.elements.versusScreen.classList.remove(HIDDEN_CLASS);
     this.syncModalInertState();
     hud.refreshLabels();
@@ -391,6 +394,7 @@ export const uiVersusMethods = {
     }
     this.elements.versusResultShareFallback?.classList.add(HIDDEN_CLASS);
     delete this.elements.versusScreen.dataset.mode;
+    delete this.elements.versusScreen.dataset.p1Mouse;
     delete this.elements.versusScreen.dataset.tooSmall;
     this.elements.btnVersusRematch?.removeAttribute('aria-disabled');
     // The run held when the screen opened is shown again; its Pause dialog is what the player sees.
@@ -882,7 +886,12 @@ export const uiVersusMethods = {
     if (!this.isLocalVersus()) {
       return;
     }
+    // The lobby starts from the devices as the match left them (takeovers and lost controllers included).
+    const liveSlots = this.versus.slots.map((slot) => ({ ...slot, device: slot.device ? { ...slot.device } : null }));
     this.leaveVersus();
+    if (this.versusLocal) {
+      this.versusLocal.slots = liveSlots;
+    }
     this.openVersusTierPicker();
     this.openVersusLocalLobby({ keep: true });
   },

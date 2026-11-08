@@ -127,7 +127,8 @@ export const VERSUS_ANNOUNCEMENTS = Object.freeze({
  * that arrive within one window are counted as one message, a neutralisation is announced at most
  * once per window, everything else is announced as it happens. Only what concerns the player is kept.
  * In the local two-player mode there is no "you": only round and match results with the winner's name,
- * sudden death and the pulses sent by a named player are announced (charges are on the screen).
+ * sudden death and the pulses sent by a named player (at most one per player per window) are announced
+ * (charges are on the screen).
  * Time is the caller's own clock (frames), so the queue is deterministic.
  * @param {{windowFrames: number, suddenDeathSeconds: number, playerBoard?: number, mode?: string}} options
  * @returns {{push: (event: object, clock: number) => object[], drain: (clock: number) => object[]}}
@@ -135,13 +136,19 @@ export const VERSUS_ANNOUNCEMENTS = Object.freeze({
 export function createAnnouncementQueue({ windowFrames, suddenDeathSeconds, playerBoard = 0, mode = 'cpu' }) {
   let pendingIncoming = null;
   let lastNeutralisedClock = -Infinity;
+  // Local play: the clock of the last pulse announced for each board, so one player's pulses do not flood the region.
+  const lastLocalPulseClock = new Map();
   const message = (key, params = {}) => ({ key, params });
   const localMessage = (key, params = {}) => ({ key, params, scope: LOCAL_SCOPE });
 
-  const pushLocal = (event) => {
+  const pushLocal = (event, clock) => {
     switch (event.type) {
       case MATCH_EVENTS.PULSE_SENT:
-        return Number.isInteger(event.board) ? [localMessage('pulseSent', { n: event.board + FIRST_PLAYER_NUMBER })] : [];
+        if (!Number.isInteger(event.board) || clock - (lastLocalPulseClock.get(event.board) ?? -Infinity) < windowFrames) {
+          return [];
+        }
+        lastLocalPulseClock.set(event.board, clock);
+        return [localMessage('pulseSent', { n: event.board + FIRST_PLAYER_NUMBER })];
       case MATCH_EVENTS.SUDDEN_DEATH:
         return [message(VERSUS_ANNOUNCEMENTS.SUDDEN_DEATH, { seconds: suddenDeathSeconds })];
       case MATCH_EVENTS.ROUND_DECIDED:
@@ -167,7 +174,7 @@ export function createAnnouncementQueue({ windowFrames, suddenDeathSeconds, play
      */
     push(event, clock) {
       if (mode === LOCAL_MODE) {
-        return pushLocal(event);
+        return pushLocal(event, clock);
       }
       switch (event.type) {
         case MATCH_EVENTS.CHARGE_INCOMING:

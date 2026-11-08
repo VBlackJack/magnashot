@@ -22,7 +22,7 @@
  */
 
 import { GAMEPAD_ACTIONS } from '../core/GamepadInput.js';
-import { t } from '../core/I18n.js';
+import { formatNumber, t } from '../core/I18n.js';
 import {
   DEVICE_TYPES,
   SIDES,
@@ -97,7 +97,7 @@ export function areLocalSlotsReady(slots) {
 export const uiVersusLocalMethods = {
   /** Fresh lobby state: nobody joined, no handicap. */
   createVersusLocalState() {
-    return { slots: createSlots(), handicaps: Array.from({ length: SLOT_COUNT }, () => 0), layoutMap: null };
+    return { slots: createSlots(), handicaps: Array.from({ length: SLOT_COUNT }, () => 0), joinOrder: [], layoutMap: null };
   },
 
   /** True while the two-player lobby is the dialog on top of the duel pickers. */
@@ -112,7 +112,19 @@ export const uiVersusLocalMethods = {
       return false;
     }
     const versusCfg = this.gameConfig.versus;
-    return canHostLocalDuel(window.innerWidth, window.innerHeight, versusCfg.layout, versusCfg.local);
+    return canHostLocalDuel(window.innerWidth, window.innerHeight, versusCfg.layout, versusCfg.local, this.gameConfig.canvas);
+  },
+
+  /** Indexes of the controllers the browser reports right now. */
+  getLivePadIndexes() {
+    const pads = typeof navigator !== 'undefined' ? navigator.getGamepads?.() : null;
+    const live = new Set();
+    for (const pad of pads ?? []) {
+      if (pad && pad.connected !== false) {
+        live.add(pad.index);
+      }
+    }
+    return live;
   },
 
   /** Shows the two-player entry of the tier picker only when two boards fit (hidden, not disabled). */
@@ -123,6 +135,8 @@ export const uiVersusLocalMethods = {
     }
     const fits = this.canHostVersusLocal();
     button.classList.toggle(HIDDEN_CLASS, !fits);
+    // The picker says why the entry is missing instead of leaving the player to wonder.
+    this.elements.versusLocalEntryHint?.classList.toggle(HIDDEN_CLASS, fits);
     // A lobby left open while the window shrinks closes with its entry.
     if (!fits && this.isVersusLocalLobbyOpen()) {
       this.closeVersusLocalLobby();
@@ -194,7 +208,12 @@ export const uiVersusLocalMethods = {
       this.versusLocal = { ...this.createVersusLocalState(), layoutMap: this.versusLocal?.layoutMap ?? null };
     } else {
       // A controller that went away since the last match cannot be kept.
-      this.versusLocal.slots = this.versusLocal.slots.map((slot) => (slot.padLost ? { device: null, padLost: false } : slot));
+      const livePads = this.getLivePadIndexes();
+      this.versusLocal.slots = this.versusLocal.slots.map((slot) =>
+        slot.padLost || (slot.device?.type === DEVICE_TYPES.PAD && !livePads.has(slot.device.padIndex))
+          ? { device: null, padLost: false }
+          : slot
+      );
     }
     this.renderVersusLocalLobby();
     const first = this.getVersusLocalSlotElements()[0]?.querySelector('.versus-local-change');
@@ -207,12 +226,21 @@ export const uiVersusLocalMethods = {
     this.closeOverlayModal(this.elements.modalVersusLocal);
   },
 
-  /** Escape and the controller's back button while the lobby is up. Returns true when handled. */
+  /**
+   * Escape while the lobby is up. Returns true when handled. With nobody joined it closes the lobby;
+   * otherwise it frees the slot that joined last (as the controller's back button frees its own slot).
+   */
   handleVersusLocalLobbyBack() {
     if (!this.isVersusLocalLobbyOpen()) {
       return false;
     }
-    this.closeVersusLocalLobby();
+    const joined = this.versusLocal.slots.map((slot, index) => (slot.device ? index : -1)).filter((index) => index !== -1);
+    if (joined.length === 0) {
+      this.closeVersusLocalLobby();
+      return true;
+    }
+    const last = this.versusLocal.joinOrder?.filter((index) => joined.includes(index)).at(-1) ?? joined.at(-1);
+    this.leaveVersusLocalSlot(last);
     return true;
   },
 
@@ -267,7 +295,8 @@ export const uiVersusLocalMethods = {
           ...cfg.handicap.labelKeys.map((labelKey, optionIndex) => {
             const option = document.createElement('option');
             option.value = String(optionIndex);
-            option.textContent = t(`versus.local.handicap.${labelKey}`);
+            const factor = formatNumber(cfg.handicap.riseMultipliers[optionIndex]);
+            option.textContent = t(`versus.local.handicap.${labelKey}`, { factor });
             return option;
           })
         );
@@ -304,12 +333,21 @@ export const uiVersusLocalMethods = {
       return false;
     }
     state.slots = next;
+    this.noteVersusLocalJoin(slotIndex);
     this.renderVersusLocalLobby();
     this.pulseVersusLocalSlot(slotIndex);
     this.announceVersusLocal(
       t('versus.local.announce.joined', { n: slotIndex + FIRST_PLAYER_NUMBER, device: describeLocalDevice(device) })
     );
     return true;
+  },
+
+  /** Remembers who joined last, so Escape frees the most recent player first. */
+  noteVersusLocalJoin(slotIndex) {
+    const order = (this.versusLocal.joinOrder ??= []);
+    if (!order.includes(slotIndex)) {
+      order.push(slotIndex);
+    }
   },
 
   /** A short ring on the slot that just joined; reduced motion removes the animation itself. */
@@ -328,6 +366,7 @@ export const uiVersusLocalMethods = {
       return;
     }
     state.slots = leaveSlot(state.slots, slotIndex);
+    state.joinOrder = (state.joinOrder ?? []).filter((index) => index !== slotIndex);
     this.renderVersusLocalLobby();
     this.announceVersusLocal(t('versus.local.announce.left', { n: slotIndex + FIRST_PLAYER_NUMBER }));
   },
@@ -376,6 +415,7 @@ export const uiVersusLocalMethods = {
     }
     const slotIndex = slotForPad(next, padIndex);
     state.slots = next;
+    this.noteVersusLocalJoin(slotIndex);
     this.renderVersusLocalLobby();
     this.pulseVersusLocalSlot(slotIndex);
     this.announceVersusLocal(

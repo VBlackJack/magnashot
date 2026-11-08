@@ -1066,6 +1066,25 @@ test('Change players leaves the screen and opens the lobby again with the same d
   assert.equal(steps.includes('cpu leave'), false, 'a CPU match has no players to change');
 });
 
+test('Change players hands the live match slots (takeovers, lost pads) to the lobby', () => {
+  const { ui } = makeLocalUi();
+  ui.versusLocal = { slots: [{ device: null, padLost: false }, { device: null, padLost: false }], handicaps: [0, 0] };
+  ui.versus.slots = [
+    { device: { type: DEVICE_TYPES.PAD, padIndex: 3, id: 'taken over' }, padLost: false },
+    { device: { type: DEVICE_TYPES.PAD, padIndex: 5, id: 'lost' }, padLost: true }
+  ];
+  ui.leaveVersus = () => {};
+  ui.openVersusTierPicker = () => {};
+  let opened = null;
+  ui.openVersusLocalLobby = (options) => {
+    opened = options;
+  };
+  ui.changeVersusPlayers();
+  assert.deepEqual(opened, { keep: true });
+  assert.equal(ui.versusLocal.slots[0].device.id, 'taken over');
+  assert.equal(ui.versusLocal.slots[1].padLost, true, 'the lobby then frees the lost pad');
+});
+
 test('opening a dialog or pausing lets go of every held key', () => {
   const { ui, controller } = makeLocalUi();
   ui.handleLocalGameplayKey(press('KeyD'));

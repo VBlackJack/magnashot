@@ -51,6 +51,8 @@ export const GAMEPAD_EVENTS = Object.freeze({
 
 const STANDARD_MAPPING = 'standard';
 const MS_PER_SECOND = 1000;
+const POLL_MODE_SINGLE = 'single';
+const POLL_MODE_ALL = 'all';
 const A = GAMEPAD_ACTIONS;
 
 const NAV_ACTIONS = Object.freeze({
@@ -94,6 +96,7 @@ export class GamepadInput {
     this.activeIndex = -1;
     this.keyStates = new Map();
     this.padStates = new Map();
+    this.lastPollMode = '';
     this.pendingEvents = [];
     this._target = null;
     this._onConnected = (e) => this._queueEvent(GAMEPAD_EVENTS.CONNECTED, e);
@@ -318,7 +321,10 @@ export class GamepadInput {
     const { pad, activity } = this._pickActive(pads);
     out.active = activity;
     out.padIndex = pad.index;
+    // Coming from pollAll(): the edge state is stale, so this read only records held buttons.
+    const primed = this._enterMode(POLL_MODE_SINGLE);
     this._readPad(pad, this.keyStates, elapsedMs, ctx, nowMs, out);
+    if (primed) out.actions = [];
     return out;
   }
 
@@ -358,6 +364,8 @@ export class GamepadInput {
     for (const index of Array.from(this.padStates.keys())) {
       if (!present.has(index)) this.padStates.delete(index);
     }
+    // Coming from poll(): every pad starts unseen, so the first read of each is primed.
+    this._enterMode(POLL_MODE_ALL);
     const results = [];
     for (const pad of pads) {
       let states = this.padStates.get(pad.index);
@@ -379,6 +387,22 @@ export class GamepadInput {
       results.push(out);
     }
     return { pads: results, events };
+  }
+
+  /**
+   * Record which poll flavour runs. On a switch the target edge map is cleared so a button held
+   * across the switch (the press that opened a menu) cannot come out as a fresh press.
+   * @param {string} mode POLL_MODE_SINGLE or POLL_MODE_ALL
+   * @returns {boolean} true when the mode changed since the last scan
+   */
+  _enterMode(mode) {
+    if (this.lastPollMode === mode) return false;
+    const switched = this.lastPollMode !== '';
+    this.lastPollMode = mode;
+    if (!switched) return false;
+    if (mode === POLL_MODE_SINGLE) this.keyStates.clear();
+    else this.padStates.clear();
+    return true;
   }
 
   /**

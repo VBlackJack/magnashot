@@ -1465,8 +1465,8 @@
       },
       "handicap": {
         "none": "Normale",
-        "slow": "Plus lente (x1,25)",
-        "slower": "La plus lente (x1,5)"
+        "slow": "Plus lente (x{{factor}})",
+        "slower": "La plus lente (x{{factor}})"
       },
       "announce": {
         "joined": "Le joueur {{n}} a rejoint avec : {{device}}",
@@ -1474,7 +1474,7 @@
         "roundWon": "Le joueur {{n}} remporte la manche",
         "matchWon": "Le joueur {{n}} remporte le match {{a}} à {{b}}",
         "pulseSent": "Le joueur {{n}} a envoyé une impulsion de champ",
-        "padLost": "Manette du joueur {{n}} déconnectée. Appuyez sur un bouton d'une manette pour la remplacer, ou quittez."
+        "padLost": "Manette du joueur {{n}} déconnectée. Appuyez sur le bouton du bas d'une manette pour la remplacer, ou quittez."
       },
       "bar": {
         "roundPips": "Manche {{round}}. Joueur 1 : {{a}} gagnée(s). Joueur 2 : {{b}} gagnée(s)."

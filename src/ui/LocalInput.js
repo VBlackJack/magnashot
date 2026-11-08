@@ -170,7 +170,23 @@ export function acceptPointerForSlot(slot, slotIndex, pointerType) {
   return false;
 }
 
-/** Whether the viewport can show two boards side by side. */
-export function canHostLocalDuel(vw, vh, layoutCfg, localCfg) {
-  return vw >= localCfg.entry.minViewportWidthPx && vh >= layoutCfg.splitMinViewportHeightPx;
+/**
+ * Whether the viewport can show two boards side by side: wide enough, tall enough for the split
+ * layout, and (when the canvas section is given) tall enough for a board of the minimum split
+ * width once the bar, the board HUD and the padding (entry.reservedHeightPx) are taken off.
+ * @param {number} vw - Viewport width.
+ * @param {number} vh - Viewport height.
+ * @param {{splitMinViewportHeightPx: number, splitMinBoardWidthPx?: number}} layoutCfg - versus.layout.
+ * @param {{entry: {minViewportWidthPx: number, reservedHeightPx?: number}}} localCfg - versus.local.
+ * @param {{logicalWidth: number, logicalHeight: number}} [canvasCfg] - The `canvas` section of the game config.
+ */
+export function canHostLocalDuel(vw, vh, layoutCfg, localCfg, canvasCfg) {
+  if (vw < localCfg.entry.minViewportWidthPx || vh < layoutCfg.splitMinViewportHeightPx) {
+    return false;
+  }
+  if (!canvasCfg || !layoutCfg.splitMinBoardWidthPx) {
+    return true;
+  }
+  const boardWidth = ((vh - (localCfg.entry.reservedHeightPx ?? 0)) * canvasCfg.logicalWidth) / canvasCfg.logicalHeight;
+  return boardWidth >= layoutCfg.splitMinBoardWidthPx;
 }

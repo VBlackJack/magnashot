@@ -651,3 +651,39 @@ test('pollAll ignores non-standard pads', () => {
     const { input } = setup({ pads: [makePad(0, { mapping: '' })] });
     assert.deepEqual(input.pollAll(16).pads, []);
 });
+
+test('a button held across a poll to pollAll switch emits no edge', () => {
+    const { input, pads } = setup({ pads: [makePad(0)] });
+    input.poll(16);
+    press(pads[0], 0);
+    assert.deepEqual(input.poll(16).actions, [A.SHOOT]);
+    assert.deepEqual(input.pollAll(16).pads[0].actions, []);
+    assert.deepEqual(input.pollAll(16).pads[0].actions, []);
+    release(pads[0], 0);
+    input.pollAll(16);
+    press(pads[0], 0);
+    assert.deepEqual(input.pollAll(16).pads[0].actions, [A.SHOOT]);
+});
+
+test('a button held across a pollAll to poll switch emits no edge', () => {
+    const { input, pads } = setup({ pads: [makePad(0)] });
+    input.pollAll(16);
+    press(pads[0], 0);
+    assert.deepEqual(input.pollAll(16).pads[0].actions, [A.SHOOT]);
+    assert.deepEqual(input.poll(16).actions, []);
+    assert.deepEqual(input.poll(16).actions, []);
+    release(pads[0], 0);
+    input.poll(16);
+    press(pads[0], 0);
+    assert.deepEqual(input.poll(16).actions, [A.SHOOT]);
+});
+
+test('reopening the per-pad mode re-primes the pads', () => {
+    const { input, pads } = setup({ pads: [makePad(0)] });
+    input.poll(16);
+    press(pads[0], 0);
+    input.poll(16);
+    input.pollAll(16);
+    input.poll(16);
+    assert.deepEqual(input.pollAll(16).pads[0].actions, []);
+});

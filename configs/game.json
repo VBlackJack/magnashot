@@ -1533,7 +1533,7 @@
   },
   "versus": {
     "local": {
-      "entry": { "minViewportWidthPx": 680 },
+      "entry": { "minViewportWidthPx": 680, "reservedHeightPx": 122 },
       "keyboard": {
         "left": {
           "aimLeft": ["KeyA"],

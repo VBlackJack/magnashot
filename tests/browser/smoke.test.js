@@ -2002,6 +2002,10 @@ const LOCAL_AIM_HOLD_MS = 300;
 const LOCAL_TOO_SMALL_VIEWPORT = Object.freeze({ width: 600, height: 850 });
 /** Layouts that cannot host two boards side by side (the entry stays hidden there). */
 const LOCAL_ENTRY_HIDDEN_VIEWPORTS = Object.freeze(['phone landscape', 'phone portrait', 'narrow phone portrait']);
+/** Short desktop windows around the height where two boards stop fitting. */
+const LOCAL_SHORT_DESKTOP_WIDTH = 1366;
+const LOCAL_SHORT_DESKTOP_HEIGHTS = Object.freeze([600, 650]);
+const LOCAL_SHORT_DESKTOP_FITS_FROM = 650;
 const LOCAL_PAD_BOTTOM_BUTTON = 0;
 const LOCAL_PAD_START_BUTTON = 9;
 /** The assertions below read English texts: the profile is pinned to English whatever the browser language. */
@@ -2261,6 +2265,34 @@ describe('Polarity Duel, two players entry by layout', () => {
       try {
         await openVersusTierPicker(page, viewport);
         assert.equal(await isShown(page, '#btn-versus-local'), !isHidden);
+        assert.deepEqual(errors, []);
+      } finally {
+        await context.close();
+      }
+    });
+  }
+
+  // A short desktop window: the entry is offered exactly when the split layout fits.
+  for (const height of LOCAL_SHORT_DESKTOP_HEIGHTS) {
+    test(`on a ${LOCAL_SHORT_DESKTOP_WIDTH}x${height} window the entry matches what the match can show`, async () => {
+      const viewport = { ...LOCAL_WIDE_VIEWPORT, width: LOCAL_SHORT_DESKTOP_WIDTH, height };
+      const { context, page, errors } = await openGame(viewport, { initStorage: LOCAL_PLAYER_STORAGE });
+      try {
+        await captureVersusEngines(page);
+        await openVersusTierPicker(page, viewport);
+        const isOffered = await isShown(page, '#btn-versus-local');
+        assert.equal(isOffered, height >= LOCAL_SHORT_DESKTOP_FITS_FROM, 'the entry follows the split layout requirement');
+        if (isOffered) {
+          await page.click('#btn-versus-local');
+          await waitShown(page, '#modal-versus-local');
+          await page.keyboard.press('KeyW');
+          await page.keyboard.press('ArrowUp');
+          await page.click('#btn-versus-local-start');
+          await waitShown(page, '#versus-screen');
+          await page.waitForFunction(() => Boolean(window.__versusBoards?.[0] && window.__versusBoards?.[1]));
+          assert.equal(await page.evaluate(() => document.querySelector('#versus-screen').dataset.tooSmall), 'false');
+          assert.equal(await isShown(page, '#modal-duel-pause'), false, 'the match opens running, not held');
+        }
         assert.deepEqual(errors, []);
       } finally {
         await context.close();

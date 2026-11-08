@@ -3962,13 +3962,13 @@ body {
   border-color: var(--accent-blue);
 }
 
-/* Boards only exist in local play: the second HUD gets its controls, the cursor shows the board answers a mouse. */
+/* Boards only exist in local play: the second HUD gets its controls; the mouse only steers board 0, so only it shows the crosshair (when player 1 plays keyboard and mouse). */
 .versus-screen:not([data-mode='local']) .versus-hud-actions-local,
 .versus-screen:not([data-mode='local']) #versus-specials-1 {
   display: none;
 }
 
-.versus-screen[data-mode='local'] #versus-canvas-1 {
+.versus-screen[data-mode='local'][data-p1-mouse='true'] #versus-canvas-0 {
   cursor: crosshair;
 }
 

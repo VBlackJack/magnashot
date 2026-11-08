@@ -133,6 +133,7 @@ function makeLobbyUi({ viewport = WIDE_VIEWPORT } = {}) {
   const els = {
     modalVersusLocal: modal,
     btnVersusLocal: fakeNode({ hidden: true }),
+    versusLocalEntryHint: fakeNode({ hidden: true }),
     btnVersusLocalStart: fakeNode(),
     btnVersusLocalBack: fakeNode(),
     versusLocalNeedTwo: fakeNode(),
@@ -357,6 +358,66 @@ test('Escape closes the lobby and gives the focus back to the entry button', () 
   assert.equal(ui.handleVersusLocalLobbyBack(), true);
   assert.equal(ui.isVersusLocalLobbyOpen(), false);
   assert.equal(ui.stackedModalOpener, els.btnVersusLocal);
+});
+
+test('Escape frees the player who joined last, and closes the lobby only when nobody has joined', () => {
+  const { ui } = makeLobbyUi();
+  ui.openVersusLocalLobby();
+  ui.joinVersusLocalSlot(1, { type: DEVICE_TYPES.TOUCH });
+  ui.joinVersusLocalSlot(0, { type: DEVICE_TYPES.KEYBOARD, side: 'left' });
+  assert.equal(ui.handleVersusLocalLobbyBack(), true);
+  assert.equal(ui.versusLocal.slots[0].device, null, 'the last to join leaves first');
+  assert.equal(ui.versusLocal.slots[1].device.type, DEVICE_TYPES.TOUCH);
+  assert.equal(ui.isVersusLocalLobbyOpen(), true);
+  assert.equal(ui.handleVersusLocalLobbyBack(), true);
+  assert.equal(ui.versusLocal.slots[1].device, null);
+  assert.equal(ui.isVersusLocalLobbyOpen(), true);
+  assert.equal(ui.handleVersusLocalLobbyBack(), true);
+  assert.equal(ui.isVersusLocalLobbyOpen(), false);
+});
+
+test('the picker shows the too-small hint exactly when the entry is hidden', () => {
+  const { ui, els } = makeLobbyUi();
+  ui.syncVersusLocalEntry();
+  assert.equal(els.versusLocalEntryHint.classList.contains('hidden'), true);
+  globalThis.window.innerWidth = NARROW_VIEWPORT.innerWidth;
+  ui.syncVersusLocalEntry();
+  assert.equal(els.versusLocalEntryHint.classList.contains('hidden'), false);
+  assert.ok(indexHtml.includes('data-i18n="versus.local.entryHint"'));
+});
+
+test('handicap labels read their factor from the configured multipliers', () => {
+  const { ui, slotElements } = makeLobbyUi();
+  ui.openVersusLocalLobby();
+  const texts = () => slotElements[0].parts['.versus-local-handicap'].children.map((option) => option.textContent);
+  assert.deepEqual(texts(), ['Normal', 'Slower (x1.25)', 'Slowest (x1.5)']);
+  const multipliers = gameConfig.versus.local.handicap.riseMultipliers;
+  ui.gameConfig = { ...gameConfig, versus: { ...gameConfig.versus, local: { ...gameConfig.versus.local, handicap: { ...gameConfig.versus.local.handicap, riseMultipliers: [multipliers[0], 1.4, 2] } } } };
+  ui.renderVersusLocalLobby();
+  assert.deepEqual(texts(), ['Normal', 'Slower (x1.4)', 'Slowest (x2)']);
+});
+
+test('reopening the lobby with Change players keeps the live devices and drops a pad that is gone', () => {
+  const originalNavigator = Object.getOwnPropertyDescriptor(globalThis, 'navigator');
+  const setPads = (pads) => Object.defineProperty(globalThis, 'navigator', { value: { getGamepads: () => pads }, configurable: true });
+  const { ui } = makeLobbyUi();
+  const live = { type: DEVICE_TYPES.PAD, padIndex: PAD_A.index, id: PAD_A.id };
+  const gone = { type: DEVICE_TYPES.PAD, padIndex: PAD_B.index, id: PAD_B.id };
+  ui.versusLocal.slots = [{ device: live, padLost: false }, { device: gone, padLost: false }];
+  setPads([{ index: PAD_A.index, connected: true }, null]);
+  ui.openVersusLocalLobby({ keep: true });
+  assert.equal(ui.versusLocal.slots[0].device.padIndex, PAD_A.index, 'a pad still present stays');
+  assert.equal(ui.versusLocal.slots[1].device, null, 'a pad that is no longer reported is dropped');
+  assert.equal(ui.elements.btnVersusLocalStart.getAttribute('aria-disabled'), 'true', 'Start waits for a live device');
+  ui.versusLocal.slots[1] = { device: { type: DEVICE_TYPES.TOUCH }, padLost: true };
+  ui.closeVersusLocalLobby();
+  ui.openVersusLocalLobby({ keep: true });
+  assert.equal(ui.versusLocal.slots[1].device, null, 'a lost pad slot is freed');
+  if (originalNavigator) {
+    Object.defineProperty(globalThis, 'navigator', originalNavigator);
+  } else {
+    delete globalThis.navigator;
+  }
 });
 
 test('the keys are named as the layout names them (AZERTY), with the QWERTY names as the fallback', () => {

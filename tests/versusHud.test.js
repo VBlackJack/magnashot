@@ -434,6 +434,15 @@ test('the local announcements name the winner of a round and of the match, and n
   assert.deepEqual(render(queue.push({ type: MATCH_EVENTS.ROUND_DECIDED, winner: 0, loser: 1, wins: [1, 0] }, 0)), ['Le joueur 1 remporte la manche']);
 });
 
+test('local pulses of one player are coalesced inside the announce window, each player apart', () => {
+  const queue = localQueue();
+  const pulse = (board, clock) => render(queue.push({ type: MATCH_EVENTS.PULSE_SENT, board, target: 1 - board }, clock));
+  assert.deepEqual(pulse(0, 0), ['Player 1 sent a field pulse']);
+  assert.deepEqual(pulse(0, LOCAL_WINDOW_FRAMES - 1), [], 'a second pulse in the window is not said again');
+  assert.deepEqual(pulse(1, 1), ['Player 2 sent a field pulse'], 'the other player is counted apart');
+  assert.deepEqual(pulse(0, LOCAL_WINDOW_FRAMES), ['Player 1 sent a field pulse'], 'it is said again after the window');
+});
+
 test('the local announcements keep pulses sent by a named player and drop the charge traffic and the CPU wording', () => {
   const queue = localQueue();
   assert.deepEqual(render(queue.push({ type: MATCH_EVENTS.PULSE_SENT, board: 1, target: 0 }, 0)), ['Player 2 sent a field pulse']);
