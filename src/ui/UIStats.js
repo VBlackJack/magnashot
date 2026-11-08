@@ -102,6 +102,18 @@ export function formatVersusTierLines(records, translate, format) {
 }
 
 /**
+ * The "2P matches" line of Polarity Duel: how many duels between two players on this device were finished.
+ * @param {number|undefined} count - Storage getVersusLocalMatches().
+ * @param {(key: string, params?: object) => string} translate - Translation function.
+ * @param {(n: number) => string} format - Number formatter.
+ * @returns {string[]} One line, or none when no such duel was played.
+ */
+export function formatVersusLocalLines(count, translate, format) {
+  const matches = Number(count) || 0;
+  return matches > 0 ? [translate('versus.local.stats.matches', { count: format(matches) })] : [];
+}
+
+/**
  * Display model of the Overview tab.
  * @param {object} stats - Local statistics (storage getPlayerStats()).
  * @param {object} records - Bests from storage: {campaign: {level, stars}, modes: {[mode]: record}}.
@@ -117,7 +129,13 @@ export function buildStatsOverview(stats, records, context) {
     const entry = modeStats[mode];
     const runs = Number(entry?.runs) || 0;
     const best = formatModeBest(records?.modes?.[mode], translate, format);
-    const details = mode === GAME_MODES.VERSUS ? formatVersusTierLines(records?.versus, translate, format) : [];
+    const details =
+      mode === GAME_MODES.VERSUS
+        ? [
+            ...formatVersusTierLines(records?.versus, translate, format),
+            ...formatVersusLocalLines(records?.versusLocalMatches, translate, format)
+          ]
+        : [];
     if (runs <= 0 && !best && details.length === 0) {
       continue;
     }
@@ -320,6 +338,7 @@ export const uiStatsMethods = {
     return {
       campaign: { level: hasCampaignProgress ? unlockedLevel : 0, stars: totalStars },
       versus: storage.getVersusRecords?.() ?? {},
+      versusLocalMatches: storage.getVersusLocalMatches?.() ?? 0,
       modes: {
         [GAME_MODES.ENDLESS]: { score: storage.getEndlessHighScore?.() ?? 0 },
         [GAME_MODES.DAILY]: { score: dailyBest },

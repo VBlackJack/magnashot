@@ -24,6 +24,7 @@ import {
   VERSUS_LAYOUTS,
   VersusHud,
   chooseVersusLayout,
+  collectVersusHudElements,
   computeMiniSize,
   createAnnouncementQueue,
   fitBoard,
@@ -387,4 +388,142 @@ test('a special that is loaded stays listed and marked as equipped', () => {
   const [button] = elements.boards[0].specials.children;
   assert.equal(button.classList.contains('equipped'), true);
   assert.equal(button.getAttribute('aria-pressed'), 'true');
+});
+
+// ---------------------------------------------------------------------------------------------
+// Two players on one device
+// ---------------------------------------------------------------------------------------------
+
+const localBoardState = (index, overrides = {}) => ({
+  index,
+  isPlayer: false,
+  isCpu: false,
+  isHuman: true,
+  tier: null,
+  incoming: 0,
+  charges: [],
+  pulse: { value: 0, max: 2, ratio: 0 },
+  ...overrides
+});
+
+const localMatchState = (overrides = {}) => ({
+  playerBoard: null,
+  mode: 'local',
+  timerSeconds: 0,
+  isSuddenDeath: false,
+  round: { number: 2, wins: [1, 0], roundsToWin: 2 },
+  boards: [localBoardState(0), localBoardState(1)],
+  ...overrides
+});
+
+const LOCAL_WINDOW_FRAMES = 30;
+const LOCAL_SUDDEN_DEATH_SECONDS = 15;
+const localQueue = () => createAnnouncementQueue({ windowFrames: LOCAL_WINDOW_FRAMES, suddenDeathSeconds: LOCAL_SUDDEN_DEATH_SECONDS, mode: 'local' });
+const render = (entries) => entries.map((entry) => renderAnnouncement(entry));
+
+test('the local announcements name the winner of a round and of the match, and nothing is "you"', () => {
+  const queue = localQueue();
+  assert.deepEqual(render(queue.push({ type: MATCH_EVENTS.ROUND_DECIDED, winner: 1, loser: 0, wins: [0, 1] }, 0)), ['Player 2 wins the round']);
+  assert.deepEqual(render(queue.push({ type: MATCH_EVENTS.MATCH_DECIDED, winner: 0, wins: [2, 1] }, 0)), ['Player 1 wins the match 2 to 1']);
+  assert.deepEqual(render(queue.push({ type: MATCH_EVENTS.ROUND_REPLAY }, 0)), ['Both boards fell. The round is replayed.']);
+  assert.deepEqual(
+    render(queue.push({ type: MATCH_EVENTS.SUDDEN_DEATH }, 0)),
+    [`Sudden death: both rails now drop every ${LOCAL_SUDDEN_DEATH_SECONDS} seconds.`]
+  );
+  i18n.currentLocale = 'fr';
+  assert.deepEqual(render(queue.push({ type: MATCH_EVENTS.ROUND_DECIDED, winner: 0, loser: 1, wins: [1, 0] }, 0)), ['Le joueur 1 remporte la manche']);
+});
+
+test('the local announcements keep pulses sent by a named player and drop the charge traffic and the CPU wording', () => {
+  const queue = localQueue();
+  assert.deepEqual(render(queue.push({ type: MATCH_EVENTS.PULSE_SENT, board: 1, target: 0 }, 0)), ['Player 2 sent a field pulse']);
+  assert.deepEqual(render(queue.push({ type: MATCH_EVENTS.PULSE_SENT, board: 0, target: 1 }, 0)), ['Player 1 sent a field pulse']);
+  for (const type of [
+    MATCH_EVENTS.CHARGE_INCOMING,
+    MATCH_EVENTS.CHARGE_NEUTRALISED,
+    MATCH_EVENTS.PULSE_RECEIVED,
+    MATCH_EVENTS.ROUND_WON,
+    MATCH_EVENTS.ROUND_LOST,
+    MATCH_EVENTS.MATCH_WON,
+    MATCH_EVENTS.MATCH_LOST
+  ]) {
+    assert.deepEqual(queue.push({ type, isPlayer: true, count: 2, source: 'pulse', wins: [2, 0] }, 0), [], type);
+  }
+  assert.deepEqual(queue.drain(LOCAL_WINDOW_FRAMES * 10), [], 'no incoming charges are ever counted');
+});
+
+test('the bar and the boards read "Player N" with the device and a badge that is not only a colour', () => {
+  const { elements, hud } = makeHud();
+  for (const board of elements.boards) {
+    board.badge = fakeElement();
+    board.badge.classList.add('hidden');
+  }
+  hud.refresh(localMatchState(), { deviceNames: ['Left keys', 'Controller'] });
+  assert.equal(elements.roundPips.getAttribute('aria-label'), 'Round 2. Player 1: 1 won. Player 2: 0 won.');
+  assert.equal(elements.pipsPlayer.children.filter((pip) => pip.classList.contains('is-won')).length, 1);
+  assert.equal(elements.boards[0].label.textContent, 'Player 1 (Left keys)');
+  assert.equal(elements.boards[1].label.textContent, 'Player 2 (Controller)');
+  assert.equal(elements.boards[0].root.getAttribute('aria-label'), 'Player 1 board');
+  assert.equal(elements.boards[1].root.getAttribute('aria-label'), 'Player 2 board');
+  assert.equal(elements.boards[0].badge.textContent, '1');
+  assert.equal(elements.boards[1].badge.textContent, '2');
+  assert.equal(elements.boards[0].badge.classList.contains('hidden'), false);
+  hud.refresh(localMatchState());
+  assert.equal(elements.boards[0].label.textContent, 'Player 1', 'a board with no device named shows only the player');
+  // Back to a match against the CPU: the badges leave and the usual labels return.
+  hud.refresh(matchState(), { cpuTierName: 'Hard' });
+  assert.equal(elements.boards[0].badge.classList.contains('hidden'), true);
+  assert.equal(elements.boards[0].label.textContent, 'Your board');
+  assert.equal(elements.boards[1].label.textContent, 'CPU board (Hard)');
+});
+
+test('the second board has its own polarity button and specials row, refreshed apart from the first', () => {
+  const { elements, hud } = makeHud();
+  elements.boards[1].specials.classList.add('hidden');
+  const engineOf = (polarity, isFlipped, inventory = {}) => ({
+    isPolarityFlipped: isFlipped,
+    getVersusShotPolarity: () => polarity,
+    specialInventory: inventory,
+    currentBall: { specialType: null }
+  });
+  const [firstType] = SPECIAL_TYPES;
+  const picked = [];
+  hud.refreshPlayerControls(engineOf(1, false), specialsContext(picked), 0);
+  const changed = hud.refreshPlayerControls(engineOf(-1, true, { [firstType]: 2 }), specialsContext(picked), 1);
+  assert.equal(changed, true, 'the second row appeared');
+  assert.equal(elements.boards[0].polarityBtn.getAttribute('aria-pressed'), 'false');
+  assert.equal(elements.boards[1].polarityBtn.getAttribute('aria-pressed'), 'true');
+  assert.match(elements.boards[0].polarityBtn.getAttribute('aria-label'), /positive/);
+  assert.match(elements.boards[1].polarityBtn.getAttribute('aria-label'), /negative/);
+  assert.equal(elements.boards[0].specials.children.length, 0, 'the first row is untouched');
+  assert.equal(elements.boards[1].specials.children.length, 1);
+  assert.equal(hud.refreshPlayerControls(engineOf(-1, true, { [firstType]: 2 }), specialsContext(picked), 1), false, 'nothing changed, nothing is rebuilt');
+  elements.boards[1].specials.children[0].listeners.click();
+  assert.deepEqual(picked, [firstType]);
+});
+
+test('the labels of both boards controls follow the language', () => {
+  const { elements, hud } = makeHud();
+  i18n.currentLocale = 'fr';
+  hud.refreshLabels();
+  assert.equal(elements.boards[1].swapBtn.textContent, 'Échanger les sphères');
+  assert.equal(elements.boards[0].swapBtn.textContent, 'Échanger les sphères');
+});
+
+test('the HUD reads the controls of the second board under their own ids', () => {
+  const found = new Map();
+  const stub = (id) => {
+    const node = { id, querySelector: (selector) => ({ selector }) };
+    found.set(id, node);
+    return node;
+  };
+  const doc = {
+    getElementById: (id) => stub(id)
+  };
+  const els = collectVersusHudElements(doc);
+  assert.equal(els.boards[0].polarityBtn.selector, '#btn-versus-polarity');
+  assert.equal(els.boards[1].polarityBtn.selector, '#btn-versus-polarity-1');
+  assert.equal(els.boards[1].swapBtn.selector, '#btn-versus-swap-1');
+  assert.equal(els.boards[1].specials.selector, '#versus-specials-1');
+  assert.equal(els.boards[1].badge.selector, '.versus-badge');
 });

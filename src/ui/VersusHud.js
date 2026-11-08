@@ -42,6 +42,12 @@ const CLASS_EQUIPPED = 'equipped';
 const HIDDEN_CLASS = 'hidden';
 const PLAYER_SIDE = 'player';
 const CPU_SIDE = 'cpu';
+/** Match mode whose two boards are both played by humans. */
+const LOCAL_MODE = 'local';
+/** Announcement scope that reads its text under versus.local.announce. */
+const LOCAL_SCOPE = 'local';
+const BOARD_COUNT = 2;
+const FIRST_PLAYER_NUMBER = 1;
 
 /**
  * Largest board that fits a box at the logical aspect ratio of the game board.
@@ -120,14 +126,38 @@ export const VERSUS_ANNOUNCEMENTS = Object.freeze({
  * Turns the match announcements into live region messages without flooding it: the charges
  * that arrive within one window are counted as one message, a neutralisation is announced at most
  * once per window, everything else is announced as it happens. Only what concerns the player is kept.
+ * In the local two-player mode there is no "you": only round and match results with the winner's name,
+ * sudden death and the pulses sent by a named player are announced (charges are on the screen).
  * Time is the caller's own clock (frames), so the queue is deterministic.
- * @param {{windowFrames: number, suddenDeathSeconds: number, playerBoard?: number}} options
+ * @param {{windowFrames: number, suddenDeathSeconds: number, playerBoard?: number, mode?: string}} options
  * @returns {{push: (event: object, clock: number) => object[], drain: (clock: number) => object[]}}
  */
-export function createAnnouncementQueue({ windowFrames, suddenDeathSeconds, playerBoard = 0 }) {
+export function createAnnouncementQueue({ windowFrames, suddenDeathSeconds, playerBoard = 0, mode = 'cpu' }) {
   let pendingIncoming = null;
   let lastNeutralisedClock = -Infinity;
   const message = (key, params = {}) => ({ key, params });
+  const localMessage = (key, params = {}) => ({ key, params, scope: LOCAL_SCOPE });
+
+  const pushLocal = (event) => {
+    switch (event.type) {
+      case MATCH_EVENTS.PULSE_SENT:
+        return Number.isInteger(event.board) ? [localMessage('pulseSent', { n: event.board + FIRST_PLAYER_NUMBER })] : [];
+      case MATCH_EVENTS.SUDDEN_DEATH:
+        return [message(VERSUS_ANNOUNCEMENTS.SUDDEN_DEATH, { seconds: suddenDeathSeconds })];
+      case MATCH_EVENTS.ROUND_DECIDED:
+        return [localMessage('roundWon', { n: event.winner + FIRST_PLAYER_NUMBER })];
+      case MATCH_EVENTS.ROUND_REPLAY:
+        return [message(VERSUS_ANNOUNCEMENTS.ROUND_DRAW)];
+      case MATCH_EVENTS.MATCH_DECIDED: {
+        const wins = event.wins ?? [0, 0];
+        return [
+          localMessage('matchWon', { n: event.winner + FIRST_PLAYER_NUMBER, a: wins[event.winner], b: wins[1 - event.winner] })
+        ];
+      }
+      default:
+        return [];
+    }
+  };
 
   return {
     /**
@@ -136,6 +166,9 @@ export function createAnnouncementQueue({ windowFrames, suddenDeathSeconds, play
      * @returns {Array<{key: string, params: object}>} Messages to speak now.
      */
     push(event, clock) {
+      if (mode === LOCAL_MODE) {
+        return pushLocal(event);
+      }
       switch (event.type) {
         case MATCH_EVENTS.CHARGE_INCOMING:
           if (event.isPlayer) {
@@ -197,7 +230,8 @@ export function createAnnouncementQueue({ windowFrames, suddenDeathSeconds, play
  * @returns {string}
  */
 export function renderAnnouncement(entry, translate = t) {
-  return translate(`versus.announce.${entry.key}`, entry.params);
+  const scope = entry.scope === LOCAL_SCOPE ? 'versus.local.announce' : 'versus.announce';
+  return translate(`${scope}.${entry.key}`, entry.params);
 }
 
 /**
@@ -208,15 +242,18 @@ export function renderAnnouncement(entry, translate = t) {
 export function collectVersusHudElements(doc) {
   const board = (index) => {
     const root = doc.getElementById(`versus-hud-${index}`);
+    // Board 0 keeps the original ids; board 1 carries the second local player's controls under a suffix.
+    const suffix = index === 0 ? '' : `-${index}`;
     return {
       root,
+      badge: root.querySelector('.versus-badge'),
       label: root.querySelector('.versus-hud-label'),
       incoming: root.querySelector('.versus-incoming'),
       pulse: root.querySelector('.versus-pulse'),
       pulseFill: root.querySelector('.versus-pulse-fill'),
-      polarityBtn: root.querySelector('#btn-versus-polarity'),
-      swapBtn: root.querySelector('#btn-versus-swap'),
-      specials: root.querySelector('#versus-specials')
+      polarityBtn: root.querySelector(`#btn-versus-polarity${suffix}`),
+      swapBtn: root.querySelector(`#btn-versus-swap${suffix}`),
+      specials: root.querySelector(`#versus-specials${suffix}`)
     };
   };
   return {
@@ -246,10 +283,12 @@ export class VersusHud {
     this.createElement = createElement;
     this.pips = { [PLAYER_SIDE]: [], [CPU_SIDE]: [] };
     this.specialButtons = [];
-    this.specialsKey = '';
+    // Per board: what the specials row shows, and the polarity (+1, -1, or null for a special
+    // sphere) of the loaded shot as last written on the button.
+    this.specialsKeys = Array.from({ length: BOARD_COUNT }, () => '');
     this.lastState = null;
-    // Polarity (+1, -1, or null for a special sphere) of the loaded shot, as last shown on the button.
-    this.shotPolarity = null;
+    this.lastContext = {};
+    this.shotPolarities = Array.from({ length: BOARD_COUNT }, () => null);
   }
 
   /** Builds one pip per round a side needs to win. */
@@ -269,27 +308,33 @@ export class VersusHud {
   /** Texts that only change with the language. */
   refreshLabels() {
     const { translate } = this;
-    for (const board of [this.els.boards[0]]) {
+    this.els.boards.forEach((board, index) => {
+      if (!board.swapBtn) {
+        return;
+      }
       setTextIfChanged(board.swapBtn, translate('versus.hud.swap'));
       setAttributeIfChanged(board.swapBtn, 'aria-label', translate('versus.hud.swap'));
-      this.refreshPolarityLabel(this.shotPolarity);
+      this.refreshPolarityLabel(this.shotPolarities[index], index);
       setAttributeIfChanged(board.specials, 'aria-label', translate('versus.hud.specials'));
-    }
+    });
     if (this.lastState) {
-      this.specialsKey = '';
-      this.refresh(this.lastState);
+      this.specialsKeys = this.specialsKeys.map(() => '');
+      this.refresh(this.lastState, this.lastContext);
     }
   }
 
   /**
    * Refreshes the bar and both boards from a controller state.
    * @param {object} state - VersusMatch getState().
-   * @param {{cpuTierName?: string}} [context] - Translated name of the CPU tier.
+   * @param {{cpuTierName?: string, deviceNames?: string[]}} [context] - Translated name of the CPU tier;
+   *   in the local mode, the translated device name of each player.
    */
   refresh(state, context = {}) {
     this.lastState = state;
+    this.lastContext = context;
     const { translate, format } = this;
     const { round } = state;
+    const isLocal = state.mode === LOCAL_MODE;
     const playerBoard = state.playerBoard ?? 0;
     const wins = { [PLAYER_SIDE]: round.wins[playerBoard], [CPU_SIDE]: round.wins[1 - playerBoard] };
     if (this.pips[PLAYER_SIDE].length !== round.roundsToWin) {
@@ -303,11 +348,17 @@ export class VersusHud {
     setAttributeIfChanged(
       this.els.roundPips,
       'aria-label',
-      translate('versus.bar.roundPips', {
-        round: format(roundNumber),
-        player: format(wins[PLAYER_SIDE]),
-        cpu: format(wins[CPU_SIDE])
-      })
+      isLocal
+        ? translate('versus.local.bar.roundPips', {
+            round: format(roundNumber),
+            a: format(wins[PLAYER_SIDE]),
+            b: format(wins[CPU_SIDE])
+          })
+        : translate('versus.bar.roundPips', {
+            round: format(roundNumber),
+            player: format(wins[PLAYER_SIDE]),
+            cpu: format(wins[CPU_SIDE])
+          })
     );
     const time = formatMatchTimer(state.timerSeconds);
     setTextIfChanged(this.els.timer, time);
@@ -315,19 +366,36 @@ export class VersusHud {
     this.els.suddenDeath?.classList.toggle(HIDDEN_CLASS, !state.isSuddenDeath);
 
     for (const boardState of state.boards) {
-      this.refreshBoard(boardState, context);
+      this.refreshBoard(boardState, context, isLocal);
     }
   }
 
-  refreshBoard(boardState, { cpuTierName = '' } = {}) {
+  refreshBoard(boardState, { cpuTierName = '', deviceNames = [] } = {}, isLocal = false) {
     const board = this.els.boards[boardState.index];
     const { translate, format } = this;
-    const labelKey = boardState.isPlayer ? 'versus.hud.playerBoard' : cpuTierName ? 'versus.hud.cpuBoardTier' : 'versus.hud.cpuBoard';
-    const label = translate(labelKey, { tier: cpuTierName });
+    let label;
+    let canvasLabel;
+    if (isLocal) {
+      const n = boardState.index + FIRST_PLAYER_NUMBER;
+      const device = deviceNames[boardState.index];
+      label = device
+        ? translate('versus.local.hud.label', { n: format(n), device })
+        : translate('versus.local.lobby.player', { n: format(n) });
+      canvasLabel = translate('versus.local.hud.board', { n: format(n) });
+      if (board.badge) {
+        setTextIfChanged(board.badge, String(n));
+        board.badge.classList.remove(HIDDEN_CLASS);
+      }
+    } else {
+      const labelKey = boardState.isPlayer ? 'versus.hud.playerBoard' : cpuTierName ? 'versus.hud.cpuBoardTier' : 'versus.hud.cpuBoard';
+      label = translate(labelKey, { tier: cpuTierName });
+      canvasLabel = label;
+      board.badge?.classList.add(HIDDEN_CLASS);
+    }
     setTextIfChanged(board.label, label);
-    setAttributeIfChanged(board.root, 'aria-label', label);
+    setAttributeIfChanged(board.root, 'aria-label', canvasLabel);
     const canvas = board.root.closest?.('.versus-board')?.querySelector?.('canvas');
-    setAttributeIfChanged(canvas, 'aria-label', label);
+    setAttributeIfChanged(canvas, 'aria-label', canvasLabel);
 
     const count = boardState.incoming;
     setTextIfChanged(board.incoming, translate('versus.hud.incomingShort', { count: format(count) }));
@@ -350,11 +418,15 @@ export class VersusHud {
    * Writes the polarity button: its text and its accessible name tell the polarity of the loaded
    * shot (a special sphere has none, the button then only names its action).
    * @param {number|null} polarity - +1, -1, or null.
+   * @param {number} [boardIndex] - Board whose button is written (the local mode has one per player).
    */
-  refreshPolarityLabel(polarity) {
-    this.shotPolarity = polarity;
+  refreshPolarityLabel(polarity, boardIndex = 0) {
+    this.shotPolarities[boardIndex] = polarity;
     const { translate } = this;
-    const button = this.els.boards[0].polarityBtn;
+    const button = this.els.boards[boardIndex].polarityBtn;
+    if (!button) {
+      return;
+    }
     if (!polarity) {
       setTextIfChanged(button, translate('versus.hud.polarity'));
       setAttributeIfChanged(button, 'aria-label', translate('versus.hud.polarity'));
@@ -377,18 +449,22 @@ export class VersusHud {
    * @param {object} specialsContext.specs - ballsConfig.specialTypes.
    * @param {(type: string, count: number) => string} specialsContext.describe - Accessible name of a special button.
    * @param {(type: string) => void} specialsContext.onPick - Equips a special.
+   * @param {number} [boardIndex] - Board whose controls are refreshed (0, or either one in the local mode).
    * @returns {boolean} True when the specials row appeared or disappeared (the layout may need to move).
    */
-  refreshPlayerControls(engine, { types, specs, describe, onPick }) {
-    const board = this.els.boards[0];
-    setAttributeIfChanged(board.polarityBtn, 'aria-pressed', String(Boolean(engine.isPolarityFlipped)));
-    this.refreshPolarityLabel(engine.getVersusShotPolarity?.() ?? null);
-    const stocked = types.filter((type) => (engine.specialInventory?.[type] || 0) > 0 || engine.currentBall?.specialType === type);
-    const key = stocked.map((type) => `${type}:${engine.specialInventory?.[type] || 0}:${engine.currentBall?.specialType === type}`).join('|');
-    if (key === this.specialsKey) {
+  refreshPlayerControls(engine, { types, specs, describe, onPick }, boardIndex = 0) {
+    const board = this.els.boards[boardIndex];
+    if (!board.polarityBtn) {
       return false;
     }
-    this.specialsKey = key;
+    setAttributeIfChanged(board.polarityBtn, 'aria-pressed', String(Boolean(engine.isPolarityFlipped)));
+    this.refreshPolarityLabel(engine.getVersusShotPolarity?.() ?? null, boardIndex);
+    const stocked = types.filter((type) => (engine.specialInventory?.[type] || 0) > 0 || engine.currentBall?.specialType === type);
+    const key = stocked.map((type) => `${type}:${engine.specialInventory?.[type] || 0}:${engine.currentBall?.specialType === type}`).join('|');
+    if (key === this.specialsKeys[boardIndex]) {
+      return false;
+    }
+    this.specialsKeys[boardIndex] = key;
     const wasShown = !board.specials.classList.contains(HIDDEN_CLASS);
     // A rebuilt button must not take the keyboard focus with it.
     const focusedType = typeof document !== 'undefined' ? document.activeElement?.dataset?.specialType : undefined;

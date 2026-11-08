@@ -22,15 +22,25 @@
  */
 
 import { GAME_MODES, GAME_STATES, INPUT_MODES, MATH_CONSTANTS, SPECIAL_TYPES_ORDER } from '../core/Constants.js';
-import { GAMEPAD_ACTIONS } from '../core/GamepadInput.js';
+import { GAMEPAD_ACTIONS, GAMEPAD_EVENTS } from '../core/GamepadInput.js';
 import { t, formatNumber } from '../core/I18n.js';
 import { buildShareText } from '../game/DailyShare.js';
 import { buildRunOutcomeDelta } from '../game/PlayerStats.js';
 import { Renderer } from '../game/Renderer.js';
 import { MATCH_EVENTS, createVersusMatch } from '../game/VersusMatch.js';
 import { bindCanvasInput } from './CanvasInput.js';
+import {
+  DEVICE_TYPES,
+  SIDES,
+  acceptPointerForSlot,
+  assignPad,
+  createSplitKeyboard,
+  markPadLost,
+  slotForPad
+} from './LocalInput.js';
 import { UI_SCENES } from './UIInputBindings.js';
-import { revealLiveRegion, scheduleNextFrame, setTextIfChanged } from './UIHelpers.js';
+import { isAriaDisabled, revealLiveRegion, scheduleNextFrame, setTextIfChanged } from './UIHelpers.js';
+import { describeLocalDevice } from './UIVersusLocal.js';
 import {
   VERSUS_LAYOUTS,
   VERSUS_ORIENTATIONS,
@@ -56,6 +66,9 @@ const CLOCK_TICK = 1;
 const TIER_BUTTON_CLASS = 'versus-tier-btn';
 const TIER_NAME_CLASS = 'versus-tier-name';
 const TIER_RECORD_CLASS = 'versus-tier-record';
+/** Kinds of match the screen can run. */
+const VERSUS_KINDS = Object.freeze({ CPU: 'cpu', LOCAL: 'local' });
+const FIRST_PLAYER_NUMBER = 1;
 
 /** Phases of the screen, as the match announcements report them. */
 const SCREEN_PHASES = Object.freeze({
@@ -104,7 +117,12 @@ export const uiVersusMethods = {
     els.btnVersusResume?.addEventListener('click', () => this.resumeVersus());
     els.btnVersusRestart?.addEventListener('click', () => this.restartVersus());
     els.btnVersusQuit?.addEventListener('click', () => this.quitVersus());
-    els.btnVersusRematch?.addEventListener('click', () => this.restartVersus());
+    els.btnVersusRematch?.addEventListener('click', () => {
+      // The primary button of the local result card ignores presses until the guard time is over.
+      if (!isAriaDisabled(els.btnVersusRematch)) {
+        this.restartVersus();
+      }
+    });
     els.btnVersusBack?.addEventListener('click', () => this.leaveVersus());
     els.btnVersusShare?.addEventListener('click', () => {
       this.shareVersusResult();
@@ -114,6 +132,13 @@ export const uiVersusMethods = {
     });
     els.btnVersusPolarity?.addEventListener('click', () => {
       this.versusPlayerAct((engine) => engine.togglePolarityFlip());
+    });
+    // The second HUD only has controls in the local two-player match.
+    els.btnVersusSwap1?.addEventListener('click', () => {
+      this.versusBoardAct(1, (engine) => engine.swapLauncherBalls());
+    });
+    els.btnVersusPolarity1?.addEventListener('click', () => {
+      this.versusBoardAct(1, (engine) => engine.togglePolarityFlip());
     });
   },
 
@@ -175,6 +200,7 @@ export const uiVersusMethods = {
       return button;
     });
     list.replaceChildren(...buttons);
+    this.syncVersusLocalEntry?.();
   },
 
   /** A tier button was activated: a locked one explains itself, an open one starts the match. */
@@ -201,14 +227,19 @@ export const uiVersusMethods = {
   },
 
   /**
-   * Opens the versus screen against a CPU tier. The current run is held paused (its snapshot is
-   * stored) and comes back paused when the screen closes.
-   * @param {string} tier - A tier of versus.cpu.
+   * Opens the versus screen. The current run is held paused (its snapshot is stored) and comes
+   * back paused when the screen closes.
+   * @param {string|{kind?: string, tier?: string, slots?: object[], riseMultipliers?: number[]}} options -
+   *   A tier of versus.cpu (a match against the CPU), or {kind: 'cpu', tier}, or {kind: 'local', slots,
+   *   riseMultipliers} for two players on this device (slots from LocalInput.js, one device each).
    */
-  enterVersus(tier) {
+  enterVersus(options) {
     if (this.versus || !this.versusConfigs || !this.elements.versusScreen) {
       return;
     }
+    const spec = typeof options === 'string' ? { kind: VERSUS_KINDS.CPU, tier: options } : options;
+    const isLocal = spec.kind === VERSUS_KINDS.LOCAL;
+    const tier = isLocal ? null : spec.tier;
     this.hideAllModals();
     if (this.engine.state === GAME_STATES.PLAYING || this.engine.state === GAME_STATES.PAUSED) {
       this.engine.state = GAME_STATES.PAUSED;
@@ -217,10 +248,18 @@ export const uiVersusMethods = {
     }
     this.storageManager.ensureModeUnlocked?.(GAME_MODES.VERSUS);
 
-    const uiCfg = this.gameConfig.versus.ui;
     const hud = new VersusHud(collectVersusHudElements(document));
     const v = {
+      kind: isLocal ? VERSUS_KINDS.LOCAL : VERSUS_KINDS.CPU,
       tier,
+      slots: isLocal ? spec.slots.map((slot) => ({ ...slot })) : null,
+      riseMultipliers: isLocal ? [...spec.riseMultipliers] : null,
+      kb: isLocal ? createSplitKeyboard(this.gameConfig.versus.local.keyboard) : null,
+      sceneController: null,
+      tooSmall: false,
+      isTooSmallAnnounced: false,
+      breakFrames: 0,
+      resultGuardTimer: null,
       hud,
       controller: null,
       renderers: [null, null],
@@ -232,27 +271,23 @@ export const uiVersusMethods = {
       hudDirty: true,
       isLayoutQueued: false,
       result: null,
-      queue: createAnnouncementQueue({
-        windowFrames: uiCfg.announceWindowFrames,
-        suddenDeathSeconds: this.gameConfig.versus.suddenDeath.intervalSeconds,
-        playerBoard: PLAYER_BOARD
-      }),
+      queue: null,
       unbindInput: null,
       unsubscribe: null,
       onResize: null
     };
+    v.queue = this.createVersusQueue(v);
     // The screen is live before the first round starts so the announcement of round 1 is received.
     this.versus = v;
     try {
       v.controller = createVersusMatch({
         seed: this.createVersusSeed(),
-        mode: 'cpu',
-        playerBoard: PLAYER_BOARD,
-        cpuTier: tier,
+        ...(isLocal
+          ? { mode: 'local', riseMultipliers: v.riseMultipliers, autoAdvance: false }
+          : { mode: 'cpu', playerBoard: PLAYER_BOARD, cpuTier: tier, autoAdvance: true }),
         configs: this.versusConfigs,
         storageManager: this.storageManager,
         audioManager: this.audioManager,
-        autoAdvance: true,
         onBoardChange: () => {
           v.hudDirty = true;
         },
@@ -263,20 +298,66 @@ export const uiVersusMethods = {
       throw error;
     }
 
+    this.elements.versusScreen.dataset.mode = v.kind;
     this.elements.versusScreen.classList.remove(HIDDEN_CLASS);
     this.syncModalInertState();
     hud.refreshLabels();
     this.layoutVersus();
-    v.unbindInput = bindCanvasInput(this.elements.versusCanvas0, () => v.controller.engines[PLAYER_BOARD], this.gameConfig, {
-      isBlocked: () => this.isAnyModalOpen() || v.controller.isPaused() || v.phase !== SCREEN_PHASES.PLAYING
-    }).unbind;
+    v.unbindInput = isLocal ? this.bindLocalCanvases(v) : this.bindCpuCanvas(v);
     v.onResize = () => this.scheduleVersusLayout();
     for (const type of ['resize', 'orientationchange']) {
       window.addEventListener(type, v.onResize);
     }
-    this.setActiveScene(UI_SCENES.VERSUS, this.versusSceneController);
+    if (isLocal) {
+      v.sceneController = this.createLocalSceneController();
+      this.setActiveScene(UI_SCENES.VERSUS, v.sceneController);
+    } else {
+      this.setActiveScene(UI_SCENES.VERSUS, this.versusSceneController);
+    }
     this.refreshVersusHud();
-    this.elements.versusCanvas0.focus();
+    // A window too small for two boards opened the pause dialog already: it keeps the focus.
+    if (!this.isAnyModalOpen()) {
+      this.elements.versusCanvas0.focus();
+    }
+  },
+
+  /** Announcement queue of the match kind. */
+  createVersusQueue(v) {
+    return createAnnouncementQueue({
+      windowFrames: this.gameConfig.versus.ui.announceWindowFrames,
+      suddenDeathSeconds: this.gameConfig.versus.suddenDeath.intervalSeconds,
+      playerBoard: PLAYER_BOARD,
+      mode: v.kind === VERSUS_KINDS.LOCAL ? VERSUS_KINDS.LOCAL : VERSUS_KINDS.CPU
+    });
+  },
+
+  /** True for the match of two players on this device. */
+  isLocalVersus() {
+    return this.versus?.kind === VERSUS_KINDS.LOCAL;
+  },
+
+  /** The one pointer-controlled board of a match against the CPU. */
+  bindCpuCanvas(v) {
+    return bindCanvasInput(this.elements.versusCanvas0, () => v.controller.engines[PLAYER_BOARD], this.gameConfig, {
+      isBlocked: () => this.isAnyModalOpen() || v.controller.isPaused() || v.phase !== SCREEN_PHASES.PLAYING
+    }).unbind;
+  },
+
+  /**
+   * Both boards of a local match follow pointers, each its own: a canvas owns one pointer from
+   * press to release, and takes only the pointer types its player's device uses.
+   */
+  bindLocalCanvases(v) {
+    const canvases = [this.elements.versusCanvas0, this.elements.versusCanvas1];
+    const unbinders = canvases.map(
+      (canvas, board) =>
+        bindCanvasInput(canvas, () => v.controller.engines[board], this.gameConfig, {
+          isBlocked: () => this.isAnyModalOpen() || v.controller.isPaused() || v.phase !== SCREEN_PHASES.PLAYING,
+          pointerOwnership: 'perCanvas',
+          acceptPointer: (event) => acceptPointerForSlot(v.slots[board], board, event.pointerType)
+        }).unbind
+    );
+    return () => unbinders.forEach((unbind) => unbind());
   },
 
   /**
@@ -289,6 +370,8 @@ export const uiVersusMethods = {
     }
     v.unsubscribe?.();
     v.unbindInput?.();
+    v.kb?.releaseAll();
+    clearTimeout(v.resultGuardTimer);
     for (const type of ['resize', 'orientationchange']) {
       window.removeEventListener(type, v.onResize);
     }
@@ -307,6 +390,9 @@ export const uiVersusMethods = {
       modal?.classList.add(HIDDEN_CLASS);
     }
     this.elements.versusResultShareFallback?.classList.add(HIDDEN_CLASS);
+    delete this.elements.versusScreen.dataset.mode;
+    delete this.elements.versusScreen.dataset.tooSmall;
+    this.elements.btnVersusRematch?.removeAttribute('aria-disabled');
     // The run held when the screen opened is shown again; its Pause dialog is what the player sees.
     this.autoPausedByOverlay = false;
     this.syncModalInertState();
@@ -383,17 +469,25 @@ export const uiVersusMethods = {
       layoutCfg,
       canvasCfg
     );
-    screen.dataset.layout = choice.layout;
+    // Two human boards never shrink to the mini-view: the match is held until the window is large enough.
+    const isLocal = v.kind === VERSUS_KINDS.LOCAL;
+    const layout = isLocal ? VERSUS_LAYOUTS.SPLIT : choice.layout;
+    const wasTooSmall = v.tooSmall;
+    v.tooSmall = isLocal && choice.layout === VERSUS_LAYOUTS.MINI;
+    screen.dataset.layout = layout;
 
-    const isMini = choice.layout === VERSUS_LAYOUTS.MINI;
+    const isMini = layout === VERSUS_LAYOUTS.MINI;
     const wraps = [els.versusCanvas0.parentElement, els.versusCanvas1.parentElement];
     if (!isMini) {
       const cpuFit = fitBoard(wraps[CPU_BOARD].clientWidth, wraps[CPU_BOARD].clientHeight, canvasCfg);
       const playerFit = fitBoard(wraps[PLAYER_BOARD].clientWidth, wraps[PLAYER_BOARD].clientHeight, canvasCfg);
       // Both boards are drawn at the size of the smaller fit, so they line up.
       const size = cpuFit.width < playerFit.width ? cpuFit : playerFit;
-      this.sizeVersusCanvas(els.versusCanvas0, size);
-      this.sizeVersusCanvas(els.versusCanvas1, size);
+      // A board squeezed to nothing keeps its last size (the boards are hidden then).
+      if (size.width > 0 && size.height > 0) {
+        this.sizeVersusCanvas(els.versusCanvas0, size);
+        this.sizeVersusCanvas(els.versusCanvas1, size);
+      }
     } else {
       // On a wide, short screen the top bar moves into the side column: the player board gets its height.
       this.placeVersusBar(isLandscape);
@@ -401,11 +495,59 @@ export const uiVersusMethods = {
     }
 
     const previous = v.layout;
-    v.layout = choice.layout;
-    const needsCpuRenderer = !v.renderers[CPU_BOARD] || previous !== choice.layout;
+    v.layout = layout;
+    const needsCpuRenderer = !v.renderers[CPU_BOARD] || previous !== layout;
     if (!v.renderers[PLAYER_BOARD] || needsCpuRenderer) {
       this.buildVersusRenderers(isMini);
     }
+    if (isLocal) {
+      this.applyLocalSizeState(wasTooSmall);
+    }
+  },
+
+  /**
+   * A local match that does not fit is held: the boards are hidden, the pause dialog says why
+   * and Resume stays out of reach until the window is large enough again (the match then stays paused).
+   */
+  applyLocalSizeState(wasTooSmall) {
+    const v = this.versus;
+    this.elements.versusScreen.dataset.tooSmall = String(v.tooSmall);
+    if (v.tooSmall && !wasTooSmall) {
+      v.isTooSmallAnnounced = false;
+    }
+    if (v.tooSmall) {
+      this.pauseVersus();
+      if (!v.isTooSmallAnnounced) {
+        v.isTooSmallAnnounced = true;
+        this.announce(t('versus.local.pause.tooSmall'));
+      }
+    }
+    this.syncLocalPauseGuards();
+  },
+
+  /** True when the match cannot be resumed: the window is too small, or a player's controller is gone. */
+  isVersusResumeBlocked() {
+    const v = this.versus;
+    return Boolean(v) && v.kind === VERSUS_KINDS.LOCAL && (v.tooSmall || v.slots.some((slot) => slot.padLost));
+  },
+
+  /** Writes the reasons the pause dialog gives (size, lost controller) and the state of Resume. */
+  syncLocalPauseGuards() {
+    const v = this.versus;
+    const els = this.elements;
+    if (!v || v.kind !== VERSUS_KINDS.LOCAL) {
+      return;
+    }
+    els.versusPauseSizeHint?.classList.toggle(HIDDEN_CLASS, !v.tooSmall);
+    if (v.tooSmall) {
+      setTextIfChanged(els.versusPauseSizeHint, t('versus.local.pause.tooSmall'));
+    }
+    const lostIndex = v.slots.findIndex((slot) => slot.padLost);
+    els.versusPausePadHint?.classList.toggle(HIDDEN_CLASS, lostIndex === -1);
+    if (lostIndex !== -1) {
+      setTextIfChanged(els.versusPausePadHint, t('versus.local.announce.padLost', { n: lostIndex + FIRST_PLAYER_NUMBER }));
+    }
+    els.btnVersusResume?.setAttribute('aria-disabled', String(this.isVersusResumeBlocked()));
   },
 
   /**
@@ -518,6 +660,7 @@ export const uiVersusMethods = {
     const events = v.controller.step();
     if (!v.controller.isPaused()) {
       v.clock += CLOCK_TICK;
+      this.advanceLocalRound(v);
     }
     // The announcements of the step already reached handleVersusEvent through the controller's listener.
     for (const entry of v.queue.drain(v.clock)) {
@@ -526,6 +669,18 @@ export const uiVersusMethods = {
     v.sinceRefresh += 1;
     if (v.hudDirty || events.length > 0 || v.sinceRefresh >= this.gameConfig.versus.ui.hudRefreshFrames) {
       this.refreshVersusHud();
+    }
+  },
+
+  /** The two-player match does not start the next round by itself: it does once the round break is over. */
+  advanceLocalRound(v) {
+    if (v.kind !== VERSUS_KINDS.LOCAL || v.phase !== SCREEN_PHASES.ROUND_OVER) {
+      return;
+    }
+    v.breakFrames += 1;
+    if (v.breakFrames >= this.gameConfig.versus.roundBreakFrames) {
+      v.breakFrames = 0;
+      v.controller.advance();
     }
   },
 
@@ -538,8 +693,11 @@ export const uiVersusMethods = {
     v.sinceRefresh = 0;
     v.hudDirty = false;
     const state = v.controller.getState();
-    const cpuTierName = t(`versus.tier.${v.tier}`);
-    v.hud.refresh(state, { cpuTierName });
+    if (v.kind === VERSUS_KINDS.LOCAL) {
+      v.hud.refresh(state, { deviceNames: v.slots.map((slot) => describeLocalDevice(slot.device)) });
+    } else {
+      v.hud.refresh(state, { cpuTierName: t(`versus.tier.${v.tier}`) });
+    }
     this.refreshVersusPlayerControls();
   },
 
@@ -552,12 +710,21 @@ export const uiVersusMethods = {
     if (!v) {
       return;
     }
-    const changed = v.hud.refreshPlayerControls(v.controller.engines[PLAYER_BOARD], {
-      types: SPECIAL_TYPES_ORDER,
-      specs: this.ballsConfig.specialTypes,
-      describe: (type, count) => this.getPowerupAriaLabel(type, count),
-      onPick: (type) => this.versusPlayerAct((engine) => engine.equipSpecialBall(type))
-    });
+    const boards = v.kind === VERSUS_KINDS.LOCAL ? [0, 1] : [PLAYER_BOARD];
+    let changed = false;
+    for (const board of boards) {
+      const didChange = v.hud.refreshPlayerControls(
+        v.controller.engines[board],
+        {
+          types: SPECIAL_TYPES_ORDER,
+          specs: this.ballsConfig.specialTypes,
+          describe: (type, count) => this.getPowerupAriaLabel(type, count),
+          onPick: (type) => this.versusBoardAct(board, (engine) => engine.equipSpecialBall(type))
+        },
+        board
+      );
+      changed = changed || didChange;
+    }
     if (changed) {
       this.scheduleVersusLayout();
     }
@@ -589,16 +756,20 @@ export const uiVersusMethods = {
     switch (event.type) {
       case MATCH_EVENTS.ROUND_START:
         v.phase = SCREEN_PHASES.PLAYING;
+        v.breakFrames = 0;
         this.elements.versusRoundOverlay.classList.add(HIDDEN_CLASS);
         break;
       case MATCH_EVENTS.ROUND_WON:
       case MATCH_EVENTS.ROUND_LOST:
       case MATCH_EVENTS.ROUND_REPLAY:
+      case MATCH_EVENTS.ROUND_DECIDED:
         v.phase = SCREEN_PHASES.ROUND_OVER;
-        this.showVersusRoundOverlay(event.type);
+        v.breakFrames = 0;
+        this.showVersusRoundOverlay(event.type, event);
         break;
       case MATCH_EVENTS.MATCH_WON:
       case MATCH_EVENTS.MATCH_LOST:
+      case MATCH_EVENTS.MATCH_DECIDED:
         v.phase = SCREEN_PHASES.MATCH_OVER;
         this.finishVersusMatch(event);
         break;
@@ -611,14 +782,15 @@ export const uiVersusMethods = {
   },
 
   /** A short overlay with the result of the round, until the next round starts by itself. */
-  showVersusRoundOverlay(type) {
+  showVersusRoundOverlay(type, event = {}) {
     const keys = {
       [MATCH_EVENTS.ROUND_WON]: 'versus.announce.roundWon',
       [MATCH_EVENTS.ROUND_LOST]: 'versus.announce.roundLost',
-      [MATCH_EVENTS.ROUND_REPLAY]: 'versus.announce.roundDraw'
+      [MATCH_EVENTS.ROUND_REPLAY]: 'versus.announce.roundDraw',
+      [MATCH_EVENTS.ROUND_DECIDED]: 'versus.local.announce.roundWon'
     };
     const overlay = this.elements.versusRoundOverlay;
-    overlay.textContent = t(keys[type]);
+    overlay.textContent = t(keys[type], { n: (event.winner ?? 0) + FIRST_PLAYER_NUMBER });
     overlay.classList.remove(HIDDEN_CLASS);
   },
 
@@ -628,6 +800,8 @@ export const uiVersusMethods = {
 
   /** Opens a versus dialog: focus goes into it and comes back to the board when it closes. */
   showVersusModal(modal, focusTarget) {
+    // A key held when a dialog opens would stay held: its release goes to the dialog.
+    this.versus?.kb?.releaseAll();
     this.saveLastFocusedElement();
     modal.classList.remove(HIDDEN_CLASS);
     this.syncModalInertState();
@@ -647,12 +821,13 @@ export const uiVersusMethods = {
     }
     v.controller.pause();
     v.hudDirty = true;
+    this.syncLocalPauseGuards();
     this.showVersusModal(this.elements.modalDuelPause, this.elements.btnVersusResume);
   },
 
   resumeVersus() {
     const v = this.versus;
-    if (!v) {
+    if (!v || this.isVersusResumeBlocked()) {
       return;
     }
     this.hideVersusModal(this.elements.modalDuelPause);
@@ -666,32 +841,50 @@ export const uiVersusMethods = {
     if (!v) {
       return;
     }
-    // Restarting a match that was started and not finished abandons it, like Quit does.
-    if (!v.result && v.controller.getState().frame > 0) {
+    // Restarting a match that was started and not finished abandons it, like Quit does (nothing is
+    // recorded for two players on one device: no statistics, no record).
+    if (v.kind !== VERSUS_KINDS.LOCAL && !v.result && v.controller.getState().frame > 0) {
       this.recordVersusOutcome(OUTCOME_QUIT);
     }
     this.hideVersusModal(this.elements.modalDuelPause);
     this.hideVersusModal(this.elements.modalDuelResult);
     this.elements.versusResultShareFallback?.classList.add(HIDDEN_CLASS);
+    clearTimeout(v.resultGuardTimer);
+    this.elements.btnVersusRematch?.removeAttribute('aria-disabled');
     v.result = null;
     v.phase = SCREEN_PHASES.PLAYING;
     v.clock = 0;
-    v.queue = createAnnouncementQueue({
-      windowFrames: this.gameConfig.versus.ui.announceWindowFrames,
-      suddenDeathSeconds: this.gameConfig.versus.suddenDeath.intervalSeconds,
-      playerBoard: PLAYER_BOARD
-    });
+    v.breakFrames = 0;
+    v.kb?.releaseAll();
+    v.queue = this.createVersusQueue(v);
     this.elements.versusRoundOverlay.classList.add(HIDDEN_CLASS);
     v.controller.restart(this.createVersusSeed());
     v.hudDirty = true;
     this.refreshVersusHud();
-    this.elements.versusCanvas0.focus();
+    if (this.isVersusResumeBlocked()) {
+      // A controller is still missing: the new match waits for its replacement.
+      this.pauseVersus();
+    } else {
+      this.elements.versusCanvas0.focus();
+    }
   },
 
-  /** Leaves a match that was not finished: it counts as a quit in the statistics. */
+  /** Leaves a match that was not finished: it counts as a quit in the statistics (not for two players). */
   quitVersus() {
-    this.recordVersusOutcome(OUTCOME_QUIT);
+    if (this.versus?.kind !== VERSUS_KINDS.LOCAL) {
+      this.recordVersusOutcome(OUTCOME_QUIT);
+    }
     this.leaveVersus();
+  },
+
+  /** Result card of a local match: back to the lobby, with the same devices, to change who plays. */
+  changeVersusPlayers() {
+    if (!this.isLocalVersus()) {
+      return;
+    }
+    this.leaveVersus();
+    this.openVersusTierPicker();
+    this.openVersusLocalLobby({ keep: true });
   },
 
   recordVersusOutcome(outcome) {
@@ -703,6 +896,9 @@ export const uiVersusMethods = {
 
   /** Escape and the controller's back button, while a versus layer is up. Returns true when it handled the press. */
   handleVersusBack() {
+    if (this.handleVersusLocalLobbyBack?.()) {
+      return true;
+    }
     if (this.isVersusTierPickerOpen()) {
       this.closeVersusTierPicker();
       return true;
@@ -728,6 +924,10 @@ export const uiVersusMethods = {
   /** Stores the result (records and statistics) and shows the result card. */
   finishVersusMatch(event) {
     const v = this.versus;
+    if (v.kind === VERSUS_KINDS.LOCAL) {
+      this.finishLocalMatch(event);
+      return;
+    }
     const won = event.type === MATCH_EVENTS.MATCH_WON;
     this.storageManager.recordVersusResult?.(v.tier, won);
     this.recordVersusOutcome(won ? OUTCOME_WIN : OUTCOME_LOSS);
@@ -746,8 +946,67 @@ export const uiVersusMethods = {
     this.showVersusModal(this.elements.modalDuelResult, this.elements.btnVersusRematch);
   },
 
+  /**
+   * End of a match between two players: it is counted once (no winner stored, no statistics, no
+   * quit) and the result card names the winner. The primary button ignores presses for a moment.
+   */
+  finishLocalMatch(event) {
+    const v = this.versus;
+    this.storageManager.recordVersusLocalMatch?.();
+    const state = v.controller.getState();
+    v.result = {
+      kind: VERSUS_KINDS.LOCAL,
+      winner: event.winner,
+      wins: [...event.wins],
+      players: state.boards.map((board) => ({
+        neutralised: board.matchStats.neutralised,
+        pulses: board.matchStats.pulsesSent
+      }))
+    };
+    this.fillVersusResult(v.result);
+    this.elements.versusResultShareFallback?.classList.add(HIDDEN_CLASS);
+    this.showVersusModal(this.elements.modalDuelResult, this.elements.btnVersusRematch);
+    this.armResultGuard(v);
+  },
+
+  /** The main button of the card stays inert for resultInputGuardMs, so a press meant for the match does not restart it. */
+  armResultGuard(v) {
+    const button = this.elements.btnVersusRematch;
+    button?.setAttribute('aria-disabled', 'true');
+    clearTimeout(v.resultGuardTimer);
+    v.resultGuardTimer = setTimeout(() => {
+      button?.removeAttribute('aria-disabled');
+    }, this.gameConfig.versus.local.resultInputGuardMs);
+    v.resultGuardTimer?.unref?.();
+  },
+
   fillVersusResult(result) {
     const els = this.elements;
+    const isLocal = result.kind === VERSUS_KINDS.LOCAL;
+    els.versusResultTier?.classList.toggle(HIDDEN_CLASS, isLocal);
+    els.versusResultNeutralisedB?.classList.toggle(HIDDEN_CLASS, !isLocal);
+    els.versusResultPulsesB?.classList.toggle(HIDDEN_CLASS, !isLocal);
+    els.btnVersusShare?.classList.toggle(HIDDEN_CLASS, isLocal);
+    els.btnVersusChangePlayers?.classList.toggle(HIDDEN_CLASS, !isLocal);
+    if (isLocal) {
+      const [first, second] = result.players;
+      setTextIfChanged(els.versusResultTitle, t('versus.local.result.title', { n: result.winner + FIRST_PLAYER_NUMBER }));
+      setTextIfChanged(
+        els.versusResultScore,
+        t('versus.local.result.score', { a: formatNumber(result.wins[0]), b: formatNumber(result.wins[1]) })
+      );
+      setTextIfChanged(
+        els.versusResultNeutralised,
+        t('versus.local.result.neutralised', { n: 1, count: formatNumber(first.neutralised) })
+      );
+      setTextIfChanged(
+        els.versusResultNeutralisedB,
+        t('versus.local.result.neutralised', { n: 2, count: formatNumber(second.neutralised) })
+      );
+      setTextIfChanged(els.versusResultPulses, t('versus.local.result.pulses', { n: 1, count: formatNumber(first.pulses) }));
+      setTextIfChanged(els.versusResultPulsesB, t('versus.local.result.pulses', { n: 2, count: formatNumber(second.pulses) }));
+      return;
+    }
     setTextIfChanged(els.versusResultTitle, t(result.won ? 'versus.result.wonTitle' : 'versus.result.lostTitle'));
     setTextIfChanged(
       els.versusResultScore,
@@ -761,7 +1020,7 @@ export const uiVersusMethods = {
   /** Share text of the finished match: the system sheet, the clipboard, or a field to copy from. */
   async shareVersusResult() {
     const result = this.versus?.result;
-    if (!result || this.isSharing) {
+    if (!result || result.kind === VERSUS_KINDS.LOCAL || this.isSharing) {
       return;
     }
     this.isSharing = true;
@@ -808,10 +1067,15 @@ export const uiVersusMethods = {
 
   /** Runs an action on the player's engine when the board takes controls, then repaints the controls. */
   versusPlayerAct(action) {
+    this.versusBoardAct(PLAYER_BOARD, action);
+  },
+
+  /** Runs an action on one board's engine when the board takes controls, then repaints the controls. */
+  versusBoardAct(board, action) {
     if (!this.canControlVersusPlayer()) {
       return;
     }
-    action(this.versus.controller.engines[PLAYER_BOARD]);
+    action(this.versus.controller.engines[board]);
     this.versus.hudDirty = true;
     this.refreshVersusPlayerControls();
   },
@@ -909,6 +1173,202 @@ export const uiVersusMethods = {
     if (actions.length > 0) {
       this.refreshVersusPlayerControls();
     }
+  },
+
+  // ---------------------------------------------------------------------------------------
+  // Two players on one device: keyboard halves, controllers, held aim
+  // ---------------------------------------------------------------------------------------
+
+  /**
+   * What the UI routes input to during a local match. `multiPad` makes the controller reader
+   * report every pad on its own (pollAll) instead of merging them.
+   */
+  createLocalSceneController() {
+    const v = this.versus;
+    return {
+      multiPad: true,
+      handleGameplayKey: (event) => this.handleLocalGameplayKey(event),
+      handleGameplayKeyUp: (event) => v.kb.keyUp(event.code),
+      releaseAllKeys: () => v.kb.releaseAll(),
+      handlePadResults: (results) => this.handleLocalPadResults(results),
+      beforeFrame: (now, elapsedMs) => this.applyLocalHeldAim(elapsedMs),
+      handleGamepadActions: () => {},
+      pause: () => this.pauseVersus()
+    };
+  },
+
+  /** Board whose player uses this half of the keyboard, or -1. */
+  localBoardForKeyboardSide(side) {
+    return this.versus.slots.findIndex(
+      (slot) =>
+        (slot.device?.type === DEVICE_TYPES.KEYBOARD || slot.device?.type === DEVICE_TYPES.KEYBOARD_MOUSE) &&
+        slot.device.side === side
+    );
+  },
+
+  /**
+   * One key of the split keyboard. Every key of the layout is kept from the page (Enter, the slash
+   * quick find, the arrows scroll); any other key does nothing in a two-player match.
+   */
+  handleLocalGameplayKey(e) {
+    const v = this.versus;
+    if (!v || v.kind !== VERSUS_KINDS.LOCAL || !v.kb.isMapped(e.code)) {
+      return;
+    }
+    e.preventDefault();
+    const hit = v.kb.keyDown(e.code, e.repeat);
+    if (!hit || !this.canControlVersusPlayer()) {
+      return;
+    }
+    const board = this.localBoardForKeyboardSide(hit.side);
+    if (board < 0) {
+      return;
+    }
+    const engine = v.controller.engines[board];
+    switch (hit.action) {
+      case 'shoot':
+        engine.shoot();
+        break;
+      case 'swap':
+        engine.swapLauncherBalls();
+        break;
+      case 'polarity':
+        engine.togglePolarityFlip();
+        break;
+      case 'special':
+        this.cycleSpecialBall(1, engine);
+        break;
+      default:
+        break;
+    }
+    v.hudDirty = true;
+    this.refreshVersusPlayerControls();
+  },
+
+  /** Aim from the keys held down, read every frame (the OS repeats only the last key pressed). */
+  applyLocalHeldAim(elapsedMs) {
+    const v = this.versus;
+    if (!v || v.kind !== VERSUS_KINDS.LOCAL || !this.canControlVersusPlayer()) {
+      return;
+    }
+    for (const side of SIDES) {
+      const delta = v.kb.aimDelta(side, elapsedMs);
+      const board = delta === 0 ? -1 : this.localBoardForKeyboardSide(side);
+      if (board >= 0) {
+        v.controller.engines[board].adjustAimByDelta(delta);
+      }
+    }
+  },
+
+  /** Actions of every controller during play: each steers only the board of its own slot. */
+  handleLocalPadResults(results) {
+    const v = this.versus;
+    if (!v || v.kind !== VERSUS_KINDS.LOCAL) {
+      return;
+    }
+    for (const pad of results.pads) {
+      const board = slotForPad(v.slots, pad.padIndex);
+      if (board < 0) {
+        continue;
+      }
+      if (pad.actions.includes(A.PAUSE) || pad.actions.includes(A.MENU)) {
+        this.pauseVersus();
+        return;
+      }
+      if (!this.canControlVersusPlayer()) {
+        continue;
+      }
+      const engine = v.controller.engines[board];
+      if (pad.aimDelta !== 0) {
+        engine.adjustAimByDelta(pad.aimDelta);
+      }
+      for (const action of pad.actions) {
+        switch (action) {
+          case A.SHOOT:
+            engine.shoot();
+            break;
+          case A.SWAP:
+            engine.swapLauncherBalls();
+            break;
+          case A.POLARITY:
+            engine.togglePolarityFlip();
+            break;
+          case A.UNEQUIP:
+            if (engine.currentBall?.specialType) {
+              engine.equipSpecialBall(engine.currentBall.specialType);
+            }
+            break;
+          case A.SPECIAL_PREV:
+            this.cycleSpecialBall(-1, engine);
+            break;
+          case A.SPECIAL_NEXT:
+            this.cycleSpecialBall(1, engine);
+            break;
+          case A.RECENTER:
+            engine.adjustAimByDelta(-Math.PI * MATH_CONSTANTS.HALF - engine.aimAngle);
+            break;
+          default:
+            break;
+        }
+      }
+      v.hudDirty = true;
+    }
+    this.refreshVersusPlayerControls();
+  },
+
+  /** Slots of the two-player lobby or match, whichever is up, or null. */
+  getVersusLocalSlots() {
+    if (this.isLocalVersus()) {
+      return this.versus.slots;
+    }
+    return this.isVersusLocalLobbyOpen?.() ? this.versusLocal.slots : null;
+  },
+
+  /**
+   * A controller appeared or went away. In the lobby a lost pad frees its slot. In a match a lost
+   * pad pauses it (Resume stays out of reach); a pad that comes back at the same index is trusted again.
+   * @param {{type: string, padIndex: number, id: string}} event - From GamepadInput.pollAll.
+   */
+  handleLocalPadEvent(event) {
+    if (this.isVersusLocalLobbyOpen?.() && event.type === GAMEPAD_EVENTS.DISCONNECTED) {
+      this.handleVersusLocalLobbyPadLost(event.padIndex);
+      return;
+    }
+    const v = this.versus;
+    if (!v || v.kind !== VERSUS_KINDS.LOCAL) {
+      return;
+    }
+    const slotIndex = slotForPad(v.slots, event.padIndex);
+    if (slotIndex < 0) {
+      return;
+    }
+    if (event.type === GAMEPAD_EVENTS.DISCONNECTED) {
+      v.slots = markPadLost(v.slots, event.padIndex);
+      this.announce(t('versus.local.announce.padLost', { n: slotIndex + FIRST_PLAYER_NUMBER }));
+      this.pauseVersus();
+    } else if (event.type === GAMEPAD_EVENTS.CONNECTED && v.slots[slotIndex].padLost) {
+      v.slots = v.slots.map((slot, i) => (i === slotIndex ? { ...slot, padLost: false } : slot));
+    }
+    this.syncLocalPauseGuards();
+  },
+
+  /** An unassigned controller pressed its bottom button while a player's controller is missing: it takes over. */
+  takeOverLostPad(padIndex, id) {
+    const v = this.versus;
+    if (!v || v.kind !== VERSUS_KINDS.LOCAL || !v.slots.some((slot) => slot.padLost)) {
+      return false;
+    }
+    const next = assignPad(v.slots, padIndex, id);
+    if (next === v.slots) {
+      return false;
+    }
+    v.slots = next;
+    const slotIndex = slotForPad(next, padIndex);
+    this.announce(
+      t('versus.local.announce.joined', { n: slotIndex + FIRST_PLAYER_NUMBER, device: describeLocalDevice(next[slotIndex].device) })
+    );
+    this.syncLocalPauseGuards();
+    return true;
   },
 
   /** Text of the arcade card of the level select: the player's overall record against the CPU. */
