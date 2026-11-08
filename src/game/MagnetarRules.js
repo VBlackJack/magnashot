@@ -59,8 +59,15 @@ const POSITIVE_POLARITY = 1;
 const NEGATIVE_POLARITY = -1;
 const POLARITY_SPLIT = 0.5;
 const SLOT_ANGLE_COUNT = 12;
+/** Growth of the search radius from one shell to the next, in ball radii. */
+const SLOT_SHELL_STEP_RADII = 0.5;
+/** Arc between two candidates of an outer shell, in ball radii. */
+const SLOT_ARC_RADII = 0.5;
 const SLOT_DISTANCE_RADII = 2;
 const SLOT_OVERLAP_RADII = 1.8;
+/** A slot beyond the first shell must touch a sphere within this many radii. */
+const SLOT_ADJACENT_RADII = 2.2;
+const FIRST_SHELL = 1;
 const FULL_PROGRESS = 1;
 const FIRST_STEP = 0;
 
@@ -215,40 +222,53 @@ export function pickMooringToSnap(mooringIds) {
  * @param {number} count - Spheres to add at most.
  * @param {{next:function():number}} rng - Seeded random source.
  * @param {{minX:number, maxX:number, minY:number, maxY:number}|null} [bounds] - Playfield limits.
+ * @param {number} [maxShells] - Shells searched outward (1 = only touching the Magnetar). A slot of
+ *   a further shell must touch an existing sphere, so Regrow still acts when the rings crowd the core.
  * @returns {Array<{x:number, y:number, isAnchor:boolean}>} Up to `count` non-overlapping slots.
  */
-export function regrowSlots(magnetar, balls, r, count, rng, bounds = null) {
+export function regrowSlots(magnetar, balls, r, count, rng, bounds = null, maxShells = FIRST_SHELL) {
   if (count <= NO_COUNT) {
     return [];
   }
-  const candidates = [];
-  for (let i = 0; i < SLOT_ANGLE_COUNT; i++) {
-    const angle = (i / SLOT_ANGLE_COUNT) * Math.PI * 2;
-    candidates.push({
-      x: magnetar.x + Math.cos(angle) * r * SLOT_DISTANCE_RADII,
-      y: magnetar.y + Math.sin(angle) * r * SLOT_DISTANCE_RADII
-    });
-  }
-  // Fisher-Yates on the seeded source: same key, same order.
-  for (let i = candidates.length - 1; i > 0; i--) {
-    const j = Math.floor(rng.next() * (i + 1));
-    [candidates[i], candidates[j]] = [candidates[j], candidates[i]];
-  }
   const minGap = r * SLOT_OVERLAP_RADII;
+  const adjacentGap = r * SLOT_ADJACENT_RADII;
   const taken = [];
   const others = balls.filter((ball) => ball.id !== magnetar.id);
-  for (const slot of candidates) {
-    if (taken.length >= count) {
-      break;
+  const touching = [magnetar, ...others];
+  const shells = Math.max(FIRST_SHELL, Math.floor(maxShells));
+  for (let shell = FIRST_SHELL; shell <= shells && taken.length < count; shell++) {
+    const shellRadius = r * (SLOT_DISTANCE_RADII + (shell - FIRST_SHELL) * SLOT_SHELL_STEP_RADII);
+    const angleCount = shell === FIRST_SHELL
+      ? SLOT_ANGLE_COUNT
+      : Math.ceil((Math.PI * 2 * shellRadius) / (r * SLOT_ARC_RADII));
+    const candidates = [];
+    for (let i = 0; i < angleCount; i++) {
+      const angle = (i / angleCount) * Math.PI * 2;
+      candidates.push({
+        x: magnetar.x + Math.cos(angle) * shellRadius,
+        y: magnetar.y + Math.sin(angle) * shellRadius
+      });
     }
-    const inBounds = !bounds
-      || (slot.x - r >= bounds.minX && slot.x + r <= bounds.maxX
-        && slot.y - r >= bounds.minY && slot.y + r <= bounds.maxY);
-    const free = inBounds
-      && others.every((ball) => Math.hypot(ball.x - slot.x, ball.y - slot.y) >= minGap)
-      && taken.every((t) => Math.hypot(t.x - slot.x, t.y - slot.y) >= minGap);
-    if (free) {
-      taken.push({ x: slot.x, y: slot.y, isAnchor: false });
+    // Fisher-Yates on the seeded source: same key, same order.
+    for (let i = candidates.length - 1; i > 0; i--) {
+      const j = Math.floor(rng.next() * (i + 1));
+      [candidates[i], candidates[j]] = [candidates[j], candidates[i]];
+    }
+    for (const slot of candidates) {
+      if (taken.length >= count) {
+        break;
+      }
+      const inBounds = !bounds
+        || (slot.x - r >= bounds.minX && slot.x + r <= bounds.maxX
+          && slot.y - r >= bounds.minY && slot.y + r <= bounds.maxY);
+      const free = inBounds
+        && others.every((ball) => Math.hypot(ball.x - slot.x, ball.y - slot.y) >= minGap)
+        && taken.every((t) => Math.hypot(t.x - slot.x, t.y - slot.y) >= minGap);
+      const attached = shell === FIRST_SHELL
+        || touching.some((ball) => Math.hypot(ball.x - slot.x, ball.y - slot.y) <= adjacentGap);
+      if (free && attached) {
+        taken.push({ x: slot.x, y: slot.y, isAnchor: false });
+      }
     }
   }
   return taken;

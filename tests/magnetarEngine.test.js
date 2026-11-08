@@ -288,6 +288,22 @@ test('Regrow plans free slots at the warning and grows only non-anchors in the s
   assert.equal(engine.getMagnetarView().phase, MAGNETAR_PHASES.REST);
 });
 
+test('Regrow finds slots in an untouched Boss Rush board by searching outer shells', () => {
+  let found = 0;
+  for (let wave = 1; wave <= 4; wave++) {
+    const engine = bossRushEngine(wave);
+    arm(engine, MAGNETAR_BEHAVIOURS.REGROW);
+    const slots = engine.getMagnetarView().regrowSlots;
+    if (slots.length > 0) {
+      found++;
+    }
+    for (const slot of slots) {
+      assert.ok(engine.physicsWorld.balls.every((b) => Math.hypot(b.x - slot.x, b.y - slot.y) >= RADIUS * 1.8));
+    }
+  }
+  assert.equal(found, 4, `Regrow planned slots on ${found}/4 untouched waves`);
+});
+
 test('Regrow is repeatable: the same key and step give the same slots and colours', () => {
   const grow = () => {
     const engine = bossRushEngine(2);

@@ -41,7 +41,7 @@ const cfg = {
   fluxStagesPerTier: 5,
   cadenceByTier: { 1: 3, 2: 3, 3: 2, 4: 2 },
   tierUnlocks: { 1: ['invert', 'undertow'], 2: ['regrow'], 3: ['barrage'], 4: [] },
-  regrow: { count: 3 },
+  regrow: { count: 3, maxShells: 8 },
   barrage: { countByTier: { 3: 2, 4: 3 }, strongFromTier: 4, strongChance: 0.5, riseTurns: 2 },
   fall: { pointsBase: 900, pointsPerSphere: 40, coins: 40, landslideMin: 20 }
 };
@@ -232,6 +232,29 @@ test('regrowSlots is deterministic, respects bounds and a full ring gives nothin
   }
   assert.deepEqual(regrowSlots(m, ring, RADIUS, 3, new SeededRandom('s')), []);
   assert.deepEqual(regrowSlots(m, [m], RADIUS, 0, new SeededRandom('s')), []);
+});
+
+test('regrowSlots searches outer shells for free slots touching existing spheres', () => {
+  const m = ball(1, 200, 200);
+  const ring = [m];
+  for (let i = 0; i < RING_SLOTS; i++) {
+    const angle = (i / RING_SLOTS) * Math.PI * 2;
+    ring.push(ball(100 + i, 200 + Math.cos(angle) * RADIUS * 2, 200 + Math.sin(angle) * RADIUS * 2));
+  }
+  const rng = () => new SeededRandom('shells');
+  assert.deepEqual(regrowSlots(m, ring, RADIUS, 3, rng()), [], 'one shell stays blocked');
+  const slots = regrowSlots(m, ring, RADIUS, 3, rng(), null, cfg.regrow.maxShells);
+  assert.ok(slots.length > 0 && slots.length <= 3);
+  for (const slot of slots) {
+    assert.equal(slot.isAnchor, false);
+    assert.ok(ring.every((b) => Math.hypot(b.x - slot.x, b.y - slot.y) >= RADIUS * 1.8), 'free');
+    assert.ok(ring.some((b) => Math.hypot(b.x - slot.x, b.y - slot.y) <= RADIUS * 2.2), 'touches the cluster');
+  }
+  assert.deepEqual(regrowSlots(m, ring, RADIUS, 3, rng(), null, cfg.regrow.maxShells), slots, 'deterministic');
+  assert.deepEqual(regrowSlots(m, ring, RADIUS, 2, rng(), null, cfg.regrow.maxShells), slots.slice(0, 2), 'count caps');
+  const lonely = [m];
+  const far = regrowSlots(m, lonely, RADIUS, 3, rng(), null, cfg.regrow.maxShells);
+  assert.ok(far.every((s) => Math.hypot(s.x - m.x, s.y - m.y) <= RADIUS * 2.01), 'inner shell fills first');
 });
 
 test('planBarrage: counts by tier, strong only from the strong tier, lanes in range', () => {

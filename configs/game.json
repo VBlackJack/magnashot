@@ -486,7 +486,7 @@
     "maxTier": 4,
     "fluxStagesPerTier": 5,
     "undertow": { "radiusFactor": 6, "force": 0.35 },
-    "regrow": { "count": 3 },
+    "regrow": { "count": 3, "maxShells": 8 },
     "barrage": {
       "countByTier": { "1": 0, "2": 0, "3": 2, "4": 3 },
       "strongFromTier": 4,

@@ -277,7 +277,7 @@ export const engineMagnetarMethods = {
     const plan = { center: { x: ball.x, y: ball.y }, slots: [], barrage: [] };
     if (magnetar.armed === MAGNETAR_BEHAVIOURS.REGROW) {
       const rng = new SeededRandom(`${magnetar.key}:${magnetar.step}:regrow`);
-      plan.slots = regrowSlots(ball, this.physicsWorld.balls, r, cfg.regrow.count, rng, this.getMagnetarBounds())
+      plan.slots = regrowSlots(ball, this.physicsWorld.balls, r, cfg.regrow.count, rng, this.getMagnetarBounds(), cfg.regrow.maxShells)
         .map(({ x, y }) => ({ x, y }));
     } else if (magnetar.armed === MAGNETAR_BEHAVIOURS.BARRAGE) {
       const canvasCfg = this.gameConfig.canvas;
