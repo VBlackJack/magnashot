@@ -65,6 +65,7 @@
           <dd id="drawer-perks" class="perk-chips"></dd>
         </div>
       </dl>
+      <button id="btn-stats" type="button" data-closes-drawer class="nav-btn stats-btn" aria-haspopup="dialog" data-i18n="app.drawer.button.stats"></button>
       <nav class="nav-controls">
         <div class="nav-group nav-modes" role="group" aria-labelledby="nav-group-modes-title">
           <span id="nav-group-modes-title" class="nav-group-title" data-i18n="app.nav.groups.modes"></span>
@@ -72,6 +73,8 @@
           <button id="btn-endless" type="button" data-closes-drawer class="nav-btn mode-btn" data-i18n="app.nav.button.endless"></button>
           <button id="btn-daily" type="button" data-closes-drawer class="nav-btn mode-btn" data-i18n="app.nav.button.daily"></button>
           <button id="btn-flux" type="button" data-closes-drawer class="nav-btn mode-btn" data-i18n="app.nav.button.flux"></button>
+          <button id="btn-weekly" type="button" data-closes-drawer class="nav-btn mode-btn" data-i18n="app.nav.button.weekly"></button>
+          <p id="nav-mode-lock-hint" class="nav-lock-hint hidden" role="status" aria-live="polite"></p>
         </div>
         <div class="nav-group nav-actions" role="group" aria-labelledby="nav-group-round-title">
           <span id="nav-group-round-title" class="nav-group-title" data-i18n="app.nav.groups.round"></span>
@@ -248,6 +251,7 @@
       <h2 id="modal-victory-title" class="modal-title victory-title" data-i18n="modals.victory.title.main"></h2>
       <div id="victory-stars" class="victory-stars-banner"></div>
       <p id="victory-next-star" class="modal-subtext hidden"></p>
+      <p id="victory-unlock" class="modal-subtext hidden"></p>
       <p id="victory-score" class="modal-stat-line"></p>
       <p id="victory-bonus" class="modal-stat-line muted"></p>
       <div class="modal-actions">
@@ -275,6 +279,7 @@
         <button id="btn-same-seed-gameover" type="button" class="modal-btn hidden"></button>
         <button id="btn-levels-gameover" type="button" class="modal-btn" data-i18n="modals.gameOver.button.levels"></button>
         <button id="btn-share-gameover" type="button" class="modal-btn hidden" data-i18n="modals.gameOver.button.share"></button>
+        <button id="btn-daily-history-gameover" type="button" class="modal-btn hidden" aria-haspopup="dialog" data-i18n="modals.gameOver.button.dailyHistory"></button>
       </div>
       <label id="gameover-share-fallback" class="share-fallback hidden">
         <span class="share-fallback-label" data-i18n="modals.gameOver.share.field.label"></span>
@@ -361,6 +366,53 @@
       </div>
       <div class="modal-actions">
         <button id="btn-close-settings" type="button" class="modal-btn primary" data-i18n="modals.settings.button.close"></button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Stats Modal -->
+  <div id="modal-stats" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="modal-stats-title">
+    <div class="modal-card wide">
+      <h2 id="modal-stats-title" class="modal-title" data-i18n="modals.stats.title.main"></h2>
+      <div class="modal-tabs" role="tablist">
+        <button id="tab-stats-overview" type="button" class="modal-tab active" role="tab" aria-selected="true" aria-controls="stats-overview-pane" tabindex="0" data-i18n="modals.stats.tabs.overview"></button>
+        <button id="tab-stats-daily" type="button" class="modal-tab" role="tab" aria-selected="false" aria-controls="stats-daily-pane" tabindex="-1" data-i18n="modals.stats.tabs.daily"></button>
+      </div>
+      <div id="stats-overview-pane" class="stats-pane" role="tabpanel" aria-labelledby="tab-stats-overview">
+        <p id="stats-since" class="modal-subtext hidden"></p>
+        <p id="stats-overview-empty" class="modal-subtext hidden" data-i18n="modals.stats.overview.empty"></p>
+        <dl id="stats-overview-list" class="stats-list"></dl>
+        <ul id="stats-campaign-list" class="stats-campaign-list"></ul>
+        <p class="modal-subtext" data-i18n="modals.stats.overview.privacy"></p>
+      </div>
+      <div id="stats-daily-pane" class="stats-pane hidden" role="tabpanel" aria-labelledby="tab-stats-daily">
+        <p id="stats-daily-summary" class="modal-subtext hidden"></p>
+        <p id="stats-daily-empty" class="modal-subtext hidden" data-i18n="modals.stats.daily.empty"></p>
+        <div id="stats-daily-wrap" class="stats-table-wrap">
+          <table class="stats-table">
+            <caption id="stats-daily-caption"></caption>
+            <thead>
+              <tr>
+                <th scope="col" data-i18n="modals.stats.daily.col.date"></th>
+                <th scope="col" data-i18n="modals.stats.daily.col.challenge"></th>
+                <th scope="col" data-i18n="modals.stats.daily.col.mutator"></th>
+                <th scope="col" data-i18n="modals.stats.daily.col.score"></th>
+                <th scope="col" data-i18n="modals.stats.daily.col.wave"></th>
+                <th scope="col" data-i18n="modals.stats.daily.col.streak"></th>
+              </tr>
+            </thead>
+            <tbody id="stats-daily-body"></tbody>
+          </table>
+        </div>
+      </div>
+      <p id="stats-copy-feedback" class="modal-subtext hidden" role="status" aria-live="polite"></p>
+      <label id="stats-copy-fallback" class="share-fallback hidden">
+        <span class="share-fallback-label" data-i18n="modals.stats.copy.fieldLabel"></span>
+        <textarea id="stats-copy-text" class="share-fallback-text" readonly></textarea>
+      </label>
+      <div class="modal-actions">
+        <button id="btn-copy-stats" type="button" class="modal-btn primary" data-i18n="modals.stats.button.copy"></button>
+        <button id="btn-close-stats" type="button" class="modal-btn" data-i18n="modals.stats.button.close"></button>
       </div>
     </div>
   </div>

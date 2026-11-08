@@ -61,7 +61,7 @@ import { uiInputBindingMethods } from './UIInputBindings.js';
 import { uiModalMethods } from './UIModals.js';
 import { uiSettingsControlMethods } from './UISettingsControls.js';
 import { uiHudRefreshMethods } from './UIHudRefresh.js';
-import { uiStatsMethods } from './UIStats.js';
+import { uiStatsMethods, STATS_TABS } from './UIStats.js';
 
 export {
   SPECIAL_ICON_HIGHLIGHT_POSITION,
@@ -149,6 +149,9 @@ export class UIManager {
       btnEndless: document.getElementById('btn-endless'),
       btnDaily: document.getElementById('btn-daily'),
       btnFlux: document.getElementById('btn-flux'),
+      btnWeekly: document.getElementById('btn-weekly'),
+      navModeLockHint: document.getElementById('nav-mode-lock-hint'),
+      btnStats: document.getElementById('btn-stats'),
       btnShop: document.getElementById('btn-shop'),
       btnRestart: document.getElementById('btn-restart'),
       btnPause: document.getElementById('btn-pause'),
@@ -220,6 +223,7 @@ export class UIManager {
       codexPane: document.getElementById('codex-pane'),
       btnCloseShop: document.getElementById('btn-close-shop'),
       modalVictory: document.getElementById('modal-victory'),
+      victoryUnlock: document.getElementById('victory-unlock'),
       victoryScore: document.getElementById('victory-score'),
       victoryBonus: document.getElementById('victory-bonus'),
       victoryStars: document.getElementById('victory-stars'),
@@ -240,6 +244,7 @@ export class UIManager {
       btnSameSeedGameOver: document.getElementById('btn-same-seed-gameover'),
       btnLevelsGameOver: document.getElementById('btn-levels-gameover'),
       btnShareGameOver: document.getElementById('btn-share-gameover'),
+      btnDailyHistoryGameOver: document.getElementById('btn-daily-history-gameover'),
       gameOverShareFallback: document.getElementById('gameover-share-fallback'),
       gameOverShareText: document.getElementById('gameover-share-text'),
       modalPause: document.getElementById('modal-pause'),
@@ -258,6 +263,25 @@ export class UIManager {
       btnCloseSettings: document.getElementById('btn-close-settings'),
       btnInstall: document.getElementById('btn-install'),
       installIosHint: document.getElementById('install-ios-hint'),
+      modalStats: document.getElementById('modal-stats'),
+      tabStatsOverview: document.getElementById('tab-stats-overview'),
+      tabStatsDaily: document.getElementById('tab-stats-daily'),
+      statsOverviewPane: document.getElementById('stats-overview-pane'),
+      statsDailyPane: document.getElementById('stats-daily-pane'),
+      statsSince: document.getElementById('stats-since'),
+      statsOverviewEmpty: document.getElementById('stats-overview-empty'),
+      statsOverviewList: document.getElementById('stats-overview-list'),
+      statsCampaignList: document.getElementById('stats-campaign-list'),
+      statsDailySummary: document.getElementById('stats-daily-summary'),
+      statsDailyEmpty: document.getElementById('stats-daily-empty'),
+      statsDailyWrap: document.getElementById('stats-daily-wrap'),
+      statsDailyCaption: document.getElementById('stats-daily-caption'),
+      statsDailyBody: document.getElementById('stats-daily-body'),
+      statsCopyFeedback: document.getElementById('stats-copy-feedback'),
+      statsCopyFallback: document.getElementById('stats-copy-fallback'),
+      statsCopyText: document.getElementById('stats-copy-text'),
+      btnCopyStats: document.getElementById('btn-copy-stats'),
+      btnCloseStats: document.getElementById('btn-close-stats'),
       modalConfirm: document.getElementById('modal-confirm'),
       btnConfirmYes: document.getElementById('btn-confirm-yes'),
       btnConfirmNo: document.getElementById('btn-confirm-no'),
@@ -291,6 +315,9 @@ export class UIManager {
     this.inputMode = this.detectInitialInputMode();
     this.isDrawerOpen = false;
     this.drawerStarParts = null;
+    this.activeStatsTab = STATS_TABS.OVERVIEW;
+    this.statsOpener = null;
+    this.statsCopied = false;
   }
 
   detectInitialInputMode() {
@@ -395,6 +422,7 @@ export class UIManager {
       this.updateResetHintsFeedback();
       this.updateShareButtonLabel();
       this.updateConfirmButtonLabel();
+      this.refreshStatsIfOpen();
       this.refresh(this.engine, this.lastExtra);
     });
   }
@@ -676,6 +704,7 @@ export class UIManager {
       return;
     }
     this.isDrawerOpen = false;
+    this.elements.navModeLockHint?.classList.add('hidden');
     this.syncDrawerState();
     if (this.elements.btnMenu && this.isDrawerLayout()) {
       this.elements.btnMenu.focus();
@@ -1030,6 +1059,7 @@ export class UIManager {
       t('modals.levelSelect.card.bestScore', { score: formatNumber(this.storageManager.getCascadeHighScore()) })
     );
     this.renderPuzzleStagesStrip();
+    this.refreshModeLocks(this.getModeAccess());
 
     if (this.elements.levelsStarsSummary) {
       const totalStars = this.storageManager.getTotalStars();
@@ -1123,9 +1153,13 @@ export class UIManager {
   /** Formats the mode-specific stage/wave/combo/coins line shown on the Game Over modal. */
   formatGameOverStageSummary(engine, summary) {
     if (engine.mode === GAME_MODES.FLUX) {
+      const weeklyBestStage = engine.isWeeklyFluxRun === true
+        ? this.storageManager.getWeeklyFluxBest?.(engine.weeklyWeekKey)?.stage || 0
+        : 0;
+      const bestStage = engine.isWeeklyFluxRun === true ? weeklyBestStage : this.storageManager.getFluxBestStage();
       return t('modals.gameOver.stats.fluxStage', {
         stage: formatNumber(engine.fluxStage),
-        best: formatNumber(Math.max(engine.fluxStage, this.storageManager.getFluxBestStage()))
+        best: formatNumber(Math.max(engine.fluxStage, bestStage))
       });
     }
     if (engine.mode === GAME_MODES.BOSS_RUSH) {

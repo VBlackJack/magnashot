@@ -412,6 +412,8 @@ export const uiSettingsControlMethods = {
         stage: engine.fluxStage,
         puzzleStage: engine.currentPuzzleStage,
         seed: engine.fluxSeed,
+        isWeekly: engine.isWeeklyFluxRun === true,
+        weekKey: engine.weeklyWeekKey ?? null,
         workshopLevels: this.getOwnedWorkshopLevelSum(),
         ammoBought: engine.specialAmmoBoughtInRun || 0,
         continues: engine.hasUsedContinue ? 1 : 0,
