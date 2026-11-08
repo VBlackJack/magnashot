@@ -143,8 +143,8 @@
           </div>
         </div>
         <div class="launcher-controls-dock">
-          <button id="btn-polarity" type="button" class="polarity-floating-btn"><span class="launcher-icon" aria-hidden="true"></span> <span class="launcher-text"></span><span class="launcher-caption" aria-hidden="true"></span></button>
-          <button id="btn-swap-ball" type="button" class="swap-floating-btn"><span class="launcher-icon" aria-hidden="true"></span> <span class="launcher-text"></span><span class="launcher-caption" aria-hidden="true"></span></button>
+          <button id="btn-polarity" type="button" class="polarity-floating-btn"><span class="launcher-icon" aria-hidden="true"></span> <span class="launcher-text"></span><span class="launcher-caption" aria-hidden="true"></span><span class="pad-glyph pad-face" data-pos="top" aria-hidden="true"></span></button>
+          <button id="btn-swap-ball" type="button" class="swap-floating-btn"><span class="launcher-icon" aria-hidden="true"></span> <span class="launcher-text"></span><span class="launcher-caption" aria-hidden="true"></span><span class="pad-glyph pad-face" data-pos="left" aria-hidden="true"></span></button>
         </div>
       </div>
 
@@ -166,6 +166,7 @@
   </div>
 
   <div id="sr-announcer" class="visually-hidden" role="status" aria-live="polite" aria-atomic="true"></div>
+  <div id="toast" class="toast hidden" aria-hidden="true"></div>
 
   <!-- Level Select Modal -->
   <div id="modal-levels" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="modal-levels-title">
@@ -302,10 +303,14 @@
       <h2 id="modal-pause-title" class="modal-title" data-i18n="modals.pause.title.main"></h2>
       <p id="pause-level-tip" class="pause-level-tip hidden"></p>
       <ul class="instructions-list">
-        <li id="pause-instruction-aim"></li>
-        <li id="pause-instruction-swap"></li>
-        <li id="pause-instruction-cancel"></li>
-        <li id="pause-instruction-keyboard"></li>
+        <li id="pause-instruction-aim" class="key-hint"></li>
+        <li id="pause-instruction-swap" class="key-hint"></li>
+        <li id="pause-instruction-cancel" class="key-hint"></li>
+        <li id="pause-instruction-keyboard" class="key-hint"></li>
+        <li id="pause-instruction-pad" class="pad-only">
+          <span data-i18n="modals.pause.instructions.pad"></span>
+          <span class="pad-glyphs"><span class="pad-glyph pad-face" data-pos="bottom" aria-hidden="true"></span><span class="pad-glyph pad-face" data-pos="left" aria-hidden="true"></span><span class="pad-glyph pad-face" data-pos="top" aria-hidden="true"></span><span class="pad-glyph pad-bumper" data-i18n="hud.pad.glyph.leftBumper" aria-hidden="true"></span><span class="pad-glyph pad-bumper" data-i18n="hud.pad.glyph.rightBumper" aria-hidden="true"></span><span class="pad-glyph pad-trigger" data-i18n="hud.pad.glyph.rightTrigger" aria-hidden="true"></span><span class="pad-glyph pad-pill" data-i18n="hud.pad.glyph.start" aria-hidden="true"></span></span>
+        </li>
         <li data-i18n="modals.pause.instructions.physics"></li>
       </ul>
       <div class="modal-actions">
@@ -373,6 +378,27 @@
         <input id="input-duel-name" type="text" class="flux-seed-input settings-duel-name-input" autocomplete="off" autocapitalize="off" spellcheck="false" aria-describedby="duel-name-hint">
         <p id="duel-name-hint" class="install-hint" data-i18n="modals.settings.duelName.hint"></p>
       </div>
+      <section class="settings-controller" aria-labelledby="settings-controller-title">
+        <h3 id="settings-controller-title" class="stats-section-title" data-i18n="modals.settings.controller.title"></h3>
+        <p id="settings-controller-hint" class="install-hint" data-i18n="modals.settings.controller.hint"></p>
+        <span class="pad-glyphs"><span class="pad-glyph pad-face" data-pos="bottom" aria-hidden="true"></span><span class="pad-glyph pad-bumper" data-i18n="hud.pad.glyph.leftBumper" aria-hidden="true"></span><span class="pad-glyph pad-bumper" data-i18n="hud.pad.glyph.rightBumper" aria-hidden="true"></span><span class="pad-glyph pad-pill" data-i18n="hud.pad.glyph.start" aria-hidden="true"></span><span class="pad-glyph pad-pill" data-i18n="hud.pad.glyph.select" aria-hidden="true"></span></span>
+        <label class="settings-controller-field">
+          <input id="input-gamepad-enabled" type="checkbox">
+          <span data-i18n="modals.settings.controller.enabled"></span>
+        </label>
+        <label class="settings-controller-field" for="select-gamepad-deadzone">
+          <span data-i18n="modals.settings.controller.deadzone"></span>
+          <select id="select-gamepad-deadzone" class="flux-seed-input settings-controller-select"></select>
+        </label>
+        <label class="settings-controller-field" for="select-gamepad-aim-speed">
+          <span data-i18n="modals.settings.controller.aimSpeed"></span>
+          <select id="select-gamepad-aim-speed" class="flux-seed-input settings-controller-select"></select>
+        </label>
+        <label class="settings-controller-field">
+          <input id="input-gamepad-invert-x" type="checkbox">
+          <span data-i18n="modals.settings.controller.invertX"></span>
+        </label>
+      </section>
       <div class="settings-install-row">
         <button id="btn-install" type="button" class="modal-btn hidden" data-i18n="modals.settings.install.button"></button>
         <p id="install-ios-hint" class="install-hint hidden" data-i18n="modals.settings.install.iosHint"></p>

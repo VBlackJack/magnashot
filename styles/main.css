@@ -3189,3 +3189,199 @@ body {
 .bootstrap-error-message {
   color: var(--text-muted);
 }
+
+/*
+ * Controller support. Glyphs are generic shapes drawn with CSS (no brand artwork): a
+ * four-dot diamond with the used position filled for the face buttons, a thin bar for a
+ * bumper, a taller rounded shape for a trigger and a pill for Start and Select. They show
+ * only while the root carries data-input="gamepad", which also hides the keyboard hints.
+ */
+.pad-glyph,
+.pad-glyphs,
+.pad-only {
+  display: none;
+}
+
+:root[data-input='gamepad'] .pad-glyphs {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 4px;
+  vertical-align: middle;
+}
+
+:root[data-input='gamepad'] .pad-glyph {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  color: var(--text-secondary);
+}
+
+:root[data-input='gamepad'] li.pad-only {
+  display: list-item;
+}
+
+:root[data-input='gamepad'] .key-hint,
+:root[data-input='gamepad'] .powerup-key {
+  display: none;
+}
+
+.pad-face {
+  --pad-dot-off: color-mix(in srgb, currentColor 30%, transparent);
+  --pad-top: var(--pad-dot-off);
+  --pad-right: var(--pad-dot-off);
+  --pad-bottom: var(--pad-dot-off);
+  --pad-left: var(--pad-dot-off);
+  width: 1.35em;
+  height: 1.35em;
+  background:
+    radial-gradient(circle at 50% 16%, var(--pad-top) 0 21%, transparent 23%),
+    radial-gradient(circle at 84% 50%, var(--pad-right) 0 21%, transparent 23%),
+    radial-gradient(circle at 50% 84%, var(--pad-bottom) 0 21%, transparent 23%),
+    radial-gradient(circle at 16% 50%, var(--pad-left) 0 21%, transparent 23%);
+}
+
+.pad-face[data-pos='top'] {
+  --pad-top: currentColor;
+}
+
+.pad-face[data-pos='right'] {
+  --pad-right: currentColor;
+}
+
+.pad-face[data-pos='bottom'] {
+  --pad-bottom: currentColor;
+}
+
+.pad-face[data-pos='left'] {
+  --pad-left: currentColor;
+}
+
+.pad-bumper,
+.pad-trigger,
+.pad-pill {
+  border: 1px solid currentColor;
+  font-size: 0.62rem;
+  font-weight: 700;
+  line-height: 1;
+  padding: 2px 6px;
+}
+
+.pad-bumper {
+  border-radius: 3px;
+  min-width: 2.2em;
+}
+
+.pad-trigger {
+  border-radius: 8px 8px 4px 4px;
+  padding: 4px 6px;
+  min-width: 2.2em;
+}
+
+.pad-pill {
+  border-radius: 999px;
+  padding: 2px 8px;
+}
+
+/* On the launcher buttons the glyph sits in a corner so the label layout never changes. */
+.swap-floating-btn,
+.polarity-floating-btn {
+  position: relative;
+}
+
+.swap-floating-btn > .pad-glyph,
+.polarity-floating-btn > .pad-glyph {
+  position: absolute;
+  top: 3px;
+  right: 4px;
+  font-size: 0.7rem;
+  pointer-events: none;
+}
+
+.pad-focus {
+  outline: 3px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: max(24px, env(safe-area-inset-bottom));
+  transform: translateX(-50%);
+  z-index: 120;
+  max-width: calc(100vw - 32px);
+  padding: 8px 16px;
+  background: var(--bg-panel);
+  color: var(--text-main);
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  font-size: var(--caption-font-size);
+  text-align: center;
+  pointer-events: none;
+}
+
+.settings-controller {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.settings-controller-field {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: var(--touch-target);
+  font-size: var(--caption-font-size);
+  color: var(--text-secondary);
+}
+
+.settings-controller-field input[type='checkbox'] {
+  width: 20px;
+  height: 20px;
+  accent-color: var(--accent-blue);
+}
+
+.settings-controller-select {
+  width: auto;
+  min-width: 120px;
+}
+
+@media (forced-colors: active) {
+  .pad-face {
+    forced-color-adjust: none;
+    --pad-dot-off: GrayText;
+    color: CanvasText;
+  }
+  .pad-face[data-pos='top'],
+  .pad-face[data-pos='right'],
+  .pad-face[data-pos='bottom'],
+  .pad-face[data-pos='left'] {
+    --pad-top: GrayText;
+    --pad-right: GrayText;
+    --pad-bottom: GrayText;
+    --pad-left: GrayText;
+  }
+  .pad-face[data-pos='top'] {
+    --pad-top: CanvasText;
+  }
+  .pad-face[data-pos='right'] {
+    --pad-right: CanvasText;
+  }
+  .pad-face[data-pos='bottom'] {
+    --pad-bottom: CanvasText;
+  }
+  .pad-face[data-pos='left'] {
+    --pad-left: CanvasText;
+  }
+  .pad-focus {
+    outline: 3px solid Highlight;
+    outline-offset: 2px;
+  }
+  .toast {
+    border-color: CanvasText;
+  }
+}
