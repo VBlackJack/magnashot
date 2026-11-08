@@ -1387,6 +1387,15 @@ body {
   border-color: var(--accent-amber);
 }
 
+.level-chapter.completed:not(.active) {
+  border-color: var(--accent-amber-alpha-45);
+}
+
+.level-chapter.completed .level-chapter-stars {
+  color: var(--text-gold);
+  font-weight: 700;
+}
+
 .level-chapter.locked {
   opacity: 0.55;
   cursor: not-allowed;

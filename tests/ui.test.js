@@ -2487,3 +2487,45 @@ test('tier colors are defined in every contrast theme', () => {
     assert.match(moreContrast.slice(0, moreContrast.indexOf('\n  }')), new RegExp(token));
   }
 });
+
+const DAILY_INTRO_TEST_SEED = '2026-11-08';
+
+test('Daily mutator intro banner, completed chapter tabs, and collectorMagnet upgrade are localized and wired', () => {
+  const previous = i18n.currentLocale;
+  try {
+    for (const lang of SUPPORTED) {
+      const locale = loadJson(`./locales/${lang}.json`);
+      i18n.dictionaries.set(lang, locale);
+      i18n.currentLocale = lang;
+
+      assert.deepEqual(
+        placeholdersOf(locale.modals.shop.upgrades.collectorMagnet.description),
+        ['overcharge', 'points']
+      );
+      assert.deepEqual(
+        placeholdersOf(locale.modals.levelSelect.chapters.ariaCompleted),
+        ['first', 'last', 'maxStars', 'name', 'stars']
+      );
+      assert.deepEqual(
+        placeholdersOf(locale.modals.levelSelect.chapters.starsCompleted),
+        ['maxStars', 'stars']
+      );
+
+      for (const mutKey of Object.keys(gameConfig.daily.mutators)) {
+        const text = buildLevelIntroText({ dailySeed: DAILY_INTRO_TEST_SEED, mutatorKey: mutKey }, t);
+        assert.ok(text.includes(locale.gameplay.mutators[mutKey]), `${lang}: intro names ${mutKey}`);
+        assert.ok(
+          text.includes(locale.modals.shop.codex.mutators[mutKey].description),
+          `${lang}: intro describes ${mutKey}`
+        );
+      }
+    }
+
+    assert.match(uiManagerCode, /modals\.levelSelect\.chapters\.ariaCompleted/);
+    assert.match(uiManagerCode, /modals\.levelSelect\.chapters\.starsCompleted/);
+    assert.match(workshopViewCode, /points:\s*formatNumber\(spec\.pointsBonusPerLevel \|\| 0\)/);
+    assert.match(workshopViewCode, /overcharge:\s*formatNumber\(spec\.overchargeBonusPerLevel \|\| 0\)/);
+  } finally {
+    i18n.currentLocale = previous;
+  }
+});

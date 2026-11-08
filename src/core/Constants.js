@@ -57,7 +57,10 @@ export const DAILY_MUTATORS = Object.freeze({
   HYPER_GRAVITY: 'hyperGravity',
   TURBO_ROTORS: 'turboRotors',
   SUPER_MAGNETISM: 'superMagnetism',
-  VOLATILE_CLUSTER: 'volatileCluster'
+  VOLATILE_CLUSTER: 'volatileCluster',
+  PORTAL_MATRIX: 'portalMatrix',
+  BUMPER_PINBALL: 'bumperPinball',
+  CRYO_SURGE: 'cryoSurge'
 });
 
 /** Kind of each row a survival run spawns, as recorded in the engine's wave log. */

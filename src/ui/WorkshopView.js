@@ -173,7 +173,9 @@ export function renderWorkshopContents() {
     const desc = document.createElement('div');
     desc.className = 'level-card-desc';
     desc.textContent = t(`modals.shop.upgrades.${upgradeKey}.description`, {
-      shots: formatNumber(spec.shotsPerLevel || 0)
+      shots: formatNumber(spec.shotsPerLevel || 0),
+      points: formatNumber(spec.pointsBonusPerLevel || 0),
+      overcharge: formatNumber(spec.overchargeBonusPerLevel || 0)
     });
 
     if (isMaxed) {

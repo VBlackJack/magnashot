@@ -241,6 +241,12 @@ function repeatsLevelName(mechanic, levelName) {
  * @returns {string} The one-line summary.
  */
 export function buildLevelIntroText(intro, translate) {
+  if (intro.mutatorKey) {
+    return translate('hud.levelIntro.dailyMutator', {
+      mutator: translate(`gameplay.mutators.${intro.mutatorKey}`),
+      effect: translate(`modals.shop.codex.mutators.${intro.mutatorKey}.description`)
+    });
+  }
   const levelName = formatLevelName(intro.summary);
   const featuredName =
     intro.featuredMechanicId === BOARD_MECHANICS.BASICS
@@ -982,13 +988,16 @@ export class UIManager {
       this.levelIntroShotsAtShow = null;
       return;
     }
-    if (this.levelIntroShotsAtShow === null || this.levelIntroShotsAtShow === undefined) {
-      this.levelIntroShotsAtShow = engine.shotsRemaining;
-    } else if (engine.shotsRemaining < this.levelIntroShotsAtShow) {
-      this.levelIntroShotsAtShow = null;
-      engine.dismissLevelIntro?.();
-      banner.classList.add('hidden');
-      return;
+    const usesShots = engine.usesShotBudget ? engine.usesShotBudget() : true;
+    if (usesShots) {
+      if (this.levelIntroShotsAtShow === null || this.levelIntroShotsAtShow === undefined) {
+        this.levelIntroShotsAtShow = engine.shotsRemaining;
+      } else if (engine.shotsRemaining < this.levelIntroShotsAtShow) {
+        this.levelIntroShotsAtShow = null;
+        engine.dismissLevelIntro?.();
+        banner.classList.add('hidden');
+        return;
+      }
     }
     const text = buildLevelIntroText(intro, t);
     revealLiveRegion({
@@ -997,8 +1006,9 @@ export class UIManager {
       text,
       schedule: scheduleNextFrame
     });
-    if (this.announcedLevelIntroId !== intro.levelId) {
-      this.announcedLevelIntroId = intro.levelId;
+    const introKey = intro.levelId ?? `daily:${intro.dailySeed || intro.mutatorKey}`;
+    if (this.announcedLevelIntroId !== introKey) {
+      this.announcedLevelIntroId = introKey;
       this.announce(text);
     }
   }

@@ -174,6 +174,7 @@ export class GameEngine {
     this.proximityGroup = null;
     // Levels whose banner already showed in this session, so a retry after a defeat is quiet.
     this.introducedLevelIds = new Set();
+    this.introducedDailySeeds = new Set();
     this.levelTutorialKey = null;
     this.isAimCancelled = false;
     this.isAimLocked = false;
@@ -733,6 +734,20 @@ export class GameEngine {
     return lvl * spec.shotsPerLevel;
   }
 
+  getCollectorBonusPoints() {
+    const base = this.gameConfig.scoring.collector?.bonusPointsPerBall || 0;
+    const lvl = this.storageManager.getUpgradeLevel('collectorMagnet');
+    const step = this.gameConfig.upgrades?.collectorMagnet?.pointsBonusPerLevel || 0;
+    return base + lvl * step;
+  }
+
+  getCollectorOvercharge() {
+    const base = this.gameConfig.scoring.collector?.overchargePerBall || 0;
+    const lvl = this.storageManager.getUpgradeLevel('collectorMagnet');
+    const step = this.gameConfig.upgrades?.collectorMagnet?.overchargeBonusPerLevel || 0;
+    return base + lvl * step;
+  }
+
   /**
    * Applies a newly purchased Workshop upgrade to the active run so the player
    * benefits immediately without having to restart the level.
@@ -1013,16 +1028,23 @@ export class GameEngine {
       ? [...paletteIds]
       : this.ballsConfig.standardColors.slice(0, this.gameConfig.defaults.matchMinCount).map((c) => c.id);
 
+    const pivots = this.physicsWorld.obstacles.filter((o) => o.type === OBSTACLE_TYPES.PIVOT);
     for (const bSpec of puzzleDef.balls || []) {
       const mod = bSpec.clusterModifier || null;
+      const x = bSpec.x !== undefined ? bSpec.x : centerX + (bSpec.dx || 0);
+      const y = bSpec.y;
+      const pivotRef = bSpec.pivotIndex !== undefined ? pivots[bSpec.pivotIndex] || null : null;
       const ball = new Ball({
-        x: bSpec.x !== undefined ? bSpec.x : centerX + (bSpec.dx || 0),
-        y: bSpec.y,
+        x,
+        y,
         radius: r,
         colorId: this.isColorlessModifier(mod) ? null : bSpec.colorId,
         clusterModifier: mod,
         armorHits: bSpec.armorHits !== undefined ? bSpec.armorHits : this.getInitialArmor(mod),
-        isAnchor: Boolean(bSpec.isAnchor)
+        isAnchor: Boolean(bSpec.isAnchor),
+        pivotRef,
+        pivotRadius: pivotRef ? Math.hypot(x - pivotRef.x, y - pivotRef.y) : 0,
+        pivotAngle: pivotRef ? Math.atan2(y - pivotRef.y, x - pivotRef.x) - pivotRef.angle : 0
       });
       this.physicsWorld.addBall(ball);
     }
@@ -1313,7 +1335,25 @@ export class GameEngine {
         this.gameConfig.theme.coinPopupColor
       );
     }
+    this.levelIntro =
+      isRestart || this.isRestoringRun || this.activeDiscoveryId ? null : this.buildDailyIntro(seed);
     this.notifyUI();
+  }
+
+  /**
+   * The first-play mutator banner of a Daily Challenge seed in the current session.
+   * @param {string} seed - Daily seed key.
+   * @returns {?{dailySeed: string, mutatorKey: string}}
+   */
+  buildDailyIntro(seed) {
+    if (!seed || !this.activeMutatorKey || this.introducedDailySeeds.has(seed)) {
+      return null;
+    }
+    this.introducedDailySeeds.add(seed);
+    return {
+      dailySeed: seed,
+      mutatorKey: this.activeMutatorKey
+    };
   }
 
   /**
@@ -1638,6 +1678,50 @@ export class GameEngine {
       );
       this.physicsWorld.obstacles.push(leftSingularity, rightSingularity, centralPivot);
 
+      const mutSpec = dailyCfg.mutators?.[this.activeMutatorKey];
+      if (mutSpec?.portalPair) {
+        this.physicsWorld.obstacles.push(
+          new Obstacle(
+            {
+              type: OBSTACLE_TYPES.PORTAL,
+              x: pivotX - dailyCfg.portalOffsetX,
+              y: pivotY + dailyCfg.portalEntryOffsetY,
+              pairId: dailyCfg.portalPairId
+            },
+            this.obstaclesConfig
+          ),
+          new Obstacle(
+            {
+              type: OBSTACLE_TYPES.PORTAL,
+              x: pivotX + dailyCfg.portalOffsetX,
+              y: dailyCfg.portalExitY,
+              pairId: dailyCfg.portalPairId
+            },
+            this.obstaclesConfig
+          )
+        );
+      }
+      if (mutSpec?.bumperPair) {
+        this.physicsWorld.obstacles.push(
+          new Obstacle(
+            {
+              type: OBSTACLE_TYPES.BUMPER,
+              x: pivotX - dailyCfg.bumperOffsetX,
+              y: pivotY + dailyCfg.bumperOffsetY
+            },
+            this.obstaclesConfig
+          ),
+          new Obstacle(
+            {
+              type: OBSTACLE_TYPES.BUMPER,
+              x: pivotX + dailyCfg.bumperOffsetX,
+              y: pivotY + dailyCfg.bumperOffsetY
+            },
+            this.obstaclesConfig
+          )
+        );
+      }
+
       const ringCount = dailyCfg.pivotRingCount;
       const ringRadius = r * dailyCfg.pivotRingRadiusFactor;
       this.spawnConcentricRings(pivotX, pivotY, [{ radius: ringRadius, count: ringCount }], centralPivot, {});
@@ -1703,6 +1787,13 @@ export class GameEngine {
       const extra = this.gameConfig.daily.mutators.volatileCluster.extraBombWeight;
       if (this.random() < extra) {
         return CLUSTER_MODIFIERS.DORMANT_BOMB;
+      }
+    } else if (this.activeMutatorKey === DAILY_MUTATORS.CRYO_SURGE) {
+      const extra = this.gameConfig.daily.mutators.cryoSurge.extraCoreWeight;
+      if (this.random() < extra) {
+        return this.random() < MATH_CONSTANTS.HALF
+          ? CLUSTER_MODIFIERS.FREEZE_CORE
+          : CLUSTER_MODIFIERS.LIGHTNING_CORE;
       }
     }
     return this.rollModifier(this.gameConfig.endless.modifierWeights);
@@ -2459,9 +2550,9 @@ export class GameEngine {
         if (!collectorCfg) {
           return;
         }
-        const bonusPts = Math.round(collectorCfg.bonusPointsPerBall * Math.max(1, this.combo));
+        const bonusPts = Math.round(this.getCollectorBonusPoints() * Math.max(1, this.combo));
         this.addScore(bonusPts);
-        this.addOvercharge(collectorCfg.overchargePerBall);
+        this.addOvercharge(this.getCollectorOvercharge());
         this.particleSystem.spawnFloatingText(
           ball.x,
           this.gameConfig.canvas.logicalHeight - collectorCfg.zoneHeight + this.gameConfig.canvas.floatingTextOffsetY,
