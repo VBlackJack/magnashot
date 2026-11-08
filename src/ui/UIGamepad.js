@@ -36,6 +36,14 @@ const NAV_VECTORS = Object.freeze({
   [A.NAV_RIGHT]: { x: 1, y: 0 }
 });
 
+/** The direction that undoes each direction. */
+const NAV_OPPOSITE = Object.freeze({
+  [A.NAV_UP]: A.NAV_DOWN,
+  [A.NAV_DOWN]: A.NAV_UP,
+  [A.NAV_LEFT]: A.NAV_RIGHT,
+  [A.NAV_RIGHT]: A.NAV_LEFT
+});
+
 /** Weight of the sideways offset against the distance along the pressed direction. */
 const CROSS_AXIS_WEIGHT = 2;
 
@@ -62,6 +70,8 @@ export function pickSpatialTarget(items, fromIndex, vector) {
   }
   let best = -1;
   let bestScore = Infinity;
+  let bestAlong = Infinity;
+  let bestAcross = Infinity;
   for (let i = 0; i < items.length; i++) {
     if (i === fromIndex) {
       continue;
@@ -78,8 +88,13 @@ export function pickSpatialTarget(items, fromIndex, vector) {
       continue;
     }
     const score = along + across * CROSS_AXIS_WEIGHT;
-    if (score < bestScore) {
+    // Ties go to the shorter run along the pressed direction, then the smaller sideways offset;
+    // a full tie keeps the earlier element in document order (strict comparisons).
+    const isTieWin = score === bestScore && (along < bestAlong || (along === bestAlong && across < bestAcross));
+    if (score < bestScore || isTieWin) {
       bestScore = score;
+      bestAlong = along;
+      bestAcross = across;
       best = i;
     }
   }
@@ -321,12 +336,20 @@ export const uiGamepadMethods = {
       this.stepSelect(focused, vector.x);
       return;
     }
+    const last = this.padLastMove;
+    if (last && last.to === focused && NAV_OPPOSITE[action] === last.action && items.includes(last.from)) {
+      // The opposite press undoes the previous move, so down then up always comes back.
+      this.padLastMove = { from: focused, to: last.from, action };
+      this.focusFromPad(last.from);
+      return;
+    }
     let target = pickSpatialTarget(items, current, vector);
     if (target < 0) {
       const forward = vector.x + vector.y > 0;
       target = Math.min(items.length - 1, Math.max(0, current + (forward ? 1 : -1)));
     }
     if (target !== current) {
+      this.padLastMove = { from: focused, to: items[target], action };
       this.focusFromPad(items[target]);
     }
   },

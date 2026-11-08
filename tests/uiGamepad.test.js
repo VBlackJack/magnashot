@@ -634,3 +634,69 @@ test('a failing frame hook is reported and the loop keeps running', () => {
   assert.equal(scheduled, 2);
   assert.ok(rendered >= 1);
 });
+
+/** A 2-column grid where nearest-up from the wide bottom control is the right-hand cell. */
+function makeGridItems(log) {
+  return [
+    makeItem('top-left', 0, 0, { log }),
+    makeItem('top-right', 100, 0, { log }),
+    makeItem('bottom', 60, 100, { log })
+  ];
+}
+
+test('moving the opposite way returns to the control the last move came from', () => {
+  withDocument((doc) => {
+    const { ui, log } = makeUi();
+    const items = makeGridItems(log);
+    const [topLeft, , bottom] = items;
+    ui.topModal = makeRoot(items);
+    doc.activeElement = topLeft;
+    assert.equal(pickSpatialTarget(items, 2, { x: 0, y: -1 }), 1, 'scoring alone picks the right cell');
+    ui.routeGamepadMenuActions([A.NAV_DOWN]);
+    assert.equal(doc.activeElement, bottom);
+    ui.routeGamepadMenuActions([A.NAV_UP]);
+    assert.equal(doc.activeElement, topLeft, 'the origin wins over the nearest-up cell');
+  });
+});
+
+test('a move that is not the exact opposite keeps the nearest-in-direction scoring', () => {
+  withDocument((doc) => {
+    const { ui, log } = makeUi();
+    const [topLeft, topRight, bottom] = makeGridItems(log);
+    const bottomRight = makeItem('bottom-right', 200, 100, { log });
+    ui.topModal = makeRoot([topLeft, topRight, bottom, bottomRight]);
+    doc.activeElement = topLeft;
+    ui.routeGamepadMenuActions([A.NAV_DOWN]);
+    ui.routeGamepadMenuActions([A.NAV_RIGHT]);
+    assert.equal(doc.activeElement, bottomRight);
+    ui.routeGamepadMenuActions([A.NAV_UP]);
+    assert.equal(doc.activeElement, topRight, 'up after a sideways move uses the scoring');
+  });
+});
+
+test('the opposite move falls back to scoring when the origin is no longer focusable', () => {
+  withDocument((doc) => {
+    const { ui, log } = makeUi();
+    const [topLeft, topRight, bottom] = makeGridItems(log);
+    const root = makeRoot([topLeft, topRight, bottom]);
+    ui.topModal = root;
+    doc.activeElement = topLeft;
+    ui.routeGamepadMenuActions([A.NAV_DOWN]);
+    assert.equal(doc.activeElement, bottom);
+    topLeft.hidden = true;
+    root.querySelectorAll = () => [topRight, bottom];
+    ui.routeGamepadMenuActions([A.NAV_UP]);
+    assert.equal(doc.activeElement, topRight);
+  });
+});
+
+test('equal scores resolve by distance along the direction, then sideways offset, then document order', () => {
+  const log = [];
+  const from = makeItem('from', 100, 100, { log });
+  const left = makeItem('left', 60, 0, { log });
+  const right = makeItem('right', 140, 0, { log });
+  const same = makeItem('same', 100, 0, { log });
+  assert.equal(pickSpatialTarget([from, left, right], 0, { x: 0, y: -1 }), 1, 'a full tie keeps document order');
+  assert.equal(pickSpatialTarget([from, right, left], 0, { x: 0, y: -1 }), 1);
+  assert.equal(pickSpatialTarget([from, left, same, right], 0, { x: 0, y: -1 }), 2, 'the aligned control wins');
+});

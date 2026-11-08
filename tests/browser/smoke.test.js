@@ -1541,6 +1541,20 @@ async function tapPad(page, button) {
   await waitFrames(page, PAD_FRAMES_PER_STEP);
 }
 
+/** Ids and boxes of the Pause dialog buttons plus the focus sequence, for assertion messages. */
+const describePauseFocus = (page, sequence) =>
+  page.evaluate(
+    (seq) =>
+      JSON.stringify({
+        sequence: seq,
+        buttons: Array.from(document.querySelectorAll('#modal-pause button')).map((button) => {
+          const { left, top, width, height } = button.getBoundingClientRect();
+          return { id: button.id, left, top, width, height };
+        })
+      }),
+    sequence
+  );
+
 const focusedId = (page) => page.evaluate(() => document.activeElement?.id ?? '');
 
 describe('browser smoke: controller', () => {
@@ -1573,7 +1587,9 @@ describe('browser smoke: controller', () => {
         assert.equal(await engineState(page), GAME_STATES.PAUSED);
         assert.equal(await focusedId(page), 'btn-resume', 'Pause opens on Resume');
 
+        const sequence = [await focusedId(page)];
         await tapPad(page, PAD_BUTTONS.dpadDown);
+        sequence.push(await focusedId(page));
         assert.notEqual(await focusedId(page), 'btn-resume', 'the d-pad moves focus off Resume');
         assert.equal(
           await page.evaluate(() => document.activeElement.classList.contains('pad-focus')),
@@ -1581,7 +1597,12 @@ describe('browser smoke: controller', () => {
           'the pad focus ring is on the focused control'
         );
         await tapPad(page, PAD_BUTTONS.dpadUp);
-        assert.equal(await focusedId(page), 'btn-resume');
+        sequence.push(await focusedId(page));
+        assert.equal(
+          await focusedId(page),
+          'btn-resume',
+          `down then up returns to Resume: ${await describePauseFocus(page, sequence)}`
+        );
         await tapPad(page, PAD_BUTTONS.bottom);
         await page.waitForFunction((playing) => window.__fluxEngine.state === playing, GAME_STATES.PLAYING);
         assert.equal(await isShown(page, '#modal-pause'), false, 'Resume closes the dialog');
