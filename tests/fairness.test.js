@@ -257,8 +257,48 @@ test('The Daily share text is unchanged by the assist fields', () => {
 });
 
 test('The Daily intro states the fair play rule', () => {
-  const intro = { mutatorKey: Object.keys(gameConfig.daily.mutators)[0] };
+  const intro = { mutatorKey: Object.keys(gameConfig.daily.mutators)[0], fairPlay: { upgrades: true, ammo: true } };
   const text = buildLevelIntroText(intro, t);
   assert.ok(text.includes('Workshop upgrades and shop ammo are off today.'));
   assert.ok(t('modals.shop.upgrades.dailyBaselineNote') !== 'modals.shop.upgrades.dailyBaselineNote');
+});
+
+test('The Daily intro names only the fairness rules that are active', () => {
+  const mutatorKey = Object.keys(gameConfig.daily.mutators)[0];
+  const intro = (fairPlay) => buildLevelIntroText({ mutatorKey, fairPlay }, t);
+  const upgradesOnly = intro({ upgrades: true, ammo: false });
+  assert.ok(upgradesOnly.includes('Workshop upgrades are off today.'));
+  assert.ok(!upgradesOnly.includes('shop ammo'));
+  const ammoOnly = intro({ upgrades: false, ammo: true });
+  assert.ok(ammoOnly.includes('shop ammo is off today.'));
+  assert.ok(!ammoOnly.includes('Workshop'));
+  const none = intro({ upgrades: false, ammo: false });
+  assert.ok(!none.includes('Same rules for everyone'));
+  assert.ok(none.startsWith('Daily Challenge:'));
+});
+
+test('The engine reports the Daily fairness rules the intro relies on', () => {
+  const engine = createTestEngine();
+  startDaily(engine);
+  assert.equal(engine.areDailyUpgradesNeutralised(), true);
+  assert.equal(engine.isDailyAmmoLocked(), true);
+
+  engine.gameConfig = {
+    ...gameConfig,
+    seededFairness: { ...gameConfig.seededFairness, dailyAllowsSpecialAmmo: true }
+  };
+  assert.equal(engine.isDailyAmmoLocked(), false);
+});
+
+test('Daily upgrades count as neutralised only in Daily and only at a zero baseline', () => {
+  const engine = createTestEngine();
+  startEndless(engine);
+  assert.equal(engine.areDailyUpgradesNeutralised(), false);
+  startDaily(engine);
+  assert.equal(engine.areDailyUpgradesNeutralised(), true);
+  engine.gameConfig = {
+    ...gameConfig,
+    seededFairness: { ...gameConfig.seededFairness, dailyUpgradeLevels: { laserSight: 1 } }
+  };
+  assert.equal(engine.areDailyUpgradesNeutralised(), false);
 });

@@ -43,6 +43,17 @@ export const engineControlsMethods = {
     return this.mode === GAME_MODES.DAILY && !this.gameConfig.seededFairness?.dailyAllowsSpecialAmmo;
   },
 
+  /** True in the Daily Challenge while every Workshop upgrade is held at a zero baseline. */
+  areDailyUpgradesNeutralised() {
+    if (this.mode !== GAME_MODES.DAILY) {
+      return false;
+    }
+    const levels = Object.keys(this.gameConfig.upgrades || {}).map(
+      (key) => this.gameConfig.seededFairness?.dailyUpgradeLevels?.[key] ?? 0
+    );
+    return levels.every((level) => level === 0);
+  },
+
   /**
    * True when a special ball can be bought now: the run is active and can be captured, so
    * the purchase is stored with its debit (no shot in flight, no Flux shape change or perk

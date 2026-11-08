@@ -149,8 +149,9 @@ export function renderWorkshopContents() {
   const grid = this.elements.shopGrid;
   grid.replaceChildren();
 
-  // Upgrades are bought as usual but count for nothing in a Daily run: say so, as text.
-  if (this.engine.mode === GAME_MODES.DAILY) {
+  // Upgrades are bought as usual but count for nothing in a Daily run that neutralises them:
+  // say so, as text, only while such a run is active.
+  if (this.engine.areDailyUpgradesNeutralised() && this.isRunActive()) {
     const baselineNote = document.createElement('p');
     baselineNote.className = 'levels-empty-filter';
     baselineNote.setAttribute('role', 'note');

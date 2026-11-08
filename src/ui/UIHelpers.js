@@ -181,6 +181,25 @@ export function repeatsLevelName(mechanic, levelName) {
 }
 
 /**
+ * Picks the fair-play sentence that matches the Daily rules actually in force, so the intro
+ * never claims a rule the configuration leaves off.
+ * @param {?{upgrades: boolean, ammo: boolean}} fairPlay - Active Daily fairness rules.
+ * @returns {?string} A locale key, or null when no rule is active.
+ */
+export function resolveDailyFairPlayKey(fairPlay) {
+  if (fairPlay?.upgrades && fairPlay?.ammo) {
+    return 'hud.levelIntro.dailyFairPlay';
+  }
+  if (fairPlay?.upgrades) {
+    return 'hud.levelIntro.dailyFairPlayUpgrades';
+  }
+  if (fairPlay?.ammo) {
+    return 'hud.levelIntro.dailyFairPlayAmmo';
+  }
+  return null;
+}
+
+/**
  * Builds the objective banner text of a level played for the first time. The basics are never
  * named as the focus (every level has them), nor is a mechanic the level name already says.
  * @param {{levelId: number, summary: Object, maxShots: number, featuredMechanicId: string|null}} intro
@@ -189,11 +208,15 @@ export function repeatsLevelName(mechanic, levelName) {
  */
 export function buildLevelIntroText(intro, translate) {
   if (intro.mutatorKey) {
-    return translate('hud.levelIntro.dailyMutatorFair', {
+    const params = {
       mutator: translate(`gameplay.mutators.${intro.mutatorKey}`),
-      effect: translate(`modals.shop.codex.mutators.${intro.mutatorKey}.description`),
-      fairPlay: translate('hud.levelIntro.dailyFairPlay')
-    });
+      effect: translate(`modals.shop.codex.mutators.${intro.mutatorKey}.description`)
+    };
+    const fairPlayKey = resolveDailyFairPlayKey(intro.fairPlay);
+    if (!fairPlayKey) {
+      return translate('hud.levelIntro.dailyMutator', params);
+    }
+    return translate('hud.levelIntro.dailyMutatorFair', { ...params, fairPlay: translate(fairPlayKey) });
   }
   const levelName = formatLevelName(intro.summary);
   const featuredName =

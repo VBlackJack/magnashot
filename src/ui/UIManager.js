@@ -488,7 +488,10 @@ export class UIManager {
         return;
       }
     }
-    const text = buildLevelIntroText(intro, t);
+    const fairPlay = intro.mutatorKey
+      ? { upgrades: engine.areDailyUpgradesNeutralised(), ammo: engine.isDailyAmmoLocked() }
+      : null;
+    const text = buildLevelIntroText({ ...intro, fairPlay }, t);
     revealLiveRegion({
       region: banner,
       textElement: this.elements.levelIntroText,

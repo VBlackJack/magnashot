@@ -254,7 +254,9 @@
       },
       "dailyMutator": "Daily Challenge: {{mutator}}. {{effect}}",
       "dailyMutatorFair": "Daily Challenge: {{mutator}}. {{effect}} {{fairPlay}}",
-      "dailyFairPlay": "Same rules for everyone: Workshop upgrades and shop ammo are off today."
+      "dailyFairPlay": "Same rules for everyone: Workshop upgrades and shop ammo are off today.",
+      "dailyFairPlayUpgrades": "Same rules for everyone: Workshop upgrades are off today.",
+      "dailyFairPlayAmmo": "Same rules for everyone: shop ammo is off today."
     }
   },
   "gameplay": {

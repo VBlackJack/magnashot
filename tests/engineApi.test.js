@@ -25,6 +25,7 @@ const EXPECTED_PROTOTYPE_NAMES = [
   'adjustAimByDelta',
   'announceAchievementUnlocks',
   'applyUpgradePurchase',
+  'areDailyUpgradesNeutralised',
   'awardRunCoins',
   'buildDailyIntro',
   'buildFluxStage',
