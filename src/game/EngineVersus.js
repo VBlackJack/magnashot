@@ -16,6 +16,10 @@
 
 
 import { SeededRandom } from '../core/SeededRandom.js';
+import { computeVersusAttack } from './VersusRules.js';
+
+// Kept exported here so existing callers of the foundation keep working.
+export { computeVersusAttack };
 
 const FIRST_STAGE = 1;
 const FIRST_BOARD = 0;
@@ -28,25 +32,6 @@ function createAttackTotals() {
 /** Fresh counters of the turn in progress. */
 function createOpenTurn() {
   return { isOpen: false, dropped: 0, links: 0, isSpecial: false };
-}
-
-/**
- * Pure attack of one resolved turn.
- * @param {{dropped:number, links:number, isSpecial:boolean}} turn - What the turn did.
- * @param {object} attackConfig - gameConfig.versus.attack.
- * @returns {{raw:number, sent:number, isStrong:boolean}} Raw attack, charges sent, strong flag.
- */
-export function computeVersusAttack(turn, attackConfig) {
-  if (turn.dropped <= 0) {
-    // A match that drops nothing sends nothing, whatever the chain did.
-    return { raw: 0, sent: 0, isStrong: false };
-  }
-  const base =
-    Math.max(0, turn.dropped - attackConfig.freeDroppedSpheres) * attackConfig.dropWeight
-    + turn.links * attackConfig.linkWeight;
-  const raw = turn.isSpecial ? base * attackConfig.specialMultiplier : base;
-  const sent = Math.min(attackConfig.maxChargesPerTurn, Math.floor(raw / attackConfig.rawPerCharge));
-  return { raw, sent, isStrong: raw >= attackConfig.strongChargeRaw };
 }
 
 /** Methods of GameEngine that belong to a board of a Polarity Duel, installed on its prototype. */
