@@ -496,7 +496,7 @@ test('the star gauge runs from the last star earned to the next one', () => {
   assert.equal(computeStarProgressPct(5000, thresholds, undefined), 100, 'all stars: full gauge');
 });
 
-const UI_MODULE_FILES = ['UIManager.js', 'CodexView.js', 'WorkshopView.js', 'LevelSelectView.js'];
+const UI_MODULE_FILES = ['UIManager.js', 'UIHelpers.js', 'UIInputBindings.js', 'UIModals.js', 'UISettingsControls.js', 'UIHudRefresh.js', 'CodexView.js', 'WorkshopView.js', 'LevelSelectView.js'];
 const uiManagerSource = UI_MODULE_FILES.map((file) => readFileSync(`./src/ui/${file}`, 'utf8')).join('\n');
 const uiManagerCode = uiManagerSource.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
 
@@ -2241,7 +2241,7 @@ test('the "?" button shows only when the level has hints and calls the replay', 
 
   const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
   assert.match(html, /id="btn-hint-replay"[^>]*data-i18n-aria-label="hud\.hints\.replayAria"/);
-  const source = readFileSync(new URL('../src/ui/UIManager.js', import.meta.url), 'utf8');
+  const source = readFileSync(new URL('../src/ui/UIInputBindings.js', import.meta.url), 'utf8');
   assert.match(source, /hintReplayBtn\?\.addEventListener\('click'[\s\S]{0,80}replayLevelHints/);
 });
 
