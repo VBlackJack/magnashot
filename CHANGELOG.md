@@ -4,6 +4,23 @@ All notable changes to **MagnaShot** are documented in this file.
 
 ## [Unreleased]
 
+### Fixed
+- **Progress Saved Before v1.9.1 Recovered (`StorageManager.migrateLegacyKeys`, `configs/game.json`)**: The v1.9.1 rebrand renamed the `localStorage` prefix from `flux_spheres_v1_` to `magnashot_v1_` without carrying saves over, so earlier players started from level 1. On first launch, the legacy save is now merged into the current one: the unlocked level keeps the higher of the two, level stats keep the best score and stars per level, and every other key is copied only when no newer value exists. A stale run in progress is not carried over, legacy keys are left in place, and a marker key keeps the merge to a single pass.
+- **Shared Flux Seeds and Daily Waves Are the Same for Everyone (`GameEngine.withScopedRandom`)**: Board colours and modifiers of each Flux stage now come from a stream derived from the seed and the stage number, and each Daily Challenge wave from the seed and the wave number. Previously they shared the run stream with shots and falling spheres, so two players on the same `?flux=` link or the same Daily saw different boards from stage or wave 2 onward. Boards built from existing seeds differ from those of earlier versions; saved runs still restore.
+- **Victory With a Shot Still in Flight (`GameEngine`)**: When a bond break emptied the board while a shot was in the air, Campaign, Puzzle and Flux declared the round over with the shot frozen mid-flight. The round now ends once the shot has resolved.
+- **Freeze Core Duration (`GameEngine`, `RunSnapshot`)**: A Freeze Core set off by a chain reaction between turns froze the board one turn longer than one destroyed during a shot. Both now last `freezeTurns`, and the state is kept in the run snapshot.
+- **Brush Scoring (`SpecialBallController.triggerBrush`)**: The Brush no longer pays points and Overcharge for spheres that already had the target colour, matching the Paint Core.
+- **Aim Preview on Shielded Boss Cores (`ImpactPreview`)**: Bomb, Lightning and Anvil previews no longer show a Boss Core with shields left as destroyed; it only loses one shield.
+- **Screen Shake Ghosting (`Renderer.render`)**: The frame is now cleared before the shake offset is applied, so no strip of the previous frame shows at the board edges.
+- **Focus After Closing the Last Dialog (`UIManager.syncModalInertState`)**: When no element was focused before a dialog opened (for example Pause by Escape, then Levels, then Resume), focus now returns to the game canvas instead of dropping to the page.
+- **Puzzle Queue Special Spheres (`GameEngine.takeUpcomingBall`)**: Queue entries beyond the second keep their special type.
+- **Run Snapshot Validation (`RunSnapshot`)**: The special inventory and bonds of a saved run are type-checked on restore.
+
+### Changed
+- **Number Formatting (`UIManager`, `LevelSelectView`)**: Badge counts and chapter numbers go through the locale number formatter.
+- **Platform Support Tolerance (`configs/physics.json`)**: Moved from code to `simulation.platformSupportTolerancePx`.
+- **Docs**: README states ESLint 10 and that share text covers every non-campaign mode; `package-lock.json` root version aligned to 1.14.0.
+
 ## [1.14.0] - 2026-11-08
 
 ### Added
