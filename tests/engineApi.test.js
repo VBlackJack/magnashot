@@ -204,7 +204,19 @@ const EXPECTED_PROTOTYPE_NAMES = [
   'updateStageTransition',
   'updateVictoryCelebration',
   'usesShotBudget',
-  'withScopedRandom'
+  'withScopedRandom',
+  'attachGhost',
+  'buildChallengeGhost',
+  'buildGhostContext',
+  'encodeGhostDuel',
+  'evaluateGhostShot',
+  'getGhostDisplayName',
+  'getGhostDuelStatus',
+  'getRunWorkshopLevels',
+  'restoreGhostDuel',
+  'retractGhostDuel',
+  'settleGhostDuel',
+  'startGhostDuel'
 ];
 
 test('GameEngine.prototype exposes exactly the same members after the module split', () => {
