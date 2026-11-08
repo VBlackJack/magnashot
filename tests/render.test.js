@@ -23,6 +23,7 @@ import { StorageManager } from '../src/core/StorageManager.js';
 import { AudioManager } from '../src/core/AudioManager.js';
 import { GameEngine } from '../src/game/GameEngine.js';
 import { Renderer, buildResolutionQuery } from '../src/game/Renderer.js';
+import { Renderer as FrozenRenderer } from './fixtures/Renderer.v1.19.0.js';
 import { ParticleSystem } from '../src/entities/ParticleSystem.js';
 import { createGameLoop } from '../src/game/GameLoop.js';
 import { GAME_STATES } from '../src/core/Constants.js';
@@ -1333,4 +1334,114 @@ test('Single-player render call log is unchanged (golden)', () => {
     'drawTrail', 'drawLauncher', 'drawSagGauge', 'drawParticles', 'drawSlowMoOverlay'
   ];
   assert.deepEqual(renderFrameWithCalls(createRenderer(), engine, names), names);
+});
+
+/**
+ * Canvas context that records every method call (with its arguments) and every property
+ * write, so two renderers can be compared draw call for draw call.
+ */
+const createRecordingCanvas = (log) => {
+  const describe = (value) => {
+    if (typeof value === 'number') {
+      return Number.isFinite(value) ? value : String(value);
+    }
+    if (value && typeof value === 'object') {
+      if (typeof value.getContext === 'function' || value.isRecordingTarget) {
+        return '[canvas]';
+      }
+      if (value.isGradient) {
+        return `[gradient:${value.id}]`;
+      }
+      return JSON.parse(JSON.stringify(value, (key, inner) => (typeof inner === 'function' ? '[fn]' : inner)));
+    }
+    return typeof value === 'function' ? '[fn]' : value;
+  };
+  let gradients = 0;
+  const props = {};
+  const ctx = new Proxy(props, {
+    get(target, prop) {
+      if (typeof prop === 'symbol') {
+        return undefined;
+      }
+      if (prop in target) {
+        return target[prop];
+      }
+      return (...args) => {
+        log.push([prop, ...args.map(describe)]);
+        if (prop === 'createLinearGradient' || prop === 'createRadialGradient') {
+          const gradient = { isGradient: true, id: gradients++, addColorStop: (...stop) => log.push(['addColorStop', gradient.id, ...stop]) };
+          return gradient;
+        }
+        if (prop === 'measureText') {
+          return { width: 10 };
+        }
+        return undefined;
+      };
+    },
+    set(target, prop, value) {
+      target[prop] = value;
+      log.push(['set', prop, describe(value)]);
+      return true;
+    }
+  });
+  return {
+    width: 0,
+    height: 0,
+    isRecordingTarget: true,
+    getContext: () => ctx,
+    getBoundingClientRect: () => ({ left: 0, top: 0, width: 0, height: 0 })
+  };
+};
+
+const FROZEN_CLOCK_MS = 1000;
+const RANDOM_SEED_MULTIPLIER = 16807;
+const RANDOM_SEED_MODULUS = 2147483647;
+const RANDOM_SEED_START = 12345;
+
+/** Runs fn with Math.random and performance.now replaced by deterministic sources. */
+const withDeterministicSources = (fn) => {
+  const realRandom = Math.random;
+  const realNow = performance.now;
+  let seed = RANDOM_SEED_START;
+  Math.random = () => {
+    seed = (seed * RANDOM_SEED_MULTIPLIER) % RANDOM_SEED_MODULUS;
+    return seed / RANDOM_SEED_MODULUS;
+  };
+  performance.now = () => FROZEN_CLOCK_MS;
+  try {
+    return fn();
+  } finally {
+    Math.random = realRandom;
+    performance.now = realNow;
+  }
+};
+
+const recordFrame = (RendererClass, prepare) => withDeterministicSources(() => {
+  const log = [];
+  const canvas = createRecordingCanvas(log);
+  const renderer = new RendererClass(canvas, gameConfig, ballsConfig, obstaclesConfig);
+  renderer.createLayerCanvas = () => createRecordingCanvas(log);
+  const engine = createTestEngine();
+  engine.startClassicMode(1);
+  engine.setReducedMotion(true);
+  prepare?.(engine);
+  log.length = 0;
+  renderer.render(engine, 1.0);
+  renderer.render(engine, 0.5);
+  return log;
+});
+
+test('Single-player render output equals the frozen v1.19.0 renderer draw call for draw call', () => {
+  const scenarios = [
+    undefined,
+    (engine) => {
+      engine.aimPoints = [{ x: 100, y: 100 }, { x: 120, y: 80 }];
+    }
+  ];
+  for (const prepare of scenarios) {
+    const frozen = recordFrame(FrozenRenderer, prepare);
+    const current = recordFrame(Renderer, prepare);
+    assert.ok(frozen.length > 100, 'the reference frame records many draw calls');
+    assert.deepEqual(current, frozen);
+  }
 });

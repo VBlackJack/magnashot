@@ -18,6 +18,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { createGameLoop, SCENE_TIME_SCALE_FIXED } from '../src/game/GameLoop.js';
+import { createGameLoop as createFrozenGameLoop } from './fixtures/GameLoop.v1.19.0.js';
 import { GAME_STATES } from '../src/core/Constants.js';
 
 const FIXED_STEP_MS = 10;
@@ -93,6 +94,40 @@ test('A one-board scene behaves exactly like the engine and renderer form', () =
   assert.ok(legacyLog.includes('b:update'));
   assert.ok(legacyLog.some((entry) => entry.startsWith('b:render:true:1')), 'frozen frames render with alpha 1');
   assert.deepEqual(sceneLog, legacyLog);
+});
+
+test('The one-board loop matches the frozen v1.19.0 loop call for call', () => {
+  const frameDeltas = [FRAME_DELTA_MS, 3, 16];
+  for (const delta of frameDeltas) {
+    const frames = Math.ceil((FRAME_COUNT * FRAME_DELTA_MS) / delta);
+    const run = (factory, wrap) => {
+      const log = [];
+      const board = makeBoard(log, 'b');
+      const script = scriptFor(board.engine);
+      const loop = factory({
+        ...wrap(board),
+        fixedStepMs: FIXED_STEP_MS,
+        maxAccumulatedMs: MAX_ACCUMULATED_MS,
+        idleRenderIntervalMs: IDLE_INTERVAL_MS,
+        scheduleFrame: () => {},
+        onFatalError: (err) => log.push(`fatal:${err.message}`),
+        beforeFrame: (now, elapsed) => log.push(`before:${now}:${elapsed}`)
+      });
+      for (let i = 0; i < frames; i++) {
+        // The scripted phases are defined on the 7 ms frame index, whatever the real delta is.
+        script(Math.floor((i * delta) / FRAME_DELTA_MS));
+        loop.frame(i * delta);
+      }
+      return log;
+    };
+    const frozenLog = run(createFrozenGameLoop, (board) => ({ engine: board.engine, renderer: board.renderer }));
+    const currentLog = run(createGameLoop, (board) => ({ engine: board.engine, renderer: board.renderer }));
+    const sceneLog = run(createGameLoop, (board) => ({ getScene: () => ({ boards: [board] }) }));
+    assert.ok(frozenLog.some((entry) => entry === 'b:update'), 'the reference run steps the engine');
+    assert.ok(frozenLog.some((entry) => entry.startsWith('b:render')), 'the reference run renders');
+    assert.deepEqual(currentLog, frozenLog, `engine/renderer form, ${delta} ms frames`);
+    assert.deepEqual(sceneLog, frozenLog, `one-board scene form, ${delta} ms frames`);
+  }
 });
 
 test('Two boards step in lockstep, board 0 then board 1, and render after stepping', () => {

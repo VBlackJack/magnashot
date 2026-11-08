@@ -1,0 +1,123 @@
+/*
+ * Copyright 2026 Julien Bombled
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+// Frozen reference copy of src/game/GameLoop.js as of v1.19.0 (commit 500bf4d). Used only by tests to prove
+// the multi-board refactor leaves single player behaviour unchanged. Never edit it.
+
+
+import { GAME_STATES } from '../../src/core/Constants.js';
+
+/**
+ * Returns true when the next engine.update() call will advance the physics simulation,
+ * i.e. the game is playing, no hit-stop freeze is pending and no Flux shape is being
+ * replaced (that transition only lets the old balls fall, without saving their previous
+ * positions, so it cannot be interpolated).
+ * @param {object} engine - Game engine exposing state, hitStopFrames and stageTransitionFrames.
+ * @returns {boolean}
+ */
+export function willSimulationAdvance(engine) {
+  return engine.state === GAME_STATES.PLAYING && engine.hitStopFrames <= 0 && !(engine.stageTransitionFrames > 0);
+}
+
+/**
+ * Creates a fixed-timestep game loop with render interpolation.
+ *
+ * Interpolation alpha is forced to 1 whenever the last update did not advance the
+ * simulation (hit-stop, pause, menus, Flux stage transition), because previous positions are only saved by a
+ * real physics step. While the engine is neither playing nor celebrating a victory, the
+ * scene is static and is redrawn at the configured idle interval instead of every frame. Any exception
+ * thrown by update or render stops the loop for good and is reported once.
+ *
+ * @param {object} options
+ * @param {object} options.engine - Game engine (update(), state, hitStopFrames, and the
+ *   optional getTimeScale() below 1 for slow motion and refreshAimPreview() before a render).
+ * @param {object} options.renderer - Renderer exposing render(engine, alpha).
+ * @param {number} options.fixedStepMs - Fixed simulation step in milliseconds.
+ * @param {number} options.maxAccumulatedMs - Upper bound of elapsed time per frame.
+ * @param {number} options.idleRenderIntervalMs - Redraw interval while not playing.
+ * @param {Function} options.scheduleFrame - requestAnimationFrame-like scheduler.
+ * @param {Function} options.onFatalError - Called once with the thrown error.
+ * @param {Function} [options.beforeFrame] - Called with (now, elapsedMs) at the start of every frame, also while
+ *   the game is idle or paused (input polling). Defaults to a no-op. A throw is reported and the loop goes on.
+ * @param {Function} [options.onHookError] - Called with the error thrown by beforeFrame. Defaults to console.error.
+ * @returns {{start: Function, frame: Function, isStopped: Function}}
+ */
+export function createGameLoop({
+  engine,
+  renderer,
+  fixedStepMs,
+  maxAccumulatedMs,
+  idleRenderIntervalMs,
+  scheduleFrame,
+  onFatalError,
+  beforeFrame = () => {},
+  onHookError = (err) => console.error('Frame hook failed:', err)
+}) {
+  let lastTime = null;
+  let accumulator = 0;
+  let lastUpdateAdvanced = false;
+  let lastRenderTime = null;
+  let stopped = false;
+
+  const frame = (now) => {
+    if (stopped) {
+      return;
+    }
+    try {
+      const elapsed = lastTime === null ? 0 : Math.min(maxAccumulatedMs, Math.max(0, now - lastTime));
+      lastTime = now;
+      // A failing input hook must not stop the simulation or the rendering.
+      try {
+        beforeFrame(now, elapsed);
+      } catch (hookErr) {
+        onHookError(hookErr);
+      }
+      // Slow motion: fewer fixed steps per real second; interpolation keeps it smooth.
+      const timeScale = typeof engine.getTimeScale === 'function' ? engine.getTimeScale() : 1;
+      accumulator += elapsed * timeScale;
+
+      while (accumulator >= fixedStepMs) {
+        lastUpdateAdvanced = willSimulationAdvance(engine);
+        engine.update();
+        accumulator -= fixedStepMs;
+      }
+      if (typeof engine.refreshAimPreview === 'function') {
+        engine.refreshAimPreview();
+      }
+
+      const alpha = lastUpdateAdvanced && fixedStepMs > 0 ? accumulator / fixedStepMs : 1.0;
+      const isLive = engine.state === GAME_STATES.PLAYING || engine.isVictoryCelebrating();
+      if (isLive || lastRenderTime === null || now - lastRenderTime >= idleRenderIntervalMs) {
+        renderer.render(engine, alpha);
+        lastRenderTime = now;
+      }
+      scheduleFrame(frame);
+    } catch (err) {
+      stopped = true;
+      onFatalError(err);
+    }
+  };
+
+  return {
+    start() {
+      scheduleFrame(frame);
+    },
+    frame,
+    isStopped() {
+      return stopped;
+    }
+  };
+}
