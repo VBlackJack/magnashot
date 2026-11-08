@@ -1144,7 +1144,8 @@
           "normal": "Normale",
           "fast": "Rapide"
         },
-        "invertX": "Inverser la visée horizontale"
+        "invertX": "Inverser la visée horizontale",
+        "rumble": "Vibration"
       }
     },
     "fluxPerk": {
@@ -1438,6 +1439,27 @@
     "defaultName": "Fantôme"
   },
   "versus": {
+    "tutorial": {
+      "title": "Comment fonctionne un duel",
+      "progress": "Étape {{current}} sur {{total}}",
+      "next": "Suivant",
+      "done": "Compris",
+      "skip": "Passer",
+      "step": {
+        "charges": {
+          "title": "Charges",
+          "body": "Les gros combos envoient des sphères chargées à votre rival, et les siennes viennent vers vous. Chacune a un signe + ou - et monte vers votre amas."
+        },
+        "guard": {
+          "title": "Garde de polarité",
+          "body": "Tirez une sphère de polarité opposée pour briser une charge. Une sphère de même polarité rebondit dessus."
+        },
+        "pulse": {
+          "title": "Impulsion de champ",
+          "body": "Neutraliser des charges remplit votre jauge d'impulsion. Pleine, elle abaisse seule le rail d'ancrage de votre rival."
+        }
+      }
+    },
     "local": {
       "entry": "2 joueurs (même appareil)",
       "entryHint": "Nécessite un écran plus large pour deux plateaux",

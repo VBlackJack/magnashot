@@ -687,3 +687,49 @@ test('reopening the per-pad mode re-primes the pads', () => {
     input.poll(16);
     assert.deepEqual(input.pollAll(16).pads[0].actions, []);
 });
+
+const RUMBLE_CONFIG = { ...CONFIG, rumble: { effectType: 'dual-rumble' } };
+const RUMBLE_EFFECT = { durationMs: 100, startDelay: 0, weakMagnitude: 0.3, strongMagnitude: 0.5 };
+
+function setupRumble({ settings = {}, actuator } = {}) {
+  const calls = [];
+  const pad = makePad(0, {
+    vibrationActuator: actuator === undefined
+      ? { playEffect: (type, effect) => { calls.push([type, effect]); return Promise.resolve('complete'); } }
+      : actuator
+  });
+  const input = new GamepadInput({
+    config: RUMBLE_CONFIG,
+    settings: { enabled: true, deadzone: 0.18, aimSpeed: 'normal', invertX: false, ...settings },
+    getGamepads: () => [pad]
+  });
+  return { input, calls };
+}
+
+test('rumble plays the configured effect type on the pad actuator', () => {
+  const { input, calls } = setupRumble();
+  assert.equal(input.rumble(0, RUMBLE_EFFECT), true);
+  // The Gamepad API reads `duration`, not the config's `durationMs`.
+  assert.deepEqual(calls, [['dual-rumble', { duration: 100, startDelay: 0, weakMagnitude: 0.3, strongMagnitude: 0.5 }]]);
+  assert.equal('durationMs' in calls[0][1], false);
+});
+
+test('rumble does nothing when the setting is off, the reader is disabled or the pad is unknown', () => {
+  const off = setupRumble({ settings: { rumble: false } });
+  assert.equal(off.input.rumble(0, RUMBLE_EFFECT), false);
+  const disabled = setupRumble({ settings: { enabled: false } });
+  assert.equal(disabled.input.rumble(0, RUMBLE_EFFECT), false);
+  const other = setupRumble();
+  assert.equal(other.input.rumble(3, RUMBLE_EFFECT), false);
+  assert.equal(other.input.rumble(0, null), false);
+  assert.equal(off.calls.length + disabled.calls.length + other.calls.length, 0);
+});
+
+test('rumble tolerates a pad without an actuator and an actuator that throws or rejects', () => {
+  assert.equal(setupRumble({ actuator: null }).input.rumble(0, RUMBLE_EFFECT), false);
+  assert.equal(setupRumble({ actuator: {} }).input.rumble(0, RUMBLE_EFFECT), false);
+  const throwing = setupRumble({ actuator: { playEffect() { throw new Error('refused'); } } });
+  assert.equal(throwing.input.rumble(0, RUMBLE_EFFECT), false);
+  const rejecting = setupRumble({ actuator: { playEffect: () => Promise.reject(new Error('refused')) } });
+  assert.equal(rejecting.input.rumble(0, RUMBLE_EFFECT), true);
+});

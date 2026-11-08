@@ -1669,6 +1669,18 @@
       "announceWindowFrames": 90,
       "seedRadix": 36
     },
+    "calibration": {
+      "defaultSeeds": 10,
+      "baseSeed": "calibration",
+      "frameCap": 150000,
+      "hardBeatsEasyMin": 0.8,
+      "normalBeatsEasyMin": 0.65,
+      "pulsesPerRound": { "min": 1.5, "max": 3.5 }
+    },
+    "tutorial": {
+      "steps": ["charges", "guard", "pulse"],
+      "stepKeyPrefix": "versus.tutorial.step"
+    },
     "records": {
       "tiers": ["easy", "normal", "hard"],
       "unlock": { "hard": { "requiresWinsOn": "normal", "wins": 1 } }
@@ -1778,7 +1790,15 @@
       "left": 14,
       "right": 15
     },
-    "axes": { "aimX": 0, "menuY": 1, "fineX": 2 }
+    "axes": { "aimX": 0, "menuY": 1, "fineX": 2 },
+    "rumble": {
+      "effectType": "dual-rumble",
+      "effects": {
+        "charge": { "durationMs": 140, "startDelay": 0, "weakMagnitude": 0.3, "strongMagnitude": 0.55 },
+        "pulse": { "durationMs": 260, "startDelay": 0, "weakMagnitude": 0.6, "strongMagnitude": 1 },
+        "roundLost": { "durationMs": 420, "startDelay": 0, "weakMagnitude": 0.4, "strongMagnitude": 0.8 }
+      }
+    }
   },
   "storage": {
     "prefix": "magnashot_v1_",
@@ -1793,6 +1813,7 @@
       "gamepadDeadzone": "gamepad_deadzone",
       "gamepadAimSpeed": "gamepad_aim_speed",
       "gamepadInvertX": "gamepad_invert_x",
+      "gamepadRumble": "gamepad_rumble",
       "animationSpeed": "anim_speed",
       "unlockedLevel": "unlocked_level",
       "levelStats": "level_stats",
@@ -1809,6 +1830,7 @@
       "classicBestStage": "classic_best_stage",
       "versusRecords": "versus_records",
       "versusLocalMatches": "versus_local_matches",
+      "versusTutorialSeen": "versus_tutorial_seen",
       "dailyBest": "daily_best",
       "dailyBestDate": "daily_best_date",
       "dailyLastPlayedDate": "daily_last_date",

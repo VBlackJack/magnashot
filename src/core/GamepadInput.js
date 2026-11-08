@@ -121,6 +121,36 @@ export class GamepadInput {
   }
 
   /**
+   * Plays a short vibration on one pad. Does nothing (returns false) when the pad has no actuator,
+   * the setting is off, or the browser refuses: vibration is a courtesy and must never break play.
+   * @param {number} padIndex - Index of the pad in the browser's pad list.
+   * @param {{durationMs: number, startDelay?: number, weakMagnitude: number, strongMagnitude: number}} effect
+   * @returns {boolean} True when an effect was handed to the pad.
+   */
+  rumble(padIndex, effect) {
+    if (!this.settings.enabled || this.settings.rumble === false || !effect) return false;
+    const pad = Array.from(this.getGamepads() || []).find((p) => p && p.index === padIndex && p.connected !== false);
+    const actuator = pad && pad.vibrationActuator;
+    if (!actuator || typeof actuator.playEffect !== 'function') return false;
+    const type = this.config.rumble?.effectType || actuator.type;
+    try {
+      // The Gamepad API names the length `duration`; the config keeps the readable `durationMs`.
+      const played = actuator.playEffect(type, {
+        duration: effect.durationMs,
+        startDelay: effect.startDelay ?? 0,
+        weakMagnitude: effect.weakMagnitude,
+        strongMagnitude: effect.strongMagnitude
+      });
+      if (played && typeof played.catch === 'function') {
+        played.catch(() => false);
+      }
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  /**
    * Queue a connection event. Each entry keeps the single-pad classification in `legacyType`
    * (what poll() reports) and the raw `type` with the pad identity (what pollAll() reports).
    */
