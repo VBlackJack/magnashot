@@ -218,15 +218,28 @@ function buildSurvivalShareText({ wave, score, waveLog, url }, shareConfig) {
  * @param {object} run
  * @param {number} run.stage - Flux shape reached.
  * @param {number} run.score - Final score.
+ * @param {number} [run.workshopLevels] - Owned Workshop levels (an assist).
+ * @param {number} [run.ammoBought] - Special balls bought during the run (an assist).
+ * @param {number} [run.continues] - Continues used (an assist).
  * @param {string} run.url - Game address appended on the last line.
  * @returns {string}
  */
-function buildFluxShareText({ stage, score, seed, url }) {
-  return [
+function buildFluxShareText({ stage, score, seed, workshopLevels = 0, ammoBought = 0, continues = 0, url }) {
+  const lines = [
     seed ? t('share.flux.headerWithSeed', { seed }) : t('share.flux.header'),
-    t('share.flux.stats', { stage: formatNumber(stage), score: formatNumber(score) }),
-    buildFluxShareUrl(url, seed)
-  ].join(LINE_SEPARATOR);
+    t('share.flux.stats', { stage: formatNumber(stage), score: formatNumber(score) })
+  ];
+  if (workshopLevels + ammoBought + continues > 0) {
+    lines.push(
+      t('share.flux.assists', {
+        levels: formatNumber(workshopLevels),
+        ammo: formatNumber(ammoBought),
+        continues: formatNumber(continues)
+      })
+    );
+  }
+  lines.push(buildFluxShareUrl(url, seed));
+  return lines.join(LINE_SEPARATOR);
 }
 
 /**

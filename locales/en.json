@@ -252,7 +252,11 @@
         "basics": "Magnetic pendulum",
         "pivot": "Inertia rotor"
       },
-      "dailyMutator": "Daily Challenge: {{mutator}}. {{effect}}"
+      "dailyMutator": "Daily Challenge: {{mutator}}. {{effect}}",
+      "dailyMutatorFair": "Daily Challenge: {{mutator}}. {{effect}} {{fairPlay}}",
+      "dailyFairPlay": "Same rules for everyone: Workshop upgrades and shop ammo are off today.",
+      "dailyFairPlayUpgrades": "Same rules for everyone: Workshop upgrades are off today.",
+      "dailyFairPlayAmmo": "Same rules for everyone: shop ammo is off today."
     }
   },
   "gameplay": {
@@ -587,7 +591,8 @@
         "blocked": {
           "shotInFlight": "Wait for the shot to land to buy special ammo.",
           "stageChanging": "Wait for the next shape to appear to buy special ammo.",
-          "perkChoice": "Pick a perk to buy special ammo."
+          "perkChoice": "Pick a perk to buy special ammo.",
+          "fairPlay": "Shop ammo is off in the Daily Challenge so every player starts equal."
         }
       },
       "codex": {
@@ -876,6 +881,7 @@
         "maxedAria": "Maximum level reached"
       },
       "upgrades": {
+        "dailyBaselineNote": "Upgrades are paused during the Daily Challenge.",
         "laserSight": {
           "name": "Curved Laser Sight",
           "description": "Increases predictive aiming distance and wall bounces."
@@ -1193,7 +1199,8 @@
     "flux": {
       "header": "MagnaShot - Flux Mode",
       "headerWithSeed": "MagnaShot - Flux Mode (#{{seed}})",
-      "stats": "Shape {{stage}} - {{score}} pts"
+      "stats": "Shape {{stage}} - {{score}} pts",
+      "assists": "Assists: Workshop +{{levels}} - Ammo {{ammo}} - Continue {{continues}}"
     },
     "puzzle": {
       "header": "MagnaShot - Puzzle Mode",

@@ -261,11 +261,19 @@ test('Daily play bonus is claimed once per date and buySpecialAmmo consumes coin
   engine.startDailyChallenge('2026-10-26');
   assert.equal(engine.storageManager.getCoins(), coinsAfterFirstDaily);
 
+  // Shop ammo is off in the Daily Challenge (fair play): the purchase is refused.
+  const dailyBombCount = engine.specialInventory[SPECIAL_TYPES.BOMB];
+  assert.equal(engine.buySpecialAmmo(SPECIAL_TYPES.BOMB), false);
+  assert.equal(engine.specialInventory[SPECIAL_TYPES.BOMB], dailyBombCount);
+  assert.equal(engine.storageManager.getCoins(), coinsAfterFirstDaily);
+
+  engine.startEndlessMode();
+  const coinsBeforePurchase = engine.storageManager.getCoins();
   const prevBombCount = engine.specialInventory[SPECIAL_TYPES.BOMB];
   const bought = engine.buySpecialAmmo(SPECIAL_TYPES.BOMB);
   assert.equal(bought, true);
   assert.equal(engine.specialInventory[SPECIAL_TYPES.BOMB], prevBombCount + 1);
-  assert.equal(engine.storageManager.getCoins(), coinsAfterFirstDaily - gameConfig.specialShopCosts.bomb);
+  assert.equal(engine.storageManager.getCoins(), coinsBeforePurchase - gameConfig.specialShopCosts.bomb);
 });
 
 test('Reduced motion setting disables screen shake while preserving particle updates', () => {

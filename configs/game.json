@@ -110,6 +110,16 @@
     "countUpMs": 900,
     "starRevealStepMs": 260
   },
+  "seededFairness": {
+    "dailyUpgradeLevels": {
+      "laserSight": 0,
+      "blastRadius": 0,
+      "overchargeRate": 0,
+      "startingShots": 0,
+      "collectorMagnet": 0
+    },
+    "dailyAllowsSpecialAmmo": false
+  },
   "upgrades": {
     "laserSight": {
       "maxLevel": 4,
@@ -1519,7 +1529,8 @@
       "discoveries": "discoveries",
       "discoveriesVersion": "discoveries_version",
       "unlockedBallStyles": "ball_styles",
-      "activeBallStyle": "ball_style"
+      "activeBallStyle": "ball_style",
+      "schemaVersion": "schema_version"
     },
     "runSnapshotVersion": 1,
     "legacyMigration": {

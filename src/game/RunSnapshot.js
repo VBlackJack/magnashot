@@ -43,6 +43,9 @@ const ENGINE_SCALAR_FIELDS = [
   'discoveryTurnCount',
   'isPolarityFlipped',
   'stashedRegularColorId',
+  'launcherDrawIndex',
+  'specialGrantIndex',
+  'specialAmmoBoughtInRun',
   'aimAngle',
   'fluxSeed',
   'fluxStage',
@@ -129,6 +132,8 @@ const isCompatibleValue = (current, saved) => {
   }
   return typeof saved === typeof current;
 };
+
+const FAIRNESS_COUNTER_FIELDS = ['launcherDrawIndex', 'specialGrantIndex', 'specialAmmoBoughtInRun'];
 
 /**
  * Copies saved fields onto a live object and throws on a value of the wrong type, so a
@@ -403,6 +408,10 @@ export function applyRunSnapshot(engine, snapshot) {
   }
   world.allowTensionBreak = Boolean(snapshot.allowTensionBreak);
 
+  // A run saved before the fairness counters existed restores them at their reset value.
+  for (const field of FAIRNESS_COUNTER_FIELDS) {
+    engine[field] = 0;
+  }
   restoreFields(engine, snapshot.engine, ENGINE_SCALAR_FIELDS);
   engine.specialInventory = restoreSpecialInventory(engine.specialInventory, snapshot.specialInventory);
   engine.waveLog = restoreWaveLog(engine, snapshot.waveLog);

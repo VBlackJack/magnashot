@@ -149,6 +149,16 @@ export function renderWorkshopContents() {
   const grid = this.elements.shopGrid;
   grid.replaceChildren();
 
+  // Upgrades are bought as usual but count for nothing in a Daily run that neutralises them:
+  // say so, as text, only while such a run is active.
+  if (this.engine.areDailyUpgradesNeutralised() && this.isRunActive()) {
+    const baselineNote = document.createElement('p');
+    baselineNote.className = 'levels-empty-filter';
+    baselineNote.setAttribute('role', 'note');
+    baselineNote.textContent = t('modals.shop.upgrades.dailyBaselineNote');
+    grid.appendChild(baselineNote);
+  }
+
   const upgradeEntries = Object.entries(this.gameConfig.upgrades);
   for (let slotIndex = 0; slotIndex < upgradeEntries.length; slotIndex++) {
     const [upgradeKey, spec] = upgradeEntries[slotIndex];
