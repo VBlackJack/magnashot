@@ -1543,6 +1543,10 @@
       "strongChargeRaw": 8
     },
     "riseFrames": 360,
+    "turnSettleFrames": 48,
+    "chargeStaggerFrames": 24,
+    "roundBreakFrames": 180,
+    "guardAimOffsetsRad": [0, 0.02, -0.02, 0.05, -0.05],
     "threatRatio": 0.4,
     "chargeRadius": 0.9,
     "strength2RawThreshold": 8,

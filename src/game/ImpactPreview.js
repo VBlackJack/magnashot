@@ -16,6 +16,7 @@
 
 import { SPECIAL_TYPES, CLUSTER_MODIFIERS } from '../core/Constants.js';
 import { pickRocketTargets } from './SpecialBallController.js';
+import { segmentCircleHitT } from './VersusRules.js';
 
 /** A Boss Core with shields left loses one shield per hit instead of being destroyed. */
 const isShieldedBossCore = (ball) => ball.clusterModifier === CLUSTER_MODIFIERS.BOSS_CORE && ball.armorHits > 1;
@@ -144,4 +145,39 @@ export function predictImpact(
   }
 
   return { highlight, destroyedIds, isMatch };
+}
+
+/**
+ * Cuts an aim path at the first charged sphere it crosses (Polarity Duel only). Pure: the
+ * input path is not changed; a cut path is a new array without the snap target of the
+ * original, since a shot that stops at a charge snaps nowhere.
+ * @param {Array<{x: number, y: number}>} points - Aim trajectory.
+ * @param {Array<{x: number, y: number, polarity: number}>} charges - Charges on the board.
+ * @param {number} hitRadius - Charge radius plus the projectile radius.
+ * @returns {{points: object[], hit: ({x: number, y: number, charge: object}|null)}}
+ */
+export function truncateAimAtCharges(points, charges, hitRadius) {
+  if (!points || points.length < 2 || charges.length === 0) {
+    return { points, hit: null };
+  }
+  for (let i = 0; i < points.length - 1; i++) {
+    const a = points[i];
+    const b = points[i + 1];
+    if (b.warpBreak) {
+      continue;
+    }
+    let best = null;
+    for (const charge of charges) {
+      const t = segmentCircleHitT(a.x, a.y, b.x, b.y, charge.x, charge.y, hitRadius);
+      if (t !== null && (best === null || t < best.t)) {
+        best = { t, charge };
+      }
+    }
+    if (best) {
+      const end = { ...b, x: a.x + (b.x - a.x) * best.t, y: a.y + (b.y - a.y) * best.t, isBounce: false };
+      const cut = [...points.slice(0, i + 1), end];
+      return { points: cut, hit: { x: end.x, y: end.y, charge: best.charge } };
+    }
+  }
+  return { points, hit: null };
 }
