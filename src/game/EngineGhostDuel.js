@@ -28,6 +28,7 @@ import {
 const GHOST_MODE_DAILY = 'daily';
 const GHOST_MODE_FLUX = 'flux';
 const NO_SHOTS_EVALUATED = -1;
+const ORIGIN_SAMPLE_COUNT = 1;
 
 /** Ghost Duel methods installed on GameEngine: lifecycle of the rival run shown during a run. */
 export const engineGhostDuelMethods = {
@@ -133,7 +134,9 @@ export const engineGhostDuelMethods = {
     if (!duel || duel.result) {
       return null;
     }
-    const shots = this.shotTimeline?.n ?? 0;
+    // The sample just taken is the state after the previous shot: n counts it, so the shots
+    // fired so far are one fewer (the origin sample is not a shot).
+    const shots = Math.max(0, (this.shotTimeline?.n ?? 0) - ORIGIN_SAMPLE_COUNT);
     if (shots === duel.lastEvaluatedShots) {
       return null;
     }
@@ -168,6 +171,7 @@ export const engineGhostDuelMethods = {
     const { ghost } = duel;
     const settled = settleDuel(this.score, ghost);
     duel.result = settled;
+    duel.settledDateKey = SeededRandom.getTodayDateKey();
     const summary = {
       name: this.getGhostDisplayName(),
       outcome: settled.outcome,
@@ -190,7 +194,7 @@ export const engineGhostDuelMethods = {
         ghostScore: ghost.final,
         myScore: this.score,
         outcome: settled.outcome,
-        dateKey: SeededRandom.getTodayDateKey()
+        dateKey: duel.settledDateKey
       });
       duel.isRecorded = true;
     }
@@ -207,11 +211,12 @@ export const engineGhostDuelMethods = {
       this.storageManager.retractLastGhostDuel({
         mode: duel.ghost.mode,
         key: duel.ghost.key,
-        dateKey: SeededRandom.getTodayDateKey()
+        dateKey: duel.settledDateKey
       });
     }
     duel.isRecorded = false;
     duel.result = null;
+    duel.settledDateKey = null;
     // The run is live again: evaluate the next shot afresh.
     duel.lastEvaluatedShots = NO_SHOTS_EVALUATED;
   },

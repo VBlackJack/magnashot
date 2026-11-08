@@ -26,6 +26,7 @@ import { captureRunSnapshot, isValidRunSnapshot, applyRunSnapshot } from '../src
 import { ghostFromTimeline } from '../src/game/GhostCodec.js';
 import { GAME_MODES, GAME_OVER_REASONS } from '../src/core/Constants.js';
 import { applyWorldGeometry } from '../src/core/WorldGeometry.js';
+import { getUtcIsoWeekKey, getWeeklyFluxSeed } from '../src/game/WeeklyFlux.js';
 
 const loadJson = (p) => JSON.parse(fs.readFileSync(p, 'utf8'));
 
@@ -53,7 +54,6 @@ const FLUX_SEED = 'abc123';
 const PAST_DAYS = 3;
 const MS_PER_DAY = 86_400_000;
 const GHOST_FINAL = 50;
-const GHOST_SHOT_COUNT = 2;
 const SHOTS_FIRED = 3;
 const TOP_UP_COINS = 10_000;
 
@@ -77,9 +77,12 @@ const withEngine = (fn) => {
   try {
     const storageManager = new StorageManager();
     storageManager.init();
-    const duelCalls = { recorded: [], retracted: 0 };
+    const duelCalls = { recorded: [], retracted: 0, retractArgs: [] };
     storageManager.recordGhostDuel = (entry) => duelCalls.recorded.push(entry);
-    storageManager.retractLastGhostDuel = () => { duelCalls.retracted += 1; };
+    storageManager.retractLastGhostDuel = (args) => {
+      duelCalls.retracted += 1;
+      duelCalls.retractArgs.push(args);
+    };
     const audioManager = { playEffect: () => {}, stopAll: () => {}, isMuted: () => true, setMuted: () => {} };
     const extras = [];
     const engine = new GameEngine({
@@ -113,15 +116,15 @@ const fireShots = (engine, count) => {
 
 const pastDateKey = () => new Date(Date.now() - PAST_DAYS * MS_PER_DAY).toISOString().slice(0, 10);
 
-const makeGhost = (mode, key, alias = 'Sam') => {
+const makeGhost = (mode, key, alias = 'Sam', scores = [0, GHOST_FINAL]) => {
   const tl = {
     v: gameConfig.shotTimeline.formatVersion,
     mode,
     c: 1,
-    n: GHOST_SHOT_COUNT,
+    n: scores.length,
     step: 1,
-    s: [0, GHOST_FINAL],
-    b: [10, 9]
+    s: scores,
+    b: scores.map(() => 10)
   };
   const ctx = {
     todayKey: SeededRandom.getTodayDateKey(),
@@ -264,6 +267,11 @@ test('continuing out of shots retracts the duel record', () => {
     assert.ok(engine.gameOverSummary.duel);
     assert.equal(engine.continueOutOfShots(), true);
     assert.equal(duelCalls.retracted, 1);
+    assert.deepEqual(duelCalls.retractArgs[0], {
+      mode: 'flux',
+      key: FLUX_SEED,
+      dateKey: duelCalls.recorded[0].dateKey
+    });
     assert.equal(engine.getGhostDuelStatus().result, null);
     engine.triggerGameOver(GAME_OVER_REASONS.LINE_CROSSED);
     assert.equal(duelCalls.recorded.length, 2);
@@ -329,5 +337,96 @@ test('evaluateGhostShot announces at most once per shot', () => {
     assert.ok(ended, 'the end of the ghost run is announced');
     assert.equal(ended.ghostAnnouncement.name, 'Sam');
     assert.equal(ended.ghostAnnouncement.score, GHOST_FINAL);
+  });
+});
+
+test('the retract uses the date key of the settle, not the day of Continue', () => {
+  withEngine((engine, storage, duelCalls) => {
+    engine.startGhostDuel(makeGhost('flux', FLUX_SEED));
+    fireShots(engine, 1);
+    storage.setCoins(TOP_UP_COINS);
+    engine.shotsRemaining = 0;
+    engine.triggerGameOver(GAME_OVER_REASONS.OUT_OF_SHOTS);
+    const settledKey = duelCalls.recorded[0].dateKey;
+    const realGetToday = SeededRandom.getTodayDateKey;
+    SeededRandom.getTodayDateKey = () => '2099-01-01';
+    try {
+      assert.equal(engine.continueOutOfShots(), true);
+    } finally {
+      SeededRandom.getTodayDateKey = realGetToday;
+    }
+    assert.equal(duelCalls.retractArgs[0].dateKey, settledKey);
+  });
+});
+
+test('a duel announces against the shots actually fired: identical runs never lead or trail', () => {
+  withEngine((engine, _storage, _calls, extras) => {
+    const scores = [0, 10, 20, 30, 40, 50];
+    engine.startGhostDuel(makeGhost('flux', FLUX_SEED, 'Sam', scores));
+    engine.shotsRemaining = scores.length * 2;
+    const kinds = () => extras.filter((extra) => extra?.ghostAnnouncement).map((extra) => extra.ghostAnnouncement.kind);
+    const lastShot = scores.length - 1;
+    for (let shot = 1; shot <= lastShot; shot++) {
+      // The player has the ghost's exact score after the shots already fired.
+      engine.score = scores[shot - 1];
+      fireShots(engine, 1);
+      assert.equal(engine.ghostDuel.announcement.lastSign, 0, 'the shot was judged a tie');
+      engine.score = scores[shot];
+      assert.equal(engine.getGhostDuelStatus().comparison.side, 'tied', 'the badge shows a tie at rest');
+      assert.ok(!kinds().includes('ahead') && !kinds().includes('behind'), 'no lead change in identical runs');
+      if (shot < lastShot) {
+        assert.ok(!kinds().includes('ended'), 'the end of the ghost run is not announced early');
+      }
+    }
+    engine.score = scores[lastShot];
+    fireShots(engine, 1);
+    assert.ok(!kinds().includes('ahead') && !kinds().includes('behind'));
+    assert.deepEqual(kinds().filter((kind) => kind === 'ended'), ['ended']);
+  });
+});
+
+test('ended fires when the last shot of the ghost is passed, not one shot early', () => {
+  withEngine((engine, _storage, _calls, extras) => {
+    // The ghost fired one shot (two samples): it ends once the player has fired one too.
+    engine.startGhostDuel(makeGhost('flux', FLUX_SEED, 'Sam'));
+    const ended = () => extras.filter((extra) => extra?.ghostAnnouncement?.kind === 'ended').length;
+    fireShots(engine, 1);
+    assert.equal(ended(), 0, 'no shot has been fired before the first one');
+    assert.equal(engine.getGhostDuelStatus().comparison.ghostFinished, true);
+    fireShots(engine, 1);
+    assert.equal(ended(), 1);
+  });
+});
+
+test('a Daily rematch is never a new record', () => {
+  withEngine((engine, storage) => {
+    storage.getDailyHighScore = () => 5;
+    engine.startGhostDuel(makeGhost('daily', pastDateKey()));
+    fireShots(engine, 1);
+    engine.score = 100;
+    engine.triggerGameOver(GAME_OVER_REASONS.LINE_CROSSED);
+    assert.equal(engine.gameOverSummary.isNewRecord, false);
+  });
+  withEngine((engine, storage) => {
+    storage.getDailyHighScore = () => 5;
+    engine.startGhostDuel(makeGhost('daily', SeededRandom.getTodayDateKey()));
+    fireShots(engine, 1);
+    engine.score = 100;
+    engine.triggerGameOver(GAME_OVER_REASONS.LINE_CROSSED);
+    assert.equal(engine.gameOverSummary.isNewRecord, true, 'control: the Daily of today still sets records');
+  });
+});
+
+test('restarting a duel on a weekly seed keeps the week of the run', () => {
+  withEngine((engine) => {
+    const pastWeek = getUtcIsoWeekKey(Date.now() - 14 * MS_PER_DAY);
+    const seed = getWeeklyFluxSeed(pastWeek, fluxConfig.seed, gameConfig.weeklyFlux.seedSalt);
+    engine.startFluxRun(seed, { isShared: true, weekKey: pastWeek });
+    assert.equal(engine.attachGhost(makeGhost('flux', seed)), true);
+    assert.equal(engine.weeklyWeekKey, pastWeek);
+    engine.restartCurrent();
+    assert.equal(engine.isWeeklyFluxRun, true);
+    assert.equal(engine.weeklyWeekKey, pastWeek);
+    assert.ok(engine.ghostDuel);
   });
 });

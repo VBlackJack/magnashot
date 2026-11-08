@@ -1363,6 +1363,9 @@ describe('Ghost Duels (desktop)', () => {
   });
 });
 
+/** The board of a Daily duel may lose its badge row, but never more than a tenth of its height. */
+const MIN_DUEL_BOARD_HEIGHT_RATIO = 0.9;
+
 describe('Ghost Duel HUD layout', () => {
   /** Geometry of the HUD that a rival badge must not change, and where the badge sits. */
   const measureHud = (page) =>
@@ -1376,6 +1379,7 @@ describe('Ghost Duel HUD layout', () => {
         barWidth: Math.round(bar.width),
         barHeight: Math.round(bar.height),
         rowHeight: Math.round(row.height),
+        canvasHeight: document.querySelector('#game-canvas').getBoundingClientRect().height,
         badgeInsideBar: badgeRect === null || (badgeRect.left >= bar.left - 1 && badgeRect.right <= bar.right + 1),
         pageOverflow: document.documentElement.scrollWidth - window.innerWidth
       };
@@ -1420,6 +1424,10 @@ describe('Ghost Duel HUD layout', () => {
         // A normal Daily has no badge to show, so its badge row is collapsed and the rival fills it.
         assert.equal(normal.rowHeight, 0, 'the normal Daily has no badge row');
         assert.ok(duel.rowHeight > 0, 'the rival badge fills the badge row');
+        assert.ok(
+          duel.canvasHeight >= normal.canvasHeight * MIN_DUEL_BOARD_HEIGHT_RATIO,
+          `the board keeps at least ${MIN_DUEL_BOARD_HEIGHT_RATIO * 100}% of its height (${duel.canvasHeight} vs ${normal.canvasHeight})`
+        );
         assert.equal(duel.badgeInsideBar, true, 'the rival badge stays inside the HUD');
         assert.ok(duel.pageOverflow <= OVERFLOW_TOLERANCE_PX, 'the page does not scroll sideways');
         assert.deepEqual(errors, []);

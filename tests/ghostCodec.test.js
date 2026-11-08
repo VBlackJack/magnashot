@@ -566,6 +566,8 @@ test('fuzz: body mutations with a recomputed checksum reach the semantic checks 
     encode(fluxGhost({ alias: 'Ren\u00e9e', n: 33, step: 4 }))
   ];
   let accepted = 0;
+  let rejected = 0;
+  const statusCounts = {};
   for (let i = 0; i < FUZZ_ROUNDS; i++) {
     const body = bodyOf(seeds[i % seeds.length]);
     const edits = 1 + Math.floor(rng.next() * 2);
@@ -580,9 +582,18 @@ test('fuzz: body mutations with a recomputed checksum reach the semantic checks 
         body.splice(at, 0, Math.floor(rng.next() * 256));
       }
     }
-    if (body.length > 0 && assertSafeDecode(seal(body))) {
+    const sealed = seal(body);
+    if (body.length > 0 && assertSafeDecode(sealed)) {
       accepted += 1;
+    } else {
+      rejected += 1;
+      const status = decode(sealed).status;
+      statusCounts[status] = (statusCounts[status] || 0) + 1;
     }
   }
-  assert.ok(accepted >= 0);
+  assert.ok(rejected > 0, 'mutated sealed payloads must hit the semantic checks');
+  assert.equal(accepted + rejected, FUZZ_ROUNDS);
+  assert.ok(accepted > 0, 'some mutations stay valid and must re-encode identically');
+  assert.ok(Object.keys(statusCounts).length >= 2, 'rejections come from several semantic checks, not one');
+  assert.ok(!(DUEL_STATUS.VALID in statusCounts), 'a rejected payload never reports a valid status');
 });

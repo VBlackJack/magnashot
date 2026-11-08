@@ -474,7 +474,8 @@ export const engineRoundFlowMethods = {
     } else if (this.mode === GAME_MODES.CLASSIC) {
       previousBestScore = this.storageManager.getClassicHighScore?.() || 0;
     }
-    const isNewRecord = this.mode !== GAME_MODES.CAMPAIGN && previousBestScore > 0 && this.score > previousBestScore;
+    // A Daily rematch persists nothing, so it never sets a record.
+    const isNewRecord = this.mode !== GAME_MODES.CAMPAIGN && !this.isDailyRematch && previousBestScore > 0 && this.score > previousBestScore;
     const remainingSpheres = this.physicsWorld.balls.length;
     this.gameOverSummary = {
       reasonKey,

@@ -15,7 +15,7 @@
  */
 
 import { GAME_MODES, GAME_STATES } from '../core/Constants.js';
-import { t, formatNumber } from '../core/I18n.js';
+import { t, formatNumber, i18n } from '../core/I18n.js';
 import { SeededRandom } from '../core/SeededRandom.js';
 import { DUEL_STATUS, buildDuelUrl, stripDuelFromUrl } from '../game/GhostCodec.js';
 import { FLUX_SEED_QUERY_PARAM, getDailyChallengeNumber, stripFluxSeedFromUrl } from '../game/DailyShare.js';
@@ -142,6 +142,7 @@ export const uiGhostDuelMethods = {
     }
     this.duelCardRead = { status: read.status, ghost: isReady ? read.ghost : null };
     this.duelCardAtStake = Boolean(isRunAtStake);
+    this.duelCardSignature = null;
     this.renderDuelCard();
     const focusTarget = isReady ? this.elements.btnDuelAccept : this.elements.btnDuelOk;
     this.openOverlayModal(this.elements.modalDuel, focusTarget);
@@ -155,6 +156,12 @@ export const uiGhostDuelMethods = {
     if (!read || !els.modalDuel) {
       return;
     }
+    // Everything the card shows depends on these: skip the work while none of them changed.
+    const signature = `${i18n.getLocale()}|${SeededRandom.getTodayDateKey()}|${read.status}|${read.ghost ? read.ghost.key : ''}|${read.ghost ? read.ghost.final : ''}|${read.ghost ? read.ghost.alias : ''}`;
+    if (signature === this.duelCardSignature) {
+      return;
+    }
+    this.duelCardSignature = signature;
     const ghost = read.ghost;
     const isReady = Boolean(ghost);
     const notes = [];
@@ -213,6 +220,7 @@ export const uiGhostDuelMethods = {
   /** Closes the card and drops what it held. */
   closeDuelCard() {
     this.duelCardRead = null;
+    this.duelCardSignature = null;
     this.duelCardAtStake = false;
     if (this.elements.modalDuel) {
       this.closeOverlayModal(this.elements.modalDuel);

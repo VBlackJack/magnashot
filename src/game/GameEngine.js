@@ -1446,7 +1446,7 @@ export class GameEngine {
     } else if (this.mode === GAME_MODES.DAILY) {
       this.startDailyChallenge(this.dailySeedKey, true, { isRematch: this.isDailyRematch });
     } else if (this.mode === GAME_MODES.FLUX && ghost) {
-      this.startFluxRun(this.fluxSeed, { isShared: true, isRestart: true });
+      this.startFluxRun(this.fluxSeed, { isShared: true, isRestart: true, weekKey: this.weeklyWeekKey ?? undefined });
     } else if (this.mode === GAME_MODES.FLUX && this.isWeeklyFluxRun) {
       this.startWeeklyFlux({ isRestart: true });
     } else if (this.mode === GAME_MODES.FLUX) {
