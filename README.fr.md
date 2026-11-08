@@ -122,6 +122,8 @@ Le code suit une architecture en modules ES sans dépendance, avec une séparati
 │   ├── core/
 │   │   ├── ConfigRegistry.js # Chargeur parallèle des configurations JSON
 │   │   ├── GamepadInput.js   # Lecteur de manette pur : zone morte, courbe de réponse, fronts d'appui, répétition dans les menus, choix de la manette active
+│   │   ├── StorageView.js    # Vue de stockage en lecture seule pour un plateau de duel : réglages relayés, toute écriture sans effet
+│   │   ├── AudioChannel.js   # Enveloppe audio par plateau : sourdine et panoramique propres, stopAll limité
 │   │   ├── Constants.js      # Énumérations figées et constantes mathématiques
 │   │   ├── I18n.js           # Service de traduction et traducteur d'attributs DOM
 │   │   ├── SeededRandom.js   # Générateur pseudo-aléatoire déterministe (Mulberry32) du Défi du jour et du Mode Flux
@@ -162,12 +164,16 @@ Le code suit une architecture en modules ES sans dépendance, avec une séparati
 │   │   ├── GhostDuel.js      # Règles pures du duel : score du fantôme par tir, écart en direct, annonces, résultat
 │   │   ├── EngineGhostDuel.js# Module de GameEngine : départ et revanche d'un duel, comparaison au fantôme à chaque tir, résultat et lien de défi
 │   │   ├── EngineProgress.js # Module de GameEngine : statistiques, déblocage des modes, historique du Défi du jour, Flux hebdomadaire et chronologies
+│   │   ├── EngineVersus.js   # Module de GameEngine : plateau de duel ensemencé et calcul de l'attaque par tour (caché, non relié à l'interface)
+│   │   ├── VersusMatch.js    # Match sans interface à deux plateaux avec CPU pilotés par le bot (tests seulement pour l'instant)
+│   │   ├── BotBrain.js       # Décisions pures du bot (visée gloutonne, valeur d'un tir, plan d'arsenal) avec flux aléatoire injecté
 │   │   └── layouts/
 │   │       ├── LayoutGenerators.js   # Géométrie pure des formes : pendule, anneaux, hexagone, spirale, croix, masques
 │   │       ├── ShapeGenerator.js     # Silhouettes Flux générées : courbes polaires sur la grille, filtre de qualité
 │   │       └── FluxStageGenerator.js # Formes Flux à graine : famille, budget de difficulté, Noyau Boss
 │   └── ui/
 │       ├── CodexView.js      # Rendu de l'onglet illustré Codex et guide
+│       ├── CanvasInput.js    # Visée au pointeur et au toucher sur le canevas, liée au moteur de n'importe quel plateau
 │       ├── FluxPerkView.js   # Dialogue de choix d'atout Flux et pastilles des atouts actifs
 │       ├── LevelSelectView.js# Chapitres, cartes de niveaux, badges de format et filtre < 3★
 │       ├── UIManager.js      # Noyau de l'interface : construction, câblage et modules ci-dessous

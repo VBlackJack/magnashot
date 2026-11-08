@@ -122,6 +122,8 @@ The codebase follows a modular, zero-dependency ES module architecture with stri
 │   ├── core/
 │   │   ├── ConfigRegistry.js # Parallel JSON configuration loader
 │   │   ├── GamepadInput.js   # Pure gamepad reader: deadzone, response curve, press edges, menu auto-repeat, active pad choice
+│   │   ├── StorageView.js    # Read-only storage view for a duel board: settings forwarded, every write a no-op
+│   │   ├── AudioChannel.js   # Per-board audio wrapper: own mute and pan, scoped stopAll
 │   │   ├── Constants.js      # Frozen enums and mathematical constants
 │   │   ├── I18n.js           # Localization service and DOM attribute translator
 │   │   ├── SeededRandom.js   # Deterministic PRNG (Mulberry32) for Daily Challenges and Flux runs
@@ -162,12 +164,16 @@ The codebase follows a modular, zero-dependency ES module architecture with stri
 │   │   ├── GhostDuel.js      # Pure duel rules: ghost score by shot, live gap, announcements, outcome
 │   │   ├── EngineGhostDuel.js# GameEngine module: duel start and rematch, ghost comparison per shot, result and challenge link
 │   │   ├── EngineProgress.js # GameEngine module: statistics, mode unlocks, Daily history, Weekly Flux and timeline hooks
+│   │   ├── EngineVersus.js   # GameEngine module: seeded duel board and per-turn attack computation (hidden, not wired to the UI)
+│   │   ├── VersusMatch.js    # Headless two-board match with bot-driven CPUs (tests only for now)
+│   │   ├── BotBrain.js       # Pure bot decisions (greedy aim, shot value, arsenal plan) with an injected random stream
 │   │   └── layouts/
 │   │       ├── LayoutGenerators.js   # Pure shape geometry: pendulum, rings, hexagon, spiral, cross, masks
 │   │       ├── ShapeGenerator.js     # Generated Flux silhouettes: polar curves on the sphere grid, quality filter
 │   │       └── FluxStageGenerator.js # Seeded Flux stages: shape family, difficulty budget, boss core
 │   └── ui/
 │       ├── CodexView.js      # Illustrated Codex & Guide tab rendering
+│       ├── CanvasInput.js    # Canvas pointer and touch aiming, bound to any board's engine
 │       ├── FluxPerkView.js   # Flux perk choice dialog and active perk chips
 │       ├── LevelSelectView.js# Campaign chapters, level cards, format badges & < 3★ filter
 │       ├── UIManager.js      # UI core: construction, wiring and the modules below
