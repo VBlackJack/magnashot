@@ -63,6 +63,8 @@ const withManager = (seed, fn) => {
   }
 };
 
+const CLASSIC_MODE = 'classic';
+
 test('config lists only real game modes', () => {
   const realModes = new Set(Object.values(GAME_MODES));
   for (const mode of cfg.order) {
@@ -85,6 +87,7 @@ test('every gated mode follows its threshold exactly', () => {
   }
   assert.deepEqual(THRESHOLDS, {
     [GAME_MODES.ENDLESS]: 3,
+    [CLASSIC_MODE]: 4,
     [GAME_MODES.PUZZLE]: 5,
     [GAME_MODES.BLITZ]: 7,
     [GAME_MODES.FLUX]: 8,
@@ -112,8 +115,9 @@ test('a stored entry unlocks for good and "new" is flagged until seen', () => {
 
 test('newly earned modes are listed in configured order and exclude stored ones', () => {
   assert.deepEqual(computeNewlyEarned({}, 0, cfg), []);
-  assert.deepEqual(computeNewlyEarned({}, 5, cfg), [GAME_MODES.ENDLESS, GAME_MODES.PUZZLE]);
-  assert.deepEqual(computeNewlyEarned({ [GAME_MODES.ENDLESS]: STATE_SEEN }, 5, cfg), [GAME_MODES.PUZZLE]);
+  assert.deepEqual(computeNewlyEarned({}, 5, cfg), [GAME_MODES.ENDLESS, CLASSIC_MODE, GAME_MODES.PUZZLE]);
+  assert.deepEqual(computeNewlyEarned({ [GAME_MODES.ENDLESS]: STATE_SEEN }, 5, cfg), [CLASSIC_MODE, GAME_MODES.PUZZLE]);
+  assert.deepEqual(computeNewlyEarned({ [GAME_MODES.ENDLESS]: STATE_SEEN, [CLASSIC_MODE]: STATE_NEW }, 5, cfg), [GAME_MODES.PUZZLE]);
   assert.deepEqual(computeNewlyEarned({}, 99, cfg), cfg.order.filter((mode) => !ALWAYS.includes(mode)));
 });
 
@@ -201,5 +205,27 @@ test('storage: a mode with a record of its own is open without a stored unlock',
     storage.setItem(`${prefix}${keys.endlessHighScore}`, '0');
     manager.memoryFallback.clear();
     assert.equal(manager.getModeAccess()[GAME_MODES.ENDLESS].unlocked, false, 'a zero record unlocks nothing');
+  });
+});
+
+test('classic: unlocks at campaign level 4, right after Survival, and is announced as introduced', () => {
+  assert.equal(cfg.order.indexOf(CLASSIC_MODE), cfg.order.indexOf(GAME_MODES.ENDLESS) + 1);
+  assert.equal(cfg.campaignLevelCleared[CLASSIC_MODE], 4);
+  assert.deepEqual(cfg.introduced, { [CLASSIC_MODE]: 4 });
+  assert.deepEqual(cfg.recordKeys[CLASSIC_MODE], ['classicHighScore', 'classicBestStage']);
+  assert.equal(resolveModeAccess({}, 3, cfg)[CLASSIC_MODE].unlocked, false);
+  assert.equal(resolveModeAccess({}, 4, cfg)[CLASSIC_MODE].unlocked, true);
+});
+
+test('classic: records only ever rise and a record opens the mode', () => {
+  withManager(null, (manager) => {
+    assert.equal(manager.getClassicHighScore(), 0);
+    assert.equal(manager.getClassicBestStage(), 0);
+    manager.setClassicRecord(900, 3);
+    manager.setClassicRecord(400, 5);
+    manager.setClassicRecord(-5, 'x');
+    assert.equal(manager.getClassicHighScore(), 900);
+    assert.equal(manager.getClassicBestStage(), 5);
+    assert.equal(manager.getModeAccess()[CLASSIC_MODE].unlocked, true);
   });
 });

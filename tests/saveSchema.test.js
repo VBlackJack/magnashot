@@ -197,7 +197,10 @@ const SEED_DATE = '2026-11-02';
 const SEED_SCORE = 4321;
 const SEED_STREAK = 4;
 const readUnlocks = (storage) => JSON.parse(storage.getItem(UNLOCKS_KEY) || '{}');
-const allSeen = Object.fromEntries(GATED_MODES.map((mode) => [mode, STATE_SEEN]));
+const INTRODUCED_MODES = Object.keys(gameConfig.modeUnlocks.introduced || {});
+// End state of the whole chain: v2 grandfathers the long-standing modes as seen, v4 announces the introduced ones as new.
+const expectedState = (mode) => (INTRODUCED_MODES.includes(mode) ? STATE_NEW : STATE_SEEN);
+const allSeen = Object.fromEntries(GATED_MODES.map((mode) => [mode, expectedState(mode)]));
 
 test('v2: a fresh install stores no mode unlocks', () => {
   const storage = createFakeStorage();
@@ -273,7 +276,7 @@ test('v2: stored entries are merged, never shrunk or downgraded', () => {
     assert.equal(stored.flux, STATE_NEW);
     assert.equal(stored.extra, STATE_SEEN);
     for (const mode of GATED_MODES.filter((name) => name !== 'flux')) {
-      assert.equal(stored[mode], STATE_SEEN);
+      assert.equal(stored[mode], expectedState(mode));
     }
   });
 });

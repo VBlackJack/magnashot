@@ -35,7 +35,8 @@ const COMPLETE_TIMELINE_FLAG = 1;
 export const SAVE_MIGRATIONS = Object.freeze([
   { toVersion: 1, run: (manager) => manager.migrateLegacyKeys() },
   { toVersion: 2, run: (manager) => manager.grandfatherModeUnlocks() },
-  { toVersion: 3, run: (manager) => manager.seedDailyHistory() }
+  { toVersion: 3, run: (manager) => manager.seedDailyHistory() },
+  { toVersion: 4, run: (manager) => manager.announceIntroducedModes() }
 ]);
 export const CURRENT_SAVE_SCHEMA_VERSION = SAVE_MIGRATIONS.at(-1).toVersion;
 
@@ -822,6 +823,29 @@ export class StorageManager {
     }
   }
 
+  getClassicHighScore() {
+    const key = this.storageConfig?.keys?.classicHighScore;
+    return key ? this.readNonNegativeInt(key) : 0;
+  }
+
+  getClassicBestStage() {
+    const key = this.storageConfig?.keys?.classicBestStage;
+    return key ? this.readNonNegativeInt(key) : 0;
+  }
+
+  setClassicRecord(score, stage) {
+    const scoreKey = this.storageConfig?.keys?.classicHighScore;
+    const stageKey = this.storageConfig?.keys?.classicBestStage;
+    const cleanScore = Math.max(0, Math.floor(Number(score) || 0));
+    const cleanStage = Math.max(0, Math.floor(Number(stage) || 0));
+    if (scoreKey && cleanScore > this.getClassicHighScore()) {
+      this.safeSetItem(scoreKey, cleanScore);
+    }
+    if (stageKey && cleanStage > this.getClassicBestStage()) {
+      this.safeSetItem(stageKey, cleanStage);
+    }
+  }
+
   getDailyHighScore(dateKey = SeededRandom.getTodayDateKey()) {
     const savedDate = this.safeGetItem(this.storageConfig.keys.dailyBestDate);
     if (savedDate !== dateKey) {
@@ -987,6 +1011,30 @@ export class StorageManager {
   }
 
   /**
+   * Whether the stored profile holds any progress, read straight from localStorage so a
+   * restricted storage throws to the caller. Uses the configured grandfather progress keys.
+   * @returns {boolean}
+   */
+  hasExistingProgress() {
+    const cfg = this.modeUnlocksConfig || {};
+    const grandfather = cfg.grandfather || {};
+    const emptyValues = new Set(Array.isArray(grandfather.emptyValues) ? grandfather.emptyValues : []);
+    const keys = this.storageConfig.keys;
+    const unlockedLevel = Number.parseInt(localStorage.getItem(this.buildKey(keys.unlockedLevel)), 10);
+    if (Number.isFinite(unlockedLevel) && unlockedLevel > (grandfather.unlockedLevelAbove ?? 1)) {
+      return true;
+    }
+    for (const name of Array.isArray(grandfather.progressKeys) ? grandfather.progressKeys : []) {
+      const suffix = keys[name];
+      const raw = typeof suffix === 'string' ? localStorage.getItem(this.buildKey(suffix)) : null;
+      if (raw !== null && !emptyValues.has(String(raw).trim())) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /**
    * Migration v2. A player with existing progress keeps every mode: all gated modes are
    * merged into the stored unlocks as "seen" (no badge). Existing entries are never removed
    * or downgraded, so reruns change nothing. Reads and writes localStorage directly so a
@@ -995,35 +1043,57 @@ export class StorageManager {
    */
   grandfatherModeUnlocks() {
     const cfg = this.modeUnlocksConfig || {};
-    const grandfather = cfg.grandfather || {};
-    const emptyValues = new Set(Array.isArray(grandfather.emptyValues) ? grandfather.emptyValues : []);
     const keys = this.storageConfig.keys;
     try {
-      let hasProgress = false;
-      const unlockedLevel = Number.parseInt(localStorage.getItem(this.buildKey(keys.unlockedLevel)), 10);
-      if (Number.isFinite(unlockedLevel) && unlockedLevel > (grandfather.unlockedLevelAbove ?? 1)) {
-        hasProgress = true;
-      }
-      for (const name of Array.isArray(grandfather.progressKeys) ? grandfather.progressKeys : []) {
-        if (hasProgress) {
-          break;
-        }
-        const suffix = keys[name];
-        const raw = typeof suffix === 'string' ? localStorage.getItem(this.buildKey(suffix)) : null;
-        hasProgress = raw !== null && !emptyValues.has(String(raw).trim());
-      }
+      const hasProgress = this.hasExistingProgress();
       if (!hasProgress) {
         return true;
       }
       const fullKey = this.buildKey(keys.modeUnlocks);
       const merged = StorageManager.sanitizeModeUnlocks(JSON.parse(localStorage.getItem(fullKey) || '{}'), cfg);
       for (const mode of Object.keys(cfg.campaignLevelCleared || {})) {
-        if (!Object.hasOwn(merged, mode)) {
+        if (!Object.hasOwn(merged, mode) && !Object.hasOwn(cfg.introduced || {}, mode)) {
           merged[mode] = getSeenState(cfg);
         }
       }
       localStorage.setItem(fullKey, JSON.stringify(merged));
       this.memoryFallback.delete(fullKey);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Migration v4. A player with existing progress gets every mode introduced after the
+   * grandfathering (config `modeUnlocks.introduced`) announced as "new", unless an entry
+   * is already stored. Existing entries are never changed or downgraded, so reruns change
+   * nothing. A fresh profile is left untouched: it unlocks the mode through the campaign.
+   * @returns {boolean} False when storage could not be read or written.
+   */
+  announceIntroducedModes() {
+    const cfg = this.modeUnlocksConfig || {};
+    const introduced = Object.keys(cfg.introduced || {});
+    if (introduced.length === 0) {
+      return true;
+    }
+    try {
+      if (!this.hasExistingProgress()) {
+        return true;
+      }
+      const fullKey = this.buildKey(this.storageConfig.keys.modeUnlocks);
+      const merged = StorageManager.sanitizeModeUnlocks(JSON.parse(localStorage.getItem(fullKey) || '{}'), cfg);
+      let changed = false;
+      for (const mode of introduced) {
+        if (!Object.hasOwn(merged, mode)) {
+          merged[mode] = getNewState(cfg);
+          changed = true;
+        }
+      }
+      if (changed) {
+        localStorage.setItem(fullKey, JSON.stringify(merged));
+        this.memoryFallback.delete(fullKey);
+      }
       return true;
     } catch {
       return false;
