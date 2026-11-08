@@ -319,6 +319,7 @@ export class UIManager {
       btnVersusTiersBack: document.getElementById('btn-versus-tiers-back'),
       versusScreen: document.getElementById('versus-screen'),
       versusBoards: document.querySelector('#versus-screen .versus-boards'),
+      versusBar: document.querySelector('#versus-screen .versus-bar'),
       versusCanvas0: document.getElementById('versus-canvas-0'),
       versusCanvas1: document.getElementById('versus-canvas-1'),
       versusHud0: document.getElementById('versus-hud-0'),

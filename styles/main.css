@@ -3752,12 +3752,27 @@ body {
 /* Mini-view on a wide, short screen: the controls on the left, the CPU board on the right, the player board between. */
 .versus-screen[data-layout='mini'][data-orient='landscape'] .versus-boards {
   grid-template-columns: minmax(0, 1fr) var(--versus-player-width) minmax(0, 1fr);
-  grid-template-rows: auto auto minmax(0, 1fr);
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
   grid-template-areas:
     'ph pc cc'
     'ph pc ch'
-    'ph pc .';
+    'ph pc .'
+    'ph pc bar';
   align-items: start;
+}
+
+/* The top bar sits at the foot of the CPU column, so the player board keeps the whole height. */
+.versus-screen[data-layout='mini'][data-orient='landscape'] .versus-boards > .versus-bar .versus-timer {
+  margin-left: 0;
+}
+
+.versus-screen[data-layout='mini'][data-orient='landscape'] .versus-boards > .versus-bar {
+  grid-area: bar;
+  flex-direction: column;
+  align-items: stretch;
+  align-self: end;
+  gap: 6px;
+  min-height: 0;
 }
 
 .versus-screen[data-layout='mini'][data-orient='landscape'] .versus-board[data-board='1'] {

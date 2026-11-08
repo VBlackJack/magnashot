@@ -369,6 +369,7 @@ export const uiVersusMethods = {
     screen.dataset.orient = isLandscape ? VERSUS_ORIENTATIONS.LANDSCAPE : VERSUS_ORIENTATIONS.PORTRAIT;
     // Measured in the split arrangement: the room under the bar does not depend on the layout.
     screen.dataset.layout = VERSUS_LAYOUTS.SPLIT;
+    this.placeVersusBar(false);
     const boardsBox = els.versusBoards;
     const style = window.getComputedStyle(boardsBox);
     const choice = chooseVersusLayout(
@@ -394,6 +395,8 @@ export const uiVersusMethods = {
       this.sizeVersusCanvas(els.versusCanvas0, size);
       this.sizeVersusCanvas(els.versusCanvas1, size);
     } else {
+      // On a wide, short screen the top bar moves into the side column: the player board gets its height.
+      this.placeVersusBar(isLandscape);
       this.layoutVersusMini(isLandscape, style);
     }
 
@@ -403,6 +406,25 @@ export const uiVersusMethods = {
     if (!v.renderers[PLAYER_BOARD] || needsCpuRenderer) {
       this.buildVersusRenderers(isMini);
     }
+  },
+
+  /**
+   * Puts the top bar above the boards (the default) or inside the boards grid, where the
+   * landscape mini-view lays it out in the side column. Keyboard focus stays on the same control.
+   * @param {boolean} insideBoards - True to move the bar into the boards grid.
+   */
+  placeVersusBar(insideBoards) {
+    const { versusBar: bar, versusBoards: boards, versusScreen: screen } = this.elements;
+    if (!bar || !boards || (bar.parentElement === boards) === insideBoards) {
+      return;
+    }
+    const focused = bar.contains(document.activeElement) ? document.activeElement : null;
+    if (insideBoards) {
+      boards.append(bar);
+    } else {
+      screen.insertBefore(bar, boards);
+    }
+    focused?.focus();
   },
 
   /**
@@ -421,7 +443,9 @@ export const uiVersusMethods = {
     const rowGap = Number.parseFloat(boardsStyle.rowGap) || 0;
     const columnGap = Number.parseFloat(boardsStyle.columnGap) || 0;
     // The HUD heights are read once the arrangement is in place: they differ from the split.
-    const columnRoom = isLandscape ? boardsBox.clientHeight - els.versusHud1.offsetHeight - rowGap : Infinity;
+    const columnRoom = isLandscape
+      ? boardsBox.clientHeight - els.versusHud1.offsetHeight - (els.versusBar?.offsetHeight ?? 0) - 2 * rowGap
+      : Infinity;
     const mini = computeMiniSize(canvasCfg, layoutCfg, columnRoom);
     screen.style.setProperty('--versus-mini-width', `${mini.width}px`);
     screen.style.setProperty('--versus-mini-height', `${mini.height}px`);

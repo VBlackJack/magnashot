@@ -518,6 +518,43 @@ test('the duel screen is inert and hidden from assistive technology while its pa
   assert.equal(shell.inert, true, 'the shell stays held while the duel screen is up');
 });
 
+test('the top bar moves into the boards grid for the landscape mini-view and back, keeping its focus', () => {
+  const { ui } = makeUi();
+  const makeNode = () => {
+    const node = fakeElement({ hidden: false });
+    node.parentElement = null;
+    return node;
+  };
+  const screen = makeNode();
+  const boards = makeNode();
+  const bar = makeNode();
+  bar.parentElement = screen;
+  bar.contains = (node) => node === bar || node === pause;
+  const pause = makeNode();
+  boards.append = (node) => {
+    node.parentElement = boards;
+  };
+  screen.insertBefore = (node) => {
+    node.parentElement = screen;
+  };
+  Object.assign(ui.elements, { versusScreen: screen, versusBoards: boards, versusBar: bar });
+  let refocused = 0;
+  pause.focus = () => {
+    refocused += 1;
+  };
+  globalThis.document.activeElement = pause;
+  ui.placeVersusBar(true);
+  assert.equal(bar.parentElement, boards);
+  assert.equal(refocused, 1, 'the control that had focus gets it back');
+  ui.placeVersusBar(true);
+  assert.equal(refocused, 1, 'nothing moves when the bar is already there');
+  ui.placeVersusBar(false);
+  assert.equal(bar.parentElement, screen);
+  assert.equal(refocused, 2);
+  const css = readFileSync('./styles/main.css', 'utf8');
+  assert.match(css, /\.versus-boards > \.versus-bar \{\s*grid-area: bar;/, 'the stylesheet lays the bar out in the side column');
+});
+
 test('a locked tier explains itself and starts nothing, an open one starts the match', () => {
   const started = [];
   const locked = makeUi({ storage: { isVersusTierUnlocked: (tier) => tier !== 'hard' } });

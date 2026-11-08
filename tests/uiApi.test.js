@@ -219,6 +219,7 @@ const EXPECTED_PROTOTYPE_NAMES = [
   'enterVersus',
   'leaveVersus',
   'restoreHeldRunDialog',
+  'placeVersusBar',
   'scheduleVersusLayout',
   'layoutVersus',
   'layoutVersusMini',
