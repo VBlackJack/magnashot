@@ -2,7 +2,7 @@
   "id": "./",
   "name": "MagnaShot - Magnetic Physics Edition",
   "short_name": "MagnaShot",
-  "description": "Magnetic physics bubble shooter game with dynamic attraction, rotors, and special balls.",
+  "description": "Magnetic physics bubble shooter game with dynamic attraction, rotors, and special spheres.",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",

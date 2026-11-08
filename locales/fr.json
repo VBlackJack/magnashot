@@ -864,7 +864,7 @@
         },
         "blastRadius": {
           "name": "Amplificateur Magnétique",
-          "description": "Augmente le rayon d'action des sphères Bombe, Foudre et Cryo ainsi que des coeurs explosifs du plateau."
+          "description": "Augmente le rayon d'action des sphères Bombe, Foudre, Cryo et Pinceau ainsi que des coeurs explosifs du plateau."
         },
         "overchargeRate": {
           "name": "Condensateur de Surcharge",
@@ -1138,7 +1138,7 @@
         },
         "arsenal": {
           "label": "Arsenal",
-          "description": "Chapitre {{chapter}} : niveau arsenal, {{index}} sur {{size}}. Grand plateau, moins de tirs et deux fois plus de balles spéciales : servez-vous-en."
+          "description": "Chapitre {{chapter}} : niveau arsenal, {{index}} sur {{size}}. Grand plateau, moins de tirs et deux fois plus de sphères spéciales : servez-vous-en."
         }
       },
       "themes": {

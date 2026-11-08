@@ -320,3 +320,36 @@ test('B4: a Boss Rush wave held for the shot spawns when that shot lands through
   assert.equal(engine.pendingBossRushWave, false);
   assert.equal(getBoss(engine).armorHits, getWaveArmor(2));
 });
+
+test('Paint Core radius scales with the blast radius multiplier', () => {
+  const engine = createTestEngine();
+  engine.startCampaignLevel(1);
+  const world = engine.physicsWorld;
+  world.clear();
+
+  const r = physicsConfig.ball.radius;
+  const paintSpec = ballsConfig.clusterModifiers.paintCore;
+  const maxUpgradeLevel = gameConfig.upgrades.blastRadius.maxLevel;
+  engine.storageManager.safeSetItem(gameConfig.storage.keys.upgrades, JSON.stringify({ blastRadius: maxUpgradeLevel }));
+  engine.storageManager.upgradesCache = null;
+  const mult = engine.getBlastRadiusMultiplier();
+  assert.ok(mult > 1);
+
+  const coreColor = ballsConfig.standardColors[0].id;
+  const otherColor = ballsConfig.standardColors[1].id;
+  const core = new Ball({
+    x: FALLING_BALL_X,
+    y: FALLING_BALL_Y,
+    radius: r,
+    colorId: coreColor,
+    clusterModifier: CLUSTER_MODIFIERS.PAINT_CORE
+  });
+  // Place target outside base radius but inside amplified radius.
+  const dist = r * paintSpec.paintRadiusFactor * (1 + mult) * TILT_TEST_SHARE;
+  const target = new Ball({ x: FALLING_BALL_X + dist, y: FALLING_BALL_Y, radius: r, colorId: otherColor });
+  world.addBall(core);
+  world.addBall(target);
+
+  engine.destroyClusterBall(core, paintSpec.highlight, true);
+  assert.equal(target.colorId, coreColor, 'amplified Paint Core repaints sphere beyond base radius');
+});

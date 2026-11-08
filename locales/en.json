@@ -864,7 +864,7 @@
         },
         "blastRadius": {
           "name": "Magnetic Amplifier",
-          "description": "Increases the area of effect of Bomb, Lightning, and Cryo spheres as well as board core explosions."
+          "description": "Increases the area of effect of Bomb, Lightning, Cryo, and Brush spheres as well as board core explosions."
         },
         "overchargeRate": {
           "name": "Overcharge Capacitor",
