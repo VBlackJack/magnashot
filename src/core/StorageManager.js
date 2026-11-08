@@ -49,7 +49,50 @@ export class StorageManager {
     this.dailyConfig = gameConfig.daily || {};
     this.maxCampaignLevel = countCampaignLevels(levelsConfig, campaignConfig);
     this.upgradesCache = null;
+    this.migrateLegacyKeys();
     this.bindCrossTabSync();
+  }
+
+  /**
+   * One-time recovery of progress saved under a pre-rename key prefix. Each legacy key is
+   * copied to the same suffix under the current prefix only when that target is absent;
+   * nothing is overwritten or deleted, so rolling back to an older build keeps working.
+   * Only keys with the configured legacy prefixes are touched (the origin is shared with
+   * other projects). A marker key prevents reruns; every storage access is guarded.
+   */
+  migrateLegacyKeys() {
+    const migration = this.storageConfig.legacyMigration;
+    const legacyPrefixes = migration && Array.isArray(migration.prefixes) ? migration.prefixes : [];
+    if (legacyPrefixes.length === 0) {
+      return;
+    }
+    const markerKey = this.buildKey(migration.markerKey);
+    try {
+      if (localStorage.getItem(markerKey) !== null) {
+        return;
+      }
+      const legacyKeys = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (typeof key === 'string' && legacyPrefixes.some((prefix) => key.startsWith(prefix))) {
+          legacyKeys.push(key);
+        }
+      }
+      for (const legacyKey of legacyKeys) {
+        const prefix = legacyPrefixes.find((candidate) => legacyKey.startsWith(candidate));
+        const targetKey = `${this.storageConfig.prefix}${legacyKey.slice(prefix.length)}`;
+        if (targetKey === legacyKey || localStorage.getItem(targetKey) !== null) {
+          continue;
+        }
+        const value = localStorage.getItem(legacyKey);
+        if (value !== null) {
+          localStorage.setItem(targetKey, value);
+        }
+      }
+      localStorage.setItem(markerKey, String(true));
+    } catch {
+      // localStorage is restricted or full; migration is retried on the next launch
+    }
   }
 
   /**
