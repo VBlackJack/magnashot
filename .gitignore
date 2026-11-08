@@ -11,6 +11,9 @@ CLAUDE.md
 AGENTS.md
 GEMINI.md
 
+# GitHub Pages build output
+_site/
+
 # OS artifacts
 Thumbs.db
 .DS_Store

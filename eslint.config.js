@@ -24,7 +24,7 @@ import js from '@eslint/js';
 import globals from 'globals';
 
 export default [
-  { ignores: ['node_modules/', 'local/', '.claude/', '.codex/', '.gemini/', '.agent/'] },
+  { ignores: ['node_modules/', 'local/', '.claude/', '.codex/', '.gemini/', '.agent/', '_site/'] },
   js.configs.recommended,
   {
     languageOptions: { ecmaVersion: 'latest', sourceType: 'module' }
