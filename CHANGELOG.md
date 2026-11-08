@@ -4,6 +4,18 @@ All notable changes to **MagnaShot** are documented in this file.
 
 ## [Unreleased]
 
+### Added
+- **Progressive Mode Unlocks (`ModeUnlocks`, `StorageManager`, `UIHudRefresh`)**: New players start with Campaign and the Daily Challenge and unlock the other modes by clearing campaign levels: Survival at 3, Puzzle at 5, Blitz at 7, Flux at 8, Cascade at 10 and Boss Rush at 12. Locked menu buttons stay focusable, say which level opens them, and a newly unlocked mode is marked "New" and announced on the victory screen. Shared Flux links always work and unlock Flux.
+- **Weekly Flux (`WeeklyFlux`, `EngineProgress`)**: A Flux run on one seed per ISO week for every player, a one-time `40 ⬡` bonus per week, a weekly best shown in the menu, and a Weekly Flux header in the shared result.
+- **My Stats Dialog (`UIStats`, `PlayerStats`)**: An overview of play time, shots, runs and records per mode, a Daily history of the last 60 days, and a Copy my stats button that builds an anonymous text. Statistics are stored on the device only.
+- **Per-Shot Score Timelines (`ShotTimeline`)**: The best Daily and Weekly Flux runs keep a compact score timeline, one point per shot.
+- **Browser Smoke Coverage**: `tests/browser/smoke.test.js` seeds the profile storage and checks locked modes at every layout, existing-player migration, shared Flux links, the Daily history, Copy my stats and the Weekly Flux seed.
+
+### Changed
+- **Save Schema 3 (`StorageManager`)**: Migration 2 grandfathers existing players so they keep every mode, and migration 3 seeds the Daily history from the stored Daily best. Rolling back to an older build keeps the save working.
+- **Complete Timelines Win Ties (`StorageManager`)**: At an equal score, a complete shot timeline replaces a partial one in the Daily history and the weekly best.
+- **Docs**: README and README.fr describe the unlocks, Weekly Flux, My stats and the new files.
+
 ## [1.15.0] - 2026-11-08
 
 ### Added
