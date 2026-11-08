@@ -1,0 +1,201 @@
+/*
+ * Copyright 2026 Julien Bombled
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { GameEngine } from '../src/game/GameEngine.js';
+
+/** The public surface of GameEngine.prototype, captured before the engine was split into modules. */
+const EXPECTED_PROTOTYPE_NAMES = [
+  'addOvercharge',
+  'addScore',
+  'adjustAimByDelta',
+  'announceAchievementUnlocks',
+  'applyUpgradePurchase',
+  'awardRunCoins',
+  'buildDailyIntro',
+  'buildFluxStage',
+  'buildLevelIntro',
+  'buildLevelLayout',
+  'buySpecialAmmo',
+  'canBuySpecialAmmo',
+  'canBuyUpgrade',
+  'canContinueOutOfShots',
+  'checkAndUnlockAchievement',
+  'checkDangerLineBreach',
+  'chooseFluxPerk',
+  'clearImpactWave',
+  'completeFluxStage',
+  'computeNearMiss',
+  'computeStars',
+  'constructor',
+  'continueOutOfShots',
+  'countDiscoveryTurn',
+  'crackWallAt',
+  'createClusterBall',
+  'createFluxSeed',
+  'createRandomLauncherBall',
+  'crumbleLooseNeutralAnchors',
+  'destroyClusterBall',
+  'detachAndRewardAvalanche',
+  'discardBetweenTurnsCoreFreeze',
+  'dismissDiscovery',
+  'dismissLevelIntro',
+  'drawFluxPerkOffer',
+  'ensureMinimumModifiers',
+  'equipSpecialBall',
+  'evaluateAutomaticChainReactions',
+  'evaluateRoundEnd',
+  'fillUpcomingColors',
+  'findClosestBall',
+  'flushPendingRunCoins',
+  'followPointer',
+  'getBlastRadiusMultiplier',
+  'getBossBall',
+  'getCollectorBonusPoints',
+  'getCollectorOvercharge',
+  'getContinuePackSpec',
+  'getDiscoveryPulseTarget',
+  'getFluxPerkBonus',
+  'getFluxPerkStacks',
+  'getFluxShotRefill',
+  'getInitialArmor',
+  'getLaserBonuses',
+  'getOverchargeMultiplier',
+  'getRunBestBaseline',
+  'getRunBestMarker',
+  'getRunBestMetric',
+  'getSpecialAmmoBlockReason',
+  'getStageIntroProgress',
+  'getStarThresholds',
+  'getStartingShotsBonus',
+  'getStepCallbacks',
+  'getTimeScale',
+  'getWaveType',
+  'grantRandomSpecialBall',
+  'grantStartingSpecialBalls',
+  'handlePostTurnCleanup',
+  'handleProjectileSnapped',
+  'hasLevelHints',
+  'initFluxRun',
+  'initSurvivalRun',
+  'isAwaitingPerk',
+  'isClearBasedMode',
+  'isColorlessModifier',
+  'isObjectiveCleared',
+  'isRunPlaying',
+  'isStageChanging',
+  'isSurvivalMode',
+  'isTiltLocked',
+  'isVictoryCelebrating',
+  'listCurrentLevelMechanics',
+  'listMechanicsKnownFromProgress',
+  'listPresentMechanics',
+  'listReplayableHints',
+  'makeBossCore',
+  'markMechanicLearned',
+  'materializeLayout',
+  'notifyUI',
+  'offersSpecialBalls',
+  'persistRunHighScore',
+  'pickLauncherColor',
+  'pickPaletteColor',
+  'pickSpawnColorForPosition',
+  'pickSpecModifier',
+  'popBubble',
+  'popBubblesAround',
+  'random',
+  'recordDiscoveryInteraction',
+  'refreshAimPreview',
+  'refreshDiscovery',
+  'refreshStaleLauncherColors',
+  'releaseAimLock',
+  'releaseBarriersWhenLocksCleared',
+  'releaseRemainingBoardAsAvalanche',
+  'replayLevelHints',
+  'resetDiscoveries',
+  'resetRunState',
+  'resolveColorMatchCluster',
+  'restartCurrent',
+  'restoreFluxRun',
+  'restoreRunBestBaseline',
+  'restoreSavedRun',
+  'rewardBossCore',
+  'rewardRescueCore',
+  'rollEndlessModifier',
+  'rollModifier',
+  'saveRunSnapshot',
+  'seedDiscoveriesFromProgress',
+  'setAnimationSpeed',
+  'setReducedMotion',
+  'setTilt',
+  'shiftChameleonBalls',
+  'shoot',
+  'showNextReplayedHint',
+  'spawnBossRushWave',
+  'spawnCascadeDropWave',
+  'spawnConcentricRings',
+  'spawnEndlessRow',
+  'spawnEndlessWave',
+  'startBlitzMode',
+  'startBossRushMode',
+  'startCampaignLevel',
+  'startCascadeMode',
+  'startDailyChallenge',
+  'startEndlessMode',
+  'startFluxRun',
+  'startImpactWave',
+  'startOutOfShotsGraceIfNeeded',
+  'startPuzzleMode',
+  'swapLauncherBalls',
+  'takeUpcomingBall',
+  'takeUpcomingColor',
+  'togglePause',
+  'togglePolarityFlip',
+  'trackDiscoveryProximity',
+  'triggerFreezeCore',
+  'triggerGameOver',
+  'triggerLightningCore',
+  'triggerSpecialSlowMo',
+  'unlockAchievementSilently',
+  'unlockAchievementTiers',
+  'update',
+  'updateAim',
+  'updateAimFromAngle',
+  'updateImpactWave',
+  'updateStageTransition',
+  'updateVictoryCelebration',
+  'usesShotBudget',
+  'withScopedRandom'
+];
+
+test('GameEngine.prototype exposes exactly the same members after the module split', () => {
+  const actual = Object.getOwnPropertyNames(GameEngine.prototype).sort();
+  assert.deepEqual(actual, [...EXPECTED_PROTOTYPE_NAMES].sort());
+});
+
+test('every GameEngine method is a non-enumerable function', () => {
+  for (const name of EXPECTED_PROTOTYPE_NAMES) {
+    if (name === 'constructor') {
+      continue;
+    }
+    const descriptor = Object.getOwnPropertyDescriptor(GameEngine.prototype, name);
+    assert.equal(typeof descriptor.value, 'function', name + ' is a function');
+    assert.equal(descriptor.enumerable, false, name + ' is not enumerable');
+    assert.equal(descriptor.writable, true, name + ' is writable');
+    assert.equal(descriptor.configurable, true, name + ' is configurable');
+  }
+});

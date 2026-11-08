@@ -646,7 +646,10 @@ test('The Boss Core crack shockwave and the singularity pull wave read their own
   assert.equal(bossSpec.crackShockwaveRadius, bossSpec.shockwaveRadius * halfFactor);
   assert.equal(obsDefaults.pullWaveAlpha, obsDefaults.fieldWaveAlpha * halfFactor);
 
-  const engineSource = fs.readFileSync('./src/game/GameEngine.js', 'utf8');
+  const engineSource = fs.readdirSync('./src/game')
+    .filter((file) => file.endsWith('.js'))
+    .map((file) => fs.readFileSync(`./src/game/${file}`, 'utf8'))
+    .join('\n');
   const rendererSource = fs.readFileSync('./src/game/Renderer.js', 'utf8');
   assert.ok(!engineSource.includes('shockwaveRadius * MATH_CONSTANTS.HALF'), 'the crack radius is no longer halved in code');
   assert.ok(!rendererSource.includes('fieldWaveAlpha * MATH_CONSTANTS.HALF'), 'the pull wave alpha is no longer halved in code');
