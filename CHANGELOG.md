@@ -4,6 +4,8 @@ All notable changes to **MagnaShot** are documented in this file.
 
 ## [Unreleased]
 
+## [1.15.0] - 2026-11-08
+
 ### Added
 - **CI-Gated GitHub Pages Deploy (`.github/workflows/ci.yml`, `scripts/pages-artifact.mjs`)**: A `deploy` job publishes the game to GitHub Pages only after the test and browser jobs pass on `master` (or on a manual run). It uploads a `_site/` artifact holding the runtime files and nothing else.
 - **Release Script (`scripts/release.mjs`)**: `npm run release -- <patch|minor|major|X.Y.Z> [--dry-run]` bumps `package.json`, `package-lock.json` and `APP_VERSION` in `sw.js`, and promotes the CHANGELOG Unreleased section. It never commits, tags or pushes.
