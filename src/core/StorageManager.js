@@ -55,8 +55,10 @@ export class StorageManager {
 
   /**
    * One-time recovery of progress saved under a pre-rename key prefix. Each legacy key is
-   * copied to the same suffix under the current prefix only when that target is absent;
-   * nothing is overwritten or deleted, so rolling back to an older build keeps working.
+   * copied to the same suffix under the current prefix only when that target is absent,
+   * except: the configured excluded keys (the stale run snapshot) are never copied, the
+   * unlocked level keeps the higher of both sides, and level stats merge the best value of
+   * each field per level. Legacy keys are never deleted, so rolling back keeps working.
    * Only keys with the configured legacy prefixes are touched (the origin is shared with
    * other projects). A marker key prevents reruns; every storage access is guarded.
    */
@@ -78,15 +80,35 @@ export class StorageManager {
           legacyKeys.push(key);
         }
       }
+      const resolveSuffixes = (names) => (Array.isArray(names) ? names : [])
+        .map((name) => this.storageConfig.keys[name])
+        .filter((suffix) => typeof suffix === 'string');
+      const excluded = new Set(resolveSuffixes(migration.excludedKeys));
+      const maxMerged = new Set(resolveSuffixes(migration.maxMergedKeys));
+      const statsMerged = new Set(resolveSuffixes(migration.levelStatsMergedKeys));
       for (const legacyKey of legacyKeys) {
         const prefix = legacyPrefixes.find((candidate) => legacyKey.startsWith(candidate));
-        const targetKey = `${this.storageConfig.prefix}${legacyKey.slice(prefix.length)}`;
-        if (targetKey === legacyKey || localStorage.getItem(targetKey) !== null) {
+        const suffix = legacyKey.slice(prefix.length);
+        const targetKey = `${this.storageConfig.prefix}${suffix}`;
+        if (targetKey === legacyKey || excluded.has(suffix)) {
           continue;
         }
         const value = localStorage.getItem(legacyKey);
-        if (value !== null) {
+        if (value === null) {
+          continue;
+        }
+        const current = localStorage.getItem(targetKey);
+        if (current === null) {
           localStorage.setItem(targetKey, value);
+        } else if (maxMerged.has(suffix)) {
+          const merged = Math.max(this.parseUnlockedLevel(current), this.parseUnlockedLevel(value));
+          localStorage.setItem(targetKey, String(merged));
+        } else if (statsMerged.has(suffix)) {
+          const merged = StorageManager.mergeLevelStats(
+            StorageManager.parseLevelStats(current),
+            StorageManager.parseLevelStats(value)
+          );
+          localStorage.setItem(targetKey, JSON.stringify(merged));
         }
       }
       localStorage.setItem(markerKey, String(true));
@@ -421,12 +443,51 @@ export class StorageManager {
   }
 
   getUnlockedLevel() {
-    const raw = this.safeGetItem(this.storageConfig.keys.unlockedLevel);
+    return this.parseUnlockedLevel(this.safeGetItem(this.storageConfig.keys.unlockedLevel));
+  }
+
+  /** Validates a stored unlocked-level value: default when invalid, clamped to the campaign size. */
+  parseUnlockedLevel(raw) {
     const parsed = Number.parseInt(raw, 10);
     if (!Number.isFinite(parsed) || parsed < 1) {
       return this.defaultsConfig.initialUnlockedLevel;
     }
     return Math.min(parsed, this.maxCampaignLevel);
+  }
+
+  /** Parses a raw level-stats string into sanitized per-level entries (empty when invalid). */
+  static parseLevelStats(raw) {
+    let parsed;
+    try {
+      parsed = JSON.parse(raw);
+    } catch {
+      return {};
+    }
+    const stats = {};
+    if (!StorageManager.isPlainObject(parsed)) {
+      return stats;
+    }
+    for (const [levelId, entry] of Object.entries(parsed)) {
+      if (StorageManager.isPlainObject(entry)) {
+        stats[levelId] = {
+          bestScore: StorageManager.toNonNegativeNumber(entry.bestScore),
+          stars: StorageManager.toNonNegativeNumber(entry.stars)
+        };
+      }
+    }
+    return stats;
+  }
+
+  /** Merges two sanitized level-stats maps keeping the best value of each field per level. */
+  static mergeLevelStats(first, second) {
+    const merged = { ...first };
+    for (const [levelId, entry] of Object.entries(second)) {
+      const existing = merged[levelId];
+      merged[levelId] = existing
+        ? { bestScore: Math.max(existing.bestScore, entry.bestScore), stars: Math.max(existing.stars, entry.stars) }
+        : entry;
+    }
+    return merged;
   }
 
   unlockLevel(levelId) {
@@ -438,18 +499,7 @@ export class StorageManager {
   }
 
   getLevelStats() {
-    const parsed = this.readJsonObject(this.storageConfig.keys.levelStats);
-    const stats = {};
-    for (const [levelId, entry] of Object.entries(parsed)) {
-      if (!StorageManager.isPlainObject(entry)) {
-        continue;
-      }
-      stats[levelId] = {
-        bestScore: StorageManager.toNonNegativeNumber(entry.bestScore),
-        stars: StorageManager.toNonNegativeNumber(entry.stars)
-      };
-    }
-    return stats;
+    return StorageManager.parseLevelStats(this.safeGetItem(this.storageConfig.keys.levelStats));
   }
 
   saveLevelResult(levelId, score, stars) {

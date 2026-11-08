@@ -127,3 +127,46 @@ test('recovered progress is readable through StorageManager', () => {
     assert.equal(manager.safeGetItem(keys.coins), OLD_COINS);
   });
 });
+
+test('the stale run snapshot is not migrated', () => {
+  const storage = createFakeStorage();
+  storage.setItem(`${LEGACY}${keys.runSnapshot}`, '{"stale":true}');
+  storage.setItem(`${LEGACY}${keys.coins}`, OLD_COINS);
+  withStorage(storage, () => {
+    initManager();
+    assert.equal(storage.getItem(`${prefix}${keys.runSnapshot}`), null);
+    assert.equal(storage.getItem(`${prefix}${keys.coins}`), OLD_COINS);
+  });
+});
+
+test('the unlocked level keeps the higher value on both sides', () => {
+  for (const [oldValue, newValue, expected] of [['9', '3', '9'], ['2', '6', '6']]) {
+    const storage = createFakeStorage();
+    storage.setItem(`${LEGACY}${keys.unlockedLevel}`, oldValue);
+    storage.setItem(`${prefix}${keys.unlockedLevel}`, newValue);
+    withStorage(storage, () => {
+      initManager();
+      assert.equal(storage.getItem(`${prefix}${keys.unlockedLevel}`), expected);
+    });
+  }
+});
+
+test('level stats merge the best value of each field per level', () => {
+  const storage = createFakeStorage();
+  storage.setItem(`${LEGACY}${keys.levelStats}`, JSON.stringify({
+    1: { bestScore: 900, stars: 1 },
+    2: { bestScore: 500, stars: 3 }
+  }));
+  storage.setItem(`${prefix}${keys.levelStats}`, JSON.stringify({
+    1: { bestScore: 400, stars: 2 },
+    3: { bestScore: 100, stars: 1 }
+  }));
+  withStorage(storage, () => {
+    const manager = initManager();
+    assert.deepEqual(manager.getLevelStats(), {
+      1: { bestScore: 900, stars: 2 },
+      2: { bestScore: 500, stars: 3 },
+      3: { bestScore: 100, stars: 1 }
+    });
+  });
+});

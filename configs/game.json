@@ -1524,7 +1524,10 @@
     "runSnapshotVersion": 1,
     "legacyMigration": {
       "prefixes": ["flux_spheres_v1_"],
-      "markerKey": "legacy_migrated"
+      "markerKey": "legacy_migrated",
+      "excludedKeys": ["runSnapshot"],
+      "maxMergedKeys": ["unlockedLevel"],
+      "levelStatsMergedKeys": ["levelStats"]
     }
   },
   "defaults": {
