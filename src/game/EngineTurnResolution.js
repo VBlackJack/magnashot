@@ -170,6 +170,18 @@ export const engineTurnResolutionMethods = {
 
     const canvasCfg = this.gameConfig.canvas;
 
+    if (ball.clusterModifier === CLUSTER_MODIFIERS.MAGNETAR) {
+      // Immune to every strike, whatever ignores armor: only losing its Moorings brings it down.
+      const magnetarSpec = this.ballsConfig.clusterModifiers.magnetar;
+      this.particleSystem.spawnFloatingText(
+        ball.x,
+        ball.y + canvasCfg.floatingTextOffsetY,
+        t('gameplay.feedback.magnetar.immune'),
+        magnetarSpec.highlight
+      );
+      return false;
+    }
+
     if (!ignoreArmor && ball.clusterModifier === CLUSTER_MODIFIERS.ARMORED && ball.armorHits > 1) {
       ball.armorHits--;
       const armoredSpec = this.ballsConfig.clusterModifiers.armored;
@@ -593,6 +605,8 @@ export const engineTurnResolutionMethods = {
       for (const d of detached) {
         if (d.clusterModifier === CLUSTER_MODIFIERS.BOSS_CORE) {
           this.rewardBossCore(d);
+        } else if (d.clusterModifier === CLUSTER_MODIFIERS.MAGNETAR) {
+          this.rewardMagnetarFall(d, detached.length - 1);
         } else if (d.clusterModifier === CLUSTER_MODIFIERS.RESCUE_CORE) {
           this.rewardRescueCore(d);
         }
@@ -634,7 +648,13 @@ export const engineTurnResolutionMethods = {
         ![...ball.bonds].some((id) => {
           // Rust holds nothing up for this rule: a neutral anchor holding only rust lets it fall.
           const neighbor = world.ballMap.get(id);
-          return neighbor && !neighbor.isAnchor && neighbor.clusterModifier !== CLUSTER_MODIFIERS.RUST;
+          // A Magnetar is no reason to stay either: it must be able to fall.
+          return (
+            neighbor &&
+            !neighbor.isAnchor &&
+            neighbor.clusterModifier !== CLUSTER_MODIFIERS.RUST &&
+            neighbor.clusterModifier !== CLUSTER_MODIFIERS.MAGNETAR
+          );
         })
     );
     for (const ball of loose) {
@@ -691,7 +711,9 @@ export const engineTurnResolutionMethods = {
       this.grantRandomSpecialBall();
       if (this.mode === GAME_MODES.BOSS_RUSH && this.bossRushWave === startWave) {
         const bossBall = this.physicsWorld.balls.find((b) => b.clusterModifier === CLUSTER_MODIFIERS.BOSS_CORE);
-        if (bossBall) {
+        if (this.magnetar) {
+          this.snapMagnetarMooring();
+        } else if (bossBall) {
           const bossSpec = this.ballsConfig.clusterModifiers.bossCore;
           const canvasCfg = this.gameConfig.canvas;
           this.particleSystem.spawnFloatingText(
@@ -816,6 +838,7 @@ export const engineTurnResolutionMethods = {
       }
     }
 
+    this.advanceMagnetarTurn();
     this.evaluateRoundEnd();
     this.updateAimFromAngle(this.aimAngle);
     if (madeMatch) {

@@ -417,12 +417,12 @@ export const engineVersusMethods = {
   },
 
   /** Colour a landing charge takes: a palette colour of its polarity, not its neighbour's. */
-  pickChargeColor(polarity, avoidColorId) {
+  pickChargeColor(polarity, avoidColorId, rng = this.versus.chargeRng) {
     const cfg = this.gameConfig.versus;
     const palette = this.activePalette;
     const ofPolarity = palette.filter((id) => chargePolarityForColor(id, cfg, this.physicsWorld.polarityMap) === polarity);
     const pool = [ofPolarity.filter((id) => id !== avoidColorId), ofPolarity, palette].find((list) => list.length > 0);
-    return pool[Math.floor(this.versus.chargeRng.next() * pool.length)];
+    return pool[Math.floor(rng.next() * pool.length)];
   },
 
   /** A charge reaches the cluster: it snaps in as one sphere, or two for a strong one. No Sag. */
@@ -436,9 +436,11 @@ export const engineVersusMethods = {
    * Snaps a charge into the nearest settled sphere of the cluster, as one sphere or two for a
    * strong charge. Shared by every mode that lands charges; it records no mode statistics.
    * @param {object} charge - The landing charge ({x, y, polarity, strong}).
+   * @param {{next:function():number}} [rng] - Random source for the sphere colours; a duel board
+   *   uses its charge stream, other modes pass a scoped one.
    * @returns {Array<Ball>} The spheres it added, empty when the cluster has no settled sphere.
    */
-  snapChargeIntoCluster(charge) {
+  snapChargeIntoCluster(charge, rng = this.versus?.chargeRng) {
     const world = this.physicsWorld;
     const sim = this.physicsConfig.simulation;
     const radius = this.physicsConfig.ball.radius;
@@ -471,7 +473,7 @@ export const engineVersusMethods = {
         x: at.x,
         y: at.y,
         radius,
-        colorId: this.pickChargeColor(charge.polarity, target.colorId),
+        colorId: this.pickChargeColor(charge.polarity, target.colorId, rng),
         clusterModifier: null,
         isAnchor: false,
         armorHits: this.getInitialArmor(null)
@@ -662,7 +664,8 @@ export const engineVersusMethods = {
    * @returns {number|null} The polarity; null for a special ball (it is not polarised) or no ball.
    */
   getVersusShotPolarity(ball = this.currentBall, flipped = this.isPolarityFlipped) {
-    if (!this.versus || !ball || ball.specialType) {
+    // A Magnetar board shows the glyph too: its Barrage charges have a polarity to answer.
+    if ((!this.versus && !this.magnetar) || !ball || ball.specialType) {
       return null;
     }
     return shotPolarity(ball.colorId, flipped, this.gameConfig.versus, this.physicsWorld.polarityMap);

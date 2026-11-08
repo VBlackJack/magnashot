@@ -252,7 +252,31 @@ const EXPECTED_PROTOTYPE_NAMES = [
   'settleVersusTurn',
   'stepVersusAfter',
   'stepVersusBefore',
-  'syncVersusChargeView'
+  'syncVersusChargeView',
+  'shouldUseMagnetar',
+  'getMagnetarKey',
+  'getMagnetarTier',
+  'initMagnetar',
+  'makeMagnetar',
+  'clearMagnetar',
+  'clearMagnetarEffects',
+  'getMagnetarBall',
+  'refreshMoorings',
+  'snapMagnetarMooring',
+  'applyMagnetarArmedEffects',
+  'getMagnetarBounds',
+  'planMagnetarBehaviour',
+  'growMagnetarSpheres',
+  'withMagnetarRandom',
+  'launchMagnetarBarrage',
+  'landMagnetarCharges',
+  'advanceMagnetarTurn',
+  'stepMagnetarAfter',
+  'rewardMagnetarFall',
+  'countMagnetarAchievement',
+  'restoreMagnetar',
+  'getMagnetarSnapshot',
+  'getMagnetarView'
 ];
 
 test('GameEngine.prototype exposes exactly the same members after the module split', () => {

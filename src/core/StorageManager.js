@@ -694,7 +694,10 @@ export class StorageManager {
       endlessWave: StorageManager.toNonNegativeNumber(parsed.endlessWave),
       maxAvalanche: StorageManager.toNonNegativeNumber(parsed.maxAvalanche),
       bossesDestroyed: StorageManager.toNonNegativeNumber(parsed.bossesDestroyed),
-      shotsRemainingOnClear: StorageManager.toNonNegativeNumber(parsed.shotsRemainingOnClear)
+      shotsRemainingOnClear: StorageManager.toNonNegativeNumber(parsed.shotsRemainingOnClear),
+      // Lifetime counters of the Magnetar achievements (falls, and falls with a huge avalanche).
+      magnetarsGrounded: StorageManager.toNonNegativeNumber(parsed.magnetarsGrounded),
+      magnetarLandslide: StorageManager.toNonNegativeNumber(parsed.magnetarLandslide)
     };
   }
 

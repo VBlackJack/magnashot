@@ -455,20 +455,38 @@ export const engineModeMethods = {
     );
     this.physicsWorld.obstacles.push(centralPivot);
 
-    const armor = Math.min(
-      bossRushCfg.maxBossArmor,
-      bossRushCfg.baseBossArmor + (this.bossRushWave - 1) * bossRushCfg.armorStepPerWave
-    );
-    const bossBall = new Ball({
-      x: centerX,
-      y: pivotY,
-      radius: r,
-      colorId: this.pickPaletteColor(),
-      clusterModifier: CLUSTER_MODIFIERS.BOSS_CORE,
-      armorHits: armor,
-      isAnchor: true
-    });
-    this.physicsWorld.addBall(bossBall);
+    this.clearMagnetar();
+    const isMagnetarWave = this.shouldUseMagnetar();
+    let bossBall;
+    if (isMagnetarWave) {
+      // The Magnetar floats on the pivot axis (it is not an anchor): the inner ring holds it up.
+      bossBall = new Ball({
+        x: centerX,
+        y: pivotY,
+        radius: r,
+        colorId: null,
+        clusterModifier: CLUSTER_MODIFIERS.MAGNETAR,
+        armorHits: 0,
+        isAnchor: false
+      });
+      this.physicsWorld.addBall(bossBall);
+      this.initMagnetar(bossBall, { key: this.getMagnetarKey(), tier: this.getMagnetarTier() });
+    } else {
+      const armor = Math.min(
+        bossRushCfg.maxBossArmor,
+        bossRushCfg.baseBossArmor + (this.bossRushWave - 1) * bossRushCfg.armorStepPerWave
+      );
+      bossBall = new Ball({
+        x: centerX,
+        y: pivotY,
+        radius: r,
+        colorId: this.pickPaletteColor(),
+        clusterModifier: CLUSTER_MODIFIERS.BOSS_CORE,
+        armorHits: armor,
+        isAnchor: true
+      });
+      this.physicsWorld.addBall(bossBall);
+    }
 
     const rings = [
       { radius: r * bossRushCfg.innerRingRadiusFactor, count: bossRushCfg.innerRingCount },
@@ -481,10 +499,16 @@ export const engineModeMethods = {
       }
     }
     this.physicsWorld.rebuildInitialBonds();
+    this.refreshMoorings(false);
   },
 
+  /** The boss ball of the board: a Magnetar or a Boss Core. */
   getBossBall() {
-    return this.physicsWorld.balls.find((b) => b.clusterModifier === CLUSTER_MODIFIERS.BOSS_CORE) || null;
+    return (
+      this.physicsWorld.balls.find(
+        (b) => b.clusterModifier === CLUSTER_MODIFIERS.BOSS_CORE || b.clusterModifier === CLUSTER_MODIFIERS.MAGNETAR
+      ) || null
+    );
   },
 
   /**
@@ -739,6 +763,8 @@ export const engineModeMethods = {
     });
 
     this.physicsWorld.clear();
+    this.clearMagnetar();
+    this.fluxIsBossStage = stageDef.isBoss;
     this.activePalette = this.ballsConfig.standardColors
       .slice(0, stageDef.paletteCount)
       .map((c) => c.id);
@@ -749,8 +775,13 @@ export const engineModeMethods = {
     const balls = this.withScopedRandom(`${this.fluxSeed}:board:${this.fluxStage}`, () =>
       this.materializeLayout(shiftSpecX(stageDef.spec, contentOffsetX), stageDef.modifierWeights)
     );
-    this.makeBossCore(balls, stageDef.bossBallIndex);
+    if (this.shouldUseMagnetar()) {
+      this.makeMagnetar(balls, stageDef.bossBallIndex, { key: this.getMagnetarKey(), tier: this.getMagnetarTier() });
+    } else {
+      this.makeBossCore(balls, stageDef.bossBallIndex);
+    }
     this.physicsWorld.rebuildInitialBonds();
+    this.refreshMoorings(false);
 
     this.fluxFamily = stageDef.family;
     this.fluxShapeIds = stageDef.shapeIds;

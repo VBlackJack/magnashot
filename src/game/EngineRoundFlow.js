@@ -353,6 +353,10 @@ export const engineRoundFlowMethods = {
       }
       this.startOutOfShotsGraceIfNeeded();
     } else if (this.mode === GAME_MODES.FLUX) {
+      if (this.magnetar && !this.getMagnetarBall() && this.physicsWorld.balls.length > 0) {
+        // The Magnetar fell: whatever else is left of the shape goes with it and the stage is won.
+        this.releaseRemainingBoardAsAvalanche();
+      }
       if (this.physicsWorld.balls.length === 0) {
         this.outOfShotsGraceFrames = 0;
         this.completeFluxStage();
@@ -395,7 +399,7 @@ export const engineRoundFlowMethods = {
         this.refreshDiscovery();
         this.saveRunSnapshot({ force: true });
         this.notifyUI();
-      } else if (this.physicsWorld.balls.length === 1) {
+      } else if (this.physicsWorld.balls.length === 1 && !this.magnetar) {
         const bossRushCfg = this.gameConfig.bossRush;
         const r = this.physicsConfig.ball.radius;
         const centralPivot = this.physicsWorld.obstacles.find((o) => o.type === OBSTACLE_TYPES.PIVOT) || null;

@@ -974,16 +974,16 @@ test('Puzzle mode enforces fixed shot budget, clamps stage index, and blocks con
 test('Boss Rush Overcharge strikes the Titan and wave clear persists a snapshot', () => {
   const engine = createTestEngine();
   engine.startBossRushMode(1);
-  const boss = engine.physicsWorld.balls.find((b) => b.clusterModifier === CLUSTER_MODIFIERS.BOSS_CORE);
-  assert.ok(boss, 'Boss Rush wave 1 spawns a Boss Core');
-  const initialArmor = boss.armorHits;
+  const boss = engine.getBossBall();
+  assert.equal(boss.clusterModifier, CLUSTER_MODIFIERS.MAGNETAR, 'Boss Rush wave 1 spawns a Magnetar');
+  const initialMoorings = engine.getMagnetarView().moorings;
   engine.addOvercharge(gameConfig.scoring.overchargeMax);
-  assert.equal(boss.armorHits, initialArmor - 1, '100% Overcharge strikes the Boss Core for 1 shield');
+  assert.equal(engine.getMagnetarView().moorings, initialMoorings - 1, '100% Overcharge snaps 1 Mooring');
 
   while (engine.bossRushWave === 1) {
     engine.addOvercharge(gameConfig.scoring.overchargeMax);
   }
-  assert.equal(engine.bossRushWave, 2, 'shattering the Titan advances to Boss Rush wave 2');
+  assert.equal(engine.bossRushWave, 2, 'dropping the Magnetar advances to Boss Rush wave 2');
   const snapshot = engine.storageManager.loadRunSnapshot();
   assert.ok(snapshot, 'Boss Rush wave clear force-saves a run snapshot');
   assert.equal(snapshot.engine.bossRushWave, 2);
@@ -993,12 +993,15 @@ const OVERCHARGE_STRIKE_MARGIN = 0.000001;
 const DROPPING_BALL_COUNT = 3;
 const SLOW_MO_TEST_FRAMES = 9;
 
-/** Boss Rush wave 1 with the Titan one shield from death and Overcharge just under full. */
+/** Boss Rush wave 1 with the Magnetar held by one Mooring and Overcharge just under full. */
 const createBossRushNearStrike = () => {
   const engine = createTestEngine();
   engine.startBossRushMode(1);
-  const boss = engine.physicsWorld.balls.find((b) => b.clusterModifier === CLUSTER_MODIFIERS.BOSS_CORE);
-  boss.armorHits = 1;
+  const boss = engine.getBossBall();
+  for (const id of engine.refreshMoorings(false).slice(1)) {
+    engine.physicsWorld.removeBall(engine.physicsWorld.ballMap.get(id));
+  }
+  engine.refreshMoorings(false);
   engine.overcharge = gameConfig.scoring.overchargeMax - OVERCHARGE_STRIKE_MARGIN;
   return { engine, boss };
 };
@@ -1189,8 +1192,14 @@ test('Blitz mode uses Blitz descent geometry and does not unlock Survival wave a
 test('Boss Rush respawns inner guard ring when only the Boss Core remains on the board', () => {
   const engine = createTestEngine();
   engine.startBossRushMode(1);
-  const boss = engine.physicsWorld.balls.find((b) => b.clusterModifier === CLUSTER_MODIFIERS.BOSS_CORE);
-  assert.ok(boss);
+  // A Boss Rush board now starts with a Magnetar; the Boss Core path stays for runs saved before
+  // Magnetars, so this board is turned into that legacy shape.
+  const boss = engine.getBossBall();
+  engine.clearMagnetar();
+  boss.clusterModifier = CLUSTER_MODIFIERS.BOSS_CORE;
+  boss.isAnchor = true;
+  boss.colorId = ballsConfig.standardColors[0].id;
+  boss.armorHits = ballsConfig.clusterModifiers.bossCore.initialArmor;
   engine.physicsWorld.balls = [boss];
   engine.physicsWorld.bonds = [];
   engine.evaluateRoundEnd();
