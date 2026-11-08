@@ -1581,6 +1581,20 @@
     "formatVersion": 1,
     "maxPoints": 120
   },
+  "ghostDuel": {
+    "queryParam": "duel",
+    "codecVersion": 1,
+    "contentVersion": 1,
+    "maxUrlLength": 1500,
+    "maxPayloadChars": 1200,
+    "maxSamples": 20000,
+    "maxStepLog2": 15,
+    "maxScore": 1000000000,
+    "dailyMaxAgeDays": 30,
+    "aliasMaxLength": 12,
+    "historyMaxEntries": 10,
+    "announceMinShots": 3
+  },
   "storage": {
     "prefix": "magnashot_v1_",
     "keys": {
@@ -1624,7 +1638,9 @@
       "dailyHistory": "daily_history",
       "weeklyFluxBest": "weekly_flux_best",
       "weeklyFluxClaimedWeek": "weekly_flux_claimed_week",
-      "playerStats": "player_stats"
+      "playerStats": "player_stats",
+      "ghostDuels": "ghost_duels",
+      "ghostAlias": "ghost_alias"
     },
     "runSnapshotVersion": 1,
     "legacyMigration": {
