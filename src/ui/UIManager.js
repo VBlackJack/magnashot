@@ -3178,7 +3178,7 @@ export class UIManager {
     setTextIfChanged(
       this.elements.btnShop,
       affordableCount > 0
-        ? t('app.nav.button.shopBadge', { count: affordableCount })
+        ? t('app.nav.button.shopBadge', { count: formatNumber(affordableCount) })
         : t('app.nav.button.shop')
     );
     this.elements.btnShop.classList.toggle('has-affordable', affordableCount > 0);
@@ -3209,7 +3209,7 @@ export class UIManager {
           ? t('app.nav.button.dailyPlayedStreakBadge', { streak: formatNumber(streak) })
           : t('app.nav.button.dailyPlayedBadge');
       } else if (dailyBonusCoins > 0) {
-        dailyLabel = t('app.nav.button.dailyBonusBadge', { coins: dailyBonusCoins });
+        dailyLabel = t('app.nav.button.dailyBonusBadge', { coins: formatNumber(dailyBonusCoins) });
       }
       setTextIfChanged(this.elements.btnDaily, dailyLabel);
       const graceHint = formatStreakGraceText(streak, this.storageManager.getDailyStreakGrace?.(todayKey), todayKey);
