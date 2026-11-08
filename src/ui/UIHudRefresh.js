@@ -699,8 +699,7 @@ export const uiHudRefreshMethods = {
       return t('app.nav.button.weeklyBestBadge', { score: formatNumber(bestScore) });
     }
     const bonusCoins = this.gameConfig.weeklyFlux?.firstPlayBonusCoins || 0;
-    const claimedKey = this.storageManager.storageConfig?.keys?.weeklyFluxClaimedWeek;
-    const isClaimed = claimedKey ? this.storageManager.safeGetItem?.(claimedKey) === weekKey : false;
+    const isClaimed = this.storageManager.hasClaimedWeeklyFluxBonus?.(weekKey) === true;
     if (bonusCoins > 0 && !isClaimed) {
       return t('app.nav.button.weeklyBonusBadge', { coins: formatNumber(bonusCoins) });
     }

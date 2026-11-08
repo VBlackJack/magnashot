@@ -19,7 +19,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { configRegistry } from '../src/core/ConfigRegistry.js';
 import { StorageManager } from '../src/core/StorageManager.js';
-import { createShotTimeline, appendTimelineSample } from '../src/game/ShotTimeline.js';
+import { createShotTimeline, appendTimelineSample, markTimelineComplete } from '../src/game/ShotTimeline.js';
 
 const loadJson = (p) => JSON.parse(fs.readFileSync(p, 'utf8'));
 const gameConfig = loadJson('./configs/game.json');
@@ -193,5 +193,21 @@ test('only the most recent entries keep their timeline', () => {
     history.forEach((entry, position) => {
       assert.equal('tl' in entry, position < timelineEntries, `position ${position}`);
     });
+  });
+});
+
+test('at an equal score a complete timeline replaces a partial one, never the reverse', () => {
+  withManager(null, (manager) => {
+    const date = dateKeyAt(0);
+    const partial = buildTimeline(3);
+    const complete = markTimelineComplete(buildTimeline(5));
+    manager.recordDailyResult({ dateKey: date, score: 100, tl: partial });
+    assert.equal(manager.getDailyHistory()[0].tl.c, 0);
+    manager.recordDailyResult({ dateKey: date, score: 100, tl: complete });
+    assert.equal(manager.getDailyHistory()[0].tl.c, 1);
+    assert.equal(manager.getDailyHistory()[0].tl.n, complete.n);
+    manager.recordDailyResult({ dateKey: date, score: 100, tl: partial });
+    assert.equal(manager.getDailyHistory()[0].tl.c, 1);
+    assert.equal(manager.getDailyHistory()[0].tl.n, complete.n);
   });
 });

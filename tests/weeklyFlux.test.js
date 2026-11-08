@@ -20,7 +20,7 @@ import fs from 'node:fs';
 import { configRegistry } from '../src/core/ConfigRegistry.js';
 import { StorageManager } from '../src/core/StorageManager.js';
 import { parseFluxSeedInput } from '../src/game/DailyShare.js';
-import { createShotTimeline, appendTimelineSample } from '../src/game/ShotTimeline.js';
+import { createShotTimeline, appendTimelineSample, markTimelineComplete } from '../src/game/ShotTimeline.js';
 import { getUtcIsoWeekKey, getWeeklyFluxSeed, getMsUntilNextWeekly } from '../src/game/WeeklyFlux.js';
 
 const loadJson = (p) => JSON.parse(fs.readFileSync(p, 'utf8'));
@@ -155,6 +155,35 @@ test('the weekly timeline follows the score', () => {
     manager.setWeeklyFluxBest(WEEK, 'aaaaaa', 50, 1, build(4));
     assert.equal(manager.getWeeklyFluxBest(WEEK).tl.n, 2);
     manager.setWeeklyFluxBest(WEEK, 'aaaaaa', 150, 1, build(4));
+    assert.equal(manager.getWeeklyFluxBest(WEEK).tl.n, 4);
+  });
+});
+
+test('hasClaimedWeeklyFluxBonus follows the weekly claim', () => {
+  withManager((manager) => {
+    assert.equal(manager.hasClaimedWeeklyFluxBonus(WEEK), false);
+    manager.claimWeeklyFluxBonus(WEEK, firstPlayBonusCoins);
+    assert.equal(manager.hasClaimedWeeklyFluxBonus(WEEK), true);
+    assert.equal(manager.hasClaimedWeeklyFluxBonus(OTHER_WEEK), false);
+    assert.equal(manager.hasClaimedWeeklyFluxBonus(''), false);
+  });
+});
+
+test('at an equal weekly score a complete timeline replaces a partial one', () => {
+  withManager((manager) => {
+    const build = (shots) => {
+      const tl = createShotTimeline('flux', TIMELINE_CFG);
+      for (let i = 1; i <= shots; i++) {
+        appendTimelineSample(tl, i, shots - i, TIMELINE_CFG);
+      }
+      return tl;
+    };
+    manager.setWeeklyFluxBest(WEEK, 'aaaaaa', 100, 1, build(2));
+    assert.equal(manager.getWeeklyFluxBest(WEEK).tl.c, 0);
+    manager.setWeeklyFluxBest(WEEK, 'aaaaaa', 100, 1, markTimelineComplete(build(4)));
+    assert.equal(manager.getWeeklyFluxBest(WEEK).tl.c, 1);
+    assert.equal(manager.getWeeklyFluxBest(WEEK).tl.n, 4);
+    manager.setWeeklyFluxBest(WEEK, 'aaaaaa', 100, 1, build(6));
     assert.equal(manager.getWeeklyFluxBest(WEEK).tl.n, 4);
   });
 });

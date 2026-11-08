@@ -24,6 +24,8 @@ import { normalizePlayerStats, applyPlayerStatsDelta } from '../game/PlayerStats
 
 const MS_PER_UTC_DAY = 86_400_000;
 const DATE_KEY_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+/** Value of a shot timeline's `c` field once its run is over. */
+const COMPLETE_TIMELINE_FLAG = 1;
 
 /**
  * Ordered save schema migrations. Contract: every step is idempotent and never deletes
@@ -1202,17 +1204,21 @@ export class StorageManager {
     const streak = this.getDailyStreak(dateKey);
     const isGrace = this.getDailyStreakGrace(dateKey).usedOn === dateKey;
     const refreshed = { k: streak > 0 ? streak : null, g: isGrace };
+    const entry = StorageManager.sanitizeDailyHistoryEntry({
+      d: dateKey,
+      s: cleanScore,
+      w: Number.isFinite(wave) ? Math.floor(wave) : null,
+      m: mutatorKey,
+      ...refreshed,
+      tl
+    }, this.shotTimelineConfig);
     if (index >= 0 && cleanScore <= history[index].s) {
       history[index] = { ...history[index], ...refreshed };
+      // At an equal score, a complete timeline replaces a partial one.
+      if (cleanScore === history[index].s && entry.tl?.c === COMPLETE_TIMELINE_FLAG && history[index].tl?.c !== COMPLETE_TIMELINE_FLAG) {
+        history[index].tl = entry.tl;
+      }
     } else {
-      const entry = StorageManager.sanitizeDailyHistoryEntry({
-        d: dateKey,
-        s: cleanScore,
-        w: Number.isFinite(wave) ? Math.floor(wave) : null,
-        m: mutatorKey,
-        ...refreshed,
-        tl
-      }, this.shotTimelineConfig);
       if (index >= 0) {
         history[index] = entry;
       } else {
@@ -1280,6 +1286,11 @@ export class StorageManager {
         if (current.tl) {
           next.tl = current.tl;
         }
+        // At an equal score, a complete timeline replaces a partial one.
+        const incoming = normalizeShotTimeline(timeline, this.shotTimelineConfig);
+        if (cleanScore === current.score && incoming?.c === COMPLETE_TIMELINE_FLAG && current.tl?.c !== COMPLETE_TIMELINE_FLAG) {
+          next.tl = incoming;
+        }
       }
     }
     if (key) {
@@ -1303,6 +1314,15 @@ export class StorageManager {
       this.addCoins(bonus);
     }
     return true;
+  }
+
+  /**
+   * @param {string} weekKey - Week key such as "2026-W45".
+   * @returns {boolean} True when the Weekly Flux bonus of that week was already paid.
+   */
+  hasClaimedWeeklyFluxBonus(weekKey) {
+    const key = this.storageConfig.keys.weeklyFluxClaimedWeek;
+    return Boolean(key) && typeof weekKey === 'string' && weekKey.length > 0 && this.safeGetItem(key) === weekKey;
   }
 
   /** @returns {object} The local statistics (a clean empty object when none are stored). */
