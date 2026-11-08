@@ -162,6 +162,10 @@ export const VERSUS_STORAGE_POLICY = Object.freeze({
   getClassicHighScore: P.ZERO,
   getClassicBestStage: P.ZERO,
   setClassicRecord: P.NOOP,
+  getVersusTiers: P.EMPTY_ARRAY,
+  getVersusRecords: P.EMPTY_OBJECT,
+  recordVersusResult: P.NOOP,
+  isVersusTierUnlocked: P.FALSE,
 
   // Economy.
   getCoins: P.ZERO,

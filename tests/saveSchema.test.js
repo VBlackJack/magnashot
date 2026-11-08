@@ -366,3 +366,48 @@ test('v3: an existing history is never overwritten', () => {
     assert.equal(storage.getItem(HISTORY_KEY), '[]');
   });
 });
+
+test('v5: the schema reaches 5 on a fresh profile', () => {
+  assert.equal(CURRENT_SAVE_SCHEMA_VERSION, 5);
+  const storage = createFakeStorage();
+  withStorage(storage, () => {
+    initManager();
+    assert.equal(storage.getItem(VERSION_KEY), '5');
+  });
+});
+
+test('v5: a veteran on schema 4 gets Polarity Duel announced as new, once', () => {
+  const unlocksKey = `${prefix}${keys.modeUnlocks}`;
+  const storage = createFakeStorage();
+  storage.setItem(VERSION_KEY, '4');
+  storage.setItem(`${prefix}${keys.coins}`, '10');
+  storage.setItem(unlocksKey, JSON.stringify({ classic: gameConfig.modeUnlocks.stateSeen }));
+  withStorage(storage, () => {
+    const manager = initManager();
+    const stored = JSON.parse(storage.getItem(unlocksKey));
+    assert.equal(stored.versus, gameConfig.modeUnlocks.stateNew);
+    assert.equal(stored.classic, gameConfig.modeUnlocks.stateSeen);
+    assert.equal(storage.getItem(VERSION_KEY), '5');
+    const first = storage.getItem(unlocksKey);
+    assert.equal(manager.announceIntroducedModes(), true);
+    assert.equal(storage.getItem(unlocksKey), first);
+  });
+});
+
+test('v5: a seen versus entry is never downgraded and a fresh profile stays untouched', () => {
+  const unlocksKey = `${prefix}${keys.modeUnlocks}`;
+  const veteran = createFakeStorage();
+  veteran.setItem(VERSION_KEY, '4');
+  veteran.setItem(`${prefix}${keys.coins}`, '10');
+  veteran.setItem(unlocksKey, JSON.stringify({ versus: gameConfig.modeUnlocks.stateSeen }));
+  withStorage(veteran, () => {
+    initManager();
+    assert.equal(JSON.parse(veteran.getItem(unlocksKey)).versus, gameConfig.modeUnlocks.stateSeen);
+  });
+  const fresh = createFakeStorage();
+  fresh.setItem(VERSION_KEY, '4');
+  withStorage(fresh, () => {
+    initManager();
+    assert.equal(fresh.getItem(unlocksKey), null);
+  });
+});

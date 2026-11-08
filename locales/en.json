@@ -1437,6 +1437,78 @@
     },
     "defaultName": "Ghost"
   },
+  "versus": {
+    "mode": {
+      "name": "Polarity Duel"
+    },
+    "tier": {
+      "easy": "Easy",
+      "normal": "Normal",
+      "hard": "Hard",
+      "hardLocked": "Beat Normal once to unlock Hard.",
+      "record": "{{wins}} won, {{losses}} lost"
+    },
+    "card": {
+      "title": "Polarity Duel",
+      "description": "Face the CPU. Your matches send charged spheres to its board: neutralise the ones sent to you.",
+      "best": "Record: {{wins}} won, {{losses}} lost"
+    },
+    "lobby": {
+      "title": "Polarity Duel",
+      "subtitle": "Pick a CPU opponent. First to win two rounds takes the match.",
+      "pickTier": "Choose a difficulty",
+      "start": "Start match",
+      "back": "Back"
+    },
+    "bar": {
+      "roundPips": "Round {{round}}. You: {{player}} won. CPU: {{cpu}} won.",
+      "roundLabel": "Round {{round}}",
+      "timer": "Time {{time}}",
+      "pause": "Pause"
+    },
+    "hud": {
+      "incoming": "Incoming charges: {{count}}",
+      "incomingShort": "In: {{count}}",
+      "pulse": "Pulse meter: {{percent}}%",
+      "playerBoard": "Your board",
+      "cpuBoard": "CPU board",
+      "cpuBoardTier": "CPU board ({{tier}})",
+      "swap": "Swap spheres",
+      "polarity": "Flip polarity"
+    },
+    "announce": {
+      "chargeIncoming": "{{count}} charged spheres incoming.",
+      "chargeNeutralised": "Charge neutralised.",
+      "pulseSent": "Field pulse sent: the CPU rail drops.",
+      "pulseReceived": "Field pulse received: your rail drops.",
+      "roundWon": "Round won.",
+      "roundLost": "Round lost.",
+      "roundDraw": "Both boards fell. The round is replayed.",
+      "matchWon": "Match won, {{player}} to {{cpu}}.",
+      "matchLost": "Match lost, {{player}} to {{cpu}}.",
+      "suddenDeath": "Sudden death: both rails now drop every {{seconds}} seconds."
+    },
+    "pause": {
+      "title": "Match paused",
+      "resume": "Resume",
+      "restart": "Restart match",
+      "quit": "Quit"
+    },
+    "result": {
+      "wonTitle": "Match won",
+      "lostTitle": "Match lost",
+      "score": "{{player}} - {{cpu}}",
+      "neutralised": "Charges neutralised: {{count}}",
+      "pulses": "Pulses sent: {{count}}",
+      "tier": "CPU {{tier}}",
+      "playAgain": "Play again",
+      "backToMenu": "Back to menu"
+    },
+    "share": {
+      "won": "MagnaShot Polarity Duel: beat CPU {{tier}} {{score}}, {{neutralised}} charges neutralized, {{pulses}} pulses",
+      "lost": "MagnaShot Polarity Duel: lost to CPU {{tier}} {{score}}, {{neutralised}} charges neutralized, {{pulses}} pulses"
+    }
+  },
   "toast": {
     "gamepad": {
       "connected": "Controller connected",
