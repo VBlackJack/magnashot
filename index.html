@@ -104,6 +104,7 @@
           <span id="hud-combo-badge" class="hud-badge combo hidden"></span>
           <span id="hud-frozen-badge" class="hud-badge frozen hidden"></span>
           <span id="hud-best-run" class="hud-badge best-run hidden"></span>
+          <span id="hud-ghost" class="hud-badge ghost hidden" role="group"></span>
           <span id="hud-perks" class="perk-chips hidden" role="group" data-i18n-aria-label="hud.stats.perks.label"></span>
         </div>
       </div>
@@ -278,6 +279,7 @@
       <p id="gameover-remaining" class="modal-subtext hidden"></p>
       <p id="gameover-stage" class="modal-stat-line hidden"></p>
       <p id="gameover-near-miss" class="modal-stat-line muted near-miss hidden"></p>
+      <p id="gameover-duel" class="modal-stat-line duel-result hidden"></p>
       <p id="gameover-daily-next" class="modal-stat-line muted hidden"></p>
       <div class="modal-actions">
         <button id="btn-continue-gameover" type="button" class="modal-btn primary hidden"></button>
@@ -366,6 +368,11 @@
           <span class="pause-setting-caption" data-i18n="app.nav.button.languageCaption" aria-hidden="true"></span>
         </div>
       </div>
+      <div class="settings-duel-name">
+        <label id="duel-name-label" class="settings-duel-name-label" for="input-duel-name" data-i18n="modals.settings.duelName.label"></label>
+        <input id="input-duel-name" type="text" class="flux-seed-input settings-duel-name-input" autocomplete="off" autocapitalize="off" spellcheck="false" aria-describedby="duel-name-hint">
+        <p id="duel-name-hint" class="install-hint" data-i18n="modals.settings.duelName.hint"></p>
+      </div>
       <div class="settings-install-row">
         <button id="btn-install" type="button" class="modal-btn hidden" data-i18n="modals.settings.install.button"></button>
         <p id="install-ios-hint" class="install-hint hidden" data-i18n="modals.settings.install.iosHint"></p>
@@ -389,6 +396,12 @@
         <p id="stats-overview-empty" class="modal-subtext hidden" data-i18n="modals.stats.overview.empty"></p>
         <dl id="stats-overview-list" class="stats-list"></dl>
         <ul id="stats-campaign-list" class="stats-campaign-list"></ul>
+        <section id="stats-duels" class="stats-duels" aria-labelledby="stats-duels-title">
+          <h3 id="stats-duels-title" class="stats-section-title" data-i18n="modals.stats.duels.title"></h3>
+          <p id="stats-duels-record" class="modal-subtext hidden"></p>
+          <p id="stats-duels-empty" class="modal-subtext hidden" data-i18n="modals.stats.duels.empty"></p>
+          <ul id="stats-duels-list" class="stats-campaign-list hidden"></ul>
+        </section>
         <p class="modal-subtext" data-i18n="modals.stats.overview.privacy"></p>
       </div>
       <div id="stats-daily-pane" class="stats-pane hidden" role="tabpanel" aria-labelledby="tab-stats-daily">
@@ -419,6 +432,20 @@
       <div class="modal-actions">
         <button id="btn-copy-stats" type="button" class="modal-btn primary" data-i18n="modals.stats.button.copy"></button>
         <button id="btn-close-stats" type="button" class="modal-btn" data-i18n="modals.stats.button.close"></button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Ghost Duel card: a challenge link, or why it cannot be played -->
+  <div id="modal-duel" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="modal-duel-title" aria-describedby="duel-card-summary">
+    <div class="modal-card">
+      <h2 id="modal-duel-title" class="modal-title" data-i18n="duel.card.title"></h2>
+      <p id="duel-card-summary" class="modal-stat-line"></p>
+      <ul id="duel-card-notes" class="duel-card-notes hidden"></ul>
+      <div class="modal-actions">
+        <button id="btn-duel-accept" type="button" class="modal-btn primary" data-i18n="duel.card.accept"></button>
+        <button id="btn-duel-decline" type="button" class="modal-btn" data-i18n="duel.card.decline"></button>
+        <button id="btn-duel-ok" type="button" class="modal-btn primary hidden" data-i18n="duel.error.ok"></button>
       </div>
     </div>
   </div>

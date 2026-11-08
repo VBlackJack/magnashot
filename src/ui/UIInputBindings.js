@@ -591,6 +591,10 @@ export const uiInputBindingMethods = {
         this.dismissConfirm();
         return;
       }
+      if (this.isDuelCardOpen()) {
+        this.dismissDuelCard();
+        return;
+      }
       if (!this.elements.modalLevels.classList.contains('hidden')) {
         this.closeOverlayModal(this.elements.modalLevels);
         return;

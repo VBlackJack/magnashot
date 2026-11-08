@@ -202,8 +202,13 @@ export const uiModalMethods = {
   /** Restarts the Flux run that just ended on its own seed, keeping its shared (tilt-locked) status. */
   retrySameFluxSeed() {
     if (this.engine.fluxSeed) {
+      // The restart clears the duel with the run state: read the rival first, attach it again after.
+      const ghost = this.engine.ghostDuel?.ghost ?? null;
       this.hideAllModals();
       this.engine.startFluxRun(this.engine.fluxSeed, { isShared: this.engine.isSharedFluxRun });
+      if (ghost && this.engine.attachGhost(ghost)) {
+        this.refresh(this.engine, this.lastExtra);
+      }
     }
   },
 
@@ -270,7 +275,8 @@ export const uiModalMethods = {
       this.elements.modalLevels,
       this.elements.modalShop,
       this.elements.modalSettings,
-      this.elements.modalStats
+      this.elements.modalStats,
+      this.elements.modalDuel
     ].filter(Boolean);
   },
 
@@ -286,6 +292,9 @@ export const uiModalMethods = {
   openOverlayModal(modal, focusTarget) {
     if (!modal) {
       return;
+    }
+    if (modal === this.elements.modalSettings) {
+      this.syncDuelNameField();
     }
     if (modal === this.elements.modalSettings && this.hintsResetConfirmed) {
       this.hintsResetConfirmed = false;

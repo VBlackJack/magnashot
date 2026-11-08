@@ -204,7 +204,11 @@ export const engineGhostDuelMethods = {
       return;
     }
     if (duel.isRecorded && typeof this.storageManager.retractLastGhostDuel === 'function') {
-      this.storageManager.retractLastGhostDuel();
+      this.storageManager.retractLastGhostDuel({
+        mode: duel.ghost.mode,
+        key: duel.ghost.key,
+        dateKey: SeededRandom.getTodayDateKey()
+      });
     }
     duel.isRecorded = false;
     duel.result = null;

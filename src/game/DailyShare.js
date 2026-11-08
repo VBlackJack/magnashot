@@ -159,6 +159,19 @@ function buildWaveRow(waveLog, shareConfig) {
 }
 
 /**
+ * The header line of a duel result: who the run raced and how it ended.
+ * @param {{name: string, outcome: string, gap: number}|null|undefined} duel - Settled duel summary.
+ * @returns {string} The line, or an empty string outside a duel.
+ */
+function buildDuelHeaderLine(duel) {
+  if (!duel || (duel.outcome !== 'won' && duel.outcome !== 'lost' && duel.outcome !== 'tie')) {
+    return '';
+  }
+  const result = t(`share.duel.${duel.outcome}`, { gap: formatNumber(duel.gap) });
+  return t('share.duel.header', { name: duel.name, result });
+}
+
+/**
  * Builds the spoiler-free result of a Daily Challenge run: challenge number and mutator,
  * wave and score, one symbol per wave passed, then the game address. Board layout and
  * shot details stay out of it, so the text gives nothing away to someone yet to play.
@@ -170,21 +183,28 @@ function buildWaveRow(waveLog, shareConfig) {
  * @param {number} run.score - Final score.
  * @param {string[]} run.waveLog - Kind of each wave passed.
  * @param {string} run.url - Game address appended on the last line.
+ * @param {{name: string, outcome: string, gap: number}} [run.duel] - Settled duel, adds a result line.
+ * @param {string} [run.duelUrl] - Challenge address, replaces the game address on the last line.
  * @param {object} shareConfig - The `share` section of configs/game.json.
  * @returns {string}
  */
-export function buildDailyShareText({ dateKey, mutatorKey, wave, score, waveLog, url }, shareConfig) {
+export function buildDailyShareText({ dateKey, mutatorKey, wave, score, waveLog, url, duel, duelUrl }, shareConfig) {
   const number = getDailyChallengeNumber(dateKey, shareConfig.epochDateKey);
   const header = mutatorKey
     ? t('share.daily.header', { number, mutator: t(`gameplay.mutators.${mutatorKey}`) })
     : t('share.daily.headerNoMutator', { number });
   const stats = t('share.daily.stats', { wave: formatNumber(wave), score: formatNumber(score) });
-  const lines = [header, stats];
+  const lines = [header];
+  const duelLine = buildDuelHeaderLine(duel);
+  if (duelLine) {
+    lines.push(duelLine);
+  }
+  lines.push(stats);
   const waveRow = buildWaveRow(waveLog || [], shareConfig);
   if (waveRow) {
     lines.push(waveRow);
   }
-  lines.push(url);
+  lines.push(duelUrl || url);
   return lines.join(LINE_SEPARATOR);
 }
 
@@ -224,6 +244,8 @@ function buildSurvivalShareText({ wave, score, waveLog, url }, shareConfig) {
  * @param {boolean} [run.isWeekly] - True for the Weekly Flux run (needs run.weekKey and run.seed).
  * @param {string} [run.weekKey] - Week key of the weekly run, such as "2026-W45".
  * @param {string} run.url - Game address appended on the last line.
+ * @param {{name: string, outcome: string, gap: number}} [run.duel] - Settled duel, adds a result line.
+ * @param {string} [run.duelUrl] - Challenge address (it carries the seed), replaces the last line.
  * @returns {string}
  */
 function buildFluxShareText({
@@ -235,6 +257,8 @@ function buildFluxShareText({
   continues = 0,
   isWeekly = false,
   weekKey = null,
+  duel = null,
+  duelUrl = null,
   url
 }) {
   let header = t('share.flux.header');
@@ -243,10 +267,12 @@ function buildFluxShareText({
   } else if (seed) {
     header = t('share.flux.headerWithSeed', { seed });
   }
-  const lines = [
-    header,
-    t('share.flux.stats', { stage: formatNumber(stage), score: formatNumber(score) })
-  ];
+  const lines = [header];
+  const duelLine = buildDuelHeaderLine(duel);
+  if (duelLine) {
+    lines.push(duelLine);
+  }
+  lines.push(t('share.flux.stats', { stage: formatNumber(stage), score: formatNumber(score) }));
   if (workshopLevels + ammoBought + continues > 0) {
     lines.push(
       t('share.flux.assists', {
@@ -256,7 +282,7 @@ function buildFluxShareText({
       })
     );
   }
-  lines.push(buildFluxShareUrl(url, seed));
+  lines.push(duelUrl || buildFluxShareUrl(url, seed));
   return lines.join(LINE_SEPARATOR);
 }
 

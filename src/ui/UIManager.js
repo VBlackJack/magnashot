@@ -62,6 +62,7 @@ import { uiModalMethods } from './UIModals.js';
 import { uiSettingsControlMethods } from './UISettingsControls.js';
 import { uiHudRefreshMethods } from './UIHudRefresh.js';
 import { uiStatsMethods, STATS_TABS } from './UIStats.js';
+import { uiGhostDuelMethods } from './UIGhostDuel.js';
 
 export {
   SPECIAL_ICON_HIGHLIGHT_POSITION,
@@ -144,6 +145,7 @@ export class UIManager {
       comboBadge: document.getElementById('hud-combo-badge'),
       frozenBadge: document.getElementById('hud-frozen-badge'),
       bestRunBadge: document.getElementById('hud-best-run'),
+      hudGhost: document.getElementById('hud-ghost'),
       powerupsContainer: document.getElementById('powerups-bar'),
       powerupsHeader: document.getElementById('powerups-header'),
       powerupsEmpty: document.getElementById('powerups-empty'),
@@ -242,6 +244,7 @@ export class UIManager {
       gameoverRemaining: document.getElementById('gameover-remaining'),
       gameOverStage: document.getElementById('gameover-stage'),
       gameOverNearMiss: document.getElementById('gameover-near-miss'),
+      gameOverDuel: document.getElementById('gameover-duel'),
       gameOverDailyNext: document.getElementById('gameover-daily-next'),
       btnContinueGameOver: document.getElementById('btn-continue-gameover'),
       btnRetry: document.getElementById('btn-retry'),
@@ -289,6 +292,16 @@ export class UIManager {
       modalConfirm: document.getElementById('modal-confirm'),
       btnConfirmYes: document.getElementById('btn-confirm-yes'),
       btnConfirmNo: document.getElementById('btn-confirm-no'),
+      modalDuel: document.getElementById('modal-duel'),
+      duelCardSummary: document.getElementById('duel-card-summary'),
+      duelCardNotes: document.getElementById('duel-card-notes'),
+      btnDuelAccept: document.getElementById('btn-duel-accept'),
+      btnDuelDecline: document.getElementById('btn-duel-decline'),
+      btnDuelOk: document.getElementById('btn-duel-ok'),
+      inputDuelName: document.getElementById('input-duel-name'),
+      statsDuelsRecord: document.getElementById('stats-duels-record'),
+      statsDuelsEmpty: document.getElementById('stats-duels-empty'),
+      statsDuelsList: document.getElementById('stats-duels-list'),
       srAnnouncer: document.getElementById('sr-announcer')
     };
 
@@ -322,6 +335,10 @@ export class UIManager {
     this.activeStatsTab = STATS_TABS.OVERVIEW;
     this.statsOpener = null;
     this.statsCopied = false;
+    this.duelCardRead = null;
+    this.duelCardAtStake = false;
+    this.ghostLastSide = null;
+    this.challengeUrl = null;
   }
 
   detectInitialInputMode() {
@@ -401,6 +418,7 @@ export class UIManager {
     this.applyInputMode();
     this.buildPowerupButtons();
     this.bindEvents();
+    this.bindDuelEvents();
     this.updateSoundButton();
     this.updateContrastButton();
     this.updatePatternsButton();
@@ -1298,3 +1316,4 @@ installMethods(UIManager, uiModalMethods);
 installMethods(UIManager, uiSettingsControlMethods);
 installMethods(UIManager, uiHudRefreshMethods);
 installMethods(UIManager, uiStatsMethods);
+installMethods(UIManager, uiGhostDuelMethods);
