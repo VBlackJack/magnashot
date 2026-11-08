@@ -1263,6 +1263,174 @@ body {
   gap: 6px;
 }
 
+/*
+ * Locked modes: still focusable (aria-disabled), but plainly out of reach. The look uses a
+ * dashed border and a sunken fill with a lighter-than-muted text, never opacity, so the
+ * label keeps its WCAG AA contrast.
+ */
+.nav-btn.is-locked,
+.arcade-mode-card.is-locked {
+  background: var(--surface-sunken);
+  color: var(--text-secondary);
+  border: 1px dashed var(--border-strong);
+  cursor: not-allowed;
+}
+
+.nav-btn.is-locked:hover,
+.arcade-mode-card.is-locked:hover {
+  border-color: var(--border-strong);
+  transform: none;
+}
+
+.arcade-mode-card.is-locked .arcade-card-desc {
+  color: var(--text-secondary);
+}
+
+.mode-new-badge {
+  display: inline-block;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--accent-amber);
+  color: var(--text-on-accent);
+  font-size: 0.68rem;
+  font-weight: 800;
+  line-height: 1.5;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  vertical-align: middle;
+  animation: mode-new-badge-pulse 1.8s ease-in-out infinite;
+}
+
+@keyframes mode-new-badge-pulse {
+  50% {
+    box-shadow: 0 0 8px var(--accent-amber-alpha-45);
+  }
+}
+
+/* The Weekly Flux button and the status line take a full row of the mode grid. */
+#btn-weekly,
+.nav-lock-hint {
+  grid-column: 1 / -1;
+}
+
+.nav-lock-hint {
+  margin: 0;
+  font-size: 0.78rem;
+  line-height: 1.3;
+  color: var(--text-gold-soft);
+  text-align: left;
+}
+
+.nav-btn.stats-btn {
+  width: 100%;
+}
+
+.stats-pane {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  text-align: left;
+}
+
+.stats-list {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
+  gap: 4px 12px;
+  margin: 0;
+}
+
+.stats-list dt {
+  font-weight: 700;
+  color: var(--text-gold-soft);
+}
+
+.stats-list dd {
+  margin: 0;
+  grid-column: 2;
+  color: var(--text-main);
+}
+
+.stats-campaign-list {
+  margin: 0;
+  padding-left: 1.2em;
+  color: var(--text-main);
+}
+
+.stats-table-wrap {
+  overflow-x: auto;
+}
+
+.stats-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+}
+
+.stats-table caption {
+  caption-side: top;
+  padding-bottom: 6px;
+  text-align: left;
+  font-weight: 700;
+  color: var(--text-gold-soft);
+}
+
+.stats-table th,
+.stats-table td {
+  padding: 5px 8px;
+  border-bottom: 1px solid var(--border-subtle);
+  text-align: left;
+  font-weight: 600;
+  color: var(--text-main);
+}
+
+.stats-table thead th {
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+@media (max-width: 480px) {
+  .stats-list {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .stats-list dd {
+    grid-column: 1;
+  }
+  .stats-table thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
+  .stats-table,
+  .stats-table tbody,
+  .stats-table tr,
+  .stats-table th,
+  .stats-table td {
+    display: block;
+  }
+  .stats-table tr {
+    padding: 6px 0;
+    border-bottom: 1px solid var(--border-strong);
+  }
+  .stats-table th,
+  .stats-table td {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    border-bottom: none;
+    padding: 2px 4px;
+  }
+  .stats-table th::before,
+  .stats-table td::before {
+    content: attr(data-label);
+    font-weight: 700;
+    color: var(--text-secondary);
+  }
+}
+
 .puzzle-stage-btn {
   padding: 4px 10px;
   background: var(--surface-raised);
@@ -2754,6 +2922,17 @@ body {
     color: GrayText;
     border: 1px dashed GrayText;
   }
+  .nav-btn.is-locked,
+  .arcade-mode-card.is-locked,
+  .arcade-mode-card.is-locked .arcade-card-desc {
+    color: GrayText;
+    border: 1px dashed GrayText;
+  }
+  .mode-new-badge {
+    border: 1px solid ButtonText;
+    background: Canvas;
+    color: CanvasText;
+  }
   .nav-btn.active-mode,
   .arcade-mode-card.active-mode,
   .puzzle-stage-btn.active,
@@ -2803,6 +2982,9 @@ body {
   }
   .flux-perk-card {
     transition: none;
+  }
+  .mode-new-badge {
+    animation: none;
   }
 }
 

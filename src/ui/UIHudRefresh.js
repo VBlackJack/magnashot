@@ -18,10 +18,20 @@ import { GAME_MODES, GAME_STATES, OBJECTIVE_TYPES } from '../core/Constants.js';
 import { t, formatNumber } from '../core/I18n.js';
 import { SeededRandom } from '../core/SeededRandom.js';
 import { resolveHintText } from '../game/Discovery.js';
+import { getUtcIsoWeekKey } from '../game/WeeklyFlux.js';
 import { FULL_PERCENT } from './WorkshopView.js';
 import { syncFluxPerkModal } from './FluxPerkView.js';
 import {
   MODE_BUTTON_KEYS,
+  MODE_NAME_KEYS,
+  MODE_LOCK_BUTTON_KEYS,
+  ARCADE_CARD_SPECS,
+  MODE_LOCKED_CLASS,
+  MODE_NEW_CLASS,
+  describeModeLock,
+  setModeLabel,
+  formatUnlockedModesText,
+  formatUnlockedModeNames,
   splitRefreshExtra,
   formatNearMissText,
   formatBestRunMarker,
@@ -72,6 +82,23 @@ export const uiHudRefreshMethods = {
         }
       }
     }
+    // A Weekly Flux run highlights its own button, not the plain Flux one.
+    const isWeeklyRun = engine.mode === GAME_MODES.FLUX && engine.isWeeklyFluxRun === true;
+    for (const [elementKey, isActive] of [
+      ['btnFlux', engine.mode === GAME_MODES.FLUX && !isWeeklyRun],
+      ['btnWeekly', isWeeklyRun]
+    ]) {
+      const button = this.elements[elementKey];
+      if (button) {
+        button.classList.toggle('active-mode', isActive);
+        if (isActive) {
+          setAttributeIfChanged(button, 'aria-current', 'true');
+        } else {
+          button.removeAttribute('aria-current');
+        }
+      }
+    }
+    this.refreshModeLocks(this.getModeAccess());
     if (this.elements.btnDaily) {
       const todayKey = SeededRandom.getTodayDateKey();
       const dailyBonusCoins = this.gameConfig.daily?.firstPlayBonusCoins || 0;
@@ -107,7 +134,10 @@ export const uiHudRefreshMethods = {
     } else if (engine.mode === GAME_MODES.DAILY) {
       bestScore = this.storageManager.getDailyHighScore(engine.dailySeedKey || SeededRandom.getTodayDateKey());
     } else if (engine.mode === GAME_MODES.FLUX) {
-      bestScore = this.storageManager.getFluxHighScore();
+      // A Weekly Flux run is measured against this week's best, not the all-time Flux record.
+      bestScore = isWeeklyRun
+        ? this.getWeeklyFluxBestScore(engine.weeklyWeekKey)
+        : this.storageManager.getFluxHighScore();
     } else if (engine.mode === GAME_MODES.PUZZLE) {
       bestScore = this.storageManager.getPuzzleHighScore();
     } else if (engine.mode === GAME_MODES.BLITZ) {
@@ -511,9 +541,21 @@ export const uiHudRefreshMethods = {
         })
       );
       this.updateNextLevelButton(engine);
+      const unlockedModes = summary.unlockedModes ?? [];
+      const unlockText = formatUnlockedModesText(unlockedModes, t);
+      if (this.elements.victoryUnlock) {
+        setTextIfChanged(this.elements.victoryUnlock, unlockText);
+        this.elements.victoryUnlock.classList.toggle('hidden', !unlockText);
+      }
       if (isVictoryJustRevealed) {
         this.saveLastFocusedElement();
-        this.announce(t('hud.announcer.round.victory', { score: scoreText, stars, maxStars }));
+        const victoryResult = t('hud.announcer.round.victory', { score: scoreText, stars, maxStars });
+        const unlockedNames = formatUnlockedModeNames(unlockedModes, t);
+        this.announce(
+          unlockedNames
+            ? `${victoryResult} ${t('hud.announcer.modeUnlocked', { modes: unlockedNames })}`
+            : victoryResult
+        );
       }
       this.elements.modalVictory.classList.remove('hidden');
       if (isVictoryJustRevealed) {
@@ -577,6 +619,7 @@ export const uiHudRefreshMethods = {
       }
       // Every mode but the campaign has a result worth sharing.
       this.elements.btnShareGameOver?.classList.toggle('hidden', engine.mode === GAME_MODES.CAMPAIGN);
+      this.elements.btnDailyHistoryGameOver?.classList.toggle('hidden', engine.mode !== GAME_MODES.DAILY);
       if (this.elements.btnContinueGameOver) {
         const canContinue = Boolean(engine.canContinueOutOfShots?.());
         if (canContinue) {
@@ -640,5 +683,102 @@ export const uiHudRefreshMethods = {
     );
     this.syncDrawerStats();
     this.syncModalInertState();
+  },
+
+  /** Best score of the given Weekly Flux week (this week when none is given), 0 when none yet. */
+  getWeeklyFluxBestScore(weekKey) {
+    const key = weekKey || getUtcIsoWeekKey(Date.now());
+    return this.storageManager.getWeeklyFluxBest?.(key)?.score || 0;
+  },
+
+  /** Weekly Flux menu label: this week's best once played, the bonus until it is claimed. */
+  getWeeklyButtonLabel() {
+    const weekKey = getUtcIsoWeekKey(Date.now());
+    const bestScore = this.getWeeklyFluxBestScore(weekKey);
+    if (bestScore > 0) {
+      return t('app.nav.button.weeklyBestBadge', { score: formatNumber(bestScore) });
+    }
+    const bonusCoins = this.gameConfig.weeklyFlux?.firstPlayBonusCoins || 0;
+    const claimedKey = this.storageManager.storageConfig?.keys?.weeklyFluxClaimedWeek;
+    const isClaimed = claimedKey ? this.storageManager.safeGetItem?.(claimedKey) === weekKey : false;
+    if (bonusCoins > 0 && !isClaimed) {
+      return t('app.nav.button.weeklyBonusBadge', { coins: formatNumber(bonusCoins) });
+    }
+    return t('app.nav.button.weekly');
+  },
+
+  /**
+   * Locked, new and normal look of every gated mode control: the menu buttons and the arcade
+   * cards of the level select. A locked control stays focusable (aria-disabled, not disabled).
+   * @param {Object<string, {unlocked?: boolean, isNew?: boolean, requiredLevel?: number}>} access
+   *   Storage getModeAccess().
+   */
+  refreshModeLocks(access) {
+    const weeklyLabel = this.getWeeklyButtonLabel();
+    for (const [mode, elementKeys] of Object.entries(MODE_LOCK_BUTTON_KEYS)) {
+      for (const elementKey of elementKeys) {
+        const button = this.elements[elementKey];
+        if (!button) {
+          continue;
+        }
+        const isWeekly = elementKey === 'btnWeekly';
+        const nameKey = isWeekly ? 'app.nav.button.weekly' : MODE_NAME_KEYS[mode];
+        const lock = describeModeLock(mode, access, t, nameKey);
+        // Weekly Flux unlocks with Flux but is not a new mode: only Flux carries the badge.
+        this.applyModeLockState(button, lock, isWeekly ? weeklyLabel : t(nameKey), !isWeekly);
+      }
+    }
+    for (const [mode, spec] of Object.entries(ARCADE_CARD_SPECS)) {
+      const card = this.elements[spec.card];
+      if (!card) {
+        continue;
+      }
+      const lock = describeModeLock(mode, access, t);
+      setModeLabel(
+        card.querySelector('.arcade-card-title'),
+        lock.isLocked ? lock.label : t(spec.titleKey),
+        lock.newBadge
+      );
+      setTextIfChanged(
+        card.querySelector('.arcade-card-desc'),
+        lock.isLocked ? t('modals.levelSelect.arcade.lockedDesc', { level: lock.level }) : t(spec.descKey)
+      );
+      this.elements[spec.best]?.classList.toggle('hidden', lock.isLocked);
+      card.classList.toggle(MODE_LOCKED_CLASS, lock.isLocked);
+      card.classList.toggle(MODE_NEW_CLASS, lock.isNew);
+      if (lock.isLocked) {
+        setAttributeIfChanged(card, 'aria-disabled', 'true');
+        setAttributeIfChanged(card, 'aria-label', lock.ariaLabel);
+        setAttributeIfChanged(card, 'title', lock.hint);
+      } else {
+        card.removeAttribute('aria-disabled');
+        card.removeAttribute('aria-label');
+        card.removeAttribute('title');
+      }
+      if (mode === GAME_MODES.PUZZLE) {
+        this.elements.puzzleStagesStrip?.classList.toggle('hidden', lock.isLocked);
+      }
+    }
+  },
+
+  /** Applies a mode lock to one menu button: label, badge, classes and accessible name. */
+  applyModeLockState(button, lock, baseLabel, showNewBadge) {
+    const hasBadge = showNewBadge && lock.isNew;
+    setModeLabel(button, lock.isLocked ? lock.label : baseLabel, hasBadge ? lock.newBadge : '');
+    button.classList.toggle(MODE_LOCKED_CLASS, lock.isLocked);
+    button.classList.toggle(MODE_NEW_CLASS, hasBadge);
+    if (lock.isLocked) {
+      setAttributeIfChanged(button, 'aria-disabled', 'true');
+      setAttributeIfChanged(button, 'aria-label', lock.ariaLabel);
+      setAttributeIfChanged(button, 'title', lock.hint);
+      return;
+    }
+    button.removeAttribute('aria-disabled');
+    button.removeAttribute('title');
+    if (hasBadge) {
+      setAttributeIfChanged(button, 'aria-label', lock.newAria);
+    } else {
+      button.removeAttribute('aria-label');
+    }
   },
 };
