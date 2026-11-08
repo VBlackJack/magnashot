@@ -42,8 +42,41 @@ function isDrawerButtonLocked(ui, button) {
   return isAriaDisabled(button);
 }
 
+/** Scenes that can own the gameplay controls. */
+export const UI_SCENES = Object.freeze({ MAIN: 'main', VERSUS: 'versus' });
+
 /** Methods installed on UIManager.prototype by UIManager.js. */
 export const uiInputBindingMethods = {
+  /**
+   * Chooses who handles the gameplay controls. In the 'versus' scene the gameplay keys, the
+   * controller actions and the auto-pause on a hidden page go to `controller`
+   * ({handleGameplayKey(event), handleGamepadActions(actions, aimDelta), pause()}); the
+   * 'main' scene (default) keeps the single-player behaviour.
+   */
+  setActiveScene(scene, controller = null) {
+    const isVersus = scene === UI_SCENES.VERSUS && Boolean(controller);
+    this.activeScene = isVersus ? UI_SCENES.VERSUS : UI_SCENES.MAIN;
+    this.sceneController = isVersus ? controller : null;
+  },
+
+  /** Pauses the run (or the versus match) when the page is hidden. */
+  handleVisibilityChange() {
+    if (!document.hidden) {
+      return;
+    }
+    const sceneController = this.getSceneController();
+    if (sceneController) {
+      sceneController.pause();
+    } else if (this.engine.state === GAME_STATES.PLAYING) {
+      this.engine.togglePause();
+    }
+  },
+
+  /** The controller of the active non-main scene, or null in the main scene. */
+  getSceneController() {
+    return this.activeScene === UI_SCENES.VERSUS ? this.sceneController || null : null;
+  },
+
   /**
    * Keeps the browser's install prompt for the Settings button instead of letting the
    * browser show it at a moment the player did not choose.
@@ -243,9 +276,7 @@ export const uiInputBindingMethods = {
     }
 
     document.addEventListener('visibilitychange', () => {
-      if (document.hidden && this.engine.state === GAME_STATES.PLAYING) {
-        this.engine.togglePause();
-      }
+      this.handleVisibilityChange();
     });
 
     const toggleLang = () => {
@@ -647,6 +678,12 @@ export const uiInputBindingMethods = {
     }
 
     if (isBrowserShortcut(e)) {
+      return;
+    }
+
+    const sceneController = this.getSceneController();
+    if (sceneController) {
+      sceneController.handleGameplayKey(e);
       return;
     }
 
