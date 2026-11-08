@@ -4,6 +4,8 @@ All notable changes to **MagnaShot** are documented in this file.
 
 ## [Unreleased]
 
+## [1.14.1] - 2026-11-08
+
 ### Fixed
 - **Progress Saved Before v1.9.1 Recovered (`StorageManager.migrateLegacyKeys`, `configs/game.json`)**: The v1.9.1 rebrand renamed the `localStorage` prefix from `flux_spheres_v1_` to `magnashot_v1_` without carrying saves over, so earlier players started from level 1. On first launch, the legacy save is now merged into the current one: the unlocked level keeps the higher of the two, level stats keep the best score and stars per level, and every other key is copied only when no newer value exists. A stale run in progress is not carried over, legacy keys are left in place, and a marker key keeps the merge to a single pass.
 - **Shared Flux Seeds and Daily Waves Are the Same for Everyone (`GameEngine.withScopedRandom`)**: Board colours and modifiers of each Flux stage now come from a stream derived from the seed and the stage number, and each Daily Challenge wave from the seed and the wave number. Previously they shared the run stream with shots and falling spheres, so two players on the same `?flux=` link or the same Daily saw different boards from stage or wave 2 onward. Boards built from existing seeds differ from those of earlier versions; saved runs still restore.
