@@ -42,7 +42,7 @@ export class SeededRandom {
     }
     h = Math.imul(h ^ (h >>> SHIFT_16), HASH_PRIME_B);
     h = Math.imul(h ^ (h >>> SHIFT_13), HASH_MULT_B);
-    return (h ^= h >>> SHIFT_16) >>> 0;
+    return (h ^ (h >>> SHIFT_16)) >>> 0;
   }
 
   static getTodayDateKey() {
