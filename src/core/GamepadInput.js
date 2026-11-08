@@ -93,6 +93,7 @@ export class GamepadInput {
     this.now = now || (() => (typeof performance !== 'undefined' ? performance.now() : Date.now()));
     this.activeIndex = -1;
     this.keyStates = new Map();
+    this.padStates = new Map();
     this.pendingEvents = [];
     this._target = null;
     this._onConnected = (e) => this._queueEvent(GAMEPAD_EVENTS.CONNECTED, e);
@@ -116,19 +117,30 @@ export class GamepadInput {
     this._target = null;
   }
 
+  /**
+   * Queue a connection event. Each entry keeps the single-pad classification in `legacyType`
+   * (what poll() reports) and the raw `type` with the pad identity (what pollAll() reports).
+   */
   _queueEvent(type, e) {
     if (!this.settings.enabled) return;
     const pad = e && e.gamepad;
     if (pad && pad.mapping !== STANDARD_MAPPING) return;
+    const padIndex = pad ? pad.index : -1;
+    const id = pad && typeof pad.id === 'string' ? pad.id : '';
     if (type === GAMEPAD_EVENTS.CONNECTED) {
       if (pad) this.connectedIndexes.add(pad.index);
-      this.pendingEvents.push(type);
+      this.pendingEvents.push({ type, legacyType: type, padIndex, id });
       return;
     }
     if (pad) this.connectedIndexes.delete(pad.index);
     // Only the pad in use going away matters to the run; an unknown active pad counts as in use.
     const isActive = !pad || this.activeIndex < 0 || pad.index === this.activeIndex;
-    this.pendingEvents.push(isActive ? GAMEPAD_EVENTS.DISCONNECTED : GAMEPAD_EVENTS.DISCONNECTED_OTHER);
+    this.pendingEvents.push({
+      type,
+      legacyType: isActive ? GAMEPAD_EVENTS.DISCONNECTED : GAMEPAD_EVENTS.DISCONNECTED_OTHER,
+      padIndex,
+      id
+    });
     if (pad && pad.index === this.activeIndex) {
       this.activeIndex = -1;
     }
@@ -182,11 +194,11 @@ export class GamepadInput {
     return btn.pressed ? 1 : 0;
   }
 
-  _state(key) {
-    let s = this.keyStates.get(key);
+  _state(states, key) {
+    let s = states.get(key);
     if (!s) {
       s = { down: false, nextAt: 0 };
-      this.keyStates.set(key, s);
+      states.set(key, s);
     }
     return s;
   }
@@ -196,8 +208,8 @@ export class GamepadInput {
   }
 
   /** Down state with press/release hysteresis, using the previous state stored under `key`. */
-  _isDown(pad, key, indexes) {
-    const wasDown = this._state(key).down;
+  _isDown(pad, states, key, indexes) {
+    const wasDown = this._state(states, key).down;
     const threshold = wasDown ? this.config.triggerRelease : this.config.triggerPress;
     const list = Array.isArray(indexes) ? indexes : [indexes];
     for (const i of list) {
@@ -212,16 +224,16 @@ export class GamepadInput {
   }
 
   /** Store the new down state; returns true on a press edge. */
-  _edge(key, down) {
-    const s = this._state(key);
+  _edge(states, key, down) {
+    const s = this._state(states, key);
     const edge = down && !s.down;
     s.down = down;
     return edge;
   }
 
   /** Update a repeating input; returns true on press and on each repeat tick. */
-  _repeat(key, down, nowMs) {
-    const s = this._state(key);
+  _repeat(states, key, down, nowMs) {
+    const s = this._state(states, key);
     const { initialDelayMs, intervalMs } = this.config.menuRepeat;
     let fire = false;
     if (down && !s.down) {
@@ -277,6 +289,7 @@ export class GamepadInput {
   }
 
   /**
+   * Single-pad poll: the active pad drives everything, edge state lives in `this.keyStates`.
    * @param {number} elapsedMs frame time
    * @param {{menuOpen?: boolean}} [ctx]
    * @returns {{actions: string[], aimDelta: number, aimSteps: number, active: boolean, padIndex: number, events: string[]}}
@@ -285,7 +298,7 @@ export class GamepadInput {
     const nowMs = this.now();
     const enabled = Boolean(this.settings.enabled);
     const hasEvents = enabled && this.pendingEvents.length > 0;
-    const events = hasEvents ? this.pendingEvents : NO_EVENTS;
+    const events = hasEvents ? this.pendingEvents.map((ev) => ev.legacyType) : NO_EVENTS;
     this.pendingEvents = [];
     if (!enabled) {
       this.keyStates.clear();
@@ -305,7 +318,79 @@ export class GamepadInput {
     const { pad, activity } = this._pickActive(pads);
     out.active = activity;
     out.padIndex = pad.index;
+    this._readPad(pad, this.keyStates, elapsedMs, ctx, nowMs, out);
+    return out;
+  }
 
+  /**
+   * Per-pad poll for local multiplayer: every standard pad is read with its own edge state.
+   * A pad seen for the first time is primed: its first read only records held buttons, so no
+   * action comes out of it.
+   * @param {number} elapsedMs frame time
+   * @param {{menuOpen?: boolean}} [ctx]
+   * @returns {{pads: Array<{padIndex: number, id: string, actions: string[], aimDelta: number,
+   *   aimSteps: number, active: boolean}>, events: Array<{type: string, padIndex: number, id: string}>}}
+   */
+  pollAll(elapsedMs, ctx = {}) {
+    const nowMs = this.now();
+    const enabled = Boolean(this.settings.enabled);
+    const hasEvents = enabled && this.pendingEvents.length > 0;
+    const events = hasEvents
+      ? this.pendingEvents.map(({ type, padIndex, id }) => ({ type, padIndex, id }))
+      : NO_EVENTS;
+    for (const ev of events) {
+      if (ev.type === GAMEPAD_EVENTS.DISCONNECTED) this.padStates.delete(ev.padIndex);
+    }
+    this.pendingEvents = [];
+    if (!enabled) {
+      this.padStates.clear();
+      this.connectedIndexes.clear();
+      this.hasScanned = false;
+      return { pads: NO_EVENTS, events };
+    }
+    const pads = this._mayHavePads(nowMs) ? this._standardPads() : [];
+    if (pads.length === 0) {
+      this.padStates.clear();
+      this.connectedIndexes.clear();
+      return { pads: NO_EVENTS, events };
+    }
+    const present = new Set(pads.map((p) => p.index));
+    for (const index of Array.from(this.padStates.keys())) {
+      if (!present.has(index)) this.padStates.delete(index);
+    }
+    const results = [];
+    for (const pad of pads) {
+      let states = this.padStates.get(pad.index);
+      const primed = !states;
+      if (primed) {
+        states = new Map();
+        this.padStates.set(pad.index, states);
+      }
+      const out = {
+        padIndex: pad.index,
+        id: typeof pad.id === 'string' ? pad.id : '',
+        actions: [],
+        aimDelta: 0,
+        aimSteps: 0,
+        active: this._hasActivity(pad)
+      };
+      this._readPad(pad, states, elapsedMs, ctx, nowMs, out);
+      if (primed) out.actions = [];
+      results.push(out);
+    }
+    return { pads: results, events };
+  }
+
+  /**
+   * Read one pad against the given edge states and fill `out` (actions, aimDelta, aimSteps).
+   * @param {object} pad
+   * @param {Map<string, {down: boolean, nextAt: number}>} states
+   * @param {number} elapsedMs
+   * @param {{menuOpen?: boolean}} ctx
+   * @param {number} nowMs
+   * @param {{actions: string[], aimDelta: number, aimSteps: number}} out
+   */
+  _readPad(pad, states, elapsedMs, ctx, nowMs, out) {
     const btns = this.config.buttons;
     const ax = this.config.axes;
     const push = (action) => out.actions.push(action);
@@ -326,12 +411,12 @@ export class GamepadInput {
       recenter: btns.recenter
     };
     for (const [key, idx] of Object.entries(defs)) {
-      edge[key] = this._edge(key, this._isDown(pad, key, idx));
+      edge[key] = this._edge(states, key, this._isDown(pad, states, key, idx));
     }
     const dpad = {};
     for (const dir of Object.keys(NAV_ACTIONS)) {
-      dpad[dir] = this._isDown(pad, `dpad:${dir}`, btns[dir]);
-      this._edge(`dpad:${dir}`, dpad[dir]);
+      dpad[dir] = this._isDown(pad, states, `dpad:${dir}`, btns[dir]);
+      this._edge(states, `dpad:${dir}`, dpad[dir]);
     }
 
     if (edge.pause) push(A.PAUSE);
@@ -348,18 +433,18 @@ export class GamepadInput {
         right: dpad.right || x > t
       };
       for (const dir of Object.keys(NAV_ACTIONS)) {
-        if (this._repeat(`nav:${dir}`, navDown[dir], nowMs)) push(NAV_ACTIONS[dir]);
+        if (this._repeat(states, `nav:${dir}`, navDown[dir], nowMs)) push(NAV_ACTIONS[dir]);
       }
-      this._repeat('step:left', false, nowMs);
-      this._repeat('step:right', false, nowMs);
+      this._repeat(states, 'step:left', false, nowMs);
+      this._repeat(states, 'step:right', false, nowMs);
       if (edge.confirm) push(A.CONFIRM);
       if (edge.back) push(A.BACK);
       if (edge.specialPrev) push(A.TAB_PREV);
       if (edge.specialNext) push(A.TAB_NEXT);
-      return out;
+      return;
     }
 
-    for (const dir of Object.keys(NAV_ACTIONS)) this._repeat(`nav:${dir}`, false, nowMs);
+    for (const dir of Object.keys(NAV_ACTIONS)) this._repeat(states, `nav:${dir}`, false, nowMs);
     if (edge.shoot) push(A.SHOOT);
     if (edge.swap) push(A.SWAP);
     if (edge.polarity) push(A.POLARITY);
@@ -370,8 +455,8 @@ export class GamepadInput {
     if (edge.recenter) push(A.RECENTER);
 
     let steps = 0;
-    if (this._repeat('step:left', dpad.left, nowMs)) steps -= 1;
-    if (this._repeat('step:right', dpad.right, nowMs)) steps += 1;
+    if (this._repeat(states, 'step:left', dpad.left, nowMs)) steps -= 1;
+    if (this._repeat(states, 'step:right', dpad.right, nowMs)) steps += 1;
     out.aimSteps = steps;
 
     const left = this._shapeStick(this._axis(pad, ax.aimX), this._axis(pad, ax.menuY));
@@ -383,6 +468,5 @@ export class GamepadInput {
     const analog = this._curve(left.x) + this._curve(fine.x) * this.config.fineAimFactor;
     out.aimDelta = sign * analog * this._speed() * dt * precision
       + sign * steps * this.fineStepRad;
-    return out;
   }
 }
