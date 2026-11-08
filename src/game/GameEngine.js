@@ -650,6 +650,8 @@ export class GameEngine {
     this.weeklyWeekKey = null;
     this.shotTimeline = null;
     this.ghostDuel = null;
+    // startVersusBoard sets the versus state again after this reset.
+    this.versus = null;
     this.isDailyRematch = false;
     // clear() keeps the tilt: a run must not start leaning from the previous run's last reading.
     this.physicsWorld.tiltFactor = 0;
@@ -1150,7 +1152,8 @@ export class GameEngine {
           anvilSpecs.highlight
         );
         this.particleSystem.addScreenShake(juice.anvilShake, juice.maxShakeOffset);
-        this.hitStopFrames = juice.hitStopFramesSpecial;
+        // A versus board never freezes: both boards must keep stepping in lockstep.
+        this.hitStopFrames = this.isVersusRole ? 0 : juice.hitStopFramesSpecial;
         // An anvil that crushed nothing is a miss: it breaks the combo and counts toward the next wave.
         const madeMatch = this.anvilCrushCount > 0;
         if (madeMatch) {
@@ -1281,6 +1284,10 @@ export class GameEngine {
 
     this.updateImpactWave();
 
+    if (this.isVersusRole) {
+      // Both boards of a duel must keep stepping in lockstep: no hit-stop freeze.
+      this.hitStopFrames = 0;
+    }
     if (this.hitStopFrames > 0) {
       this.hitStopFrames--;
       this.particleSystem.updateShakeOnly(juice.shakeDecay);

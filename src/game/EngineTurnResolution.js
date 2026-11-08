@@ -90,7 +90,7 @@ export const engineTurnResolutionMethods = {
     this.particleSystem.addScreenShake(juice.matchShake, juice.maxShakeOffset);
     this.audioManager.playEffect('match', this.combo);
     if (this.combo >= juice.hitStopMinCombo) {
-      this.hitStopFrames = juice.hitStopFramesCombo;
+      this.hitStopFrames = this.isVersusRole ? 0 : juice.hitStopFramesCombo;
     }
     this.storageManager?.recordAchievementProgress?.({ maxCombo: this.combo });
     this.unlockAchievementTiers('comboMaster', this.combo);
@@ -471,7 +471,7 @@ export const engineTurnResolutionMethods = {
       }
       if (result.destroyed.length > 0) {
         this.addOvercharge(result.destroyed.length * this.gameConfig.scoring.overchargePerMatchedBall);
-        this.hitStopFrames = this.gameConfig.juice.hitStopFramesSpecial;
+        this.hitStopFrames = this.isVersusRole ? 0 : this.gameConfig.juice.hitStopFramesSpecial;
         if (result.slowMoFrames > 0) {
           this.triggerSpecialSlowMo(result.slowMoFrames, result.slowMoTimeScale, result.slowMoColor);
         }
