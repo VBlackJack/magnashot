@@ -494,6 +494,7 @@ export const engineRoundFlowMethods = {
     this.flushPendingRunCoins();
     this.storageManager.clearRunSnapshot();
     this.audioManager.playEffect('gameOver');
+    this.noteVersusBoardLost(reasonKey);
     this.notifyUI({ gameOverReason: reasonKey });
   },
 

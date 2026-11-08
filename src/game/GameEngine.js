@@ -829,8 +829,8 @@ export class GameEngine {
   }
 
   getOverchargeMultiplier() {
-    // Classic has no specials, so nothing may charge toward one.
-    if (this.mode === GAME_MODES.CLASSIC) {
+    // Classic has no specials, so nothing may charge toward one; a duel board still charges its pulse.
+    if (this.mode === GAME_MODES.CLASSIC && !this.versus) {
       return 0;
     }
     const lvl = this.getEffectiveUpgradeLevel('overchargeRate');
@@ -1325,11 +1325,18 @@ export class GameEngine {
 
     // Step callbacks must not tear the world down mid-step: a round end they trigger
     // (an overcharge strike on the boss) is deferred until the step has returned.
+    if (this.versus) {
+      this.stepVersusBefore();
+    }
+    const flyingProjectile = this.physicsWorld.projectile;
     this.isSteppingPhysics = true;
     try {
       this.physicsWorld.step(this.getStepCallbacks());
     } finally {
       this.isSteppingPhysics = false;
+    }
+    if (this.versus) {
+      this.stepVersusAfter(flyingProjectile);
     }
     if (this.pendingRoundEnd || (this.pendingBossRushWave && !this.physicsWorld.projectile)) {
       this.evaluateRoundEnd();

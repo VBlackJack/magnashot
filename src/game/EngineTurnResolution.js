@@ -457,6 +457,9 @@ export const engineTurnResolutionMethods = {
     if (snappedBall.specialType) {
       const prevOrigin = this.detonationOrigin;
       this.detonationOrigin = snappedBall;
+      if (this.versus) {
+        this.neutraliseChargesBySpecial(snappedBall.specialType, snappedBall.x, snappedBall.y);
+      }
       const result = this.specialController.resolveSpecialImpact(
         snappedBall,
         this.physicsWorld,
@@ -575,7 +578,7 @@ export const engineTurnResolutionMethods = {
     if (detached.length > 0) {
       const scoring = this.gameConfig.scoring;
       const juice = this.gameConfig.juice;
-      this.noteVersusDrop(detached.length);
+      this.noteVersusDrop(detached.length, detached[0].colorId);
       const dropPoints = detached.length * scoring.droppedBallPoints * Math.max(1, this.combo);
       this.addScore(dropPoints);
       this.addOvercharge(detached.length * scoring.overchargePerDroppedBall);
@@ -673,13 +676,18 @@ export const engineTurnResolutionMethods = {
     if (!this.isRunPlaying()) {
       return;
     }
-    const max = this.gameConfig.scoring.overchargeMax;
+    const max = this.getOverchargeCap();
     // A strike can clear the wave: later iterations still grant their special ball but
     // must not hit the next wave's boss.
     const startWave = this.bossRushWave;
     this.overcharge += rawAmount * this.getOverchargeMultiplier();
     while (this.overcharge >= max) {
       this.overcharge -= max;
+      if (this.versus) {
+        // In a duel a full meter fires the field pulse at the other board.
+        this.fireVersusPulse();
+        continue;
+      }
       this.grantRandomSpecialBall();
       if (this.mode === GAME_MODES.BOSS_RUSH && this.bossRushWave === startWave) {
         const bossBall = this.physicsWorld.balls.find((b) => b.clusterModifier === CLUSTER_MODIFIERS.BOSS_CORE);
