@@ -31,6 +31,7 @@ import {
   promoteUnreleased,
   planRelease,
   parseArgs,
+  buildNextSteps,
 } from '../scripts/release.mjs';
 
 const REPO_ROOT = fileURLToPath(new URL('../', import.meta.url));
@@ -253,4 +254,12 @@ test('planRelease refuses when version sources disagree', () => {
 test('planRelease writes nothing when one output fails (empty Unreleased)', () => {
   const inputs = { ...readRealInputs(), changelog: '# Changelog\n\n## [Unreleased]\n\n## [1.0.0] - 2026-01-01\n' };
   assert.throws(() => planRelease(inputs, 'patch'), /empty/);
+});
+
+test('buildNextSteps suggests an annotated tag and pushes only that tag', () => {
+  const lines = buildNextSteps(TEST_VERSION);
+  assert.ok(lines.includes(`  git tag -a v${TEST_VERSION} -m "v${TEST_VERSION}"`));
+  assert.ok(lines.includes(`  git push origin v${TEST_VERSION}`));
+  assert.ok(!lines.some((line) => line.includes('--tags')));
+  assert.ok(!lines.includes(`  git tag v${TEST_VERSION}`));
 });

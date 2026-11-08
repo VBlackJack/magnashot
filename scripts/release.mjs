@@ -236,6 +236,18 @@ export function parseArgs(argv) {
   return { arg, dryRun };
 }
 
+/** Lines printed after a release bump: commit, annotated tag, explicit tag push. */
+export function buildNextSteps(version) {
+  return [
+    MSG.next,
+    '  git add package.json package-lock.json sw.js CHANGELOG.md',
+    `  git commit -m "chore(release): ${version}"`,
+    `  git tag -a v${version} -m "v${version}"`,
+    '  git push origin HEAD',
+    `  git push origin v${version}`,
+  ];
+}
+
 function run(argv) {
   let options;
   try {
@@ -260,11 +272,9 @@ function run(argv) {
       fs.writeFileSync(path, plan.outputs[key]);
       console.log(MSG.wrote(path.slice(REPO_ROOT.length)));
     }
-    console.log(MSG.next);
-    console.log('  git add package.json package-lock.json sw.js CHANGELOG.md');
-    console.log(`  git commit -m "chore(release): ${plan.target}"`);
-    console.log(`  git tag v${plan.target}`);
-    console.log('  git push origin HEAD --tags');
+    for (const line of buildNextSteps(plan.target)) {
+      console.log(line);
+    }
     return 0;
   } catch (error) {
     console.error(error.message);
