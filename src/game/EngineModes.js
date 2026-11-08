@@ -145,6 +145,109 @@ export const engineModeMethods = {
   },
 
   /**
+   * Starts Classic: the pure ruleset (no specials, no Workshop, no shot budget) on seeded
+   * stage boards. Misses fill the Sag meter and each full meter lowers the anchor rail.
+   * @param {number} [stage=1] - 1-based stage to start on.
+   */
+  startClassicMode(stage = 1) {
+    const cleanStage = Math.max(1, Math.floor(Number(stage) || 1));
+    this.resetRunState(GAME_MODES.CLASSIC);
+    this.classicStage = cleanStage;
+    // A run stream of its own (launcher draws) so the stage boards below can be scoped: a stage
+    // board never depends on the shots played before it.
+    this.seededRng = new SeededRandom(`${this.gameConfig.classic.seedPrefix}:run:${Math.random()}`);
+    this.waveCount = 1;
+    this.endlessRowParity = 0;
+    this.sagLevel = 0;
+    this.railDrops = 0;
+    this.specialInventory = Object.fromEntries(Object.values(SPECIAL_TYPES).map((type) => [type, 0]));
+
+    this.audioManager.stopAll();
+    this.particleSystem.clear();
+    this.buildClassicStage(cleanStage);
+    this.currentBall = this.createRandomLauncherBall();
+    this.nextBall = this.createRandomLauncherBall();
+    this.fillUpcomingColors();
+    this.state = GAME_STATES.PLAYING;
+    const canvasCfg = this.gameConfig.canvas;
+    this.updateAim(canvasCfg.launcherX, canvasCfg.launcherY + canvasCfg.initialAimOffsetY);
+    this.notifyUI();
+  },
+
+  /**
+   * Replaces the board with the seeded board of a Classic stage: a fully anchored top row,
+   * no modifiers and no obstacles. The same stage always gives the same board.
+   * @param {number} stage - 1-based stage number.
+   */
+  buildClassicStage(stage) {
+    const classicCfg = this.gameConfig.classic;
+    const rows = Math.min(classicCfg.maxRows, classicCfg.baseRows + (stage - 1) * classicCfg.rowsPerStage);
+    const paletteSize = Math.min(
+      classicCfg.maxPalette,
+      classicCfg.basePalette + Math.floor((stage - 1) / classicCfg.paletteStepStages)
+    );
+    this.physicsWorld.clear();
+    this.activePalette = this.ballsConfig.standardColors.slice(0, paletteSize).map((c) => c.id);
+
+    const r = this.physicsConfig.ball.radius;
+    const cols = classicCfg.columns;
+    const spacingX = r * this.physicsConfig.simulation.bondRestDistanceFactor;
+    const startX = (this.gameConfig.canvas.logicalWidth - (cols - 1) * spacingX) * MATH_CONSTANTS.HALF;
+    this.withScopedRandom(`${classicCfg.seedPrefix}:${stage}`, () => {
+      for (let row = 0; row < rows; row++) {
+        const y = classicCfg.startY + row * classicCfg.rowSpacingY;
+        const rowOffset = (row % 2) * r * MATH_CONSTANTS.HALF;
+        for (let col = 0; col < cols; col++) {
+          this.physicsWorld.addBall(
+            this.createClusterBall({
+              x: startX + col * spacingX + rowOffset,
+              y,
+              radius: r,
+              colorId: this.pickPaletteColor(),
+              clusterModifier: null,
+              isAnchor: row === 0
+            })
+          );
+        }
+      }
+    });
+    this.physicsWorld.rebuildInitialBonds();
+    this.hasFiredInRound = false;
+    this.combo = 0;
+    this.freezeTurnsRemaining = 0;
+  },
+
+  /**
+   * Pays a cleared Classic board, resets the Sag meter and the rail, and builds the next
+   * stage. The score bonus scales with the stage that was cleared.
+   */
+  completeClassicStage() {
+    const classicCfg = this.gameConfig.classic;
+    const clearedStage = this.classicStage;
+    const points = classicCfg.stageClearBonusBase * clearedStage;
+    this.addScore(points);
+    this.audioManager.playEffect('victory');
+    this.particleSystem.spawnFloatingText(
+      this.gameConfig.canvas.logicalWidth * MATH_CONSTANTS.HALF,
+      this.gameConfig.canvas.logicalHeight * MATH_CONSTANTS.HALF,
+      t('gameplay.feedback.classic.stageCleared', { points }),
+      this.gameConfig.theme.victoryPopupColor
+    );
+    this.classicStage = clearedStage + 1;
+    this.sagLevel = 0;
+    this.railDrops = 0;
+    this.railLowerFrames = 0;
+    this.buildClassicStage(this.classicStage);
+    this.refreshStaleLauncherColors();
+    if (this.currentBall) {
+      this.updateAimFromAngle(this.aimAngle);
+    }
+    this.persistRunHighScore();
+    this.saveRunSnapshot({ force: true });
+    this.notifyUI({ classicStageCleared: clearedStage });
+  },
+
+  /**
    * Starts a deterministic One-Shot / Puzzle challenge stage from configs/game.json.
    * @param {number} [stageIndex=1] - 1-based puzzle stage index.
    */

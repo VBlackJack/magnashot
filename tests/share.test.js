@@ -279,3 +279,29 @@ test('the Weekly Flux text uses the weekly header with the week key and the seed
     locales.fr.share.flux.weeklyHeader.replace('{{week}}', '2026-W45').replace('{{seed}}', 'k9x4m2')
   );
 });
+
+const LINE_BREAK = String.fromCharCode(10);
+
+// The Classic keys ship with the interface; the text is pinned here so the builder is tested on its own.
+const CLASSIC_FALLBACK_KEYS = {
+  en: { header: 'MagnaShot Classic', stats: 'Stage {{stage}} - {{score}} pts', drops: 'Rail drops: {{drops}}' },
+  fr: { header: 'MagnaShot Classic', stats: 'Niveau {{stage}} - {{score}} pts', drops: 'Chutes du rail : {{drops}}' }
+};
+
+test('The Classic share text lists header, stage and score, then the rail drops, with no address', () => {
+  for (const [locale, dictionary] of Object.entries(locales)) {
+    dictionary.share.classic ??= CLASSIC_FALLBACK_KEYS[locale];
+  }
+  const run = { mode: GAME_MODES.CLASSIC, stage: 4, score: 12500, drops: 7, url: shareConfig.url };
+  useLocale('en');
+  assert.deepEqual(buildShareText(run, shareConfig).split(LINE_BREAK), [
+    locales.en.share.classic.header,
+    'Stage 4 - 12,500 pts',
+    'Rail drops: 7'
+  ]);
+  useLocale('fr');
+  const lines = buildShareText(run, shareConfig).split(LINE_BREAK);
+  assert.equal(lines.length, 3);
+  assert.ok(lines.every((line) => !line.includes(shareConfig.url)));
+  assert.ok(lines[1].includes(formatFrench(12500)));
+});

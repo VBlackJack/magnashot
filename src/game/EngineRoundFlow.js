@@ -338,6 +338,10 @@ export const engineRoundFlowMethods = {
         return;
       }
       this.startOutOfShotsGraceIfNeeded();
+    } else if (this.mode === GAME_MODES.CLASSIC) {
+      if (this.physicsWorld.balls.length === 0 && !this.physicsWorld.projectile) {
+        this.completeClassicStage();
+      }
     } else if (this.mode === GAME_MODES.BOSS_RUSH) {
       const bossBall = this.getBossBall();
       if (!bossBall) {

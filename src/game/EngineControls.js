@@ -38,8 +38,11 @@ export const engineControlsMethods = {
     return grants || holds || Boolean(this.currentBall?.specialType);
   },
 
-  /** True in the Daily Challenge while shop ammo is switched off for fairness. */
+  /** True while shop ammo is switched off: Daily fairness, or the Classic ruleset (no specials). */
   isDailyAmmoLocked() {
+    if (this.mode === GAME_MODES.CLASSIC) {
+      return true;
+    }
     return this.mode === GAME_MODES.DAILY && !this.gameConfig.seededFairness?.dailyAllowsSpecialAmmo;
   },
 
@@ -265,7 +268,11 @@ export const engineControlsMethods = {
 
   /** True when the device tilt is ignored: Daily and shared-seed Flux runs share one physics. */
   isTiltLocked() {
-    return this.mode === GAME_MODES.DAILY || (this.mode === GAME_MODES.FLUX && this.isSharedFluxRun);
+    return (
+      this.mode === GAME_MODES.DAILY
+      || this.mode === GAME_MODES.CLASSIC
+      || (this.mode === GAME_MODES.FLUX && this.isSharedFluxRun)
+    );
   },
 
   /**
