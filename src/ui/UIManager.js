@@ -522,7 +522,7 @@ export class UIManager {
       }
     }
     const fairPlay = intro.mutatorKey
-      ? { upgrades: engine.areDailyUpgradesNeutralised(), ammo: engine.isDailyAmmoLocked() }
+      ? { upgrades: engine.areUpgradesNeutralised(), ammo: engine.isDailyAmmoLocked() }
       : null;
     const text = buildLevelIntroText({ ...intro, fairPlay }, t);
     revealLiveRegion({

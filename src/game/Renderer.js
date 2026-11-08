@@ -46,7 +46,7 @@ const PATTERNS = Object.freeze({
 const INTRO_EASE_POWER = 3;
 /** Fixed render clock under reduced motion: pulses and field waves hold their resting frame. */
 const REDUCED_MOTION_CLOCK_MS = 0;
-/** Sag meter drawing: shapes and timings that are not worth a config key. */
+/** Sag meter drawing: shape constants. Colors, thickness and pulse period live in `sag.render`. */
 const SAG_DRAW = Object.freeze({
   PHASE_WARN: 'warn',
   PHASE_FULL: 'full',
@@ -61,11 +61,7 @@ const SAG_DRAW = Object.freeze({
   CHEVRON_GAP: 5,
   CHEVRON_WIDTH: 2,
   HATCH_WIDTH: 1,
-  HATCH_COLOR: 'rgba(0, 0, 0, 0.55)',
-  RAIL_THICKNESS: 6,
-  RAIL_PULSE_PERIOD_MS: 380,
   RAIL_PULSE_DEPTH: 0.35,
-  RAIL_SHADE_COLOR: '#000000',
   RAIL_SHADE_PER_DROP: 0.07,
   RAIL_SHADE_MAX: 0.6,
   RAIL_HATCH_STEP: 12
@@ -469,13 +465,19 @@ export class Renderer {
     // A new Flux shape slides down into place; only the drawing moves, not the physics.
     // After a Sag step the cluster is already lower in the physics: it eases down from its
     // old place, drawing only.
-    const introOffset = this.getStageIntroOffset(engineState) + this.getRailLowerOffset(engineState);
+    const introOffset = this.getStageIntroOffset(engineState);
     if (introOffset > 0) {
       ctx.save();
       ctx.translate(0, -introOffset);
     }
     this.drawObstacles(ctx, engineState.physicsWorld.obstacles, now, alpha);
     this.drawRails(ctx, engineState.physicsWorld);
+    // Only the cluster and its rail ease down; fixed fixtures stay where they are.
+    const lowerOffset = this.getRailLowerOffset(engineState);
+    if (lowerOffset > 0) {
+      ctx.save();
+      ctx.translate(0, -lowerOffset);
+    }
     this.drawAnchorRail(ctx, engineState, theme, now);
     this.drawMagneticBonds(ctx, engineState.physicsWorld, theme, now, alpha);
     this.drawTethers(ctx, engineState.physicsWorld, alpha);
@@ -484,6 +486,9 @@ export class Renderer {
       this.drawBall(ctx, ball, now, alpha);
     }
     this.drawChainLinkOverlays(ctx, engineState.physicsWorld, alpha);
+    if (lowerOffset > 0) {
+      ctx.restore();
+    }
     if (introOffset > 0) {
       ctx.restore();
     }
@@ -2009,29 +2014,29 @@ export class Renderer {
     const color = sag.phase === SAG_DRAW.PHASE_FULL
       ? sagCfg.railCritColor
       : sag.phase === SAG_DRAW.PHASE_WARN ? sagCfg.railWarnColor : sagCfg.railColor;
-    const half = SAG_DRAW.RAIL_THICKNESS * MATH_CONSTANTS.HALF;
+    const half = sagCfg.render.railThickness * MATH_CONSTANTS.HALF;
     ctx.save();
     if (sag.phase === SAG_DRAW.PHASE_WARN && !this.isReducedMotion) {
-      const wave = Math.sin((now / SAG_DRAW.RAIL_PULSE_PERIOD_MS) * MATH_CONSTANTS.TWO_PI);
+      const wave = Math.sin((now / sagCfg.render.railPulsePeriodMs) * MATH_CONSTANTS.TWO_PI);
       ctx.globalAlpha = 1 - SAG_DRAW.RAIL_PULSE_DEPTH * (MATH_CONSTANTS.HALF + MATH_CONSTANTS.HALF * wave);
     }
     ctx.fillStyle = color;
-    ctx.fillRect(minX, top - half, maxX - minX, SAG_DRAW.RAIL_THICKNESS);
+    ctx.fillRect(minX, top - half, maxX - minX, sagCfg.render.railThickness);
     const shade = Math.min(SAG_DRAW.RAIL_SHADE_MAX, sag.railDrops * SAG_DRAW.RAIL_SHADE_PER_DROP);
     if (shade > 0) {
       ctx.globalAlpha = shade;
-      ctx.fillStyle = SAG_DRAW.RAIL_SHADE_COLOR;
-      ctx.fillRect(minX, top - half, maxX - minX, SAG_DRAW.RAIL_THICKNESS);
+      ctx.fillStyle = sagCfg.render.railShadeColor;
+      ctx.fillRect(minX, top - half, maxX - minX, sagCfg.render.railThickness);
       ctx.globalAlpha = 1;
     }
     if (sag.phase !== SAG_DRAW.PHASE_CALM && (this.colorPatterns || this.highContrast)) {
       // Shape cue besides the color: diagonal hatching on the rail while it is stressed.
-      ctx.strokeStyle = SAG_DRAW.HATCH_COLOR;
+      ctx.strokeStyle = sagCfg.render.hatchColor;
       ctx.lineWidth = SAG_DRAW.HATCH_WIDTH;
       ctx.beginPath();
       for (let x = minX; x < maxX; x += SAG_DRAW.RAIL_HATCH_STEP) {
         ctx.moveTo(x, top + half);
-        ctx.lineTo(x + SAG_DRAW.RAIL_THICKNESS, top - half);
+        ctx.lineTo(x + sagCfg.render.railThickness, top - half);
       }
       ctx.stroke();
     }
@@ -2070,7 +2075,7 @@ export class Renderer {
         ctx.fillStyle = fill;
         ctx.fillRect(left, y, gauge.width, gauge.segmentHeight);
         if (hatch && (isWarn || isFull)) {
-          ctx.strokeStyle = SAG_DRAW.HATCH_COLOR;
+          ctx.strokeStyle = sagCfg.render.hatchColor;
           ctx.lineWidth = SAG_DRAW.HATCH_WIDTH;
           ctx.beginPath();
           ctx.moveTo(left, y + gauge.segmentHeight);

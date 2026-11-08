@@ -76,7 +76,7 @@ export const uiHudRefreshMethods = {
       setAttributeIfChanged(
         meter,
         'aria-valuetext',
-        t('hud.stats.sag.aria', {
+        t(remaining === 1 ? 'hud.stats.sag.ariaOne' : 'hud.stats.sag.aria', {
           level: formatNumber(sag.level),
           size: formatNumber(sag.size),
           remaining: formatNumber(remaining)
@@ -133,7 +133,7 @@ export const uiHudRefreshMethods = {
     // One-shot extras (an unlocked achievement, a cleared Flux stage) must not replay
     // when refresh is re-run with lastExtra (language change, input mode change, shop
     // purchase): they are read from this call only.
-    const { oneShot: { unlockedAchievementIds, fluxStageCleared, fluxPerkChosen }, persistentExtra } =
+    const { oneShot: { unlockedAchievementIds, fluxStageCleared, classicStageCleared, fluxPerkChosen }, persistentExtra } =
       splitRefreshExtra(extra);
     this.lastExtra = persistentExtra;
     setTextIfChanged(this.elements.scoreValue, formatNumber(engine.score));
@@ -527,7 +527,11 @@ export const uiHudRefreshMethods = {
     this.elements.powerupsContainer.classList.toggle('hidden', !offersSpecialBalls);
     this.elements.powerupsHeader?.classList.toggle('hidden', !offersSpecialBalls);
     // The panel keeps its place in the layout, so it says why it is empty.
-    this.elements.powerupsEmpty?.classList.toggle('hidden', offersSpecialBalls);
+    // Classic has no specials at all: no empty-panel message and no overcharge bar either.
+    const isPurist = engine.mode === GAME_MODES.CLASSIC;
+    this.elements.powerupsEmpty?.classList.toggle('hidden', offersSpecialBalls || isPurist);
+    this.elements.overchargeFill?.closest?.('.overcharge-widget')?.classList.toggle('hidden', isPurist);
+    this.elements.overchargePct?.classList.toggle('hidden', isPurist);
 
     this.syncShopAmmoAvailability();
     this.updateTiltButton();
@@ -538,6 +542,10 @@ export const uiHudRefreshMethods = {
 
     if (fluxStageCleared) {
       this.announce(t('hud.announcer.round.fluxStageCleared', { stage: fluxStageCleared }));
+    }
+
+    if (classicStageCleared) {
+      this.announce(t('hud.announcer.round.classicStageCleared', { stage: classicStageCleared }));
     }
 
     if (fluxPerkChosen) {

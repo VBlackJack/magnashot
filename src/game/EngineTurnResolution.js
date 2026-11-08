@@ -24,7 +24,7 @@ import {
 } from '../core/Constants.js';
 import { t } from '../core/I18n.js';
 import { DISCOVERY_INTERACTIONS } from './Discovery.js';
-import { getSagSpec, applyTurn, SAG_STEPS } from './SagMeter.js';
+import { applyTurn, SAG_STEPS } from './SagMeter.js';
 
 /** Methods of GameEngine that belong to this domain, installed on its prototype. */
 export const engineTurnResolutionMethods = {
@@ -711,14 +711,29 @@ export const engineTurnResolutionMethods = {
    * @param {{removed:boolean, dropped:number, frozen:boolean}} outcome
    */
   resolveSagTurn(outcome) {
-    const spec = getSagSpec(this.mode, this.gameConfig.sag, this.gameConfig.endless);
+    const spec = this.getSagSpecCached();
     if (!spec) {
       return;
     }
     const result = applyTurn({ level: this.sagLevel ?? 0 }, outcome, spec);
     this.sagLevel = result.level;
+    const canvasCfg = this.gameConfig.canvas;
+    if (result.drained > 0) {
+      this.particleSystem.spawnFloatingText(
+        canvasCfg.launcherX,
+        canvasCfg.launcherY + canvasCfg.launcherPopupOffsetY,
+        t('gameplay.feedback.sag.drained', { amount: result.drained }),
+        this.gameConfig.theme.overchargePopupColor
+      );
+    }
     if (result.lowered) {
-      if (spec.step === SAG_STEPS.RAIL) {
+      const isRail = spec.step === SAG_STEPS.RAIL;
+      // A board emptied by this very turn is about to be paid as a cleared stage: the rail
+      // does not drop on it.
+      if (isRail && this.physicsWorld.balls.length === 0 && !this.physicsWorld.projectile) {
+        return;
+      }
+      if (isRail) {
         this.lowerAnchorRail();
       } else {
         this.spawnEndlessWave();
@@ -726,6 +741,12 @@ export const engineTurnResolutionMethods = {
         // compare against. On a non-empty board the wave only adds balls, so every launcher
         // color is still present and this second pass draws nothing from the seeded random.
         this.refreshStaleLauncherColors();
+      }
+      // The step may have ended the run (rail past the danger line): no creak, shake or
+      // text on the end screen, and the cluster stays where it really is.
+      if (!this.isRunPlaying()) {
+        this.railLowerFrames = 0;
+        return;
       }
       this.railLowerFrames = this.gameConfig.sag?.lowerFrames ?? 0;
       this.audioManager.playEffect?.('creak');
@@ -735,9 +756,9 @@ export const engineTurnResolutionMethods = {
       }
       if (this.gameConfig.sag) {
         this.particleSystem.spawnFloatingText(
-          this.gameConfig.canvas.logicalWidth * MATH_CONSTANTS.HALF,
-          this.gameConfig.endless.startY + this.gameConfig.canvas.wavePopupOffsetY,
-          t('gameplay.feedback.sag.lowered'),
+          canvasCfg.logicalWidth * MATH_CONSTANTS.HALF,
+          this.gameConfig.endless.startY + canvasCfg.wavePopupOffsetY,
+          t(isRail ? 'gameplay.feedback.sag.lowered' : 'gameplay.feedback.sag.dropped'),
           this.gameConfig.theme.wavePopupColor
         );
       }

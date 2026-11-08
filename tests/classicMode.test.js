@@ -378,3 +378,87 @@ test('The Classic rail-drop total survives a stage change and a snapshot, and a 
   engine.triggerGameOver(GAME_OVER_REASONS.LINE_CROSSED);
   assert.equal(engine.gameOverSummary.isNewRecord, true);
 });
+
+const recordFloatingTexts = (engine) => {
+  const texts = [];
+  const original = engine.particleSystem.spawnFloatingText.bind(engine.particleSystem);
+  engine.particleSystem.spawnFloatingText = (x, y, text, color) => {
+    texts.push(text);
+    return original(x, y, text, color);
+  };
+  return texts;
+};
+
+test('A rail drop that crosses the danger line ends the run with no lowering feedback', () => {
+  const engine = createTestEngine();
+  engine.startClassicMode();
+  const texts = recordFloatingTexts(engine);
+  const size = gameConfig.sag.modes[GAME_MODES.CLASSIC].size;
+  const lowestEdge = Math.max(...engine.physicsWorld.balls.map((b) => b.y + b.radius));
+  const shift = gameConfig.canvas.dangerLineY - lowestEdge - 1;
+  for (const ball of engine.physicsWorld.balls) {
+    ball.y += shift;
+    ball.prevY += shift;
+    ball.anchorY += shift;
+  }
+  engine.sagLevel = size - 1;
+  engine.handlePostTurnCleanup(false);
+  assert.equal(engine.state, GAME_STATES.GAME_OVER);
+  assert.equal(engine.railLowerFrames, 0, 'the end screen shows the cluster where it really is');
+  assert.ok(!texts.some((text) => text.includes('rail')), 'no lowering text on the end screen');
+});
+
+test('The meter reads full while the cluster eases down, then empty', () => {
+  const engine = createTestEngine();
+  engine.startClassicMode();
+  const size = gameConfig.sag.modes[GAME_MODES.CLASSIC].size;
+  engine.sagLevel = size - 1;
+  engine.handlePostTurnCleanup(false);
+  assert.ok(engine.railLowerFrames > 0);
+  const lowering = engine.getSagState();
+  assert.equal(lowering.phase, 'full');
+  assert.equal(lowering.level, size);
+  engine.railLowerFrames = 0;
+  assert.equal(engine.getSagState().phase, 'calm');
+  assert.equal(engine.getSagState().level, 0);
+});
+
+test('A board emptied by the turn does not lower the rail', () => {
+  const engine = createTestEngine();
+  engine.startClassicMode();
+  const size = gameConfig.sag.modes[GAME_MODES.CLASSIC].size;
+  let drops = 0;
+  engine.lowerAnchorRail = () => {
+    drops++;
+  };
+  engine.sagLevel = size - 1;
+  clearBoard(engine);
+  engine.handlePostTurnCleanup(false);
+  assert.equal(drops, 0);
+  assert.equal(engine.classicStage, 2, 'the stage is cleared instead');
+});
+
+test('Classic hides special slots and neutralises the Workshop; Survival keeps the slots', () => {
+  const engine = createTestEngine();
+  engine.startClassicMode();
+  assert.equal(engine.offersSpecialBalls(), false);
+  assert.equal(engine.areUpgradesNeutralised(), true);
+  engine.startEndlessMode();
+  assert.equal(engine.offersSpecialBalls(), true);
+  assert.equal(engine.areUpgradesNeutralised(), false);
+});
+
+test('An avalanche that drains the meter says so, and Survival words its drop differently from Classic', () => {
+  const engine = createTestEngine();
+  engine.startEndlessMode();
+  const texts = recordFloatingTexts(engine);
+  const spec = gameConfig.sag.modes[GAME_MODES.ENDLESS];
+  engine.sagLevel = 2;
+  engine.resolveSagTurn({ removed: true, dropped: spec.dropsPerDrain, frozen: false });
+  assert.equal(engine.sagLevel, 1);
+  assert.ok(texts.some((text) => text.includes('sag.drained') || text.includes('sag -1')), 'the drain is announced on the canvas');
+  engine.sagLevel = spec.size - 1;
+  engine.resolveSagTurn({ removed: false, dropped: 0, frozen: false });
+  assert.ok(texts.some((text) => text.includes('sag.dropped') || text === 'The cluster drops'));
+  assert.ok(!texts.some((text) => text.includes('sag.lowered') || text === 'The rail gives way'));
+});

@@ -25,7 +25,7 @@ import {
 } from '../core/Constants.js';
 import { t } from '../core/I18n.js';
 import { SeededRandom } from '../core/SeededRandom.js';
-import { getSagSpec, getSagPhase } from './SagMeter.js';
+import { getSagSpec, getSagPhase, SAG_PHASES } from './SagMeter.js';
 
 /** Methods of GameEngine that belong to this domain, installed on its prototype. */
 export const engineRoundFlowMethods = {
@@ -111,14 +111,34 @@ export const engineRoundFlowMethods = {
   },
 
   /**
+   * Sag spec of the current mode, memoised: the renderer and the HUD ask every frame.
+   * Rebuilt when the mode or the config sections change.
+   */
+  getSagSpecCached() {
+    const cache = this.sagSpecCache;
+    const sagCfg = this.gameConfig.sag;
+    const endlessCfg = this.gameConfig.endless;
+    if (cache && cache.mode === this.mode && cache.sagCfg === sagCfg && cache.endlessCfg === endlessCfg) {
+      return cache.spec;
+    }
+    const spec = getSagSpec(this.mode, sagCfg, endlessCfg);
+    this.sagSpecCache = { mode: this.mode, sagCfg, endlessCfg, spec };
+    return spec;
+  },
+
+  /**
    * Read-only view of the Sag meter for the HUD and the renderer.
    * @returns {{active:boolean, level:number, size:number, phase:string, railDrops:number}}
    */
   getSagState() {
-    const spec = getSagSpec(this.mode, this.gameConfig.sag, this.gameConfig.endless);
+    const spec = this.getSagSpecCached();
     const railDrops = this.railDrops ?? 0;
     if (!spec) {
       return { active: false, level: 0, size: 0, phase: 'calm', railDrops };
+    }
+    // The meter resets the moment it fills; while the step is still easing in it reads as full.
+    if ((this.railLowerFrames ?? 0) > 0) {
+      return { active: true, level: spec.size, size: spec.size, phase: SAG_PHASES.FULL, railDrops };
     }
     const level = this.sagLevel ?? 0;
     return { active: true, level, size: spec.size, phase: getSagPhase(level, spec, spec.warnAt), railDrops };
@@ -432,6 +452,8 @@ export const engineRoundFlowMethods = {
     if (this.state === GAME_STATES.GAME_OVER || this.state === GAME_STATES.VICTORY) {
       return;
     }
+    // The final board is shown where it really is: no lowering ease on the end screen.
+    this.railLowerFrames = 0;
     let previousBestScore = 0;
     if (this.mode === GAME_MODES.ENDLESS) {
       previousBestScore = this.storageManager.getEndlessHighScore();

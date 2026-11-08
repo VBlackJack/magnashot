@@ -1506,7 +1506,13 @@
     "railColor": "#94a3b8",
     "railWarnColor": "#f59e0b",
     "railCritColor": "#ef4444",
-    "gauge": { "offsetX": 58, "offsetY": -8, "segmentHeight": 7, "segmentGap": 3, "width": 10 }
+    "gauge": { "offsetX": 58, "offsetY": -8, "segmentHeight": 7, "segmentGap": 3, "width": 10 },
+    "render": {
+      "railThickness": 6,
+      "railPulsePeriodMs": 380,
+      "railShadeColor": "#000000",
+      "hatchColor": "rgba(0, 0, 0, 0.55)"
+    }
   },
   "classic": {
     "columns": 10,

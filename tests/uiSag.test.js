@@ -224,6 +224,6 @@ test('the Classic record reads as a stage in the stats and shares without a link
       { mode: GAME_MODES.CLASSIC, stage: 3, score: 1200, drops: 4, url: 'https://example.invalid/' },
       gameConfig.share
     );
-    assert.deepEqual(text.split(/\r?\n/), ['MagnaShot Classic', 'Stage 3 - 1,200 pts', 'Rail drops: 4']);
+    assert.deepEqual(text.split(/\r?\n/), ['MagnaShot Purist', 'Stage 3 - 1,200 pts', 'Rail drops: 4']);
   });
 });

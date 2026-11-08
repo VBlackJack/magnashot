@@ -29,6 +29,9 @@ export const engineControlsMethods = {
    * @returns {boolean} True when the special ball slots belong on screen.
    */
   offersSpecialBalls() {
+    if (this.mode === GAME_MODES.CLASSIC) {
+      return false;
+    }
     if (this.mode !== GAME_MODES.CAMPAIGN) {
       return true;
     }
@@ -44,6 +47,14 @@ export const engineControlsMethods = {
       return true;
     }
     return this.mode === GAME_MODES.DAILY && !this.gameConfig.seededFairness?.dailyAllowsSpecialAmmo;
+  },
+
+  /**
+   * True while the Workshop upgrades count for nothing in the current run: Classic always,
+   * the Daily Challenge while it holds a zero baseline.
+   */
+  areUpgradesNeutralised() {
+    return this.mode === GAME_MODES.CLASSIC || this.areDailyUpgradesNeutralised();
   },
 
   /** True in the Daily Challenge while every Workshop upgrade is held at a zero baseline. */

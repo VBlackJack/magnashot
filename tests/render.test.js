@@ -1077,6 +1077,7 @@ test('The Sag gauge and the lowering offset leave the canvas state balanced in e
   const levels = { calm: 1, warn: size - 1, full: size };
   for (const [phase, level] of Object.entries(levels)) {
     engine.sagLevel = level;
+    engine.railLowerFrames = 0;
     assert.equal(engine.getSagState().phase, phase);
     for (const patterns of [false, true]) {
       for (const reducedMotion of [false, true]) {
@@ -1150,4 +1151,29 @@ test('The Classic anchor rail is drawn and the frame stays balanced while it low
     const rails = ctx.calls.filter((c) => c.name === 'fillRect' && c.args[3] === 6);
     assert.ok(rails.length > 0, 'the rail bar is drawn');
   }
+});
+
+test('The lowering offset moves the cluster and the anchor rail, never the fixed obstacles', () => {
+  const engine = createTestEngine();
+  engine.startClassicMode(1);
+  engine.railLowerFrames = gameConfig.sag.lowerFrames;
+  const renderer = createRenderer();
+  renderer.setColorPatterns(false);
+  engine.setReducedMotion(false);
+  const ctx = renderer.ctx;
+  const upwardTranslates = () => ctx.calls.filter((c) => c.name === 'translate' && c.args[1] < 0).length;
+  const seen = {};
+  for (const name of ['drawObstacles', 'drawRails', 'drawAnchorRail', 'drawMagneticBonds']) {
+    const original = renderer[name].bind(renderer);
+    renderer[name] = (...args) => {
+      seen[name] = upwardTranslates();
+      return original(...args);
+    };
+  }
+  renderer.render(engine, 1.0);
+  assert.equal(seen.drawObstacles, 0, 'obstacles are drawn without the lowering offset');
+  assert.equal(seen.drawRails, 0, 'rails are drawn without the lowering offset');
+  assert.equal(seen.drawAnchorRail, 1, 'the anchor rail eases down with the cluster');
+  assert.equal(seen.drawMagneticBonds, 1, 'the bonds ease down with the cluster');
+  assert.equal(ctx.saveDepth, 0);
 });

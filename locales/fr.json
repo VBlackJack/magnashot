@@ -130,7 +130,7 @@
         "coreRescueProgress": "💎 {{rescued}}/{{total}}",
         "switchHint": "Cliquer pour changer de mode ou de niveau",
         "switchHintTouch": "Touchez pour changer de mode ou de niveau",
-        "classic": "Classique - Étape {{stage}}"
+        "classic": "Puriste - Étape {{stage}}"
       },
       "shots": {
         "label": "Tirs restants",
@@ -158,7 +158,8 @@
       "sag": {
         "label": "Affaissement",
         "value": "{{level}}/{{size}}",
-        "aria": "Affaissement {{level}} sur {{size}} : {{remaining}} tirs manqués avant la chute de l'amas"
+        "aria": "Affaissement {{level}} sur {{size}} : {{remaining}} tirs manqués avant la chute de l'amas",
+        "ariaOne": "Affaissement {{level}} sur {{size}} : {{remaining}} tir manqué avant la chute de l'amas"
       }
     },
     "launcher": {
@@ -249,7 +250,8 @@
         "victory": "Niveau terminé. Score : {{score}}. Étoiles : {{stars}} sur {{maxStars}}.",
         "withNearMiss": "{{result}} {{nearMiss}}.",
         "gameOver": "Partie terminée. {{reason}} Score : {{score}}.",
-        "fluxStageCleared": "Forme {{stage}} vidée. La forme suivante arrive."
+        "fluxStageCleared": "Forme {{stage}} vidée. La forme suivante arrive.",
+        "classicStageCleared": "Étape {{stage}} terminée. L'étape suivante est prête."
       },
       "hints": {
         "reset": "Les indices de découverte s'afficheront de nouveau."
@@ -365,6 +367,7 @@
       "sag": {
         "warning": "Un raté de plus et l'amas descend",
         "lowered": "Le rail cède",
+        "dropped": "L'amas descend",
         "drained": "Avalanche : affaissement -{{amount}}"
       },
       "classic": {
@@ -568,7 +571,7 @@
         "cascade": "⬇ Cascade",
         "cascadeDesc": "Puits haute gravité • Plateformes",
         "lockedDesc": "Terminez le niveau {{level}} pour débloquer",
-        "classic": "Classique",
+        "classic": "Puriste",
         "classicDesc": "Règles pures : ni spéciaux, ni améliorations. Les ratés abaissent le plafond.",
         "classicBest": "Record : étape {{stage}}"
       }
@@ -915,6 +918,7 @@
       },
       "upgrades": {
         "dailyBaselineNote": "Les améliorations sont suspendues pendant le Défi du Jour.",
+        "classicBaselineNote": "Les améliorations sont suspendues en mode Puriste.",
         "laserSight": {
           "name": "Visée Laser Courbée",
           "description": "Augmente la portée et le nombre de rebonds prédictifs du viseur."
@@ -1318,7 +1322,7 @@
       "failed": "Le partage a échoué. Copiez plutôt le texte sélectionné."
     },
     "classic": {
-      "header": "MagnaShot Classique",
+      "header": "MagnaShot Puriste",
       "stats": "Étape {{stage}} - {{score}} pts",
       "drops": "Chutes du rail : {{drops}}"
     }

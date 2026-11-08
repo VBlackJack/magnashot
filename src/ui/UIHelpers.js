@@ -244,8 +244,8 @@ export const INPUT_ARIA_HINTS = Object.freeze([{ elementId: 'game-canvas', key: 
  * @returns {{oneShot: object, persistentExtra: object}} The two halves.
  */
 export function splitRefreshExtra(extra) {
-  const { unlockedAchievementIds, fluxStageCleared, fluxPerkChosen, ...persistentExtra } = extra;
-  return { oneShot: { unlockedAchievementIds, fluxStageCleared, fluxPerkChosen }, persistentExtra };
+  const { unlockedAchievementIds, fluxStageCleared, classicStageCleared, fluxPerkChosen, ...persistentExtra } = extra;
+  return { oneShot: { unlockedAchievementIds, fluxStageCleared, classicStageCleared, fluxPerkChosen }, persistentExtra };
 }
 
 /** Default star ceiling when no scoring config is passed to resolveNextCampaignTarget. */
