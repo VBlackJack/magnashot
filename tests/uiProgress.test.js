@@ -344,15 +344,14 @@ test('the Weekly Flux label shows the best, then the unclaimed bonus, then the p
   assert.equal(best.getWeeklyButtonLabel(), `Weekly Flux ✓ ${formatNumber(4200)}`);
 
   const unclaimed = makeUi({
-    storage: { getWeeklyFluxBest: () => null, storageConfig: gameConfig.storage, safeGetItem: () => null }
+    storage: { getWeeklyFluxBest: () => null, hasClaimedWeeklyFluxBonus: () => false }
   });
   assert.equal(unclaimed.getWeeklyButtonLabel(), `Weekly Flux +${gameConfig.weeklyFlux.firstPlayBonusCoins} ⬡`);
 
   const claimed = makeUi({
     storage: {
       getWeeklyFluxBest: () => null,
-      storageConfig: gameConfig.storage,
-      safeGetItem: () => getUtcIsoWeekKey(Date.now())
+      hasClaimedWeeklyFluxBonus: (weekKey) => weekKey === getUtcIsoWeekKey(Date.now())
     }
   });
   assert.equal(claimed.getWeeklyButtonLabel(), 'Weekly Flux');
