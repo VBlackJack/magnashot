@@ -296,7 +296,7 @@ export function planGuardShot(engine, charge, canFlip) {
   }
   const cfg = engine.gameConfig.versus;
   const canvasCfg = engine.gameConfig.canvas;
-  const flipNeeded = shotPolarity(ball.colorId, engine.isPolarityFlipped, cfg) === charge.polarity;
+  const flipNeeded = shotPolarity(ball.colorId, engine.isPolarityFlipped, cfg, engine.physicsWorld.polarityMap) === charge.polarity;
   if (flipNeeded && !canFlip) {
     return null;
   }
@@ -310,7 +310,7 @@ export function planGuardShot(engine, charge, canFlip) {
       const angle = Math.max(-canvasCfg.maxAimAngleRad, Math.min(-canvasCfg.minAimAngleRad, direct + offset));
       engine.updateAimFromAngle(angle);
       const cut = truncateAimAtCharges(engine.aimPoints, engine.versus.charges, hitRadius);
-      const shot = shotPolarity(ball.colorId, engine.isPolarityFlipped, cfg);
+      const shot = shotPolarity(ball.colorId, engine.isPolarityFlipped, cfg, engine.physicsWorld.polarityMap);
       if (cut.hit && cut.hit.charge.polarity !== shot) {
         found = { angle, flip: flipNeeded };
         break;

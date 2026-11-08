@@ -218,6 +218,7 @@ const EXPECTED_PROTOTYPE_NAMES = [
   'createVersusSeed',
   'enterVersus',
   'leaveVersus',
+  'restoreHeldRunDialog',
   'scheduleVersusLayout',
   'layoutVersus',
   'layoutVersusMini',

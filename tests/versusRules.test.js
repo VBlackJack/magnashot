@@ -51,7 +51,6 @@ const cfg = {
     boardClearCharges: 4,
     strongChargeRaw: 8
   },
-  colorPolarities: { red: 1, blue: -1, green: 1 },
   fallbackPolarity: 1,
   threatRatio: 0.4,
   guardStreakSize: 3,
@@ -60,6 +59,7 @@ const cfg = {
   suddenDeath: { startSeconds: 180, intervalSeconds: 20 }
 };
 
+const polarities = new Map([['red', 1], ['blue', -1], ['green', 1]]);
 const RISE = 360;
 const makeCharge = (over = {}) => createCharge({
   polarity: 1, strength: 1, x: 100, startY: 800, targetY: 200, riseFrames: RISE, id: 'c1', ...over
@@ -81,12 +81,12 @@ test('attack table: free sphere, links, special, cap and strong flag', () => {
 });
 
 test('polarity of charges and shots follows the colour and the flip', () => {
-  assert.equal(chargePolarityForColor('red', cfg), 1);
-  assert.equal(chargePolarityForColor('blue', cfg), -1);
-  assert.equal(chargePolarityForColor('unknown', cfg), cfg.fallbackPolarity);
-  assert.equal(shotPolarity('red', false, cfg), 1);
-  assert.equal(shotPolarity('red', true, cfg), -1);
-  assert.equal(shotPolarity('blue', true, cfg), 1);
+  assert.equal(chargePolarityForColor('red', cfg, polarities), 1);
+  assert.equal(chargePolarityForColor('blue', cfg, polarities), -1);
+  assert.equal(chargePolarityForColor('unknown', cfg, polarities), cfg.fallbackPolarity);
+  assert.equal(shotPolarity('red', false, cfg, polarities), 1);
+  assert.equal(shotPolarity('red', true, cfg, polarities), -1);
+  assert.equal(shotPolarity('blue', true, cfg, polarities), 1);
 });
 
 test('createCharge starts at its start height with its data', () => {

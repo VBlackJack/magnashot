@@ -46,7 +46,8 @@ export const SCENE_TIME_SCALE_FIXED = 'fixed';
  * Interpolation alpha is forced to 1 whenever the last update did not advance the
  * simulation (hit-stop, pause, menus, Flux stage transition), because previous positions are only saved by a
  * real physics step. While no board is playing or celebrating a victory, the
- * scene is static and is redrawn at the configured idle interval instead of every frame. Any exception
+ * scene is static (a scene whose isAdvancing() says false counts as static too) and is redrawn at the configured
+ * idle interval instead of every frame. Any exception
  * thrown by update or render stops the loop for good and is reported once.
  *
  * @param {object} options
@@ -136,7 +137,9 @@ export function createGameLoop({
         }
       }
 
-      const isLive = boards.some((board) => board.engine.state === GAME_STATES.PLAYING || board.engine.isVictoryCelebrating());
+      // A scene that says it is not advancing (paused, between rounds, behind a dialog) is static: idle redraw.
+      const isSceneHeld = typeof scene.isAdvancing === 'function' && !scene.isAdvancing();
+      const isLive = !isSceneHeld && boards.some((board) => board.engine.state === GAME_STATES.PLAYING || board.engine.isVictoryCelebrating());
       if (isLive || lastRenderTime === null || now - lastRenderTime >= idleRenderIntervalMs) {
         for (let i = 0; i < boards.length; i++) {
           const alpha = lastUpdateAdvanced[i] && fixedStepMs > 0 ? accumulator / fixedStepMs : 1.0;

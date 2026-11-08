@@ -248,6 +248,8 @@ export class VersusHud {
     this.specialButtons = [];
     this.specialsKey = '';
     this.lastState = null;
+    // Polarity (+1, -1, or null for a special sphere) of the loaded shot, as last shown on the button.
+    this.shotPolarity = null;
   }
 
   /** Builds one pip per round a side needs to win. */
@@ -268,14 +270,9 @@ export class VersusHud {
   refreshLabels() {
     const { translate } = this;
     for (const board of [this.els.boards[0]]) {
-      const labels = [
-        [board.swapBtn, 'versus.hud.swap'],
-        [board.polarityBtn, 'versus.hud.polarity']
-      ];
-      for (const [button, key] of labels) {
-        setTextIfChanged(button, translate(key));
-        setAttributeIfChanged(button, 'aria-label', translate(key));
-      }
+      setTextIfChanged(board.swapBtn, translate('versus.hud.swap'));
+      setAttributeIfChanged(board.swapBtn, 'aria-label', translate('versus.hud.swap'));
+      this.refreshPolarityLabel(this.shotPolarity);
       setAttributeIfChanged(board.specials, 'aria-label', translate('versus.hud.specials'));
     }
     if (this.lastState) {
@@ -350,6 +347,29 @@ export class VersusHud {
   }
 
   /**
+   * Writes the polarity button: its text and its accessible name tell the polarity of the loaded
+   * shot (a special sphere has none, the button then only names its action).
+   * @param {number|null} polarity - +1, -1, or null.
+   */
+  refreshPolarityLabel(polarity) {
+    this.shotPolarity = polarity;
+    const { translate } = this;
+    const button = this.els.boards[0].polarityBtn;
+    if (!polarity) {
+      setTextIfChanged(button, translate('versus.hud.polarity'));
+      setAttributeIfChanged(button, 'aria-label', translate('versus.hud.polarity'));
+      return;
+    }
+    const isPlus = polarity > 0;
+    setTextIfChanged(button, translate('versus.hud.polarityButton', { sign: translate(isPlus ? 'versus.hud.signPlus' : 'versus.hud.signMinus') }));
+    setAttributeIfChanged(
+      button,
+      'aria-label',
+      translate('versus.hud.polarityAria', { polarity: translate(isPlus ? 'versus.hud.polarityPositive' : 'versus.hud.polarityNegative') })
+    );
+  }
+
+  /**
    * Refreshes what depends on the player's engine: the polarity button and the stocked specials.
    * @param {object} engine - The player's engine.
    * @param {object} specialsContext
@@ -362,6 +382,7 @@ export class VersusHud {
   refreshPlayerControls(engine, { types, specs, describe, onPick }) {
     const board = this.els.boards[0];
     setAttributeIfChanged(board.polarityBtn, 'aria-pressed', String(Boolean(engine.isPolarityFlipped)));
+    this.refreshPolarityLabel(engine.getVersusShotPolarity?.() ?? null);
     const stocked = types.filter((type) => (engine.specialInventory?.[type] || 0) > 0 || engine.currentBall?.specialType === type);
     const key = stocked.map((type) => `${type}:${engine.specialInventory?.[type] || 0}:${engine.currentBall?.specialType === type}`).join('|');
     if (key === this.specialsKey) {

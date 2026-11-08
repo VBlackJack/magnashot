@@ -241,21 +241,27 @@ export const uiVersusMethods = {
       unsubscribe: null,
       onResize: null
     };
-    v.controller = createVersusMatch({
-      seed: this.createVersusSeed(),
-      mode: 'cpu',
-      playerBoard: PLAYER_BOARD,
-      cpuTier: tier,
-      configs: this.versusConfigs,
-      storageManager: this.storageManager,
-      audioManager: this.audioManager,
-      autoAdvance: true,
-      onBoardChange: () => {
-        v.hudDirty = true;
-      }
-    });
+    // The screen is live before the first round starts so the announcement of round 1 is received.
     this.versus = v;
-    v.unsubscribe = v.controller.onEvent((event) => this.handleVersusEvent(event));
+    try {
+      v.controller = createVersusMatch({
+        seed: this.createVersusSeed(),
+        mode: 'cpu',
+        playerBoard: PLAYER_BOARD,
+        cpuTier: tier,
+        configs: this.versusConfigs,
+        storageManager: this.storageManager,
+        audioManager: this.audioManager,
+        autoAdvance: true,
+        onBoardChange: () => {
+          v.hudDirty = true;
+        },
+        onEvent: (event) => this.handleVersusEvent(event)
+      });
+    } catch (error) {
+      this.versus = null;
+      throw error;
+    }
 
     this.elements.versusScreen.classList.remove(HIDDEN_CLASS);
     this.syncModalInertState();
@@ -305,8 +311,28 @@ export const uiVersusMethods = {
     this.autoPausedByOverlay = false;
     this.syncModalInertState();
     this.refresh(this.engine, this.lastExtra);
+    this.restoreHeldRunDialog();
     if (this.engine.state === GAME_STATES.PAUSED && !this.elements.modalPause.classList.contains(HIDDEN_CLASS)) {
       this.elements.btnResume?.focus();
+    }
+  },
+
+  /**
+   * Entering the duel hides every dialog; a held run that had already ended gets its Victory or
+   * Game Over dialog back when the screen closes.
+   */
+  restoreHeldRunDialog() {
+    const engine = this.engine;
+    if (engine.state === GAME_STATES.VICTORY && !engine.isVictoryCelebrating?.()) {
+      this.isVictoryModalRevealed = true;
+      this.updateNextLevelButton?.(engine);
+      this.elements.modalVictory?.classList.remove(HIDDEN_CLASS);
+      this.syncModalInertState();
+      this.focusInTopModal?.(this.elements.btnNextLevel);
+    } else if (engine.state === GAME_STATES.GAME_OVER) {
+      this.elements.modalGameOver?.classList.remove(HIDDEN_CLASS);
+      this.syncModalInertState();
+      this.focusInTopModal?.(this.elements.btnRetry);
     }
   },
 
@@ -604,6 +630,10 @@ export const uiVersusMethods = {
     if (!v) {
       return;
     }
+    // Restarting a match that was started and not finished abandons it, like Quit does.
+    if (!v.result && v.controller.getState().frame > 0) {
+      this.recordVersusOutcome(OUTCOME_QUIT);
+    }
     this.hideVersusModal(this.elements.modalDuelPause);
     this.hideVersusModal(this.elements.modalDuelResult);
     this.elements.versusResultShareFallback?.classList.add(HIDDEN_CLASS);
@@ -666,7 +696,7 @@ export const uiVersusMethods = {
     this.storageManager.recordVersusResult?.(v.tier, won);
     this.recordVersusOutcome(won ? OUTCOME_WIN : OUTCOME_LOSS);
     const state = v.controller.getState();
-    const playerStats = state.boards[PLAYER_BOARD].stats;
+    const playerStats = state.boards[PLAYER_BOARD].matchStats;
     v.result = {
       won,
       tier: v.tier,

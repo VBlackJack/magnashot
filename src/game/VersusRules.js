@@ -18,7 +18,7 @@
  * Pure rules of the Polarity Duel. No DOM, no engine, no random source: every tunable is read
  * from the `cfg` argument (the `versus` section of the game config). Keys read here:
  *   attack            attack table (see computeVersusAttack)
- *   colorPolarities   { [colorId]: 1 | -1 }
+ *   (colour polarities come from the ball palette: a Map colourId -> polarity, see physicsWorld.polarityMap)
  *   fallbackPolarity  polarity of a colour that has none
  *   threatRatio       a charge is threatening below this share of its rise left to travel
  *   guardStreakSize   neutralised charges needed for one granted special
@@ -74,10 +74,11 @@ export function computeVersusAttack(turn, attackConfig) {
  * Polarity of the charge caused by an avalanche of a colour.
  * @param {string|number} colorId - Colour that caused the avalanche.
  * @param {object} cfg - Versus config.
+ * @param {Map<string|number, number>} polarities - Polarity of each palette colour (balls config).
  * @returns {number} +1 or -1.
  */
-export function chargePolarityForColor(colorId, cfg) {
-  const polarity = cfg.colorPolarities?.[colorId];
+export function chargePolarityForColor(colorId, cfg, polarities) {
+  const polarity = polarities?.get(colorId);
   return polarity === undefined || polarity === 0 ? cfg.fallbackPolarity : Math.sign(polarity);
 }
 
@@ -85,8 +86,8 @@ export function chargePolarityForColor(colorId, cfg) {
  * Polarity of a shot: the colour polarity, inverted when the polarity flip is armed.
  * @returns {number} +1 or -1.
  */
-export function shotPolarity(colorId, flipped, cfg) {
-  return chargePolarityForColor(colorId, cfg) * (flipped ? FLIPPED_SIGN : STRAIGHT_SIGN);
+export function shotPolarity(colorId, flipped, cfg, polarities) {
+  return chargePolarityForColor(colorId, cfg, polarities) * (flipped ? FLIPPED_SIGN : STRAIGHT_SIGN);
 }
 
 /**

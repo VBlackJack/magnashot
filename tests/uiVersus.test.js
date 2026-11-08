@@ -81,6 +81,9 @@ function fakeElement({ hidden = true } = {}) {
     getAttribute(name) {
       return this.attrs[name] ?? null;
     },
+    removeAttribute(name) {
+      delete this.attrs[name];
+    },
     append(...nodes) {
       this.children.push(...nodes);
     },
@@ -124,13 +127,13 @@ function makeSteppedScene({ isAdvancing } = {}) {
   return { scene, log };
 }
 
-function runLoop(scene) {
+function runLoop(scene, idleRenderIntervalMs = FIXED_STEP_MS) {
   const frames = [];
   const loop = createGameLoop({
     getScene: () => scene,
     fixedStepMs: FIXED_STEP_MS,
     maxAccumulatedMs: FIXED_STEP_MS * FRAMES,
-    idleRenderIntervalMs: FIXED_STEP_MS,
+    idleRenderIntervalMs,
     scheduleFrame: (callback) => frames.push(callback),
     onFatalError: (error) => {
       throw error;
@@ -156,6 +159,17 @@ test('a scene that is held is drawn without interpolation', () => {
   const alphas = log.filter((entry) => entry.includes(':render:')).map((entry) => entry.split(':')[2]);
   assert.ok(alphas.length > 0);
   assert.ok(alphas.every((alpha) => alpha === '1'), `alphas ${alphas}`);
+});
+
+test('a scene that is held is redrawn at the idle interval, not on every frame', () => {
+  const idleInterval = FIXED_STEP_MS * FRAMES * 10;
+  const live = makeSteppedScene({ isAdvancing: () => true });
+  runLoop(live.scene, idleInterval);
+  const held = makeSteppedScene({ isAdvancing: () => false });
+  runLoop(held.scene, idleInterval);
+  const renders = (log) => log.filter((entry) => entry.startsWith('a:render')).length;
+  assert.equal(renders(live.log), FRAMES, 'a running scene is drawn every frame');
+  assert.equal(renders(held.log), 1, 'a held scene is drawn once, then at the idle interval');
 });
 
 // ---------------------------------------------------------------------------------------------
@@ -197,9 +211,10 @@ function makeController() {
     isPaused: () => paused,
     restart: (seed) => log.push(['restart', seed]),
     getState: () => ({
+      frame: 120,
       boards: [
-        { index: 0, stats: { neutralised: 14, pulsesSent: 3 } },
-        { index: 1, stats: { neutralised: 5, pulsesSent: 1 } }
+        { index: 0, stats: { neutralised: 2, pulsesSent: 0 }, matchStats: { neutralised: 14, pulsesSent: 3 } },
+        { index: 1, stats: { neutralised: 1, pulsesSent: 0 }, matchStats: { neutralised: 5, pulsesSent: 1 } }
       ]
     })
   };
@@ -224,6 +239,7 @@ function makeUi({ phase = 'playing', storage = {} } = {}) {
   els.btnModeVersus = fakeElement({ hidden: false });
   const ui = Object.create(UIManager.prototype);
   ui.gameConfig = gameConfig;
+  ui.ballsConfig = { specialTypes: {} };
   ui.elements = els;
   ui.engine = { state: GAME_STATES.PLAYING, togglePause: () => ui.pauseCalls.push('main') };
   ui.pauseCalls = [];
@@ -419,6 +435,87 @@ test('quitting counts as a quit and leaves the screen without recording a result
   assert.deepEqual(recorded.results, []);
   assert.deepEqual(recorded.stats[0].modes[GAME_MODES.VERSUS], { runs: 1, quits: 1 });
   assert.equal(left, 1);
+});
+
+test('restarting from the pause dialog of a started match counts as a quit; a rematch after the result does not', () => {
+  const started = makeUi();
+  started.ui.restartVersus();
+  assert.equal(started.recorded.stats.length, 1);
+  assert.deepEqual(started.recorded.stats[0].modes[GAME_MODES.VERSUS], { runs: 1, quits: 1 });
+  assert.deepEqual(started.controller.log.at(-1)[0], 'restart');
+
+  const rematch = makeUi();
+  rematch.ui.handleVersusEvent({ type: MATCH_EVENTS.MATCH_WON, wins: [2, 0] });
+  const before = rematch.recorded.stats.length;
+  rematch.ui.restartVersus();
+  assert.equal(rematch.recorded.stats.length, before, 'the finished match was already counted');
+
+  const fresh = makeUi();
+  fresh.controller.getState = () => ({ frame: 0, boards: [{ stats: {} }, { stats: {} }] });
+  fresh.ui.restartVersus();
+  assert.equal(fresh.recorded.stats.length, 0, 'a match that never ran is not a quit');
+});
+
+test('the result card and the share text count the whole match, not the last round', () => {
+  const { ui, els } = makeUi();
+  ui.handleVersusEvent({ type: MATCH_EVENTS.MATCH_WON, wins: [2, 1] });
+  assert.equal(ui.versus.result.neutralised, 14);
+  assert.equal(ui.versus.result.pulses, 3);
+  assert.equal(els.versusResultNeutralised.textContent, 'Charges neutralised: 14');
+});
+
+test('leaving the screen brings back the Victory or Game Over dialog of the held run', (t) => {
+  const originalWindow = globalThis.window;
+  globalThis.window = { removeEventListener() {} };
+  t.after(() => {
+    globalThis.window = originalWindow;
+  });
+  for (const [state, dialog] of [[GAME_STATES.VICTORY, 'modalVictory'], [GAME_STATES.GAME_OVER, 'modalGameOver']]) {
+    const { ui, els } = makeUi();
+    els.modalVictory = fakeElement();
+    els.modalGameOver = fakeElement();
+    els.btnVersusRematch = fakeElement();
+    ui.engine.state = state;
+    ui.engine.isVictoryCelebrating = () => false;
+    ui.updateNextLevelButton = () => {};
+    ui.focusInTopModal = () => {};
+    ui.refresh = () => {};
+    ui.lastExtra = {};
+    ui.leaveVersus();
+    assert.equal(els[dialog].classList.contains('hidden'), false, `${dialog} is shown again`);
+    assert.equal(ui.versus, null);
+  }
+  const { ui, els } = makeUi();
+  els.modalVictory = fakeElement();
+  els.modalGameOver = fakeElement();
+  ui.engine.state = GAME_STATES.PAUSED;
+  ui.refresh = () => {};
+  ui.leaveVersus();
+  assert.equal(els.modalVictory.classList.contains('hidden') && els.modalGameOver.classList.contains('hidden'), true);
+});
+
+test('the duel screen is inert and hidden from assistive technology while its pause or result dialog is open', () => {
+  globalThis.document = { activeElement: null, body: {} };
+  const screen = Object.assign(fakeElement({ hidden: false }), { inert: false });
+  const shell = Object.assign(fakeElement({ hidden: false }), { inert: false });
+  let open = true;
+  const fake = {
+    elements: { versusScreen: screen, appShell: shell, versusCanvas0: fakeElement({ hidden: false }) },
+    versus: {},
+    isAnyModalOpen: () => open,
+    getActiveTopModal: () => null,
+    getModalsByPriority: () => [],
+    keepFocusInTopModal() {},
+    wasAnyModalOpen: true
+  };
+  UIManager.prototype.syncModalInertState.call(fake);
+  assert.equal(screen.inert, true);
+  assert.equal(screen.getAttribute('aria-hidden'), 'true');
+  open = false;
+  UIManager.prototype.syncModalInertState.call(fake);
+  assert.equal(screen.inert, false);
+  assert.equal(screen.getAttribute('aria-hidden'), null);
+  assert.equal(shell.inert, true, 'the shell stays held while the duel screen is up');
 });
 
 test('a locked tier explains itself and starts nothing, an open one starts the match', () => {

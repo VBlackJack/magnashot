@@ -44,6 +44,10 @@ const FULL_PROGRESS = 1;
 const STRONG_STRENGTH = 2;
 const NORMAL_STRENGTH = 1;
 const STRAIGHT_UP_VY = -1;
+/** Two spheres closer than this share of their diameter overlap. */
+const OVERLAP_TOLERANCE = 0.9;
+/** Vertical offsets tried for the second sphere of a strong charge, in rest distances. */
+const SECOND_SPHERE_Y_OFFSETS = Object.freeze([0, 0.5, -0.5]);
 
 /** Event names an engine reports to its match controller. */
 export const VERSUS_ENGINE_EVENTS = Object.freeze({
@@ -210,20 +214,24 @@ export const engineVersusMethods = {
   },
 
   /**
-   * Puts an attack in the outbox. A strong attack sends half as many charges, each of
-   * strength 2 (two hits to neutralise, two spheres when it lands), so the spheres that
-   * land still add up to the charges the attack table promises.
+   * Puts an attack in the outbox. A strong attack sends floor(sent / 2) charges of strength 2
+   * (two hits to neutralise, two spheres when it lands) plus sent % 2 charge of strength 1,
+   * so the spheres that land add up to exactly the charges the attack table promises.
    */
   queueVersusAttack(sent, isStrong, colorId) {
-    const count = isStrong ? Math.ceil(sent / STRONG_STRENGTH) : sent;
-    const attack = {
-      type: 'charges',
-      count,
-      strength: isStrong ? STRONG_STRENGTH : NORMAL_STRENGTH,
-      polarity: chargePolarityForColor(colorId, this.gameConfig.versus)
-    };
-    this.versus.outbox.push(attack);
-    this.pushVersusEvent(VERSUS_ENGINE_EVENTS.ATTACK_SENT, { count, strength: attack.strength, polarity: attack.polarity });
+    const polarity = chargePolarityForColor(colorId, this.gameConfig.versus, this.physicsWorld.polarityMap);
+    const groups = isStrong
+      ? [
+        { count: Math.floor(sent / STRONG_STRENGTH), strength: STRONG_STRENGTH },
+        { count: sent % STRONG_STRENGTH, strength: NORMAL_STRENGTH }
+      ]
+      : [{ count: sent, strength: NORMAL_STRENGTH }];
+    for (const group of groups) {
+      if (group.count > 0) {
+        this.versus.outbox.push({ type: 'charges', count: group.count, strength: group.strength, polarity });
+        this.pushVersusEvent(VERSUS_ENGINE_EVENTS.ATTACK_SENT, { count: group.count, strength: group.strength, polarity });
+      }
+    }
   },
 
   /** Records a report for the match controller. */
@@ -399,7 +407,7 @@ export const engineVersusMethods = {
   pickChargeColor(polarity, avoidColorId) {
     const cfg = this.gameConfig.versus;
     const palette = this.activePalette;
-    const ofPolarity = palette.filter((id) => chargePolarityForColor(id, cfg) === polarity);
+    const ofPolarity = palette.filter((id) => chargePolarityForColor(id, cfg, this.physicsWorld.polarityMap) === polarity);
     const pool = [ofPolarity.filter((id) => id !== avoidColorId), ofPolarity, palette].find((list) => list.length > 0);
     return pool[Math.floor(this.versus.chargeRng.next() * pool.length)];
   },
@@ -428,15 +436,17 @@ export const engineVersusMethods = {
     }
     const spot = world.computeSnapPosition(charge.x, charge.y, 0, STRAIGHT_UP_VY, target.x, target.y, restDist);
     const placed = [];
-    let x = spot.x;
-    const y = spot.y;
     const minX = canvasCfg.wallMargin + radius;
     const maxX = canvasCfg.logicalWidth - canvasCfg.wallMargin - radius;
-    for (let i = 0; i < landingBalls(charge); i++) {
+    const count = landingBalls(charge);
+    for (let i = 0; i < count; i++) {
+      const at = i === 0
+        ? { x: Math.min(maxX, Math.max(minX, spot.x)), y: spot.y }
+        : this.findFreeSecondSpot(placed[0], restDist, minX, maxX);
       // Built directly: the colour of a charge is its polarity, not the match-avoiding pick of a spawn.
       const ball = new Ball({
-        x: Math.min(maxX, Math.max(minX, x)),
-        y,
+        x: at.x,
+        y: at.y,
         radius,
         colorId: this.pickChargeColor(charge.polarity, target.colorId),
         clusterModifier: null,
@@ -450,11 +460,37 @@ export const engineVersusMethods = {
         }
       }
       placed.push(ball);
-      // The second sphere sits beside the first, on the side with room.
-      x += x + restDist > maxX ? -restDist : restDist;
     }
     this.audioManager.playEffect('snap');
     this.pushVersusEvent(VERSUS_ENGINE_EVENTS.CHARGE_LANDED, { id: charge.id, polarity: charge.polarity, balls: placed.length });
+  },
+
+  /**
+   * Position for the second sphere of a strong charge: beside the first one, on the side with
+   * room, at a few small vertical offsets, where it overlaps no cluster sphere. Falls back to
+   * stacking it below the first one.
+   * @param {object} first - The sphere already placed.
+   * @param {number} restDist - Distance between two bonded spheres at rest.
+   * @param {number} minX - Left limit of a sphere centre.
+   * @param {number} maxX - Right limit of a sphere centre.
+   * @returns {{x:number, y:number}} The centre to use.
+   */
+  findFreeSecondSpot(first, restDist, minX, maxX) {
+    const minDist = first.radius * 2 * OVERLAP_TOLERANCE;
+    const isFree = (x, y) => this.physicsWorld.balls.every(
+      (ball) => ball.isDropping || Math.hypot(ball.x - x, ball.y - y) >= minDist
+    );
+    const preferred = first.x + restDist > maxX ? -1 : 1;
+    for (const dy of SECOND_SPHERE_Y_OFFSETS) {
+      for (const side of [preferred, -preferred]) {
+        const x = first.x + side * restDist;
+        const y = first.y + dy * restDist;
+        if (x >= minX && x <= maxX && isFree(x, y)) {
+          return { x, y };
+        }
+      }
+    }
+    return { x: first.x, y: first.y + restDist };
   },
 
   /**
@@ -486,7 +522,7 @@ export const engineVersusMethods = {
       return;
     }
     const cfg = this.gameConfig.versus;
-    const result = resolveChargeHit(best.charge, { polarity: shotPolarity(projectile.colorId, projectile.isPolarityFlipped, cfg) });
+    const result = resolveChargeHit(best.charge, { polarity: shotPolarity(projectile.colorId, projectile.isPolarityFlipped, cfg, this.physicsWorld.polarityMap) });
     hitIds.add(best.charge.id);
     const info = { id: best.charge.id, polarity: best.charge.polarity, x: best.charge.x, y: best.charge.y };
     if (result.outcome === CHARGE_OUTCOMES.DEFLECTED) {
@@ -596,13 +632,35 @@ export const engineVersusMethods = {
     this.settleVersusTurn();
   },
 
+  /**
+   * Polarity (+1 or -1) a ball would have as a shot: its colour polarity, inverted by the flip.
+   * @param {object|null} [ball] - Ball to read, default the loaded one.
+   * @param {boolean} [flipped] - Whether the flip is armed, default the engine's flip.
+   * @returns {number|null} The polarity; null for a special ball (it is not polarised) or no ball.
+   */
+  getVersusShotPolarity(ball = this.currentBall, flipped = this.isPolarityFlipped) {
+    if (!this.versus || !ball || ball.specialType) {
+      return null;
+    }
+    return shotPolarity(ball.colorId, flipped, this.gameConfig.versus, this.physicsWorld.polarityMap);
+  },
+
   /** Recomputes the aim preview marker and, for a human board, cuts the aim path at the first charge. */
   applyVersusAimPreview() {
     const versus = this.versus;
     const hitRadius = this.getChargeRadius() + this.physicsConfig.ball.radius;
     const cut = truncateAimAtCharges(this.aimPoints, versus.charges, hitRadius);
+    const shot = cut.hit ? this.getVersusShotPolarity() : null;
     this.aimPreview = {
-      chargeHit: cut.hit ? { x: cut.hit.x, y: cut.hit.y, polarity: cut.hit.charge.polarity } : null
+      chargeHit: cut.hit
+        ? {
+            x: cut.hit.x,
+            y: cut.hit.y,
+            polarity: cut.hit.charge.polarity,
+            // What the loaded shot would do to this charge: shatter it, weaken it or bounce off.
+            outcome: shot === null ? null : resolveChargeHit(cut.hit.charge, { polarity: shot }).outcome
+          }
+        : null
     };
     if (versus.isAimTruncated && cut.hit) {
       this.aimPoints = cut.points;

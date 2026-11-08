@@ -149,7 +149,7 @@ test('a turn sends charges of the polarity of its colour, strong ones in pairs o
   engine.noteVersusDrop(3, NEGATIVE_COLOR);
   assert.equal(engine.closeVersusTurn().sent, 1);
   const [weak] = engine.drainVersusOutput().outbox;
-  assert.deepEqual(weak, { type: 'charges', count: 1, strength: 1, polarity: chargePolarityForColor(NEGATIVE_COLOR, versusCfg) });
+  assert.deepEqual(weak, { type: 'charges', count: 1, strength: 1, polarity: chargePolarityForColor(NEGATIVE_COLOR, versusCfg, engine.physicsWorld.polarityMap) });
 
   engine.beginVersusTurn({ colorId: POSITIVE_COLOR });
   engine.noteVersusDrop(8, POSITIVE_COLOR);
@@ -158,13 +158,25 @@ test('a turn sends charges of the polarity of its colour, strong ones in pairs o
   assert.equal(attack.isStrong, true);
   const [strong] = engine.drainVersusOutput().outbox;
   assert.equal(strong.strength, 2);
-  assert.equal(strong.count, Math.ceil(attack.sent / 2));
+  assert.equal(strong.count, Math.floor(attack.sent / 2));
   assert.equal(strong.polarity, 1);
 
   engine.beginVersusTurn({ colorId: POSITIVE_COLOR });
   engine.noteVersusDrop(1, POSITIVE_COLOR);
   engine.closeVersusTurn();
   assert.deepEqual(engine.drainVersusOutput().outbox, [], 'a match that drops one sphere sends nothing');
+});
+
+test('a strong attack of an odd size sends pairs plus one single charge, total preserved', () => {
+  const engine = createBoard();
+  engine.beginVersusTurn({ colorId: POSITIVE_COLOR });
+  engine.noteVersusDrop(11, POSITIVE_COLOR);
+  const attack = engine.closeVersusTurn();
+  assert.equal(attack.sent, 5);
+  assert.equal(attack.isStrong, true);
+  const { outbox } = engine.drainVersusOutput();
+  assert.deepEqual(outbox.map((item) => [item.count, item.strength]), [[2, 2], [1, 1]]);
+  assert.equal(outbox.reduce((sum, item) => sum + item.count * item.strength, 0), attack.sent);
 });
 
 test('a special ball multiplies the attack of its turn', () => {
@@ -244,7 +256,7 @@ test('a charge rises, then snaps in as one sphere (two when strong) of its polar
     const landed = engine.physicsWorld.balls.filter((ball) => !knownIds.has(ball.id));
     assert.equal(landed.length, strength);
     for (const ball of landed) {
-      assert.equal(chargePolarityForColor(ball.colorId, versusCfg), -1);
+      assert.equal(chargePolarityForColor(ball.colorId, versusCfg, engine.physicsWorld.polarityMap), -1);
       assert.ok(ball.bonds.size > 0, 'a landed sphere is bonded to the cluster');
     }
   }
@@ -262,6 +274,28 @@ test('an opposite shot neutralises a charge, is consumed and charges the pulse m
   assert.equal(engine.overcharge, versusCfg.neutraliseOverchargeGain * engine.getOverchargeCap());
   assert.equal(engine.sagLevel, 0, 'a neutralising shot is not a whiff');
   assert.ok(drainEventTypes(engine).includes('chargeNeutralised'));
+});
+
+test('the second sphere of a strong charge overlaps no other sphere wherever the charge lands', () => {
+  const radius = physicsConfig.ball.radius;
+  const minX = gameConfig.canvas.wallMargin + radius;
+  const maxX = gameConfig.canvas.logicalWidth - gameConfig.canvas.wallMargin - radius;
+  const steps = 12;
+  for (let i = 0; i <= steps; i++) {
+    const engine = createBoard();
+    const knownIds = new Set(engine.physicsWorld.balls.map((ball) => ball.id));
+    const y = engine.getClusterUndersideY();
+    engine.landVersusCharge({ id: 900 + i, polarity: 1, strength: 2, x: minX + ((maxX - minX) * i) / steps, y });
+    const balls = engine.physicsWorld.balls;
+    const landed = balls.filter((ball) => !knownIds.has(ball.id));
+    assert.equal(landed.length, 2);
+    const second = landed[1];
+    for (const other of balls) {
+      if (other.id !== second.id) {
+        assert.ok(Math.hypot(second.x - other.x, second.y - other.y) >= radius * 2 * 0.85, `overlap at step ${i}`);
+      }
+    }
+  }
 });
 
 test('a flipped shot has the opposite polarity of its colour', () => {
@@ -413,6 +447,30 @@ test('the aim preview stops at the first charge on its path and marks it', () =>
   assert.ok(end.y > fullEnd.y, 'the path ends below the cluster, at the charge');
   assert.equal(engine.aimPoints.snapTarget, undefined, 'a cut path snaps nowhere');
   assert.equal(engine.aimPreview.chargeHit.x, end.x);
+});
+
+test('the aim preview predicts the outcome of the loaded shot on the first charge: shatter, weaken or bounce', () => {
+  const engine = createBoard();
+  const ball = engine.currentBall;
+  const own = engine.getVersusShotPolarity();
+  assert.ok(own === 1 || own === -1, 'a coloured sphere has a polarity');
+  const outcomeFor = (polarity, strength = 1) => {
+    engine.versus.charges = [];
+    engine.updateAimFromAngle(STRAIGHT_UP);
+    pathCharge(engine, { polarity, strength });
+    engine.updateAimFromAngle(STRAIGHT_UP);
+    return engine.aimPreview.chargeHit.outcome;
+  };
+  assert.equal(outcomeFor(-own), 'neutralised', 'opposite polarity shatters a strength 1 charge');
+  assert.equal(outcomeFor(-own, 2), 'weakened', 'opposite polarity only weakens a strength 2 charge');
+  assert.equal(outcomeFor(own), 'deflected', 'the same polarity bounces off');
+  engine.togglePolarityFlip();
+  assert.equal(engine.getVersusShotPolarity(), -own, 'the flip inverts the shot polarity');
+  assert.equal(outcomeFor(own), 'neutralised', 'after the flip the prediction follows');
+  assert.ok(Math.abs(engine.getVersusShotPolarity(engine.nextBall, false)) === 1, 'the next sphere has a polarity of its own');
+  ball.specialType = SPECIAL_TYPES.BOMB;
+  assert.equal(engine.getVersusShotPolarity(), null, 'a special sphere has no polarity');
+  assert.equal(outcomeFor(own), null, 'a special shot makes no prediction');
 });
 
 test('engines of a single player run are not touched by the duel hooks', () => {

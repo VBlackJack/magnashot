@@ -1460,6 +1460,7 @@
       "title": "Polarity Duel",
       "subtitle": "Pick a CPU opponent. First to win two rounds takes the match.",
       "pickTier": "Choose a difficulty",
+      "rules": "Opposite polarity shatters a charge; the same polarity bounces off.",
       "start": "Start match",
       "back": "Back"
     },
@@ -1479,6 +1480,12 @@
       "cpuBoardTier": "CPU board ({{tier}})",
       "swap": "Swap spheres",
       "polarity": "Flip polarity",
+      "polarityButton": "Polarity {{sign}}",
+      "polarityAria": "Flip polarity. Your shot is {{polarity}}.",
+      "polarityPositive": "positive",
+      "polarityNegative": "negative",
+      "signPlus": "+",
+      "signMinus": "-",
       "specials": "Special spheres"
     },
     "announce": {

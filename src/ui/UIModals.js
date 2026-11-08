@@ -364,6 +364,17 @@ export const uiModalMethods = {
         this.elements.appShell.removeAttribute('aria-hidden');
       }
     }
+    // The duel screen itself is out of reach while one of its dialogs (pause, result) is open.
+    const versusScreen = this.elements.versusScreen;
+    if (versusScreen) {
+      const isScreenHeld = Boolean(this.versus) && anyOpen;
+      versusScreen.inert = isScreenHeld;
+      if (isScreenHeld) {
+        versusScreen.setAttribute('aria-hidden', 'true');
+      } else {
+        versusScreen.removeAttribute('aria-hidden');
+      }
+    }
     // A modal stacked on another (Confirm over Pause or Levels) leaves the
     // one underneath visible but unreachable.
     const topModal = this.getActiveTopModal();

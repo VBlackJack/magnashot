@@ -1564,3 +1564,69 @@ test('Versus charges: a full render with versus state stays balanced', () => {
   assert.equal(ctx.saveDepth, 0);
   assert.equal(ctx.restoreUnderflows, 0);
 });
+
+test('Versus preview ring: the predicted outcome is a shape, a crack to shatter and a rebound arrow to bounce', () => {
+  const renderer = createRenderer();
+  const draw = (outcome) => {
+    const ctx = createChargeRecorder();
+    renderer.drawVersusCharges(ctx, chargeState([], { aimPreview: { chargeHit: { x: 70, y: 80, polarity: -1, outcome } } }));
+    return ctx;
+  };
+  const none = draw(undefined);
+  const shatter = draw('neutralised');
+  const weaken = draw('weakened');
+  const bounce = draw('deflected');
+  assert.equal(lineToCount(none), 1, 'without a prediction only the polarity glyph is drawn');
+  assert.equal(lineToCount(shatter), lineToCount(none) + 3, 'the crack is a three-segment zigzag');
+  assert.equal(lineToCount(weaken), lineToCount(shatter), 'a weakened charge shows the break mark too');
+  assert.equal(lineToCount(bounce), lineToCount(none) + 4, 'the rebound arrow is a V with an arrowhead');
+  assert.notEqual(lineToCount(bounce), lineToCount(shatter));
+  for (const ctx of [shatter, bounce]) {
+    assert.equal(ctx.depth, 0);
+    assert.equal(ctx.underflows, 0);
+  }
+});
+
+test('Versus launcher: the loaded and the next sphere show their +/- glyph, on a versus board only', () => {
+  const drawWith = (setup, options) => {
+    const renderer = options?.lite
+      ? new Renderer(createStubCanvas(), gameConfig, ballsConfig, obstaclesConfig, { lite: true })
+      : createRenderer();
+    renderer.createLayerCanvas = () => createStubCanvas();
+    const calls = [];
+    renderer.drawShotPolarityGlyph = (ctx, x, y, half, polarity) => calls.push({ x, y, half, polarity });
+    const engine = createTestEngine();
+    engine.startClassicMode(1);
+    setup(engine);
+    renderer.render(engine, 1.0);
+    return { calls, engine };
+  };
+  const versusSetup = (engine) => {
+    engine.versus = { charges: [] };
+    engine.getVersusShotPolarity = (_ball, flipped = engine.isPolarityFlipped) => (flipped ? -1 : 1);
+  };
+  const versus = drawWith(versusSetup);
+  assert.equal(versus.calls.length, 2, 'one glyph on the launcher, one on the next sphere');
+  const radius = versus.engine.currentBall.radius;
+  assert.equal(versus.calls[0].half, radius * gameConfig.versus.render.launcherGlyphSizeFactor);
+  assert.equal(versus.calls[0].x, gameConfig.canvas.launcherX);
+  assert.equal(versus.calls[1].half, versus.engine.nextBall.radius * gameConfig.versus.render.nextGlyphSizeFactor);
+  const flipped = drawWith((engine) => {
+    versusSetup(engine);
+    engine.isPolarityFlipped = true;
+  });
+  assert.equal(flipped.calls[0].polarity, -1, 'the loaded sphere follows the flip');
+  assert.equal(flipped.calls[1].polarity, 1, 'the next sphere is not flipped yet');
+  assert.equal(drawWith(versusSetup, { lite: true }).calls.length, 0, 'lite boards draw no glyph');
+  assert.equal(drawWith(() => {}).calls.length, 0, 'a single player board draws none');
+  const special = drawWith((engine) => {
+    versusSetup(engine);
+    engine.getVersusShotPolarity = (ball = engine.currentBall) => (ball === engine.currentBall ? null : 1);
+  });
+  assert.equal(special.calls.length, 1, 'a special loaded sphere has no polarity glyph');
+
+  const ctx = createChargeRecorder();
+  createRenderer().drawShotPolarityGlyph(ctx, 10, 10, 8, -1);
+  assert.equal(lineToCount(ctx), 2, 'a minus is drawn twice: backdrop, then the sign');
+  assert.equal(ctx.depth, 0);
+});

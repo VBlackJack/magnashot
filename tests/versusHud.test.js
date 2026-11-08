@@ -32,6 +32,7 @@ import {
 } from '../src/ui/VersusHud.js';
 
 const loadJson = (path) => JSON.parse(readFileSync(path, 'utf8'));
+const indexHtml = readFileSync('./index.html', 'utf8');
 const gameConfig = loadJson('./configs/game.json');
 const ballsConfig = loadJson('./configs/balls.json');
 const canvasCfg = gameConfig.canvas;
@@ -343,6 +344,40 @@ test('the polarity button mirrors the flip, and stocked specials appear as butto
   engine.specialInventory[SPECIAL_TYPES[0]] = 0;
   assert.equal(hud.refreshPlayerControls(engine, specialsContext()), true);
   assert.equal(row.classList.contains('hidden'), true, 'an empty stock hides the row again');
+});
+
+test('the polarity button says the polarity of the loaded shot in text and in its accessible name', () => {
+  const { elements, hud } = makeHud();
+  const button = elements.boards[0].polarityBtn;
+  const engine = (polarity, flipped = false) => ({
+    isPolarityFlipped: flipped,
+    specialInventory: {},
+    currentBall: { specialType: null },
+    getVersusShotPolarity: () => polarity
+  });
+  hud.refreshPlayerControls(engine(1), specialsContext());
+  assert.equal(button.textContent, 'Polarity +');
+  assert.equal(button.getAttribute('aria-label'), 'Flip polarity. Your shot is positive.');
+  hud.refreshPlayerControls(engine(-1, true), specialsContext());
+  assert.equal(button.textContent, 'Polarity -');
+  assert.equal(button.getAttribute('aria-label'), 'Flip polarity. Your shot is negative.');
+  assert.equal(button.getAttribute('aria-pressed'), 'true');
+  hud.refreshPlayerControls(engine(null), specialsContext());
+  assert.equal(button.textContent, 'Flip polarity', 'a special sphere has no polarity to show');
+  hud.refreshPlayerControls(engine(-1), specialsContext());
+  i18n.currentLocale = 'fr';
+  hud.refreshLabels();
+  assert.equal(button.textContent, 'Polarité -');
+  assert.equal(button.getAttribute('aria-label'), 'Inverser la polarité. Votre tir est négatif.');
+});
+
+test('the difficulty picker carries one line of rules in both languages', () => {
+  assert.match(indexHtml, /id="versus-tiers-rules"[^>]*data-i18n="versus\.lobby\.rules"/);
+  for (const locale of ['en', 'fr']) {
+    const rules = loadJson(`./locales/${locale}.json`).versus.lobby.rules;
+    assert.ok(typeof rules === 'string' && rules.length > 0, locale);
+  }
+  assert.equal(i18n.t('versus.lobby.rules'), 'Opposite polarity shatters a charge; the same polarity bounces off.');
 });
 
 test('a special that is loaded stays listed and marked as equipped', () => {

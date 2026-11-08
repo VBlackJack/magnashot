@@ -1460,6 +1460,7 @@
       "title": "Duel de polarité",
       "subtitle": "Choisissez un adversaire. Le premier à gagner deux manches remporte le match.",
       "pickTier": "Choisissez une difficulté",
+      "rules": "Une polarité opposée brise une charge ; la même polarité rebondit.",
       "start": "Lancer le match",
       "back": "Retour"
     },
@@ -1479,6 +1480,12 @@
       "cpuBoardTier": "Plateau de l'ordinateur ({{tier}})",
       "swap": "Échanger les sphères",
       "polarity": "Inverser la polarité",
+      "polarityButton": "Polarité {{sign}}",
+      "polarityAria": "Inverser la polarité. Votre tir est {{polarity}}.",
+      "polarityPositive": "positif",
+      "polarityNegative": "négatif",
+      "signPlus": "+",
+      "signMinus": "-",
       "specials": "Sphères spéciales"
     },
     "announce": {

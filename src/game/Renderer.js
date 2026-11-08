@@ -20,6 +20,7 @@ import { isChainLink, isTetherLink } from '../physics/PhysicsWorld.js';
 import { Ball } from '../entities/Ball.js';
 import { predictImpact } from './ImpactPreview.js';
 import { SAG_STEPS } from './SagMeter.js';
+import { CHARGE_OUTCOMES } from './VersusRules.js';
 
 const BOND_STYLE = Object.freeze({
   STRESSED: 0,
@@ -32,6 +33,10 @@ const BOND_STYLE_COUNT = 5;
 const SEGMENT_STRIDE = 4;
 /** Shared empty dash pattern that resets a line to solid without allocating. */
 const EMPTY_DASH = Object.freeze([]);
+/** Shape ratios of the aim preview outcome marks (fractions of the mark size). */
+const OUTCOME_ARROW_DEPTH = 0.4;
+const OUTCOME_ARROW_HEAD = 0.9;
+const OUTCOME_CRACK_INNER = 0.3;
 
 /** Color-blind patterns a standard color may declare in configs/balls.json. */
 const PATTERNS = Object.freeze({
@@ -692,6 +697,59 @@ export class Renderer {
     ctx.setLineDash(EMPTY_DASH);
     ctx.lineWidth = renderCfg.previewGlyphLineWidth;
     this.drawPolarityGlyph(ctx, hit.x, hit.y, radius * renderCfg.previewGlyphSizeFactor, hit.polarity);
+    if (hit.outcome) {
+      this.drawPreviewOutcomeMark(ctx, hit, radius, renderCfg);
+    }
+    ctx.restore();
+  }
+
+  /**
+   * Marks what the loaded shot would do to the charge it meets, by shape and not by colour: a
+   * jagged crack when the charge is shattered (or weakened), a bent rebound arrow when the shot
+   * bounces off. Drawn beside the preview ring.
+   * @private
+   */
+  drawPreviewOutcomeMark(ctx, hit, radius, renderCfg) {
+    const cx = hit.x;
+    const cy = hit.y - radius * renderCfg.previewOutcomeGapFactor;
+    const half = radius * renderCfg.previewOutcomeSizeFactor;
+    ctx.strokeStyle = renderCfg.previewOutcomeColor;
+    ctx.lineWidth = renderCfg.previewOutcomeLineWidth;
+    ctx.lineJoin = 'round';
+    ctx.setLineDash(EMPTY_DASH);
+    ctx.beginPath();
+    if (hit.outcome === CHARGE_OUTCOMES.DEFLECTED) {
+      ctx.moveTo(cx - half, cy - half);
+      ctx.lineTo(cx, cy + half * OUTCOME_ARROW_DEPTH);
+      ctx.lineTo(cx + half, cy - half);
+      ctx.moveTo(cx + half - half * OUTCOME_ARROW_HEAD, cy - half);
+      ctx.lineTo(cx + half, cy - half);
+      ctx.lineTo(cx + half, cy - half + half * OUTCOME_ARROW_HEAD);
+    } else {
+      ctx.moveTo(cx - half, cy - half);
+      ctx.lineTo(cx - half * OUTCOME_CRACK_INNER, cy);
+      ctx.lineTo(cx + half * OUTCOME_CRACK_INNER, cy - half * OUTCOME_CRACK_INNER);
+      ctx.lineTo(cx + half, cy + half);
+    }
+    ctx.stroke();
+  }
+
+  /**
+   * Draws the +/- of a shot on a launcher ball (a backdrop stroke first, so the sign reads on
+   * any ball colour), with the glyph style of the charges.
+   * @private
+   */
+  drawShotPolarityGlyph(ctx, x, y, half, polarity) {
+    const renderCfg = this.gameConfig.versus.render;
+    ctx.save();
+    ctx.lineCap = 'round';
+    ctx.setLineDash(EMPTY_DASH);
+    ctx.strokeStyle = renderCfg.launcherGlyphBackdrop;
+    ctx.lineWidth = renderCfg.launcherGlyphLineWidth + renderCfg.launcherGlyphBackdropExtraWidth;
+    this.drawPolarityGlyph(ctx, x, y, half, polarity);
+    ctx.strokeStyle = polarity > 0 ? renderCfg.plusColor : renderCfg.minusColor;
+    ctx.lineWidth = renderCfg.launcherGlyphLineWidth;
+    this.drawPolarityGlyph(ctx, x, y, half, polarity);
     ctx.restore();
   }
 
@@ -2101,8 +2159,15 @@ export class Renderer {
       }
     }
 
+    const canShowPolarity = !this.lite && Boolean(engineState.versus) && typeof engineState.getVersusShotPolarity === 'function';
     if (engineState.currentBall && !engineState.physicsWorld.projectile) {
       this.drawBallAt(ctx, engineState.currentBall, lx, ly, now);
+      const shotPolarity = canShowPolarity ? engineState.getVersusShotPolarity() : null;
+      if (shotPolarity) {
+        this.drawShotPolarityGlyph(
+          ctx, lx, ly, engineState.currentBall.radius * this.gameConfig.versus.render.launcherGlyphSizeFactor, shotPolarity
+        );
+      }
       if (engineState.isPolarityFlipped) {
         const renderCfg = this.ballsConfig.render;
         ctx.save();
@@ -2131,6 +2196,13 @@ export class Renderer {
       ctx.restore();
 
       this.drawBallAt(ctx, engineState.nextBall, nx, ny, now);
+      // The flip only applies to the loaded shot: the next sphere shows its own polarity.
+      const nextPolarity = canShowPolarity ? engineState.getVersusShotPolarity(engineState.nextBall, false) : null;
+      if (nextPolarity) {
+        this.drawShotPolarityGlyph(
+          ctx, nx, ny, engineState.nextBall.radius * this.gameConfig.versus.render.nextGlyphSizeFactor, nextPolarity
+        );
+      }
       this.drawUpcomingBalls(ctx, engineState.upcomingColorIds, nx, ny, engineState.nextBall.radius, now);
     }
   }

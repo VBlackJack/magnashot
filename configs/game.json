@@ -1554,14 +1554,6 @@
     "guardStreakSize": 3,
     "framesPerSecond": 60,
     "fallbackPolarity": 1,
-    "colorPolarities": {
-      "crimson": 1,
-      "cobalt": -1,
-      "emerald": 1,
-      "amber": -1,
-      "violet": 1,
-      "cyan": -1
-    },
     "overchargeMaxMultiplier": 2,
     "suddenDeath": { "startSeconds": 180, "intervalSeconds": 20 },
     "roundsToWin": 2,
@@ -1616,7 +1608,16 @@
       "previewRingDash": [4, 4],
       "previewGlyphSizeFactor": 0.5,
       "previewGlyphLineWidth": 3,
-      "previewAlpha": 0.9
+      "previewAlpha": 0.9,
+      "previewOutcomeColor": "#ffffff",
+      "previewOutcomeSizeFactor": 0.45,
+      "previewOutcomeGapFactor": 1.9,
+      "previewOutcomeLineWidth": 3,
+      "launcherGlyphSizeFactor": 0.5,
+      "launcherGlyphLineWidth": 3,
+      "launcherGlyphBackdrop": "rgba(8, 12, 24, 0.85)",
+      "launcherGlyphBackdropExtraWidth": 3,
+      "nextGlyphSizeFactor": 0.45
     },
     "layout": {
       "splitMinBoardWidthPx": 300,

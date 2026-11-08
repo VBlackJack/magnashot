@@ -335,3 +335,35 @@ test('a full match stays inside a generous time budget', () => {
     assert.ok(elapsedMs < 60000, `a full match took ${Math.round(elapsedMs)} ms`);
   });
 });
+
+test('matchStats add up every round of the match and equal the announced events', () => {
+  withStorage(createSpyStorage(), () => {
+    let sawLaterRoundMatter = false;
+    for (const seed of ['flow-1', 'stats-2']) {
+      const match = createCpuMatch(seed, ['hard', 'normal']);
+      match.run(MATCH_FRAME_CAP);
+      const state = match.getState();
+      assert.ok(state.round.decided.length >= gameConfig.versus.roundsToWin, `${seed} must play several rounds`);
+      const log = match.getEventLog();
+      for (const board of state.boards) {
+        const count = (type) => log.filter((event) => event.type === type && event.board === board.index).length;
+        assert.equal(board.matchStats.neutralised, count(MATCH_EVENTS.CHARGE_NEUTRALISED), `${seed} neutralised of board ${board.index}`);
+        assert.equal(board.matchStats.pulsesSent, count(MATCH_EVENTS.PULSE_SENT), `${seed} pulses of board ${board.index}`);
+        assert.ok(board.matchStats.neutralised >= board.stats.neutralised);
+        sawLaterRoundMatter ||= board.matchStats.neutralised > board.stats.neutralised;
+      }
+    }
+    assert.ok(sawLaterRoundMatter, 'the match total is more than the last round alone');
+  });
+});
+
+test('a listener passed as onEvent hears the roundStart of round 1', () => {
+  withStorage(createSpyStorage(), () => {
+    const heard = [];
+    const match = createCpuMatch('listen-1', ['easy', 'easy'], { onEvent: (event) => heard.push(event) });
+    assert.equal(heard[0]?.type, MATCH_EVENTS.ROUND_START);
+    assert.equal(heard[0].number, 1);
+    match.restart();
+    assert.equal(heard.filter((event) => event.type === MATCH_EVENTS.ROUND_START).length, 2, 'later restarts are heard too');
+  });
+});

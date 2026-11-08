@@ -236,6 +236,8 @@ const EXPECTED_PROTOTYPE_NAMES = [
   'getClusterUndersideY',
   'getOverchargeCap',
   'landVersusCharge',
+  'findFreeSecondSpot',
+  'getVersusShotPolarity',
   'neutraliseChargesBySpecial',
   'noteVersusBoardLost',
   'pickChargeColor',

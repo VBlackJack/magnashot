@@ -68,7 +68,7 @@ test('every Classic palette colour has a polarity and both polarities exist', ()
   const balls = loadJson('./configs/balls.json');
   const classic = gameConfig.classic;
   const palette = balls.standardColors.slice(0, classic.maxPalette).map((c) => c.id);
-  const polarities = gameConfig.versus.colorPolarities;
+  const polarities = Object.fromEntries(balls.standardColors.map((c) => [c.id, c.polarity]));
   for (const id of palette) {
     assert.ok(polarities[id] === 1 || polarities[id] === -1, id);
   }

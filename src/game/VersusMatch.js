@@ -99,6 +99,20 @@ const FORWARDED_ENGINE_EVENTS = new Set([
   VERSUS_ENGINE_EVENTS.PULSE_RECEIVED
 ]);
 
+/** Counters of one board over a match, all zero. */
+function createEmptyStats() {
+  return { neutralised: 0, weakened: 0, deflected: 0, landed: 0, pulsesSent: 0, pulsesReceived: 0, specialsGranted: 0 };
+}
+
+/** Sum of two stats objects (a key missing on one side counts as zero). */
+function addStats(total, extra) {
+  const sum = { ...total };
+  for (const [key, value] of Object.entries(extra ?? {})) {
+    sum[key] = (sum[key] ?? 0) + value;
+  }
+  return sum;
+}
+
 /** Seeded stream as a () => number in [0, 1). */
 function createRng(key) {
   const stream = new SeededRandom(key);
@@ -256,7 +270,7 @@ function createBoardEngine({ configs, storageManager, audioManager, isMuted, boa
  *   playerBoard, round: {number, wins:[n,n], roundsToWin, decided:[winnerIndex...], lastResult},
  *   matchWinner, boards:[{index, isPlayer, isCpu, tier, state, score, incoming, charges:[{id,
  *   polarity, strength, progress, threatening}], pulse:{value, max, ratio}, sag, guardStreak,
- *   stats}], lastEvents}.
+ *   stats (this round), matchStats (whole match)}], lastEvents}.
  *
  * @param {object} options
  * @param {string|number} options.seed - Match seed; round n plays on `versus:<seed>:r<n>`.
@@ -271,6 +285,7 @@ function createBoardEngine({ configs, storageManager, audioManager, isMuted, boa
  * @param {boolean[]} [options.mutedBoards] - Muted flags per board; default: only the player's board is audible.
  * @param {boolean} [options.autoAdvance] - Start the next round by itself after the round break (default: CPU vs CPU only).
  * @param {Function} [options.onBoardChange] - (boardIndex, engine, extra) for the HUD of each board.
+ * @param {Function} [options.onEvent] - Announcement listener, subscribed before the first round starts (so roundStart of round 1 is received).
  * @returns {object} The controller.
  */
 export function createVersusMatch(options) {
@@ -286,7 +301,8 @@ export function createVersusMatch(options) {
     storageManager,
     audioManager,
     mutedBoards,
-    onBoardChange = () => {}
+    onBoardChange = () => {},
+    onEvent = null
   } = options;
   const gameConfig = configs.gameConfig;
   const cfg = gameConfig.versus;
@@ -314,7 +330,12 @@ export function createVersusMatch(options) {
   }));
 
   const listeners = new Set();
+  if (onEvent) {
+    listeners.add(onEvent);
+  }
   const eventLog = [];
+  // Stats of the rounds already played, per board; the round in progress is added on top in getState().
+  let bankedStats = [createEmptyStats(), createEmptyStats()];
   let matchSeed = seed;
   let roundState = createRoundState(cfg);
   let attempt = FIRST_ROUND;
@@ -424,6 +445,8 @@ export function createVersusMatch(options) {
     for (const engine of engines) {
       engine.closeVersusTurn();
     }
+    // The round is over for good: its counters join the match totals before the board is rebuilt.
+    bankedStats = bankedStats.map((total, b) => addStats(total, engines[b].versus.stats));
     const result = roundState.lastResult;
     breakLeft = cfg.roundBreakFrames;
     if (result.type === ROUND_RESULTS.REPLAY) {
@@ -506,6 +529,7 @@ export function createVersusMatch(options) {
       roundState = createRoundState(cfg);
       attempt = FIRST_ROUND;
       frame = 0;
+      bankedStats = [createEmptyStats(), createEmptyStats()];
       eventLog.length = 0;
       isPaused = false;
       stepEvents = [];
@@ -586,7 +610,8 @@ export function createVersusMatch(options) {
             pulse: { value: engine.overcharge, max, ratio: max > 0 ? engine.overcharge / max : 0 },
             sag: engine.getSagState(),
             guardStreak: versus.guard?.streak ?? 0,
-            stats: { ...versus.stats }
+            stats: { ...versus.stats },
+            matchStats: phase === MATCH_PHASES.PLAYING ? addStats(bankedStats[b], versus.stats) : { ...bankedStats[b] }
           };
         }),
         lastEvents
