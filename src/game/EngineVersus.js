@@ -40,6 +40,8 @@ export { computeVersusAttack };
 const FIRST_STAGE = 1;
 const FIRST_BOARD = 0;
 const NO_PROGRESS = 0;
+/** Charge rise time factor of a board without a handicap. */
+const DEFAULT_RISE_MULTIPLIER = 1;
 const FULL_PROGRESS = 1;
 const STRONG_STRENGTH = 2;
 const NORMAL_STRENGTH = 1;
@@ -118,6 +120,17 @@ export const engineVersusMethods = {
     this.upcomingColorIds = [];
     this.railLowerFrames = 0;
     this.launchClassicBoard(stage, new SeededRandom(`${seedKey}:launcher`), versusState);
+  },
+
+  /**
+   * Scales the rise time of the charges that arrive on this board (a handicap: above 1 the
+   * charges take longer to land). Survives the rounds; a value that is not a positive finite
+   * number restores the default.
+   * @param {number} multiplier - Factor applied to gameConfig.versus.riseFrames.
+   */
+  setVersusRiseMultiplier(multiplier) {
+    const isValid = Number.isFinite(multiplier) && multiplier > 0;
+    this.versusRiseMultiplier = isValid ? multiplier : DEFAULT_RISE_MULTIPLIER;
   },
 
   /** Makes the aim preview of this board stop at the first charge it crosses. */
@@ -341,7 +354,7 @@ export const engineVersusMethods = {
           x: margin + versus.chargeRng.next() * spanX,
           startY,
           targetY,
-          riseFrames: cfg.riseFrames,
+          riseFrames: Math.round(cfg.riseFrames * (this.versusRiseMultiplier ?? DEFAULT_RISE_MULTIPLIER)),
           id: versus.chargeSeq++
         });
         // Charges of one attack leave the line one after the other.

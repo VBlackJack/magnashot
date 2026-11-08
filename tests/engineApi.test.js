@@ -247,6 +247,7 @@ const EXPECTED_PROTOTYPE_NAMES = [
   'receiveVersusAttack',
   'registerNeutralised',
   'setVersusAimTruncation',
+  'setVersusRiseMultiplier',
   'settleVersusTurn',
   'stepVersusAfter',
   'stepVersusBefore',

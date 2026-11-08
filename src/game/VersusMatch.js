@@ -24,9 +24,10 @@
  * or an ambient random source, and nothing is written to the player's profile (the engines
  * only see the versus storage view).
  *
- * Two entry points share the file: createVersusMatch({mode: 'cpu', ...}) builds the full
- * controller, createVersusMatch({tiers, ...}) keeps the one-round headless duel of the
- * multi-board foundation (run() with a frame cap).
+ * Three entry points share the file: createVersusMatch({mode: 'cpu', ...}) builds the full
+ * controller against a CPU (or CPU vs CPU), createVersusMatch({mode: 'local', ...}) builds it
+ * for two humans on one device, and createVersusMatch({tiers, ...}) keeps the one-round
+ * headless duel of the multi-board foundation (run() with a frame cap).
  */
 
 import { GAME_STATES } from '../core/Constants.js';
@@ -58,6 +59,10 @@ const LOG_ANGLE_PRECISION = 1e6;
 /** Stereo pan of each board: the first board on the left, the second on the right. */
 const BOARD_PANS = Object.freeze([-1, 1]);
 const NO_PLAYER = null;
+/** Match modes of the controller (exposed by getState). */
+export const MATCH_MODES = Object.freeze({ CPU: 'cpu', LOCAL: 'local', CPU_VS_CPU: 'cpuVsCpu' });
+/** Charge rise time factor of a board without a handicap. */
+const NO_HANDICAP = 1;
 const ALL_ANGLES = Infinity;
 
 /** Phases of a match controller. */
@@ -84,7 +89,10 @@ export const MATCH_EVENTS = Object.freeze({
   ROUND_LOST: 'roundLost',
   ROUND_REPLAY: 'roundReplay',
   MATCH_WON: 'matchWon',
-  MATCH_LOST: 'matchLost'
+  MATCH_LOST: 'matchLost',
+  // Local mode: there is no viewpoint, so a result names the winner and the loser instead.
+  ROUND_DECIDED: 'roundDecided',
+  MATCH_DECIDED: 'matchDecided'
 });
 
 /** Engine reports passed on as announcements as they are. */
@@ -267,15 +275,19 @@ function createBoardEngine({ configs, storageManager, audioManager, isMuted, boa
  *   getEventLog()                  every announcement of the match
  *
  * getState() returns {phase, isPaused, frame, roundFrame, timerSeconds, isSuddenDeath,
- *   playerBoard, round: {number, wins:[n,n], roundsToWin, decided:[winnerIndex...], lastResult},
- *   matchWinner, boards:[{index, isPlayer, isCpu, tier, state, score, incoming, charges:[{id,
+ *   playerBoard, mode ('cpu'|'local'|'cpuVsCpu'), humanBoards:[boardIndex...],
+ *   round: {number, wins:[n,n], roundsToWin, decided:[winnerIndex...], lastResult},
+ *   matchWinner, boards:[{index, isPlayer, isHuman, isCpu, tier, state, score, incoming, charges:[{id,
  *   polarity, strength, progress, threatening}], pulse:{value, max, ratio}, sag, guardStreak,
  *   stats (this round), matchStats (whole match)}], lastEvents}.
  *
  * @param {object} options
  * @param {string|number} options.seed - Match seed; round n plays on `versus:<seed>:r<n>`.
- * @param {string} [options.mode] - 'cpu' for the controller; omitted for the foundation duel.
- * @param {number|null} [options.playerBoard=0] - Board driven by external input; null for CPU vs CPU.
+ * @param {string} [options.mode] - 'cpu' or 'local' for the controller; omitted for the foundation duel.
+ *   In 'local' both boards are driven by external input (two humans): no board is "the player",
+ *   rounds and the match end with ROUND_DECIDED / MATCH_DECIDED, and the rounds never advance by themselves.
+ * @param {number|null} [options.playerBoard=0] - Board driven by external input; null for CPU vs CPU (ignored in 'local').
+ * @param {number[]} [options.riseMultipliers] - Local handicap: charge rise time factor of each board (default none).
  * @param {string|object} [options.cpuTier='normal'] - Tier of the CPU opposite the player.
  * @param {Array<string|object>} [options.cpuTiers] - Both tiers for CPU vs CPU.
  * @param {object} options.configs - {gameConfig, physicsConfig, ballsConfig, obstaclesConfig, levelsConfig, campaignConfig, campaignTuning, fluxConfig}.
@@ -294,7 +306,8 @@ export function createVersusMatch(options) {
   }
   const {
     seed,
-    playerBoard = 0,
+    riseMultipliers = [NO_HANDICAP, NO_HANDICAP],
+    playerBoard: requestedPlayerBoard = 0,
     cpuTier = 'normal',
     cpuTiers,
     configs,
@@ -307,19 +320,22 @@ export function createVersusMatch(options) {
   const gameConfig = configs.gameConfig;
   const cfg = gameConfig.versus;
   const bot = options.bot ?? configs.campaignConfig.generated.calibration.bot;
+  const isLocal = options.mode === MATCH_MODES.LOCAL;
+  const playerBoard = isLocal ? NO_PLAYER : requestedPlayerBoard;
   const hasPlayer = playerBoard === 0 || playerBoard === 1;
-  const autoAdvance = options.autoAdvance ?? !hasPlayer;
+  const matchMode = isLocal ? MATCH_MODES.LOCAL : (hasPlayer ? MATCH_MODES.CPU : MATCH_MODES.CPU_VS_CPU);
+  const autoAdvance = options.autoAdvance ?? (!hasPlayer && !isLocal);
   const viewpoint = hasPlayer ? playerBoard : 0;
   const reach = configs.physicsConfig.ball.radius * bot.neighborhoodRadii;
 
   const tiers = [0, 1].map((b) => {
-    if (hasPlayer && b === playerBoard) {
+    if (isLocal || (hasPlayer && b === playerBoard)) {
       return null;
     }
     const chosen = hasPlayer ? cpuTier : (cpuTiers ?? [cpuTier, cpuTier])[b];
     return { name: typeof chosen === 'string' ? chosen : null, spec: resolveCpuTier(gameConfig, chosen) };
   });
-  const muted = mutedBoards ?? [0, 1].map((b) => !hasPlayer || b !== playerBoard);
+  const muted = mutedBoards ?? [0, 1].map((b) => !isLocal && (!hasPlayer || b !== playerBoard));
   const engines = [0, 1].map((b) => createBoardEngine({
     configs,
     storageManager,
@@ -366,8 +382,9 @@ export function createVersusMatch(options) {
   const startRound = () => {
     const seedKey = `versus:${matchSeed}:r${attempt}`;
     cpus = engines.map((engine, b) => {
+      engine.setVersusRiseMultiplier(riseMultipliers[b] ?? NO_HANDICAP);
       engine.startVersusBoard({ seedKey, boardIndex: b });
-      if (hasPlayer && b === playerBoard) {
+      if (isLocal || (hasPlayer && b === playerBoard)) {
         engine.setVersusAimTruncation(true);
       }
       return tiers[b]
@@ -455,19 +472,26 @@ export function createVersusMatch(options) {
       emit(MATCH_EVENTS.ROUND_REPLAY, {});
       return;
     }
-    emit(result.winner === viewpoint ? MATCH_EVENTS.ROUND_WON : MATCH_EVENTS.ROUND_LOST, {
+    const roundOutcome = {
       winner: result.winner,
       loser: result.loser,
       wins: [...roundState.wins]
-    });
+    };
+    if (isLocal) {
+      emit(MATCH_EVENTS.ROUND_DECIDED, roundOutcome);
+    } else {
+      emit(result.winner === viewpoint ? MATCH_EVENTS.ROUND_WON : MATCH_EVENTS.ROUND_LOST, roundOutcome);
+    }
     attempt += 1;
     if (isMatchOver(roundState)) {
       phase = MATCH_PHASES.MATCH_OVER;
       const winner = matchWinner(roundState);
-      emit(winner === viewpoint ? MATCH_EVENTS.MATCH_WON : MATCH_EVENTS.MATCH_LOST, {
-        winner,
-        wins: [...roundState.wins]
-      });
+      const matchOutcome = { winner, wins: [...roundState.wins] };
+      if (isLocal) {
+        emit(MATCH_EVENTS.MATCH_DECIDED, matchOutcome);
+      } else {
+        emit(winner === viewpoint ? MATCH_EVENTS.MATCH_WON : MATCH_EVENTS.MATCH_LOST, matchOutcome);
+      }
     } else {
       phase = MATCH_PHASES.ROUND_OVER;
     }
@@ -581,6 +605,8 @@ export function createVersusMatch(options) {
         timerSeconds: Math.floor(roundFrame / fps),
         isSuddenDeath,
         playerBoard: hasPlayer ? playerBoard : NO_PLAYER,
+        mode: matchMode,
+        humanBoards: isLocal ? [0, 1] : (hasPlayer ? [playerBoard] : []),
         round: {
           number: roundState.decided.length + 1,
           wins: [...roundState.wins],
@@ -595,6 +621,7 @@ export function createVersusMatch(options) {
           return {
             index: b,
             isPlayer: hasPlayer && b === playerBoard,
+            isHuman: tiers[b] === null,
             isCpu: tiers[b] !== null,
             tier: tiers[b]?.name ?? null,
             state: engine.state,
