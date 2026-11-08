@@ -16,6 +16,11 @@
 
 import { GAME_MODES } from '../core/Constants.js';
 import { Ball } from '../entities/Ball.js';
+import { SeededRandom } from '../core/SeededRandom.js';
+
+/** Recolor slots: 0 current ball, 1 next ball, then the stash, then the queue. */
+const STASH_RECOLOR_SLOT = 2;
+const QUEUE_RECOLOR_SLOT_BASE = 3;
 
 /** Methods of GameEngine that belong to this domain, installed on its prototype. */
 export const engineLauncherMethods = {
@@ -23,15 +28,53 @@ export const engineLauncherMethods = {
     return this.activePalette[Math.floor(this.random() * this.activePalette.length)];
   },
 
-  pickLauncherColor() {
+  /**
+   * Picks a launcher color among the colors still on the board. The pool follows the palette
+   * order, never the board order, so a given roll names the same color whatever was played.
+   * @param {number} [roll] - Unit roll in [0, 1); defaults to a draw from the run stream.
+   * @returns {string} A color id.
+   */
+  pickLauncherColor(roll = this.random()) {
     const existingColors = new Set();
     for (const b of this.physicsWorld.balls) {
       if (b.colorId) {
         existingColors.add(b.colorId);
       }
     }
-    const pool = existingColors.size > 0 ? Array.from(existingColors) : this.activePalette;
-    return pool[Math.floor(this.random() * pool.length)];
+    const ordered = this.activePalette.filter((colorId) => existingColors.has(colorId));
+    const pool = ordered.length > 0 ? ordered : this.activePalette;
+    return pool[Math.floor(roll * pool.length)];
+  },
+
+  /** Seed key shared by every player of the run: the Flux seed, the Daily date, or null. */
+  getRunSeedKey() {
+    if (this.mode === GAME_MODES.FLUX) {
+      return this.fluxSeed;
+    }
+    if (this.mode === GAME_MODES.DAILY) {
+      return this.dailySeedKey;
+    }
+    return null;
+  },
+
+  /**
+   * Roll of a named stream, keyed by its index so it depends on neither the shots played
+   * nor any saved generator state. Unseeded runs draw from the ambient source.
+   * @param {string} stream - Stream name.
+   * @param {number|string} index - Position of the draw in the stream.
+   * @returns {number} A unit roll in [0, 1).
+   */
+  drawSeededRoll(stream, index) {
+    const key = this.getRunSeedKey();
+    if (!key) {
+      return this.random();
+    }
+    return new SeededRandom(`${key}:${stream}:${index}`).next();
+  },
+
+  /** Next color of the launcher queue: one indexed draw, the same for every player of a seed. */
+  drawLauncherColor() {
+    return this.pickLauncherColor(this.drawSeededRoll('launcher', this.launcherDrawIndex++));
   },
 
   /**
@@ -44,7 +87,7 @@ export const engineLauncherMethods = {
       x: this.gameConfig.canvas.launcherX,
       y: this.gameConfig.canvas.launcherY,
       radius: this.physicsConfig.ball.radius,
-      colorId: specialType ? null : colorId || this.pickLauncherColor(),
+      colorId: specialType ? null : colorId || this.drawLauncherColor(),
       specialType,
       isProjectile: false
     });
@@ -61,7 +104,7 @@ export const engineLauncherMethods = {
     const length = this.gameConfig.canvas.launcherPreviewCount;
     this.upcomingColorIds.length = Math.min(this.upcomingColorIds.length, length);
     while (this.upcomingColorIds.length < length) {
-      this.upcomingColorIds.push(this.pickLauncherColor());
+      this.upcomingColorIds.push(this.drawLauncherColor());
     }
   },
 
@@ -84,7 +127,7 @@ export const engineLauncherMethods = {
         specialType: nextSpec?.specialType || null
       };
     }
-    const color = this.upcomingColorIds.shift() || this.pickLauncherColor();
+    const color = this.upcomingColorIds.shift() || this.drawLauncherColor();
     this.fillUpcomingColors();
     return { colorId: color, specialType: null };
   },
@@ -104,14 +147,19 @@ export const engineLauncherMethods = {
     if (activeColors.size === 0) {
       return;
     }
-    for (const launcherBall of [this.currentBall, this.nextBall]) {
+    // Recolors never advance the queue counter: they are keyed by it and by their slot.
+    const recolorStream = `recolor:${this.launcherDrawIndex}`;
+    const recolor = (slot) => this.pickLauncherColor(this.drawSeededRoll(recolorStream, slot));
+    [this.currentBall, this.nextBall].forEach((launcherBall, slot) => {
       if (launcherBall && !launcherBall.specialType && !activeColors.has(launcherBall.colorId)) {
-        launcherBall.colorId = this.pickLauncherColor();
+        launcherBall.colorId = recolor(slot);
       }
-    }
+    });
     if (this.stashedRegularColorId && !activeColors.has(this.stashedRegularColorId)) {
-      this.stashedRegularColorId = this.pickLauncherColor();
+      this.stashedRegularColorId = recolor(STASH_RECOLOR_SLOT);
     }
-    this.upcomingColorIds = this.upcomingColorIds.map((color) => (activeColors.has(color) ? color : this.pickLauncherColor()));
+    this.upcomingColorIds = this.upcomingColorIds.map((color, idx) =>
+      activeColors.has(color) ? color : recolor(QUEUE_RECOLOR_SLOT_BASE + idx)
+    );
   },
 };

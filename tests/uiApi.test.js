@@ -53,6 +53,7 @@ const EXPECTED_PROTOTYPE_NAMES = [
   'getAffordableUpgradeCount',
   'getLevelsModalInitialFocus',
   'getModalsByPriority',
+  'getOwnedWorkshopLevelSum',
   'getOverlayModals',
   'getPowerupAriaLabel',
   'getShopTabs',

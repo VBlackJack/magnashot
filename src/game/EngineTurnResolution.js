@@ -638,7 +638,7 @@ export const engineTurnResolutionMethods = {
   grantRandomSpecialBall() {
     const canvasCfg = this.gameConfig.canvas;
     const types = Object.values(SPECIAL_TYPES);
-    const granted = types[Math.floor(this.random() * types.length)];
+    const granted = types[Math.floor(this.drawSeededRoll('special', this.specialGrantIndex++) * types.length)];
     const amount = this.gameConfig.scoring.specialChargePerMatch;
     this.specialInventory[granted] = (this.specialInventory[granted] || 0) + amount;
     this.audioManager.playEffect('overcharge');

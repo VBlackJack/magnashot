@@ -43,6 +43,9 @@ const ENGINE_SCALAR_FIELDS = [
   'discoveryTurnCount',
   'isPolarityFlipped',
   'stashedRegularColorId',
+  'launcherDrawIndex',
+  'specialGrantIndex',
+  'specialAmmoBoughtInRun',
   'aimAngle',
   'fluxSeed',
   'fluxStage',
@@ -135,6 +138,8 @@ const isCompatibleValue = (current, saved) => {
  * snapshot that still parses but holds, say, a text score is discarded instead of being
  * concatenated into the run.
  */
+const FAIRNESS_COUNTER_FIELDS = ['launcherDrawIndex', 'specialGrantIndex', 'specialAmmoBoughtInRun'];
+
 const restoreFields = (target, source, fields) => {
   for (const field of fields) {
     if (source[field] === undefined) {
@@ -403,6 +408,10 @@ export function applyRunSnapshot(engine, snapshot) {
   }
   world.allowTensionBreak = Boolean(snapshot.allowTensionBreak);
 
+  // A run saved before the fairness counters existed restores them at their reset value.
+  for (const field of FAIRNESS_COUNTER_FIELDS) {
+    engine[field] = 0;
+  }
   restoreFields(engine, snapshot.engine, ENGINE_SCALAR_FIELDS);
   engine.specialInventory = restoreSpecialInventory(engine.specialInventory, snapshot.specialInventory);
   engine.waveLog = restoreWaveLog(engine, snapshot.waveLog);

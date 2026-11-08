@@ -252,7 +252,9 @@
         "basics": "Pendule magnétique",
         "pivot": "Rotor à inertie"
       },
-      "dailyMutator": "Défi du Jour : {{mutator}}. {{effect}}"
+      "dailyMutator": "Défi du Jour : {{mutator}}. {{effect}}",
+      "dailyMutatorFair": "Défi du Jour : {{mutator}}. {{effect}} {{fairPlay}}",
+      "dailyFairPlay": "Mêmes règles pour tous : les améliorations de l'Atelier et les munitions de la boutique sont désactivées aujourd'hui."
     }
   },
   "gameplay": {
@@ -587,7 +589,8 @@
         "blocked": {
           "shotInFlight": "Attendez la fin du tir pour acheter des munitions spéciales.",
           "stageChanging": "Attendez l'apparition de la prochaine forme pour acheter des munitions spéciales.",
-          "perkChoice": "Choisissez un atout pour acheter des munitions spéciales."
+          "perkChoice": "Choisissez un atout pour acheter des munitions spéciales.",
+          "fairPlay": "Les munitions de la boutique sont désactivées dans le Défi du Jour pour que chaque joueur parte à égalité."
         }
       },
       "codex": {
@@ -876,6 +879,7 @@
         "maxedAria": "Niveau maximum atteint"
       },
       "upgrades": {
+        "dailyBaselineNote": "Les améliorations sont suspendues pendant le Défi du Jour.",
         "laserSight": {
           "name": "Visée Laser Courbée",
           "description": "Augmente la portée et le nombre de rebonds prédictifs du viseur."
@@ -1193,7 +1197,8 @@
     "flux": {
       "header": "MagnaShot - Mode Flux",
       "headerWithSeed": "MagnaShot - Mode Flux (#{{seed}})",
-      "stats": "Forme {{stage}} - {{score}} pts"
+      "stats": "Forme {{stage}} - {{score}} pts",
+      "assists": "Aides : Atelier +{{levels}} - Munitions {{ammo}} - Continuer {{continues}}"
     },
     "puzzle": {
       "header": "MagnaShot - Mode Puzzle",

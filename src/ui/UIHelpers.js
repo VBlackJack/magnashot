@@ -189,9 +189,10 @@ export function repeatsLevelName(mechanic, levelName) {
  */
 export function buildLevelIntroText(intro, translate) {
   if (intro.mutatorKey) {
-    return translate('hud.levelIntro.dailyMutator', {
+    return translate('hud.levelIntro.dailyMutatorFair', {
       mutator: translate(`gameplay.mutators.${intro.mutatorKey}`),
-      effect: translate(`modals.shop.codex.mutators.${intro.mutatorKey}.description`)
+      effect: translate(`modals.shop.codex.mutators.${intro.mutatorKey}.description`),
+      fairPlay: translate('hud.levelIntro.dailyFairPlay')
     });
   }
   const levelName = formatLevelName(intro.summary);
@@ -258,7 +259,8 @@ export function inputModeForPointerType(pointerType) {
 export const SPECIAL_AMMO_BLOCK_REASON_KEYS = Object.freeze({
   shotInFlight: 'modals.shop.specialAmmo.blocked.shotInFlight',
   stageChanging: 'modals.shop.specialAmmo.blocked.stageChanging',
-  perkChoice: 'modals.shop.specialAmmo.blocked.perkChoice'
+  perkChoice: 'modals.shop.specialAmmo.blocked.perkChoice',
+  fairPlay: 'modals.shop.specialAmmo.blocked.fairPlay'
 });
 
 /** Keys whose action is a one-shot toggle or trigger; auto-repeat must not re-fire them. */

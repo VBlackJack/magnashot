@@ -389,6 +389,14 @@ export const uiSettingsControlMethods = {
     }
   },
 
+  /** Sum of the owned Workshop levels, disclosed in a Flux share as assists. */
+  getOwnedWorkshopLevelSum() {
+    return Object.keys(this.gameConfig.upgrades || {}).reduce(
+      (sum, upgradeKey) => sum + (this.storageManager.getUpgradeLevel(upgradeKey) || 0),
+      0
+    );
+  },
+
   /** One share attempt of shareRunResult, without the in-progress guard. */
   async shareRunResultOnce() {
     const engine = this.engine;
@@ -404,6 +412,9 @@ export const uiSettingsControlMethods = {
         stage: engine.fluxStage,
         puzzleStage: engine.currentPuzzleStage,
         seed: engine.fluxSeed,
+        workshopLevels: this.getOwnedWorkshopLevelSum(),
+        ammoBought: engine.specialAmmoBoughtInRun || 0,
+        continues: engine.hasUsedContinue ? 1 : 0,
         url: shareConfig.url
       },
       shareConfig

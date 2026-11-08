@@ -38,22 +38,30 @@ export const engineControlsMethods = {
     return grants || holds || Boolean(this.currentBall?.specialType);
   },
 
+  /** True in the Daily Challenge while shop ammo is switched off for fairness. */
+  isDailyAmmoLocked() {
+    return this.mode === GAME_MODES.DAILY && !this.gameConfig.seededFairness?.dailyAllowsSpecialAmmo;
+  },
+
   /**
    * True when a special ball can be bought now: the run is active and can be captured, so
    * the purchase is stored with its debit (no shot in flight, no Flux shape change or perk
    * choice pending).
    */
   canBuySpecialAmmo() {
-    return isRunSnapshotable(this) && !this.isStageChanging() && !this.isAwaitingPerk();
+    return !this.isDailyAmmoLocked() && isRunSnapshotable(this) && !this.isStageChanging() && !this.isAwaitingPerk();
   },
 
   /**
    * Why a special ball cannot be bought right now, for the shop to explain.
-   * @returns {'shotInFlight'|'stageChanging'|'perkChoice'|null} Null when it can, or when no run is active.
+   * @returns {'fairPlay'|'shotInFlight'|'stageChanging'|'perkChoice'|null} Null when it can, or when no run is active.
    */
   getSpecialAmmoBlockReason() {
     if (this.state !== GAME_STATES.PLAYING && this.state !== GAME_STATES.PAUSED) {
       return null;
+    }
+    if (this.isDailyAmmoLocked()) {
+      return 'fairPlay';
     }
     if (this.physicsWorld.projectile || this.pendingBossRushWave) {
       return 'shotInFlight';
@@ -90,6 +98,7 @@ export const engineControlsMethods = {
     }
     this.storageManager.setCoins(coins - cost);
     this.specialInventory[specialType] = (this.specialInventory[specialType] || 0) + 1;
+    this.specialAmmoBoughtInRun++;
     // Stored right away, even before the first shot: a reload must not keep the debit and
     // lose the ball it paid for.
     this.saveRunSnapshot({ force: true });

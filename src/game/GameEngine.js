@@ -165,6 +165,9 @@ export class GameEngine {
     this.dailySeedKey = null;
     this.seededRng = null;
     this.scopedRng = null;
+    this.launcherDrawIndex = 0;
+    this.specialGrantIndex = 0;
+    this.specialAmmoBoughtInRun = 0;
     this.fluxSeed = null;
     this.fluxStage = 0;
     this.fluxFamily = null;
@@ -613,6 +616,9 @@ export class GameEngine {
     this.scopedRng = null;
     this.waveLog = [];
     this.stashedRegularColorId = null;
+    this.launcherDrawIndex = 0;
+    this.specialGrantIndex = 0;
+    this.specialAmmoBoughtInRun = 0;
     this.fluxSeed = null;
     this.fluxStage = 0;
     this.fluxFamily = null;
@@ -710,14 +716,27 @@ export class GameEngine {
     }
   }
 
+  /**
+   * Workshop level that counts in this run: the Daily Challenge fixes every upgrade at its
+   * configured baseline so all players start equal; other modes use the owned level.
+   * @param {string} upgradeKey - Upgrade identifier.
+   * @returns {number}
+   */
+  getEffectiveUpgradeLevel(upgradeKey) {
+    if (this.mode === GAME_MODES.DAILY) {
+      return this.gameConfig.seededFairness?.dailyUpgradeLevels?.[upgradeKey] ?? 0;
+    }
+    return this.storageManager.getUpgradeLevel(upgradeKey);
+  }
+
   getBlastRadiusMultiplier() {
-    const lvl = this.storageManager.getUpgradeLevel('blastRadius');
+    const lvl = this.getEffectiveUpgradeLevel('blastRadius');
     const spec = this.gameConfig.upgrades.blastRadius;
     return 1 + lvl * spec.radiusMultiplierPerLevel + this.getFluxPerkBonus(FLUX_PERK_IDS.BLAST);
   }
 
   getOverchargeMultiplier() {
-    const lvl = this.storageManager.getUpgradeLevel('overchargeRate');
+    const lvl = this.getEffectiveUpgradeLevel('overchargeRate');
     const spec = this.gameConfig.upgrades.overchargeRate;
     return 1 + lvl * spec.rateMultiplierPerLevel + this.getFluxPerkBonus(FLUX_PERK_IDS.OVERCHARGE);
   }
@@ -727,7 +746,7 @@ export class GameEngine {
    * asks every frame): read it right away, do not keep it.
    */
   getLaserBonuses() {
-    const lvl = this.storageManager.getUpgradeLevel('laserSight');
+    const lvl = this.getEffectiveUpgradeLevel('laserSight');
     const spec = this.gameConfig.upgrades.laserSight;
     this.laserBonuses.distanceBonus = lvl * spec.distanceBonusPerLevel;
     this.laserBonuses.bouncesBonus = lvl * spec.bouncesBonusPerLevel;
@@ -735,21 +754,21 @@ export class GameEngine {
   }
 
   getStartingShotsBonus() {
-    const lvl = this.storageManager.getUpgradeLevel('startingShots');
+    const lvl = this.getEffectiveUpgradeLevel('startingShots');
     const spec = this.gameConfig.upgrades.startingShots;
     return lvl * spec.shotsPerLevel;
   }
 
   getCollectorBonusPoints() {
     const base = this.gameConfig.scoring.collector?.bonusPointsPerBall || 0;
-    const lvl = this.storageManager.getUpgradeLevel('collectorMagnet');
+    const lvl = this.getEffectiveUpgradeLevel('collectorMagnet');
     const step = this.gameConfig.upgrades?.collectorMagnet?.pointsBonusPerLevel || 0;
     return base + lvl * step;
   }
 
   getCollectorOvercharge() {
     const base = this.gameConfig.scoring.collector?.overchargePerBall || 0;
-    const lvl = this.storageManager.getUpgradeLevel('collectorMagnet');
+    const lvl = this.getEffectiveUpgradeLevel('collectorMagnet');
     const step = this.gameConfig.upgrades?.collectorMagnet?.overchargeBonusPerLevel || 0;
     return base + lvl * step;
   }
