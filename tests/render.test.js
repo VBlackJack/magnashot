@@ -1630,3 +1630,156 @@ test('Versus launcher: the loaded and the next sphere show their +/- glyph, on a
   assert.equal(lineToCount(ctx), 2, 'a minus is drawn twice: backdrop, then the sign');
   assert.equal(ctx.depth, 0);
 });
+
+// ---- Magnetar rendering -------------------------------------------------------------------
+
+const magnetarState = (viewExtra = {}) => ({
+  physicsWorld: {
+    physicsConfig: { ball: { radius: 20 } },
+    ballMap: new Map([[11, { id: 11, x: 80, y: 100 }], [12, { id: 12, x: 200, y: 120 }]])
+  },
+  magnetarView: {
+    ballId: 1, x: 150, y: 60, tier: 1, phase: 'rest', armed: null, mooringIds: [11, 12], moorings: [11, 12],
+    regrowSlots: [], undertow: null, barrageMarkers: [], charges: [],
+    ...viewExtra
+  }
+});
+
+const drawMagnetarWith = (viewExtra, options = {}) => {
+  const renderer = options.lite
+    ? new Renderer(createStubCanvas(), gameConfig, ballsConfig, obstaclesConfig, { lite: true })
+    : createRenderer();
+  renderer.isReducedMotion = Boolean(options.reduced);
+  const ctx = createChargeRecorder();
+  const state = magnetarState(viewExtra);
+  renderer.magnetarView = state.magnetarView;
+  renderer.drawMagnetar(ctx, state, options.now ?? 700);
+  return ctx;
+};
+
+const pathSignature = (ctx) => JSON.stringify(ctx.calls.filter((c) => ['moveTo', 'lineTo', 'arc'].includes(c.name)));
+
+test('Magnetar: drawing is save/restore balanced for every behaviour', () => {
+  for (const armed of [null, 'invert', 'undertow', 'regrow', 'barrage']) {
+    const ctx = drawMagnetarWith({
+      armed,
+      regrowSlots: [{ x: 30, y: 30 }],
+      undertow: { x: 150, y: 60, radius: 120 },
+      barrageMarkers: [{ x: 60, polarity: 1 }, { x: 140, polarity: -1 }]
+    });
+    assert.equal(ctx.depth, 0, `balanced for ${armed}`);
+    assert.equal(ctx.underflows, 0);
+  }
+});
+
+test('Magnetar: each behaviour has its own stroked badge glyph', () => {
+  const signatures = new Set();
+  for (const armed of ['invert', 'undertow', 'regrow', 'barrage']) {
+    signatures.add(pathSignature(drawMagnetarWith({ armed })));
+  }
+  assert.equal(signatures.size, 4, 'four behaviours, four distinct glyph shapes');
+  assert.ok(!signatures.has(pathSignature(drawMagnetarWith({ armed: null }))), 'no badge at rest');
+  const ctx = drawMagnetarWith({ armed: 'barrage' });
+  assert.ok(!ctx.calls.some((c) => c.name === 'fillText' || c.name === 'strokeText'), 'glyphs are strokes, not text');
+});
+
+test('Magnetar: Mooring lines are heavy dashed, one per anchor, with a bracket each', () => {
+  const ctx = drawMagnetarWith({ armed: null });
+  assert.equal(ctx.calls.filter((c) => c.name === 'setLineDash' && c.args[0].length > 0).length, 2);
+  const widths = ctx.calls.filter((c) => c.name === 'set:lineWidth').map((c) => c.value);
+  assert.ok(widths.includes(gameConfig.magnetar.render.mooringLineWidth));
+  const none = drawMagnetarWith({ armed: null, mooringIds: [], moorings: [] });
+  assert.equal(none.calls.filter((c) => c.name === 'setLineDash' && c.args[0].length > 0).length, 0);
+  assert.equal(lineToCount(ctx) - lineToCount(none), 2 * 7, 'a line and a bracket per Mooring');
+});
+
+test('Magnetar: Regrow slots are dashed outlines, Undertow a dotted radius, Barrage marks the danger line', () => {
+  const base = drawMagnetarWith({ armed: null });
+  const regrow = drawMagnetarWith({ armed: null, regrowSlots: [{ x: 30, y: 30 }, { x: 60, y: 30 }] });
+  assert.equal(arcCount(regrow), arcCount(base) + 2);
+  assert.ok(dashesFor(regrow).some((n) => n > 0));
+  const undertow = drawMagnetarWith({ armed: null, undertow: { x: 150, y: 60, radius: 99 } });
+  assert.ok(undertow.calls.some((c) => c.name === 'arc' && c.args[2] === 99));
+  assert.ok(undertow.calls.some((c) => c.name === 'setLineDash' && c.args[0][0] === 0 && c.args[0][1] > 0));
+  const barrage = drawMagnetarWith({ armed: null, barrageMarkers: [{ x: 50, polarity: 1 }, { x: 90, polarity: -1 }] });
+  const dangerMarks = barrage.calls.filter((c) => c.name === 'moveTo' && c.args[1] === gameConfig.canvas.dangerLineY);
+  assert.equal(dangerMarks.length, 2);
+  assert.equal(lineToCount(barrage) - lineToCount(base), 3, 'a plus has two bars, a minus one');
+});
+
+test('Magnetar: field rings are static under reduced motion and breathe otherwise', () => {
+  const ringAlphas = (ctx) => ctx.calls.filter((c) => c.name === 'set:globalAlpha').map((c) => c.value);
+  assert.deepEqual(
+    ringAlphas(drawMagnetarWith({}, { reduced: true, now: 100 })),
+    ringAlphas(drawMagnetarWith({}, { reduced: true, now: 900 }))
+  );
+  assert.notDeepEqual(
+    ringAlphas(drawMagnetarWith({}, { now: 100 })),
+    ringAlphas(drawMagnetarWith({}, { now: 700 }))
+  );
+});
+
+test('Magnetar: lite boards skip the field halo rings', () => {
+  const full = drawMagnetarWith({});
+  const lite = drawMagnetarWith({}, { lite: true });
+  assert.equal(arcCount(full) - arcCount(lite), gameConfig.magnetar.render.ringCount);
+  assert.equal(lite.depth, 0);
+});
+
+test('Magnetar: draws nothing without a view', () => {
+  const renderer = createRenderer();
+  const ctx = createChargeRecorder();
+  renderer.drawMagnetar(ctx, { physicsWorld: { physicsConfig: { ball: { radius: 20 } } } }, 0);
+  assert.equal(ctx.calls.length, 0);
+  const engine = createTestEngine();
+  engine.startClassicMode(1);
+  assert.equal(renderer.resolveMagnetarView(engine), null);
+  const names = renderFrameWithCalls(renderer, engine, ['drawMagnetar', 'drawMagnetarCharges']);
+  assert.deepEqual(names, []);
+});
+
+test('Magnetar: a full render draws the overlay and its charges, balanced', () => {
+  const renderer = createRenderer();
+  const engine = createTestEngine();
+  engine.startClassicMode(1);
+  engine.getMagnetarView = () => ({
+    ballId: 999, x: 150, y: 60, tier: 2, phase: 'armed', armed: 'barrage', mooringIds: [], moorings: [],
+    regrowSlots: [], undertow: null, barrageMarkers: [{ x: 100, polarity: 1 }],
+    charges: [{ id: 5, polarity: -1, strength: 1, x: 100, y: 200, progress: 0.5 }]
+  });
+  const names = renderFrameWithCalls(renderer, engine, ['drawMagnetar', 'drawMagnetarCharges', 'drawChargeList']);
+  assert.deepEqual(names, ['drawMagnetar', 'drawMagnetarCharges', 'drawChargeList']);
+  assert.equal(renderer.ctx.saveDepth, 0);
+});
+
+test('Magnetar: the launcher glyph shows the effective polarity under a Reverse Field', () => {
+  const polarities = (inverted) => {
+    const renderer = createRenderer();
+    const seen = [];
+    renderer.drawShotPolarityGlyph = (ctx, x, y, half, polarity) => seen.push(polarity);
+    const engine = createTestEngine();
+    engine.startClassicMode(1);
+    engine.getMagnetarView = () => ({ x: 1, y: 1, armed: null, mooringIds: [], charges: [] });
+    engine.getVersusShotPolarity = () => 1;
+    engine.physicsWorld.boardPolarityInverted = inverted;
+    renderFrameWithCalls(renderer, engine, []);
+    return seen;
+  };
+  const normal = polarities(false);
+  const reversed = polarities(true);
+  assert.ok(normal.length > 0 && normal.every((p) => p === 1));
+  assert.ok(reversed.length > 0 && reversed.every((p) => p === -1));
+});
+
+test('drawChargeList: versus charge drawing equals the shared list drawing', () => {
+  const charges = [
+    { id: 1, polarity: 1, strength: 2, x: 50, y: 90 },
+    { id: 7, polarity: -1, strength: 1, x: 70, y: 40 }
+  ];
+  const renderer = createRenderer();
+  const viaVersus = createChargeRecorder();
+  renderer.drawVersusCharges(viaVersus, chargeState(charges, { versus: { threatIds: [7] } }));
+  const direct = createChargeRecorder();
+  renderer.drawChargeList(direct, charges, new Set([7]), 20 * gameConfig.versus.chargeRadius);
+  assert.deepEqual(viaVersus.calls, direct.calls);
+});

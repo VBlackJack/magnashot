@@ -38,6 +38,47 @@ const OUTCOME_ARROW_DEPTH = 0.4;
 const OUTCOME_ARROW_HEAD = 0.9;
 const OUTCOME_CRACK_INNER = 0.3;
 
+// Badge glyph shapes per Magnetar behaviour, as polylines in a [-1, 1] box (stroked, never text).
+// `circle` is the radius of an open arc (0 for none). Shapes differ in structure, not colour.
+const MAGNETAR_GLYPHS = Object.freeze({
+  invert: Object.freeze({
+    lines: Object.freeze([
+      Object.freeze([[-1, -0.45], [1, -0.45]]),
+      Object.freeze([[0.45, -0.95], [1, -0.45], [0.45, 0.05]]),
+      Object.freeze([[1, 0.45], [-1, 0.45]]),
+      Object.freeze([[-0.45, -0.05], [-1, 0.45], [-0.45, 0.95]])
+    ]),
+    circle: 0
+  }),
+  undertow: Object.freeze({
+    lines: Object.freeze([Object.freeze([[0.1, 0.95], [-0.45, 0.6], [0.1, 0.25]])]),
+    circle: 0.75
+  }),
+  regrow: Object.freeze({
+    lines: Object.freeze([
+      Object.freeze([[-0.8, -0.1], [0.8, -0.1], [0.8, 0.9], [-0.8, 0.9], [-0.8, -0.1]]),
+      Object.freeze([[0, 0.5], [0, -0.9]]),
+      Object.freeze([[-0.45, -0.45], [0, -0.9], [0.45, -0.45]])
+    ]),
+    circle: 0
+  }),
+  barrage: Object.freeze({
+    lines: Object.freeze([
+      Object.freeze([[-0.8, -0.9], [0, -0.4], [0.8, -0.9]]),
+      Object.freeze([[-0.8, -0.2], [0, 0.3], [0.8, -0.2]]),
+      Object.freeze([[-0.8, 0.5], [0, 1], [0.8, 0.5]])
+    ]),
+    circle: 0
+  })
+});
+const MAGNETAR_ARC_SWEEP = 0.75;
+const BRACKET_REACH_FACTOR = 1.25;
+const BRACKET_SERIF_FACTOR = 0.5;
+const BADGE_GLYPH_FACTOR = 0.55;
+const FIELD_RING_PULSE_DEPTH = 0.2;
+const FIELD_RING_BASE_ALPHA = 0.6;
+const HALF = 0.5;
+
 /** Color-blind patterns a standard color may declare in configs/balls.json. */
 const PATTERNS = Object.freeze({
   STRIPES_H: 'stripesH',
@@ -189,6 +230,7 @@ export class Renderer {
     this.highContrast = false;
     this.colorPatterns = false;
     this.isReducedMotion = false;
+    this.magnetarView = null;
     this.activeBallStyle = gameConfig.defaults?.ballStyle || BALL_STYLES.CLASSIC;
     this.ballSpriteKeySuffix = '';
     this.refreshBallSpriteKeySuffix();
@@ -484,6 +526,8 @@ export class Renderer {
     // Every pulse, glow and field wave is a function of this clock: holding it still under
     // reduced motion freezes them all, while the physics keeps moving the board.
     this.isReducedMotion = Boolean(engineState.isReducedMotion);
+    const magnetarView = this.resolveMagnetarView(engineState);
+    this.magnetarView = magnetarView;
     const now = this.isReducedMotion ? REDUCED_MOTION_CLOCK_MS : performance.now();
 
     ctx.setTransform(this.scaleX, 0, 0, this.scaleY, 0, 0);
@@ -534,6 +578,9 @@ export class Renderer {
       this.drawBall(ctx, ball, now, alpha);
     }
     this.drawChainLinkOverlays(ctx, engineState.physicsWorld, alpha);
+    if (magnetarView) {
+      this.drawMagnetar(ctx, engineState, now);
+    }
     if (lowerOffset > 0) {
       ctx.restore();
     }
@@ -579,7 +626,21 @@ export class Renderer {
     if (engineState.versus) {
       this.drawVersusCharges(ctx, engineState);
     }
+    if (magnetarView && magnetarView.charges?.length) {
+      this.drawMagnetarCharges(ctx, engineState, magnetarView);
+    }
     ctx.restore();
+  }
+
+  /**
+   * Reads the Magnetar view of the engine, or null when the board has no Magnetar.
+   * @private
+   */
+  resolveMagnetarView(engineState) {
+    const view = typeof engineState.getMagnetarView === 'function'
+      ? engineState.getMagnetarView()
+      : engineState.magnetarView;
+    return view && typeof view === 'object' ? view : null;
   }
 
   /**
@@ -607,15 +668,209 @@ export class Renderer {
     const radius = baseRadius * cfg.chargeRadius;
     const charges = Array.isArray(versus.charges) ? versus.charges : [];
     const threatIds = versus.threatIds ? new Set(versus.threatIds) : null;
+    this.drawChargeList(ctx, charges, threatIds, radius);
+    const hit = !this.lite ? engineState.aimPreview?.chargeHit : null;
+    if (hit) {
+      this.drawChargePreviewRing(ctx, hit, radius, renderCfg);
+    }
+  }
+
+  /**
+   * Draws a list of charged spheres with the shared charge style (Polarity Duel and Magnetar
+   * Barrage). The rise trail is skipped on lite boards and under reduced motion.
+   * @param {CanvasRenderingContext2D} ctx
+   * @param {Array<Object>} charges Charges with `polarity`, `strength`, `x`, `y`.
+   * @param {Set<number>|null} threatIds Ids of charges about to land.
+   * @param {number} radius Drawn charge radius.
+   */
+  drawChargeList(ctx, charges, threatIds, radius) {
+    const renderCfg = this.gameConfig.versus?.render;
+    if (!renderCfg) {
+      return;
+    }
     const showTrail = !this.lite && !this.isReducedMotion;
     for (const charge of charges) {
       const threatening = Boolean(charge.threatening) || Boolean(threatIds?.has(charge.id));
       this.drawOneCharge(ctx, charge, radius, renderCfg, threatening, showTrail);
     }
-    const hit = !this.lite ? engineState.aimPreview?.chargeHit : null;
-    if (hit) {
-      this.drawChargePreviewRing(ctx, hit, radius, renderCfg);
+  }
+
+  /** Draws the live Barrage charges of a Magnetar board. @private */
+  drawMagnetarCharges(ctx, engineState, view) {
+    const baseRadius = engineState.physicsWorld?.physicsConfig?.ball?.radius;
+    const chargeRadius = this.gameConfig.versus?.chargeRadius;
+    if (!(baseRadius > 0) || !(chargeRadius > 0)) {
+      return;
     }
+    this.drawChargeList(ctx, view.charges, null, baseRadius * chargeRadius);
+  }
+
+  /**
+   * Draws the Magnetar overlay: dark core with field rings, heavy dashed Mooring lines with a
+   * bracket on each anchor, the warning badge (one stroked glyph shape per behaviour), Regrow
+   * slot outlines, the Undertow radius and the Barrage markers on the danger line.
+   * Every cue is a shape or a dash pattern, never colour alone. Lite boards skip the field halo.
+   * Draws nothing without a Magnetar view.
+   * @param {CanvasRenderingContext2D} ctx
+   * @param {Object} engineState
+   * @param {number} now Animation clock in ms (already frozen under reduced motion).
+   */
+  drawMagnetar(ctx, engineState, now) {
+    const view = this.magnetarView ?? this.resolveMagnetarView(engineState);
+    const cfg = this.gameConfig.magnetar?.render;
+    const r = engineState.physicsWorld?.physicsConfig?.ball?.radius;
+    if (!view || !cfg || !(r > 0)) {
+      return;
+    }
+    this.drawMagnetarField(ctx, view, cfg, r, now);
+    this.drawMagnetarMoorings(ctx, engineState, view, cfg, r);
+    this.drawMagnetarTelegraphs(ctx, view, cfg, r);
+    if (view.armed) {
+      this.drawMagnetarBadge(ctx, view, cfg, r);
+    }
+  }
+
+  /** @private */
+  drawMagnetarField(ctx, view, cfg, r, now) {
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(view.x, view.y, r, 0, MATH_CONSTANTS.TWO_PI);
+    ctx.fillStyle = cfg.coreColor;
+    ctx.fill();
+    if (!this.lite) {
+      // Static rings under reduced motion; otherwise they breathe on a fixed period.
+      const wave = this.isReducedMotion
+        ? 0
+        : Math.sin((now / cfg.ringPulsePeriodMs) * MATH_CONSTANTS.TWO_PI);
+      ctx.strokeStyle = cfg.fieldColor;
+      ctx.lineWidth = cfg.ringLineWidth;
+      ctx.globalAlpha = FIELD_RING_BASE_ALPHA + FIELD_RING_PULSE_DEPTH * wave;
+      for (let i = 1; i <= cfg.ringCount; i++) {
+        ctx.beginPath();
+        ctx.arc(view.x, view.y, r * (1 + i * cfg.ringSpacingFactor), 0, MATH_CONSTANTS.TWO_PI);
+        ctx.stroke();
+      }
+    }
+    ctx.restore();
+  }
+
+  /** @private */
+  drawMagnetarMoorings(ctx, engineState, view, cfg, r) {
+    const ids = Array.isArray(view.mooringIds) ? view.mooringIds : (Array.isArray(view.moorings) ? view.moorings : []);
+    const ballMap = engineState.physicsWorld?.ballMap;
+    if (!ids.length || !ballMap) {
+      return;
+    }
+    const reach = r * BRACKET_REACH_FACTOR;
+    const half = r * cfg.bracketSizeFactor;
+    const serif = half * BRACKET_SERIF_FACTOR;
+    ctx.save();
+    ctx.strokeStyle = cfg.mooringColor;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.lineWidth = cfg.mooringLineWidth;
+    for (const id of ids) {
+      const anchor = ballMap.get(id);
+      if (!anchor) {
+        continue;
+      }
+      ctx.setLineDash([r * cfg.mooringDashFactor, r * cfg.mooringDashFactor]);
+      ctx.beginPath();
+      ctx.moveTo(view.x, view.y);
+      ctx.lineTo(anchor.x, anchor.y);
+      ctx.stroke();
+      ctx.setLineDash(EMPTY_DASH);
+      ctx.beginPath();
+      ctx.moveTo(anchor.x - reach + serif, anchor.y - half);
+      ctx.lineTo(anchor.x - reach, anchor.y - half);
+      ctx.lineTo(anchor.x - reach, anchor.y + half);
+      ctx.lineTo(anchor.x - reach + serif, anchor.y + half);
+      ctx.moveTo(anchor.x + reach - serif, anchor.y - half);
+      ctx.lineTo(anchor.x + reach, anchor.y - half);
+      ctx.lineTo(anchor.x + reach, anchor.y + half);
+      ctx.lineTo(anchor.x + reach - serif, anchor.y + half);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  /** @private */
+  drawMagnetarTelegraphs(ctx, view, cfg, r) {
+    const slots = Array.isArray(view.regrowSlots) ? view.regrowSlots : [];
+    const markers = Array.isArray(view.barrageMarkers) ? view.barrageMarkers : [];
+    if (!slots.length && !view.undertow && !markers.length) {
+      return;
+    }
+    ctx.save();
+    ctx.lineCap = 'round';
+    if (slots.length) {
+      ctx.strokeStyle = cfg.fieldColor;
+      ctx.lineWidth = cfg.slotLineWidth;
+      ctx.setLineDash([r * cfg.slotDashFactor, r * cfg.slotDashFactor]);
+      for (const slot of slots) {
+        ctx.beginPath();
+        ctx.arc(slot.x, slot.y, r, 0, MATH_CONSTANTS.TWO_PI);
+        ctx.stroke();
+      }
+      ctx.setLineDash(EMPTY_DASH);
+    }
+    if (view.undertow) {
+      ctx.strokeStyle = cfg.fieldColor;
+      ctx.lineWidth = cfg.fieldLineWidth;
+      // Dots: a zero-length dash with round caps.
+      ctx.setLineDash([0, r * cfg.fieldDotFactor * 2]);
+      ctx.beginPath();
+      ctx.arc(view.undertow.x, view.undertow.y, view.undertow.radius, 0, MATH_CONSTANTS.TWO_PI);
+      ctx.stroke();
+      ctx.setLineDash(EMPTY_DASH);
+    }
+    const versusCfg = this.gameConfig.versus?.render;
+    if (markers.length && versusCfg) {
+      const y = this.gameConfig.canvas.dangerLineY;
+      const markerHalf = r * cfg.markerSizeFactor;
+      ctx.lineWidth = versusCfg.glyphLineWidth;
+      for (const marker of markers) {
+        ctx.strokeStyle = marker.polarity > 0 ? versusCfg.plusColor : versusCfg.minusColor;
+        this.drawPolarityGlyph(ctx, marker.x, y, markerHalf, marker.polarity);
+      }
+    }
+    ctx.restore();
+  }
+
+  /** @private */
+  drawMagnetarBadge(ctx, view, cfg, r) {
+    const glyph = MAGNETAR_GLYPHS[view.armed];
+    if (!glyph) {
+      return;
+    }
+    const bx = view.x;
+    const by = view.y - r * cfg.badgeOffsetFactor;
+    const radius = r * cfg.badgeRadiusFactor;
+    const s = radius * BADGE_GLYPH_FACTOR * 2 * HALF;
+    ctx.save();
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.beginPath();
+    ctx.arc(bx, by, radius, 0, MATH_CONSTANTS.TWO_PI);
+    ctx.fillStyle = cfg.badgeBackground;
+    ctx.fill();
+    ctx.strokeStyle = cfg.badgeColor;
+    ctx.lineWidth = cfg.fieldLineWidth;
+    ctx.stroke();
+    ctx.beginPath();
+    for (const line of glyph.lines) {
+      ctx.moveTo(bx + line[0][0] * s, by + line[0][1] * s);
+      for (let i = 1; i < line.length; i++) {
+        ctx.lineTo(bx + line[i][0] * s, by + line[i][1] * s);
+      }
+    }
+    ctx.stroke();
+    if (glyph.circle > 0) {
+      ctx.beginPath();
+      ctx.arc(bx, by, glyph.circle * s, 0, MATH_CONSTANTS.TWO_PI * MAGNETAR_ARC_SWEEP);
+      ctx.stroke();
+    }
+    ctx.restore();
   }
 
   /**
@@ -2159,10 +2414,15 @@ export class Renderer {
       }
     }
 
-    const canShowPolarity = !this.lite && Boolean(engineState.versus) && typeof engineState.getVersusShotPolarity === 'function';
+    const canShowPolarity = !this.lite
+      && (Boolean(engineState.versus) || Boolean(this.magnetarView))
+      && typeof engineState.getVersusShotPolarity === 'function';
+    // A Magnetar Reverse Field flips how the shot is pulled: the glyph shows the effective sign.
+    const polaritySign = engineState.physicsWorld?.boardPolarityInverted ? -1 : 1;
     if (engineState.currentBall && !engineState.physicsWorld.projectile) {
       this.drawBallAt(ctx, engineState.currentBall, lx, ly, now);
-      const shotPolarity = canShowPolarity ? engineState.getVersusShotPolarity() : null;
+      const rawShot = canShowPolarity ? engineState.getVersusShotPolarity() : null;
+      const shotPolarity = rawShot ? rawShot * polaritySign : null;
       if (shotPolarity) {
         this.drawShotPolarityGlyph(
           ctx, lx, ly, engineState.currentBall.radius * this.gameConfig.versus.render.launcherGlyphSizeFactor, shotPolarity
@@ -2197,7 +2457,8 @@ export class Renderer {
 
       this.drawBallAt(ctx, engineState.nextBall, nx, ny, now);
       // The flip only applies to the loaded shot: the next sphere shows its own polarity.
-      const nextPolarity = canShowPolarity ? engineState.getVersusShotPolarity(engineState.nextBall, false) : null;
+      const rawNext = canShowPolarity ? engineState.getVersusShotPolarity(engineState.nextBall, false) : null;
+      const nextPolarity = rawNext ? rawNext * polaritySign : null;
       if (nextPolarity) {
         this.drawShotPolarityGlyph(
           ctx, nx, ny, engineState.nextBall.radius * this.gameConfig.versus.render.nextGlyphSizeFactor, nextPolarity
