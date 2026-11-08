@@ -110,11 +110,24 @@ const resumeFrom = (engine) => {
   return resumed;
 };
 
-const getBoss = (engine) => engine.physicsWorld.balls.find((b) => b.clusterModifier === CLUSTER_MODIFIERS.BOSS_CORE);
+const getBoss = (engine) => engine.getBossBall() ?? undefined;
 
-const getWaveArmor = (wave) => {
-  const cfg = gameConfig.bossRush;
-  return Math.min(cfg.maxBossArmor, cfg.baseBossArmor + (wave - 1) * cfg.armorStepPerWave);
+/**
+ * Boss Rush bosses are Magnetars now: the old "one shield left" setup becomes "one Mooring
+ * left", so a single Overcharge strike still brings the boss down.
+ */
+const leaveLastMooring = (engine) => {
+  const world = engine.physicsWorld;
+  for (const id of engine.refreshMoorings(false).slice(1)) {
+    world.removeBall(world.ballMap.get(id));
+  }
+  engine.refreshMoorings(false);
+  assert.equal(engine.getMagnetarView().moorings, 1);
+};
+
+/** The boss of a new wave was not struck: it still holds every Mooring of the layout. */
+const assertBossUntouched = (engine) => {
+  assert.equal(engine.getMagnetarView().moorings, gameConfig.bossRush.innerRingCount);
 };
 
 test('B1: special ammo is refused with no debit while a shot is in flight', () => {
@@ -182,7 +195,7 @@ test('B4 and B6: a wave cleared mid-shot waits for the shot, keeps falling balls
   const engine = createTestEngine();
   engine.startBossRushMode(1);
   const world = engine.physicsWorld;
-  getBoss(engine).armorHits = 1;
+  leaveLastMooring(engine);
   const projectile = makeProjectile();
   const falling = makeFallingBall();
   world.projectile = projectile;
@@ -205,19 +218,19 @@ test('B4 and B6: a wave cleared mid-shot waits for the shot, keeps falling balls
   assert.equal(engine.bossRushWave, 2);
   assert.equal(engine.pendingBossRushWave, false);
   assert.ok(world.droppingBalls.includes(falling), 'the new wave keeps the falling ball');
-  assert.equal(getBoss(engine).armorHits, getWaveArmor(2), 'the new boss was not struck');
+  assertBossUntouched(engine);
 });
 
 test('B6: overcharge left over after a wave change does not strike the next boss', () => {
   const engine = createTestEngine();
   engine.startBossRushMode(1);
-  getBoss(engine).armorHits = 1;
+  leaveLastMooring(engine);
   engine.overcharge = 0;
 
   engine.addOvercharge(gameConfig.scoring.overchargeMax * OVERCHARGE_STRIKES);
 
   assert.equal(engine.bossRushWave, 2);
-  assert.equal(getBoss(engine).armorHits, getWaveArmor(2));
+  assertBossUntouched(engine);
 });
 
 test('B4: clearing the world can keep the falling balls and still bumps the clear epoch', () => {
@@ -309,7 +322,7 @@ test('B4: a Boss Rush wave held for the shot spawns when that shot lands through
   const engine = createTestEngine();
   engine.startBossRushMode(1);
   const world = engine.physicsWorld;
-  getBoss(engine).armorHits = 1;
+  leaveLastMooring(engine);
   world.projectile = makeProjectile();
   engine.overcharge = 0;
   engine.addOvercharge(gameConfig.scoring.overchargeMax * OVERCHARGE_STRIKES);
@@ -326,7 +339,7 @@ test('B4: a Boss Rush wave held for the shot spawns when that shot lands through
 
   assert.equal(engine.bossRushWave, 2, 'the post-turn evaluation spawns the next wave');
   assert.equal(engine.pendingBossRushWave, false);
-  assert.equal(getBoss(engine).armorHits, getWaveArmor(2));
+  assertBossUntouched(engine);
 });
 
 test('Paint Core radius scales with the blast radius multiplier', () => {

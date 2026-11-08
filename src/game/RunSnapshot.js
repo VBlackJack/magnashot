@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-import { GAME_MODES, GAME_STATES, SPECIAL_TYPES_ORDER, WAVE_TYPES } from '../core/Constants.js';
+import { CLUSTER_MODIFIERS, GAME_MODES, GAME_STATES, SPECIAL_TYPES_ORDER, WAVE_TYPES } from '../core/Constants.js';
 import { Ball } from '../entities/Ball.js';
 import { normalizeShotTimeline } from './ShotTimeline.js';
 import { getSagSpec } from './SagMeter.js';
@@ -282,6 +282,8 @@ export function captureRunSnapshot(engine, version) {
     // Optional: the Ghost Duel being raced (encoded, re-decoded on restore) and the Daily rematch flag.
     ghostDuelCode: engine.encodeGhostDuel?.() ?? null,
     isDailyRematch: Boolean(engine.isDailyRematch),
+    // Optional: the Magnetar schedule (a run saved before Magnetars, or with a Boss Core, holds none).
+    magnetar: engine.getMagnetarSnapshot?.() ?? null,
     currentBall: { colorId: engine.currentBall.colorId, specialType: engine.currentBall.specialType },
     nextBall: { colorId: engine.nextBall.colorId, specialType: engine.nextBall.specialType },
     allowTensionBreak: world.allowTensionBreak,
@@ -444,6 +446,16 @@ export function applyRunSnapshot(engine, snapshot) {
     }
   }
   world.allowTensionBreak = Boolean(snapshot.allowTensionBreak);
+
+  // The mode start built a fresh Magnetar; the restored board decides whether it stays. A
+  // Boss Core board (a run saved before Magnetars) has none, and a missing saved schedule
+  // leaves the fresh one at step 0.
+  const restoredMagnetar = restored.find((ball) => ball.clusterModifier === CLUSTER_MODIFIERS.MAGNETAR);
+  if (restoredMagnetar && engine.magnetar) {
+    engine.restoreMagnetar(snapshot.magnetar, restoredMagnetar.id);
+  } else {
+    engine.clearMagnetar();
+  }
 
   // A run saved before the fairness counters existed restores them at their reset value.
   for (const field of FAIRNESS_COUNTER_FIELDS) {

@@ -1040,7 +1040,9 @@ test('StorageManager persists all-time best achievement progress records', () =>
     endlessWave: 0,
     maxAvalanche: 0,
     bossesDestroyed: 0,
-    shotsRemainingOnClear: 0
+    shotsRemainingOnClear: 0,
+    magnetarsGrounded: 0,
+    magnetarLandslide: 0
   });
   storage.recordAchievementProgress({ maxCombo: 3, endlessWave: 6, maxAvalanche: 9 });
   storage.recordAchievementProgress({ maxCombo: 2, endlessWave: 8, bossesDestroyed: 1, shotsRemainingOnClear: 5 });
@@ -1049,7 +1051,9 @@ test('StorageManager persists all-time best achievement progress records', () =>
     endlessWave: 8,
     maxAvalanche: 9,
     bossesDestroyed: 1,
-    shotsRemainingOnClear: 5
+    shotsRemainingOnClear: 5,
+    magnetarsGrounded: 0,
+    magnetarLandslide: 0
   });
 });
 
