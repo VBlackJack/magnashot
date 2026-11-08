@@ -201,7 +201,10 @@ const EXPECTED_PROTOTYPE_NAMES = [
   'nearestTabList',
   'setupGamepadControls',
   'updateGamepadControls',
-  'handleBackAction'
+  'handleBackAction',
+  'setActiveScene',
+  'getSceneController',
+  'handleVisibilityChange'
 ];
 
 test('UIManager.prototype exposes exactly the same members after the module split', () => {
