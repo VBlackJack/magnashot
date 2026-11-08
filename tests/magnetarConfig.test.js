@@ -36,12 +36,14 @@ test('The Magnetar config unlocks behaviours by tier and keeps the campaign unto
   assert.equal(campaign.generated.magnetar.enabled, false);
   for (let tier = 1; tier <= cfg.maxTier; tier++) {
     assert.ok(cfg.cadenceByTier[tier] > 0, `tier ${tier} has a cadence`);
-    const unlocked = cfg.tierUnlocks[tier];
-    assert.ok(unlocked.length >= 2 && unlocked.every((id) => BEHAVIOURS.includes(id)), `tier ${tier} behaviours`);
-    if (tier > 1) {
-      assert.ok(cfg.tierUnlocks[tier - 1].every((id) => unlocked.includes(id)), `tier ${tier} keeps earlier ones`);
-    }
+    assert.ok(cfg.tierUnlocks[tier].every((id) => BEHAVIOURS.includes(id)), `tier ${tier} behaviours`);
   }
+  // Tier sets are cumulative: every behaviour is unlocked exactly once, tier 1 holds at least two.
+  const unlockedAll = Object.values(cfg.tierUnlocks).flat();
+  assert.deepEqual([...unlockedAll].sort(), [...BEHAVIOURS].sort());
+  assert.ok(cfg.tierUnlocks[1].length >= 2);
+  assert.equal(cfg.barrage.countByTier[1], 0);
+  assert.ok(cfg.barrage.strongChance > 0 && cfg.barrage.strongChance < 1);
   assert.ok(game.onboarding.order.indexOf('magnetar') === game.onboarding.order.indexOf('bossCore') + 1);
   assert.equal(game.onboarding.mechanics.magnetar.interaction, 'proximity');
 });
