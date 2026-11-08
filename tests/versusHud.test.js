@@ -1,0 +1,355 @@
+/*
+ * Copyright 2026 Julien Bombled
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+import { test, beforeEach, afterEach } from 'node:test';
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+
+import { i18n } from '../src/core/I18n.js';
+import { MATCH_EVENTS } from '../src/game/VersusMatch.js';
+import {
+  VERSUS_LAYOUTS,
+  VersusHud,
+  chooseVersusLayout,
+  computeMiniSize,
+  createAnnouncementQueue,
+  fitBoard,
+  formatMatchTimer,
+  renderAnnouncement
+} from '../src/ui/VersusHud.js';
+
+const loadJson = (path) => JSON.parse(readFileSync(path, 'utf8'));
+const gameConfig = loadJson('./configs/game.json');
+const ballsConfig = loadJson('./configs/balls.json');
+const canvasCfg = gameConfig.canvas;
+const layoutCfg = gameConfig.versus.layout;
+for (const locale of ['en', 'fr']) {
+  i18n.dictionaries.set(locale, loadJson(`./locales/${locale}.json`));
+}
+beforeEach(() => {
+  i18n.currentLocale = 'en';
+});
+afterEach(() => {
+  i18n.currentLocale = 'en';
+});
+
+const WINDOW_FRAMES = gameConfig.versus.ui.announceWindowFrames;
+const SUDDEN_DEATH_SECONDS = gameConfig.versus.suddenDeath.intervalSeconds;
+const BAR_HEIGHT = 60;
+const SHELL_PAD = 16;
+const HUD_HEIGHT = 54;
+const GAP = 12;
+
+/** The measured inputs of a viewport: the room under the top bar. */
+const measure = (width, height) => ({
+  areaWidth: width - SHELL_PAD,
+  areaHeight: height - SHELL_PAD - BAR_HEIGHT,
+  hudHeight: HUD_HEIGHT,
+  viewportHeight: height,
+  gap: GAP
+});
+
+test('fitBoard keeps the aspect ratio of the board inside any box', () => {
+  const ratio = canvasCfg.logicalWidth / canvasCfg.logicalHeight;
+  for (const [width, height] of [[400, 400], [400, 1000], [100, 900], [0, 500]]) {
+    const fit = fitBoard(width, height, canvasCfg);
+    assert.ok(fit.width <= width && fit.height <= height + 1, `${width}x${height} holds ${fit.width}x${fit.height}`);
+    assert.ok(Math.abs(fit.width / Math.max(1, fit.height) - ratio) < 0.02 || fit.width === 0);
+  }
+  assert.deepEqual(fitBoard(-5, 100, canvasCfg), { width: 0, height: 0 });
+});
+
+test('the layout is split where each board gets the configured width and the viewport is tall enough', () => {
+  const desktop = chooseVersusLayout(measure(1300, 850), layoutCfg, canvasCfg);
+  assert.equal(desktop.layout, VERSUS_LAYOUTS.SPLIT);
+  assert.ok(desktop.boardWidth >= layoutCfg.splitMinBoardWidthPx);
+  assert.equal(chooseVersusLayout(measure(768, 1024), layoutCfg, canvasCfg).layout, VERSUS_LAYOUTS.SPLIT);
+  assert.equal(chooseVersusLayout(measure(1024, 768), layoutCfg, canvasCfg).layout, VERSUS_LAYOUTS.SPLIT);
+});
+
+test('phones take the mini-view, in both orientations', () => {
+  for (const [width, height] of [[844, 390], [390, 844], [360, 800]]) {
+    assert.equal(chooseVersusLayout(measure(width, height), layoutCfg, canvasCfg).layout, VERSUS_LAYOUTS.MINI, `${width}x${height}`);
+  }
+});
+
+test('a wide window that is too short takes the mini-view even when the width would do', () => {
+  const short = chooseVersusLayout(measure(1400, layoutCfg.splitMinViewportHeightPx - 1), layoutCfg, canvasCfg);
+  assert.equal(short.layout, VERSUS_LAYOUTS.MINI);
+  const tall = chooseVersusLayout(measure(1400, layoutCfg.splitMinViewportHeightPx + 300), layoutCfg, canvasCfg);
+  assert.equal(tall.layout, VERSUS_LAYOUTS.SPLIT);
+});
+
+test('the layout switches exactly at the configured board width', () => {
+  const areaHeight = 2000;
+  const edgeWidth = layoutCfg.splitMinBoardWidthPx * 2 + GAP;
+  const base = { areaHeight, hudHeight: 0, viewportHeight: 900, gap: GAP };
+  assert.equal(chooseVersusLayout({ ...base, areaWidth: edgeWidth }, layoutCfg, canvasCfg).layout, VERSUS_LAYOUTS.SPLIT);
+  assert.equal(chooseVersusLayout({ ...base, areaWidth: edgeWidth - 4 }, layoutCfg, canvasCfg).layout, VERSUS_LAYOUTS.MINI);
+});
+
+test('the CPU board of the mini-view is miniScale of the logical size and shrinks into a short column', () => {
+  const nominal = computeMiniSize(canvasCfg, layoutCfg);
+  assert.equal(nominal.width, Math.round(canvasCfg.logicalWidth * layoutCfg.miniScale));
+  assert.equal(nominal.height, Math.round(canvasCfg.logicalHeight * layoutCfg.miniScale));
+  const short = computeMiniSize(canvasCfg, layoutCfg, 100);
+  assert.ok(short.height <= 100 && short.width < nominal.width);
+  assert.deepEqual(computeMiniSize(canvasCfg, layoutCfg, 0), { width: 0, height: 0 });
+});
+
+test('the timer is written as minutes and two-digit seconds', () => {
+  assert.equal(formatMatchTimer(0), '0:00');
+  assert.equal(formatMatchTimer(9), '0:09');
+  assert.equal(formatMatchTimer(61), '1:01');
+  assert.equal(formatMatchTimer(185), '3:05');
+  assert.equal(formatMatchTimer(-4), '0:00');
+  assert.equal(formatMatchTimer(Number.NaN), '0:00');
+});
+
+test('charges that arrive within one window are announced once, with their total', () => {
+  const queue = createAnnouncementQueue({ windowFrames: WINDOW_FRAMES, suddenDeathSeconds: SUDDEN_DEATH_SECONDS });
+  const incoming = (count, isPlayer = true) => ({ type: MATCH_EVENTS.CHARGE_INCOMING, isPlayer, count });
+  assert.deepEqual(queue.push(incoming(2), 0), []);
+  assert.deepEqual(queue.push(incoming(1), 10), []);
+  assert.deepEqual(queue.push(incoming(3, false), 11), [], 'the CPU board is not announced');
+  assert.deepEqual(queue.drain(WINDOW_FRAMES - 1), [], 'the window is still open');
+  assert.deepEqual(queue.drain(WINDOW_FRAMES), [{ key: 'chargeIncoming', params: { count: 3 } }]);
+  assert.deepEqual(queue.drain(WINDOW_FRAMES * 2), [], 'nothing is left to say');
+  assert.deepEqual(queue.push(incoming(1), WINDOW_FRAMES + 5), []);
+  assert.deepEqual(queue.drain(WINDOW_FRAMES * 2 + 5), [{ key: 'chargeIncoming', params: { count: 1 } }], 'the next window opens on its own');
+});
+
+test('a neutralisation is announced at most once per window, for the player board only', () => {
+  const queue = createAnnouncementQueue({ windowFrames: WINDOW_FRAMES, suddenDeathSeconds: SUDDEN_DEATH_SECONDS });
+  const neutralised = (isPlayer = true) => ({ type: MATCH_EVENTS.CHARGE_NEUTRALISED, isPlayer });
+  assert.equal(queue.push(neutralised(), 100).length, 1);
+  assert.equal(queue.push(neutralised(), 100 + WINDOW_FRAMES - 1).length, 0);
+  assert.equal(queue.push(neutralised(false), 100 + WINDOW_FRAMES).length, 0);
+  assert.equal(queue.push(neutralised(), 100 + WINDOW_FRAMES).length, 1);
+});
+
+test('rounds, pulses, sudden death and the match are announced as they happen', () => {
+  const queue = createAnnouncementQueue({ windowFrames: WINDOW_FRAMES, suddenDeathSeconds: SUDDEN_DEATH_SECONDS });
+  const keys = (event) => queue.push(event, 0).map((entry) => entry.key);
+  assert.deepEqual(keys({ type: MATCH_EVENTS.ROUND_WON }), ['roundWon']);
+  assert.deepEqual(keys({ type: MATCH_EVENTS.ROUND_LOST }), ['roundLost']);
+  assert.deepEqual(keys({ type: MATCH_EVENTS.ROUND_REPLAY }), ['roundDraw']);
+  assert.deepEqual(keys({ type: MATCH_EVENTS.PULSE_SENT, isPlayer: true }), ['pulseSent']);
+  assert.deepEqual(keys({ type: MATCH_EVENTS.PULSE_SENT, isPlayer: false }), []);
+  assert.deepEqual(keys({ type: MATCH_EVENTS.PULSE_RECEIVED, isPlayer: true, source: 'pulse' }), ['pulseReceived']);
+  assert.deepEqual(keys({ type: MATCH_EVENTS.PULSE_RECEIVED, isPlayer: true, source: 'suddenDeath' }), [], 'sudden death speaks for itself');
+  assert.deepEqual(queue.push({ type: MATCH_EVENTS.SUDDEN_DEATH }, 0), [{ key: 'suddenDeath', params: { seconds: SUDDEN_DEATH_SECONDS } }]);
+  assert.deepEqual(queue.push({ type: MATCH_EVENTS.MATCH_WON, wins: [2, 1] }, 0), [{ key: 'matchWon', params: { player: 2, cpu: 1 } }]);
+  assert.deepEqual(queue.push({ type: MATCH_EVENTS.MATCH_LOST, wins: [0, 2] }, 0), [{ key: 'matchLost', params: { player: 0, cpu: 2 } }]);
+  assert.deepEqual(keys({ type: MATCH_EVENTS.ATTACK_SENT }), [], 'unrelated reports stay silent');
+});
+
+test('announcements read in both languages with the numbers filled in', () => {
+  const entry = { key: 'matchWon', params: { player: 2, cpu: 1 } };
+  assert.equal(renderAnnouncement(entry), 'Match won, 2 to 1.');
+  i18n.currentLocale = 'fr';
+  assert.equal(renderAnnouncement(entry), 'Match gagné, 2 à 1.');
+  assert.equal(renderAnnouncement({ key: 'chargeIncoming', params: { count: 3 } }), '3 sphères chargées arrivent.');
+});
+
+/** A minimal element: text, classes, attributes, children, style and listeners. */
+function fakeElement(tag = 'div') {
+  const classes = new Set();
+  const attrs = {};
+  const listeners = {};
+  return {
+    tag,
+    textContent: '',
+    className: '',
+    dataset: {},
+    style: {},
+    children: [],
+    attrs,
+    listeners,
+    classList: {
+      add: (...names) => names.forEach((name) => classes.add(name)),
+      remove: (...names) => names.forEach((name) => classes.delete(name)),
+      contains: (name) => classes.has(name),
+      toggle(name, force) {
+        const on = force === undefined ? !classes.has(name) : Boolean(force);
+        if (on) {
+          classes.add(name);
+        } else {
+          classes.delete(name);
+        }
+        return on;
+      }
+    },
+    setAttribute(name, value) {
+      attrs[name] = String(value);
+    },
+    getAttribute(name) {
+      return attrs[name] ?? null;
+    },
+    replaceChildren(...nodes) {
+      this.children = nodes;
+    },
+    append(...nodes) {
+      this.children.push(...nodes);
+    },
+    addEventListener(name, handler) {
+      listeners[name] = handler;
+    },
+    focus() {}
+  };
+}
+
+function makeHudElements() {
+  const board = () => ({
+    root: fakeElement(),
+    label: fakeElement(),
+    incoming: fakeElement(),
+    pulse: fakeElement(),
+    pulseFill: fakeElement(),
+    polarityBtn: fakeElement('button'),
+    swapBtn: fakeElement('button'),
+    specials: fakeElement()
+  });
+  const els = {
+    roundPips: fakeElement(),
+    roundLabel: fakeElement(),
+    pipsPlayer: fakeElement(),
+    pipsCpu: fakeElement(),
+    timer: fakeElement(),
+    suddenDeath: fakeElement(),
+    boards: [board(), board()]
+  };
+  els.suddenDeath.classList.add('hidden');
+  els.boards[0].specials.classList.add('hidden');
+  return els;
+}
+
+const boardState = (index, overrides = {}) => ({
+  index,
+  isPlayer: index === 0,
+  isCpu: index === 1,
+  tier: index === 1 ? 'hard' : null,
+  incoming: 0,
+  charges: [],
+  pulse: { value: 0, max: 2, ratio: 0 },
+  ...overrides
+});
+
+const matchState = (overrides = {}) => ({
+  playerBoard: 0,
+  timerSeconds: 0,
+  isSuddenDeath: false,
+  round: { number: 1, wins: [0, 0], roundsToWin: 2 },
+  boards: [boardState(0), boardState(1)],
+  ...overrides
+});
+
+const makeHud = (elements = makeHudElements()) => ({
+  elements,
+  hud: new VersusHud(elements, { createElement: (tag) => fakeElement(tag) })
+});
+
+test('the bar shows one pip per round to win, filled for the rounds won, with a spoken summary', () => {
+  const { elements, hud } = makeHud();
+  hud.refresh(matchState({ round: { number: 2, wins: [1, 0], roundsToWin: 2 }, timerSeconds: 75 }));
+  assert.equal(elements.pipsPlayer.children.length, 2);
+  assert.equal(elements.pipsCpu.children.length, 2);
+  assert.deepEqual(elements.pipsPlayer.children.map((pip) => pip.classList.contains('is-won')), [true, false]);
+  assert.deepEqual(elements.pipsCpu.children.map((pip) => pip.classList.contains('is-won')), [false, false]);
+  assert.equal(elements.roundLabel.textContent, 'Round 2');
+  assert.equal(elements.roundPips.getAttribute('aria-label'), 'Round 2. You: 1 won. CPU: 0 won.');
+  assert.equal(elements.timer.textContent, '1:15');
+  assert.equal(elements.timer.getAttribute('aria-label'), 'Time 1:15');
+});
+
+test('the sudden death badge shows only while it applies', () => {
+  const { elements, hud } = makeHud();
+  hud.refresh(matchState());
+  assert.equal(elements.suddenDeath.classList.contains('hidden'), true);
+  hud.refresh(matchState({ isSuddenDeath: true }));
+  assert.equal(elements.suddenDeath.classList.contains('hidden'), false);
+});
+
+test('each board shows its incoming charges as text, with the danger as a second, non-colour cue', () => {
+  const { elements, hud } = makeHud();
+  hud.refresh(matchState({ boards: [boardState(0, { incoming: 3, charges: [{ threatening: false }, { threatening: true }] }), boardState(1)] }), { cpuTierName: 'Hard' });
+  const [player, cpu] = elements.boards;
+  assert.equal(player.incoming.textContent, 'In: 3');
+  assert.equal(player.incoming.getAttribute('aria-label'), 'Incoming charges: 3');
+  assert.equal(player.incoming.classList.contains('has-incoming'), true);
+  assert.equal(player.incoming.classList.contains('has-threat'), true);
+  assert.equal(cpu.incoming.textContent, 'In: 0');
+  assert.equal(cpu.incoming.classList.contains('has-incoming'), false);
+  assert.equal(player.label.textContent, 'Your board');
+  assert.equal(cpu.label.textContent, 'CPU board (Hard)');
+});
+
+test('the pulse meter reports its value to assistive technology and fills in proportion', () => {
+  const { elements, hud } = makeHud();
+  hud.refresh(matchState({ boards: [boardState(0, { pulse: { value: 1, max: 2, ratio: 0.5 } }), boardState(1, { pulse: { value: 3, max: 2, ratio: 1.5 } })] }));
+  const [player, cpu] = elements.boards;
+  assert.equal(player.pulse.getAttribute('aria-valuenow'), '50');
+  assert.equal(player.pulse.getAttribute('aria-valuetext'), 'Pulse meter: 50%');
+  assert.equal(player.pulse.getAttribute('aria-label'), 'Pulse meter: 50%');
+  assert.equal(player.pulseFill.style.width, '50%');
+  assert.equal(cpu.pulse.getAttribute('aria-valuenow'), '100', 'a ratio above one is clamped');
+});
+
+test('the labels of the player controls follow the language', () => {
+  const { elements, hud } = makeHud();
+  hud.refreshLabels();
+  assert.equal(elements.boards[0].swapBtn.textContent, 'Swap spheres');
+  assert.equal(elements.boards[0].polarityBtn.getAttribute('aria-label'), 'Flip polarity');
+  i18n.currentLocale = 'fr';
+  hud.refreshLabels();
+  assert.equal(elements.boards[0].swapBtn.textContent, 'Échanger les sphères');
+});
+
+const SPECIAL_TYPES = Object.keys(ballsConfig.specialTypes);
+const specialsContext = (picked = []) => ({
+  types: SPECIAL_TYPES,
+  specs: ballsConfig.specialTypes,
+  describe: (type, count) => `${type} x${count}`,
+  onPick: (type) => picked.push(type)
+});
+
+test('the polarity button mirrors the flip, and stocked specials appear as buttons that equip them', () => {
+  const { elements, hud } = makeHud();
+  const picked = [];
+  const engine = { isPolarityFlipped: true, specialInventory: { [SPECIAL_TYPES[0]]: 2 }, currentBall: { specialType: null } };
+  const changed = hud.refreshPlayerControls(engine, specialsContext(picked));
+  assert.equal(changed, true, 'the row appeared, the layout may need to move');
+  assert.equal(elements.boards[0].polarityBtn.getAttribute('aria-pressed'), 'true');
+  const row = elements.boards[0].specials;
+  assert.equal(row.classList.contains('hidden'), false);
+  assert.equal(row.children.length, 1);
+  assert.equal(row.children[0].getAttribute('aria-label'), `${SPECIAL_TYPES[0]} x2`);
+  row.children[0].listeners.click();
+  assert.deepEqual(picked, [SPECIAL_TYPES[0]]);
+  assert.equal(hud.refreshPlayerControls(engine, specialsContext()), false, 'nothing changed, nothing is rebuilt');
+  engine.specialInventory[SPECIAL_TYPES[0]] = 0;
+  assert.equal(hud.refreshPlayerControls(engine, specialsContext()), true);
+  assert.equal(row.classList.contains('hidden'), true, 'an empty stock hides the row again');
+});
+
+test('a special that is loaded stays listed and marked as equipped', () => {
+  const { elements, hud } = makeHud();
+  const engine = { isPolarityFlipped: false, specialInventory: {}, currentBall: { specialType: SPECIAL_TYPES[1] } };
+  hud.refreshPlayerControls(engine, specialsContext());
+  const [button] = elements.boards[0].specials.children;
+  assert.equal(button.classList.contains('equipped'), true);
+  assert.equal(button.getAttribute('aria-pressed'), 'true');
+});
