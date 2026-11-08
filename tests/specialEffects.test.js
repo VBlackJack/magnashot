@@ -23,7 +23,8 @@ import { StorageManager } from '../src/core/StorageManager.js';
 import { Ball } from '../src/entities/Ball.js';
 import { GameEngine } from '../src/game/GameEngine.js';
 import { predictImpact } from '../src/game/ImpactPreview.js';
-import { CLUSTER_MODIFIERS, SPECIAL_TYPES } from '../src/core/Constants.js';
+import { CLUSTER_MODIFIERS, OBSTACLE_TYPES, SPECIAL_TYPES } from '../src/core/Constants.js';
+import { PhysicsWorld } from '../src/physics/PhysicsWorld.js';
 import { applyWorldGeometry } from '../src/core/WorldGeometry.js';
 
 const loadJson = (p) => JSON.parse(fs.readFileSync(p, 'utf8'));
@@ -53,6 +54,9 @@ const ORIGIN_Y = 200;
 const FAR_X = 500;
 const FAR_Y = 600;
 const BOSS_SHIELD_HITS = 3;
+const PLATFORM_WIDTH = 200;
+const PLATFORM_HEIGHT = 20;
+const HOVER_EXTRA_PX = 4;
 const [COLOR_A, COLOR_B] = ballsConfig.standardColors.map((c) => c.id);
 
 const createBoard = () => {
@@ -168,6 +172,48 @@ test('Impact previews do not mark a shielded Boss Core as destroyed, and do once
 });
 
 test('The platform support tolerance is read from the physics config', () => {
-  assert.ok(Number.isFinite(physicsConfig.simulation.platformSupportTolerancePx));
-  assert.ok(physicsConfig.simulation.platformSupportTolerancePx > 0);
+  const baseTolerance = physicsConfig.simulation.platformSupportTolerancePx;
+  assert.ok(baseTolerance > 0);
+  const platform = { type: OBSTACLE_TYPES.PLATFORM, x: ORIGIN_X, y: ORIGIN_Y, width: PLATFORM_WIDTH, height: PLATFORM_HEIGHT };
+  const shelfTopY = platform.y - platform.height / 2;
+  // A ball hovering just above the shelf, farther than the configured tolerance.
+  const hoverGap = baseTolerance + HOVER_EXTRA_PX;
+  const makeWorld = (tolerance) => {
+    const config = { ...physicsConfig, simulation: { ...physicsConfig.simulation, platformSupportTolerancePx: tolerance } };
+    const world = new PhysicsWorld(config, gameConfig, ballsConfig);
+    world.obstacles = [{ ...platform }];
+    return world;
+  };
+  const ball = new Ball({ x: ORIGIN_X, y: shelfTopY - RADIUS - hoverGap, radius: RADIUS, colorId: COLOR_A });
+  assert.equal(makeWorld(baseTolerance).isSupportedByPlatform(ball), false, 'outside the tolerance: unsupported');
+  assert.equal(
+    makeWorld(hoverGap + HOVER_EXTRA_PX).isSupportedByPlatform(ball),
+    true,
+    'a larger configured tolerance supports the same ball'
+  );
+});
+
+test('Puzzle restore keeps queue specials when an entry has no colour (falls back to the first palette colour)', () => {
+  const puzzleDef = gameConfig.puzzles[0];
+  const originalQueue = puzzleDef.queue;
+  puzzleDef.queue = [
+    { specialType: null },
+    { specialType: null },
+    { specialType: SPECIAL_TYPES.FREEZE },
+    { specialType: SPECIAL_TYPES.BOMB }
+  ];
+  try {
+    const engine = createBoard();
+    engine.startPuzzleMode(1);
+    assert.equal(engine.puzzleQueue.length, 2);
+    engine.saveRunSnapshot({ force: true });
+    assert.equal(engine.restoreSavedRun(), true);
+    assert.deepEqual(
+      engine.puzzleQueue.map((spec) => spec.specialType),
+      [SPECIAL_TYPES.FREEZE, SPECIAL_TYPES.BOMB],
+      'specials survive the restore'
+    );
+  } finally {
+    puzzleDef.queue = originalQueue;
+  }
 });
