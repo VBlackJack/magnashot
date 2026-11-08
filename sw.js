@@ -58,6 +58,7 @@ const PRECACHE_ASSETS = [
   './src/game/WeeklyFlux.js',
   './src/game/PlayerStats.js',
   './src/game/ShotTimeline.js',
+  './src/game/SagMeter.js',
   './src/game/EngineProgress.js',
   './src/game/GameEngine.js',
   './src/game/EngineModes.js',

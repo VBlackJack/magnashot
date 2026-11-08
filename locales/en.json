@@ -129,7 +129,8 @@
         "cascade": "Cascade Drop • Wave {{wave}}",
         "coreRescueProgress": "💎 {{rescued}}/{{total}}",
         "switchHint": "Click to change mode or level",
-        "switchHintTouch": "Tap to change mode or level"
+        "switchHintTouch": "Tap to change mode or level",
+        "classic": "Classic - Stage {{stage}}"
       },
       "shots": {
         "label": "Shots Left",
@@ -153,6 +154,11 @@
       "bestRun": {
         "stage": "Best: shape {{best}}",
         "wave": "Best: wave {{best}}"
+      },
+      "sag": {
+        "label": "Sag",
+        "value": "{{level}}/{{size}}",
+        "aria": "Sag {{level}} of {{size}}: {{remaining}} missed shots before the cluster drops"
       }
     },
     "launcher": {
@@ -355,6 +361,14 @@
       },
       "weeklyBonus": {
         "claimed": "Weekly Flux bonus +{{coins}} ⬡"
+      },
+      "sag": {
+        "warning": "One more miss and the cluster drops",
+        "lowered": "The rail gives way",
+        "drained": "Avalanche: sag -{{amount}}"
+      },
+      "classic": {
+        "stageCleared": "Stage cleared! +{{points}}"
       }
     },
     "mutators": {
@@ -553,7 +567,10 @@
         "bossRushRecord": "Wave {{wave}} • Best: {{score}}",
         "cascade": "⬇ Cascade",
         "cascadeDesc": "High-gravity well • Platforms",
-        "lockedDesc": "Clear level {{level}} to unlock"
+        "lockedDesc": "Clear level {{level}} to unlock",
+        "classic": "Classic",
+        "classicDesc": "Pure rules: no specials, no upgrades. Misses lower the ceiling.",
+        "classicBest": "Best: stage {{stage}}"
       }
     },
     "shop": {
@@ -970,7 +987,8 @@
         "fluxStage": "Shape reached: {{stage}} (best: {{best}})",
         "bossRushSummary": "Boss Wave: {{wave}} (best: {{best}}) • Coins: +{{coins}} ⬡",
         "waveSummary": "Wave reached: {{wave}} • Max Combo: x{{combo}} • Coins: +{{coins}} ⬡",
-        "puzzleSummary": "Puzzle Stage: {{stage}} / {{total}}"
+        "puzzleSummary": "Puzzle Stage: {{stage}} / {{total}}",
+        "classicSummary": "Stage reached: {{stage}} (best: {{best}}) • Coins: +{{coins}} ⬡"
       },
       "button": {
         "continueShots": "+{{shots}} Shots ({{cost}} ⬡)",
@@ -1091,7 +1109,8 @@
         "hardestLevel": "Hardest level for you: {{level}} ({{fails}} failed attempts)",
         "mostLeftLevel": "Most often left: level {{level}} ({{quits}} times)",
         "empty": "Play a round and your stats will appear here.",
-        "privacy": "Stored on this device only. Nothing is sent anywhere."
+        "privacy": "Stored on this device only. Nothing is sent anywhere.",
+        "bestClassicStage": "Best {{score}}, stage {{stage}}"
       },
       "button": {
         "copy": "Copy my stats",
@@ -1297,6 +1316,11 @@
       "copied": "Result copied to the clipboard.",
       "manual": "Copy the selected text to share your result.",
       "failed": "Sharing failed. Copy the selected text instead."
+    },
+    "classic": {
+      "header": "MagnaShot Classic",
+      "stats": "Stage {{stage}} - {{score}} pts",
+      "drops": "Rail drops: {{drops}}"
     }
   },
   "stats": {

@@ -101,6 +101,7 @@ export const MODE_BUTTON_KEYS = Object.freeze({
   [GAME_MODES.CAMPAIGN]: ['btnLevels'],
   [GAME_MODES.ENDLESS]: ['btnEndless'],
   [GAME_MODES.DAILY]: ['btnDaily'],
+  [GAME_MODES.CLASSIC]: ['btnModeClassic'],
   [GAME_MODES.FLUX]: ['btnFlux'],
   [GAME_MODES.PUZZLE]: ['btnModePuzzle'],
   [GAME_MODES.BLITZ]: ['btnModeBlitz'],
@@ -577,6 +578,7 @@ export const MODE_NEW_BADGE_CLASS = 'mode-new-badge';
 /** i18n key of each gated mode's name; the lock texts, hints and announcements reuse them. */
 export const MODE_NAME_KEYS = Object.freeze({
   [GAME_MODES.ENDLESS]: 'app.nav.button.endless',
+  [GAME_MODES.CLASSIC]: 'modals.levelSelect.arcade.classic',
   [GAME_MODES.PUZZLE]: 'modals.levelSelect.arcade.puzzle',
   [GAME_MODES.BLITZ]: 'modals.levelSelect.arcade.blitz',
   [GAME_MODES.FLUX]: 'app.nav.button.flux',
@@ -592,6 +594,12 @@ export const MODE_LOCK_BUTTON_KEYS = Object.freeze({
 
 /** Arcade cards of the level select: element keys and the texts a card shows while unlocked. */
 export const ARCADE_CARD_SPECS = Object.freeze({
+  [GAME_MODES.CLASSIC]: Object.freeze({
+    card: 'btnModeClassic',
+    best: 'arcadeBestClassic',
+    titleKey: 'modals.levelSelect.arcade.classic',
+    descKey: 'modals.levelSelect.arcade.classicDesc'
+  }),
   [GAME_MODES.PUZZLE]: Object.freeze({
     card: 'btnModePuzzle',
     best: 'arcadeBestPuzzle',

@@ -39,6 +39,7 @@ const STATS_EXTRA_MODE_NAME_KEYS = Object.freeze({
 /** Record kinds of PlayerStats.buildPlayerStatsText: a best shown with its shape number or its wave. */
 const RECORD_KIND_STAGE = 'stage';
 const RECORD_KIND_WAVE = 'wave';
+const RECORD_KIND_CLASSIC_STAGE = 'classicStage';
 
 const MS_PER_DAY = 86_400_000;
 const UTC_TIME_ZONE = 'UTC';
@@ -72,6 +73,9 @@ export function formatModeBest(record, translate, format) {
   }
   if (record.kind === RECORD_KIND_STAGE && record.stage > 0) {
     return translate('modals.stats.overview.bestStage', { score: format(score), stage: format(record.stage) });
+  }
+  if (record.kind === RECORD_KIND_CLASSIC_STAGE && record.stage > 0) {
+    return translate('modals.stats.overview.bestClassicStage', { score: format(score), stage: format(record.stage) });
   }
   if (record.kind === RECORD_KIND_WAVE && record.wave > 0) {
     return translate('modals.stats.overview.bestWave', { score: format(score), wave: format(record.wave) });
@@ -298,6 +302,11 @@ export const uiStatsMethods = {
       modes: {
         [GAME_MODES.ENDLESS]: { score: storage.getEndlessHighScore?.() ?? 0 },
         [GAME_MODES.DAILY]: { score: dailyBest },
+        [GAME_MODES.CLASSIC]: {
+          score: storage.getClassicHighScore?.() ?? 0,
+          kind: RECORD_KIND_CLASSIC_STAGE,
+          stage: storage.getClassicBestStage?.() ?? 0
+        },
         [GAME_MODES.PUZZLE]: {
           score: storage.getPuzzleHighScore?.() ?? 0,
           kind: RECORD_KIND_STAGE,

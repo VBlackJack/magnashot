@@ -131,6 +131,8 @@ export class UIManager {
       starNext: document.getElementById('hud-star-next'),
       starMeter: document.getElementById('hud-star-meter'),
       starMeterFill: document.getElementById('hud-star-meter-fill'),
+      sagMeter: document.getElementById('hud-sag-meter'),
+      sagMeterFill: document.getElementById('hud-sag-meter-fill'),
       highScoreValue: document.getElementById('hud-best-value'),
       coinsValue: document.getElementById('hud-coins-value'),
       overchargePct: document.getElementById('hud-overcharge-pct'),
@@ -188,10 +190,12 @@ export class UIManager {
       specialEquippedBanner: document.getElementById('special-equipped-banner'),
       cancelAimBanner: document.getElementById('cancel-aim-banner'),
       modalLevels: document.getElementById('modal-levels'),
+      btnModeClassic: document.getElementById('btn-mode-classic'),
       btnModePuzzle: document.getElementById('btn-mode-puzzle'),
       btnModeBlitz: document.getElementById('btn-mode-blitz'),
       btnModeBossRush: document.getElementById('btn-mode-boss-rush'),
       btnModeCascade: document.getElementById('btn-mode-cascade'),
+      arcadeBestClassic: document.getElementById('arcade-best-classic'),
       arcadeBestPuzzle: document.getElementById('arcade-best-puzzle'),
       arcadeBestBlitz: document.getElementById('arcade-best-blitz'),
       arcadeBestBossRush: document.getElementById('arcade-best-boss-rush'),
@@ -999,6 +1003,9 @@ export class UIManager {
         playButton
       );
     }
+    if (this.engine?.mode === GAME_MODES.CLASSIC) {
+      return this.elements?.btnModeClassic || this.elements?.btnCloseLevels || playButton;
+    }
     if (this.engine?.mode === GAME_MODES.BLITZ) {
       return this.elements?.btnModeBlitz || this.elements?.btnCloseLevels || playButton;
     }
@@ -1059,6 +1066,12 @@ export class UIManager {
     setTextIfChanged(
       this.elements.arcadeBestCascade,
       t('modals.levelSelect.card.bestScore', { score: formatNumber(this.storageManager.getCascadeHighScore()) })
+    );
+    setTextIfChanged(
+      this.elements.arcadeBestClassic,
+      t('modals.levelSelect.arcade.classicBest', {
+        stage: formatNumber(Math.max(1, this.storageManager.getClassicBestStage?.() || 1))
+      })
     );
     this.renderPuzzleStagesStrip();
     this.refreshModeLocks(this.getModeAccess());
@@ -1168,6 +1181,13 @@ export class UIManager {
       return t('modals.gameOver.stats.bossRushSummary', {
         wave: formatNumber(engine.bossRushWave),
         best: formatNumber(Math.max(engine.bossRushWave, this.storageManager.getBossRushBestWave?.() || 1)),
+        coins: formatNumber(summary?.earnedCoins || 0)
+      });
+    }
+    if (engine.mode === GAME_MODES.CLASSIC) {
+      return t('modals.gameOver.stats.classicSummary', {
+        stage: formatNumber(engine.classicStage),
+        best: formatNumber(Math.max(engine.classicStage, this.storageManager.getClassicBestStage?.() || 1)),
         coins: formatNumber(summary?.earnedCoins || 0)
       });
     }

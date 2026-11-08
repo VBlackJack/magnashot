@@ -21,6 +21,9 @@ import { UIManager } from '../src/ui/UIManager.js';
 /** The public surface of UIManager.prototype, captured before the UI manager was split into modules. */
 const EXPECTED_PROTOTYPE_NAMES = [
   'announce',
+  'announceSagChanges',
+  'hideSagMeter',
+  'refreshSagMeter',
   'bindStatsEvents',
   'buildStatsRecords',
   'buildStatsText',

@@ -18,6 +18,7 @@ import { GAME_MODES, GAME_STATES, OBJECTIVE_TYPES } from '../core/Constants.js';
 import { t, formatNumber } from '../core/I18n.js';
 import { SeededRandom } from '../core/SeededRandom.js';
 import { resolveHintText } from '../game/Discovery.js';
+import { SAG_PHASES } from '../game/SagMeter.js';
 import { getUtcIsoWeekKey } from '../game/WeeklyFlux.js';
 import { FULL_PERCENT } from './WorkshopView.js';
 import { syncFluxPerkModal } from './FluxPerkView.js';
@@ -44,8 +45,90 @@ import {
   setAttributeIfChanged
 } from './UIHelpers.js';
 
+/** Sag phases (see SagMeter.getSagPhase) and the HUD meter class each one sets. */
+const SAG_METER_CLASS_BY_PHASE = Object.freeze({
+  [SAG_PHASES.WARN]: 'warning',
+  [SAG_PHASES.FULL]: 'critical'
+});
+
 /** Methods installed on UIManager.prototype by UIManager.js. */
 export const uiHudRefreshMethods = {
+  /**
+   * Shows the Sag box: label, level/size value, the segmented meter and its accessible
+   * value text. Speaks the warning once per cycle and every lowering.
+   * @param {object} engine - Game engine.
+   * @param {{level:number, size:number, phase:string}} sag - Engine sag state.
+   */
+  refreshSagMeter(engine, sag) {
+    const meter = this.elements.sagMeter;
+    if (this.elements.shotsLabel) {
+      setTextIfChanged(this.elements.shotsLabel, t('hud.stats.sag.label'));
+    }
+    setTextIfChanged(
+      this.elements.shotsValue,
+      t('hud.stats.sag.value', { level: formatNumber(sag.level), size: formatNumber(sag.size) })
+    );
+    this.elements.shotsValue.classList.toggle('warning', sag.phase !== SAG_PHASES.CALM);
+    if (meter) {
+      const remaining = Math.max(0, sag.size - sag.level);
+      setAttributeIfChanged(meter, 'aria-valuemax', String(sag.size));
+      setAttributeIfChanged(meter, 'aria-valuenow', String(sag.level));
+      setAttributeIfChanged(
+        meter,
+        'aria-valuetext',
+        t('hud.stats.sag.aria', {
+          level: formatNumber(sag.level),
+          size: formatNumber(sag.size),
+          remaining: formatNumber(remaining)
+        })
+      );
+      meter.style.setProperty('--sag-size', String(sag.size));
+      meter.style.setProperty('--sag-level', String(sag.level));
+      for (const [phase, className] of Object.entries(SAG_METER_CLASS_BY_PHASE)) {
+        meter.classList.toggle(className, sag.phase === phase);
+      }
+      meter.classList.remove('hidden');
+    }
+    this.announceSagChanges(engine, sag);
+  },
+
+  /** Hides the meter and forgets what the announcer saw, outside the Sag modes. */
+  hideSagMeter() {
+    this.elements.sagMeter?.classList.add('hidden');
+    this.sagAnnouncerState = null;
+  },
+
+  /**
+   * Polite announcements: the warning once per cycle (a cycle ends when the cluster drops
+   * or the meter empties), and every lowering. The first refresh of a run only records.
+   */
+  announceSagChanges(engine, sag) {
+    const lowerKey = engine.mode === GAME_MODES.CLASSIC ? engine.classicRailDropsTotal : engine.waveCount;
+    const seen = this.sagAnnouncerState;
+    this.sagAnnouncerState = {
+      mode: engine.mode,
+      lowerKey,
+      phase: sag.phase,
+      warned: seen && seen.mode === engine.mode ? seen.warned : false
+    };
+    if (!seen || seen.mode !== engine.mode) {
+      this.sagAnnouncerState.warned = sag.phase === SAG_PHASES.WARN;
+      return;
+    }
+    if (lowerKey > seen.lowerKey) {
+      this.sagAnnouncerState.warned = false;
+      this.announce(t('gameplay.feedback.sag.lowered'));
+      return;
+    }
+    if (sag.level === 0) {
+      this.sagAnnouncerState.warned = false;
+    }
+    if (sag.phase === SAG_PHASES.WARN && !this.sagAnnouncerState.warned) {
+      this.sagAnnouncerState.warned = true;
+      this.announce(t('gameplay.feedback.sag.warning'));
+    }
+  },
+
   refresh(engine, extra = {}) {
     // One-shot extras (an unlocked achievement, a cleared Flux stage) must not replay
     // when refresh is re-run with lastExtra (language change, input mode change, shop
@@ -150,6 +233,8 @@ export const uiHudRefreshMethods = {
       bestScore = this.storageManager.getBossRushHighScore();
     } else if (engine.mode === GAME_MODES.CASCADE) {
       bestScore = this.storageManager.getCascadeHighScore();
+    } else if (engine.mode === GAME_MODES.CLASSIC) {
+      bestScore = this.storageManager.getClassicHighScore();
     } else {
       bestScore = this.storageManager.getEndlessHighScore();
     }
@@ -322,6 +407,13 @@ export const uiHudRefreshMethods = {
             wave: engine.waveCount
           })
         );
+      } else if (engine.mode === GAME_MODES.CLASSIC) {
+        setTextIfChanged(
+          this.elements.modeBanner,
+          t('hud.stats.mode.classic', {
+            stage: formatNumber(engine.classicStage)
+          })
+        );
       } else {
         setTextIfChanged(
           this.elements.modeBanner,
@@ -330,26 +422,35 @@ export const uiHudRefreshMethods = {
           })
         );
       }
-      if (this.elements.shotsLabel) {
-        const shotsLabelKey = engine.mode === GAME_MODES.BOSS_RUSH
-          ? 'hud.stats.shots.shieldsLabel'
-          : 'hud.stats.shots.waveLabel';
-        setTextIfChanged(this.elements.shotsLabel, t(shotsLabelKey));
+      const sag = engine.getSagState?.();
+      if (sag?.active) {
+        this.refreshSagMeter(engine, sag);
+      } else {
+        if (this.elements.shotsLabel) {
+          const shotsLabelKey = engine.mode === GAME_MODES.BOSS_RUSH
+            ? 'hud.stats.shots.shieldsLabel'
+            : 'hud.stats.shots.waveLabel';
+          setTextIfChanged(this.elements.shotsLabel, t(shotsLabelKey));
+        }
+        const waveCountdown =
+          engine.mode === GAME_MODES.CASCADE
+            ? engine.cascadeTurnsUntilDrop
+            : engine.mode === GAME_MODES.BOSS_RUSH
+              ? engine.getBossBall()?.armorHits || 0
+              : 0;
+        setTextIfChanged(this.elements.shotsValue, formatNumber(waveCountdown));
+        this.elements.shotsValue.classList.toggle(
+          'warning',
+          waveCountdown <= warningShotsThreshold
+        );
       }
-      const waveCountdown =
-        engine.mode === GAME_MODES.CASCADE
-          ? engine.cascadeTurnsUntilDrop
-          : engine.mode === GAME_MODES.BOSS_RUSH
-            ? engine.getBossBall()?.armorHits || 0
-            : engine.shotsUntilWave;
-      setTextIfChanged(this.elements.shotsValue, formatNumber(waveCountdown));
-      this.elements.shotsValue.classList.toggle(
-        'warning',
-        waveCountdown <= warningShotsThreshold
-      );
       if (this.elements.starProgress) {
         this.elements.starProgress.classList.add('hidden');
       }
+    }
+
+    if (!engine.getSagState?.().active) {
+      this.hideSagMeter();
     }
 
     if (this.elements.modeBanner) {

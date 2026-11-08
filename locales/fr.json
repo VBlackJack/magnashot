@@ -129,7 +129,8 @@
         "cascade": "Cascade • Vague {{wave}}",
         "coreRescueProgress": "💎 {{rescued}}/{{total}}",
         "switchHint": "Cliquer pour changer de mode ou de niveau",
-        "switchHintTouch": "Touchez pour changer de mode ou de niveau"
+        "switchHintTouch": "Touchez pour changer de mode ou de niveau",
+        "classic": "Classique - Étape {{stage}}"
       },
       "shots": {
         "label": "Tirs restants",
@@ -153,6 +154,11 @@
       "bestRun": {
         "stage": "Record : forme {{best}}",
         "wave": "Record : vague {{best}}"
+      },
+      "sag": {
+        "label": "Affaissement",
+        "value": "{{level}}/{{size}}",
+        "aria": "Affaissement {{level}} sur {{size}} : {{remaining}} tirs manqués avant la chute de l'amas"
       }
     },
     "launcher": {
@@ -355,6 +361,14 @@
       },
       "weeklyBonus": {
         "claimed": "BONUS DE LA SEMAINE +{{coins}} ⬡"
+      },
+      "sag": {
+        "warning": "Un raté de plus et l'amas descend",
+        "lowered": "Le rail cède",
+        "drained": "Avalanche : affaissement -{{amount}}"
+      },
+      "classic": {
+        "stageCleared": "Étape terminée ! +{{points}}"
       }
     },
     "mutators": {
@@ -553,7 +567,10 @@
         "bossRushRecord": "Vague {{wave}} • Record : {{score}}",
         "cascade": "⬇ Cascade",
         "cascadeDesc": "Puits haute gravité • Plateformes",
-        "lockedDesc": "Terminez le niveau {{level}} pour débloquer"
+        "lockedDesc": "Terminez le niveau {{level}} pour débloquer",
+        "classic": "Classique",
+        "classicDesc": "Règles pures : ni spéciaux, ni améliorations. Les ratés abaissent le plafond.",
+        "classicBest": "Record : étape {{stage}}"
       }
     },
     "shop": {
@@ -970,7 +987,8 @@
         "fluxStage": "Forme atteinte : {{stage}} (record : {{best}})",
         "bossRushSummary": "Vague Boss : {{wave}} (record : {{best}}) • Pièces : +{{coins}} ⬡",
         "waveSummary": "Vague atteinte : {{wave}} • Combo max : x{{combo}} • Pièces : +{{coins}} ⬡",
-        "puzzleSummary": "Niveau Puzzle : {{stage}} / {{total}}"
+        "puzzleSummary": "Niveau Puzzle : {{stage}} / {{total}}",
+        "classicSummary": "Étape atteinte : {{stage}} (record : {{best}}) • Pièces : +{{coins}} ⬡"
       },
       "button": {
         "continueShots": "+{{shots}} tirs ({{cost}} ⬡)",
@@ -1091,7 +1109,8 @@
         "hardestLevel": "Niveau le plus dur pour vous : {{level}} ({{fails}} échecs)",
         "mostLeftLevel": "Le plus souvent quitté : niveau {{level}} ({{quits}} fois)",
         "empty": "Jouez une partie et vos statistiques apparaîtront ici.",
-        "privacy": "Stocké uniquement sur cet appareil. Rien n'est envoyé nulle part."
+        "privacy": "Stocké uniquement sur cet appareil. Rien n'est envoyé nulle part.",
+        "bestClassicStage": "Record {{score}}, étape {{stage}}"
       },
       "button": {
         "copy": "Copier mes statistiques",
@@ -1297,6 +1316,11 @@
       "copied": "Résultat copié dans le presse-papiers.",
       "manual": "Copiez le texte sélectionné pour partager votre résultat.",
       "failed": "Le partage a échoué. Copiez plutôt le texte sélectionné."
+    },
+    "classic": {
+      "header": "MagnaShot Classique",
+      "stats": "Étape {{stage}} - {{score}} pts",
+      "drops": "Chutes du rail : {{drops}}"
     }
   },
   "stats": {

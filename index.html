@@ -110,6 +110,7 @@
       <div class="hud-stat-box hud-stat-shots">
         <span id="hud-shots-label" class="hud-label" data-i18n="hud.stats.shots.label"></span>
         <span id="hud-shots-value" class="hud-value highlight"></span>
+        <span id="hud-sag-meter" class="sag-meter hidden" role="meter" aria-valuemin="0" aria-valuemax="1" aria-valuenow="0" aria-valuetext="" data-i18n-aria-label="hud.stats.sag.label"><span id="hud-sag-meter-fill" class="sag-meter-fill"></span></span>
       </div>
       <div class="hud-stat-box hud-stat-coins">
         <span class="hud-label" data-i18n="hud.stats.coins.label"></span>
@@ -172,6 +173,11 @@
       <div class="arcade-modes-section">
         <div class="arcade-modes-header" data-i18n="modals.levelSelect.arcade.sectionTitle"></div>
         <div class="arcade-modes-strip">
+          <button id="btn-mode-classic" type="button" class="arcade-mode-card">
+            <span class="arcade-card-title" data-i18n="modals.levelSelect.arcade.classic"></span>
+            <span class="arcade-card-desc" data-i18n="modals.levelSelect.arcade.classicDesc"></span>
+            <span id="arcade-best-classic" class="arcade-card-best gold-text"></span>
+          </button>
           <button id="btn-mode-puzzle" type="button" class="arcade-mode-card">
             <span class="arcade-card-title" data-i18n="modals.levelSelect.arcade.puzzle"></span>
             <span class="arcade-card-desc" data-i18n="modals.levelSelect.arcade.puzzleDesc"></span>
