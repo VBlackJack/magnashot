@@ -17,6 +17,9 @@
 import { SPECIAL_TYPES, CLUSTER_MODIFIERS } from '../core/Constants.js';
 import { pickRocketTargets } from './SpecialBallController.js';
 
+/** A Boss Core with shields left loses one shield per hit instead of being destroyed. */
+const isShieldedBossCore = (ball) => ball.clusterModifier === CLUSTER_MODIFIERS.BOSS_CORE && ball.armorHits > 1;
+
 /**
  * What a shot along an aim trajectory would hit, as the aim preview shows it: the spheres
  * highlighted, and among them the ones the shot destroys. Shared by the renderer and the
@@ -55,7 +58,7 @@ export function predictImpact(
       for (const b of physicsWorld.balls) {
         if (Math.hypot(b.x - endX, b.y - endY) <= aoeRadius) {
           highlight.push(b);
-          if (specType === SPECIAL_TYPES.BOMB) {
+          if (specType === SPECIAL_TYPES.BOMB && !isShieldedBossCore(b)) {
             destroyedIds.add(b.id);
           }
         }
@@ -65,7 +68,9 @@ export function predictImpact(
       for (const b of physicsWorld.balls) {
         if (Math.abs(b.y - endY) <= bandHalf) {
           highlight.push(b);
-          destroyedIds.add(b.id);
+          if (!isShieldedBossCore(b)) {
+            destroyedIds.add(b.id);
+          }
         }
       }
     } else if (specType === SPECIAL_TYPES.RAINBOW) {
@@ -94,7 +99,9 @@ export function predictImpact(
           const dy = b.y - pt.y;
           if (dx * dx + dy * dy <= pierceRadiusSq) {
             highlight.push(b);
-            destroyedIds.add(b.id);
+            if (!isShieldedBossCore(b)) {
+              destroyedIds.add(b.id);
+            }
             break;
           }
         }
@@ -103,7 +110,7 @@ export function predictImpact(
       const targets = pickRocketTargets({ x: endX, y: endY }, physicsWorld.balls, specCfg.rocketCount);
       for (const target of targets) {
         highlight.push(target);
-        if (target.clusterModifier !== CLUSTER_MODIFIERS.BOSS_CORE || target.armorHits <= 1) {
+        if (!isShieldedBossCore(target)) {
           destroyedIds.add(target.id);
         }
       }
