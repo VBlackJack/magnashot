@@ -55,6 +55,16 @@ export const RUN_BEST_METRICS = Object.freeze({
 
 export { FLUX_PERK_IDS };
 
+/**
+ * What an engine is for. A main engine is the player's own game: it reads and writes the
+ * profile. A versus engine plays one board of a duel: it keeps no hints, shot timeline, ghost
+ * or statistics, so a duel never touches the player's profile.
+ */
+export const ENGINE_ROLES = Object.freeze({
+  MAIN: 'main',
+  VERSUS: 'versus'
+});
+
 export class GameEngine {
   constructor({
     gameConfig,
@@ -67,7 +77,9 @@ export class GameEngine {
     fluxConfig,
     audioManager,
     storageManager,
-    onStateChange
+    onStateChange,
+    role = ENGINE_ROLES.MAIN,
+    seedSource = null
   }) {
     this.gameConfig = gameConfig;
     this.physicsConfig = physicsConfig;
@@ -86,6 +98,11 @@ export class GameEngine {
     this.audioManager = audioManager;
     this.storageManager = storageManager;
     this.onStateChange = onStateChange;
+    this.role = role === ENGINE_ROLES.VERSUS ? ENGINE_ROLES.VERSUS : ENGINE_ROLES.MAIN;
+    /** True when this engine plays a board of a duel (no hints, timeline, ghost or stats). */
+    this.isVersusRole = this.role === ENGINE_ROLES.VERSUS;
+    /** Optional () => number in [0, 1) feeding the unseeded run streams; Math.random when null. */
+    this.seedSource = typeof seedSource === 'function' ? seedSource : null;
 
     this.physicsWorld = new PhysicsWorld(physicsConfig, gameConfig, ballsConfig);
     // Daily runs draw avalanche drift from the seeded stream so scores stay reproducible

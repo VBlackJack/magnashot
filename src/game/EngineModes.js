@@ -155,7 +155,8 @@ export const engineModeMethods = {
     this.classicStage = cleanStage;
     // A run stream of its own (launcher draws) so the stage boards below can be scoped: a stage
     // board never depends on the shots played before it.
-    this.seededRng = new SeededRandom(`${this.gameConfig.classic.seedPrefix}:run:${Math.random()}`);
+    const drawRunSeed = this.seedSource || Math.random;
+    this.seededRng = new SeededRandom(`${this.gameConfig.classic.seedPrefix}:run:${drawRunSeed()}`);
     this.waveCount = 1;
     this.endlessRowParity = 0;
     this.sagLevel = 0;
