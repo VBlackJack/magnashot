@@ -134,7 +134,13 @@ export class GamepadInput {
     if (!actuator || typeof actuator.playEffect !== 'function') return false;
     const type = this.config.rumble?.effectType || actuator.type;
     try {
-      const played = actuator.playEffect(type, effect);
+      // The Gamepad API names the length `duration`; the config keeps the readable `durationMs`.
+      const played = actuator.playEffect(type, {
+        duration: effect.durationMs,
+        startDelay: effect.startDelay ?? 0,
+        weakMagnitude: effect.weakMagnitude,
+        strongMagnitude: effect.strongMagnitude
+      });
       if (played && typeof played.catch === 'function') {
         played.catch(() => false);
       }

@@ -376,6 +376,7 @@ test('the tutorial opens once per device, holds the match, and closing resumes i
       ui.gameConfig = gameConfig;
       ui.storageManager = createManager();
       ui.elements = { versusCanvas0: fakeElement('canvas') };
+      ui.syncModalInertState = () => {};
       ui.versus = {
         kb: { releaseAll: () => calls.push('release') },
         controller: { pause: () => calls.push('pause'), resume: () => calls.push('resume') },
@@ -420,4 +421,58 @@ test('a pad moves the tutorial on with the bottom button and skips it with back 
   assert.equal(tutorial.index, 1);
   ui.routeVersusTutorialActions([A.PAUSE]);
   assert.deepEqual(closed, ['skip']);
+});
+
+test('closing the tutorial keeps a blocked local match paused behind its pause dialog', () => {
+  const calls = [];
+  const ui = Object.create(UIManager.prototype);
+  ui.elements = { versusCanvas0: fakeElement('canvas') };
+  ui.syncModalInertState = () => {};
+  ui.isVersusResumeBlocked = () => true;
+  ui.pauseVersus = () => calls.push('pauseDialog');
+  ui.versus = {
+    tutorial: { element: fakeElement('div') },
+    controller: { resume: () => calls.push('resume') },
+    hudDirty: false
+  };
+  ui.closeVersusTutorial();
+  assert.deepEqual(calls, ['pauseDialog']);
+  assert.equal(ui.versus.tutorial, null);
+  assert.notEqual(ui.elements.versusCanvas0.focused, true);
+});
+
+test('the tutorial makes the duel screen inert while it is open and restores it on close', () => {
+  const makeScreen = () => {
+    const attrs = {};
+    return {
+      inert: false,
+      attrs,
+      setAttribute: (name, value) => { attrs[name] = value; },
+      removeAttribute: (name) => { delete attrs[name]; }
+    };
+  };
+  const previousDocument = globalThis.document;
+  globalThis.document = { activeElement: null, body: fakeElement('body'), documentElement: {} };
+  try {
+    const ui = Object.create(UIManager.prototype);
+    const screen = makeScreen();
+    ui.elements = { appShell: makeScreen(), versusScreen: screen, versusCanvas0: fakeElement('canvas') };
+    ui.getModalsByPriority = () => [];
+    ui.getActiveTopModal = () => null;
+    ui.keepFocusInTopModal = () => {};
+    ui.lastFocusedElement = null;
+    ui.versus = { tutorial: null };
+    ui.syncModalInertState();
+    assert.equal(screen.inert, false);
+    ui.versus.tutorial = { element: fakeElement('div') };
+    ui.syncModalInertState();
+    assert.equal(screen.inert, true);
+    assert.equal(screen.attrs['aria-hidden'], 'true');
+    ui.versus.tutorial = null;
+    ui.syncModalInertState();
+    assert.equal(screen.inert, false);
+    assert.equal('aria-hidden' in screen.attrs, false);
+  } finally {
+    globalThis.document = previousDocument;
+  }
 });

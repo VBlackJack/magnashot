@@ -709,7 +709,9 @@ function setupRumble({ settings = {}, actuator } = {}) {
 test('rumble plays the configured effect type on the pad actuator', () => {
   const { input, calls } = setupRumble();
   assert.equal(input.rumble(0, RUMBLE_EFFECT), true);
-  assert.deepEqual(calls, [['dual-rumble', RUMBLE_EFFECT]]);
+  // The Gamepad API reads `duration`, not the config's `durationMs`.
+  assert.deepEqual(calls, [['dual-rumble', { duration: 100, startDelay: 0, weakMagnitude: 0.3, strongMagnitude: 0.5 }]]);
+  assert.equal('durationMs' in calls[0][1], false);
 });
 
 test('rumble does nothing when the setting is off, the reader is disabled or the pad is unknown', () => {

@@ -353,6 +353,7 @@ export const uiVersusMethods = {
     });
     document.body.append(v.tutorial.element);
     v.tutorial.open();
+    this.syncModalInertState();
   },
 
   /** Takes the tutorial off the page and hands the board back: the match resumes. */
@@ -363,8 +364,14 @@ export const uiVersusMethods = {
     }
     v.tutorial.element.remove?.();
     v.tutorial = null;
-    v.controller.resume();
+    this.syncModalInertState();
     v.hudDirty = true;
+    if (this.isVersusResumeBlocked()) {
+      // A small window or a lost controller still holds the match: the pause dialog says why.
+      this.pauseVersus();
+      return;
+    }
+    v.controller.resume();
     this.elements.versusCanvas0.focus();
   },
 

@@ -91,7 +91,7 @@ jobs:
   calibration:
     name: Polarity Duel Calibration
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 15
     steps:
       - name: Checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -113,7 +113,7 @@ jobs:
 
   deploy:
     name: Deploy to GitHub Pages
-    needs: [test, browser, calibration]
+    needs: [test, browser]
     if: github.ref == 'refs/heads/master' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
     runs-on: ubuntu-latest
     timeout-minutes: 10

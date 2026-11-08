@@ -1452,11 +1452,11 @@
         },
         "guard": {
           "title": "Garde de polarité",
-          "body": "Tirez une sphère de signe opposé pour annuler une charge. Inversez votre polarité au besoin ; un tir de même signe rebondit sur elle."
+          "body": "Tirez une sphère de polarité opposée pour briser une charge. Une sphère de même polarité rebondit dessus."
         },
         "pulse": {
-          "title": "Pulsation de champ",
-          "body": "Neutraliser des charges remplit votre jauge de pulsation. Pleine, elle abaisse seule le rail d'ancrage de votre rival."
+          "title": "Impulsion de champ",
+          "body": "Neutraliser des charges remplit votre jauge d'impulsion. Pleine, elle abaisse seule le rail d'ancrage de votre rival."
         }
       }
     },

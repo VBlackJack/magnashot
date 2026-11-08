@@ -1670,7 +1670,7 @@
       "seedRadix": 36
     },
     "calibration": {
-      "defaultSeeds": 6,
+      "defaultSeeds": 10,
       "baseSeed": "calibration",
       "frameCap": 150000,
       "hardBeatsEasyMin": 0.8,

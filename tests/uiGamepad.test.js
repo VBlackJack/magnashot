@@ -881,6 +881,25 @@ test('rumbleGamepad sends the configured effect only when vibration is on and mo
   assert.equal(sent.length, 1);
 });
 
+test('rumbleGamepad stays silent when the system asks for reduced motion', () => {
+  const { ui } = makeUi();
+  const sent = [];
+  ui.gamepadInput = { settings: {}, rumble: (index, effect) => { sent.push([index, effect]); return true; } };
+  ui.storageManager = { getGamepadRumble: () => true, getReducedMotion: () => false };
+  const previous = Object.getOwnPropertyDescriptor(globalThis, 'window');
+  let systemReduced = true;
+  globalThis.window = { matchMedia: (query) => ({ matches: systemReduced && query.includes('prefers-reduced-motion') }) };
+  try {
+    assert.equal(ui.rumbleGamepad('pulse', 1), false);
+    systemReduced = false;
+    assert.equal(ui.rumbleGamepad('pulse', 1), true);
+  } finally {
+    if (previous) Object.defineProperty(globalThis, 'window', previous);
+    else delete globalThis.window;
+  }
+  assert.equal(sent.length, 1);
+});
+
 test('the Vibration setting is handed to the live reader', () => {
   const { ui } = makeUi();
   ui.gamepadInput = { settings: { rumble: true } };

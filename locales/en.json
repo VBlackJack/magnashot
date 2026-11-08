@@ -1452,7 +1452,7 @@
         },
         "guard": {
           "title": "Polarity guard",
-          "body": "Shoot a sphere of the opposite sign to cancel a charge. Flip your polarity to match, and shoot the same sign and it bounces away."
+          "body": "Shoot a charge with the opposite polarity to shatter it. The same polarity bounces off."
         },
         "pulse": {
           "title": "Field pulse",

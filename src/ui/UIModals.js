@@ -368,7 +368,8 @@ export const uiModalMethods = {
     // The duel screen itself is out of reach while one of its dialogs (pause, result) is open.
     const versusScreen = this.elements.versusScreen;
     if (versusScreen) {
-      const isScreenHeld = Boolean(this.versus) && anyOpen;
+      // The first-duel tutorial is a dialog over the screen too, even though it is not a registered modal.
+      const isScreenHeld = Boolean(this.versus) && (anyOpen || Boolean(this.versus.tutorial));
       versusScreen.inert = isScreenHeld;
       if (isScreenHeld) {
         versusScreen.setAttribute('aria-hidden', 'true');

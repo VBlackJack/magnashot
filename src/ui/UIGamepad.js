@@ -28,6 +28,9 @@ export const PAD_FOCUS_CLASS = 'pad-focus';
 /** Settings checkbox of the Vibration option (looked up here so the shared element map stays untouched). */
 const GAMEPAD_RUMBLE_INPUT_ID = 'input-gamepad-rumble';
 
+/** System-level request for less motion, honoured by vibration as well as the in-app setting. */
+const REDUCED_MOTION_QUERY = '(prefers-reduced-motion: reduce)';
+
 /** Role of the container that holds the tabs of a dialog (Workshop, chapters, stats). */
 const TABLIST_SELECTOR = '[role="tablist"]';
 const TAB_SELECTOR = '[role="tab"]';
@@ -147,7 +150,9 @@ export const uiGamepadMethods = {
     if (!reader || !effect || !(padIndex >= 0)) {
       return false;
     }
-    if (!this.storageManager.getGamepadRumble?.() || this.storageManager.getReducedMotion?.()) {
+    const isSystemReduced = typeof window !== 'undefined' && typeof window.matchMedia === 'function'
+      && window.matchMedia(REDUCED_MOTION_QUERY).matches === true;
+    if (!this.storageManager.getGamepadRumble?.() || this.storageManager.getReducedMotion?.() || isSystemReduced) {
       return false;
     }
     return reader.rumble(padIndex, effect);
