@@ -1531,6 +1531,18 @@
     "stageClearBonusBase": 500,
     "seedPrefix": "classic"
   },
+  "versus": {
+    "attack": {
+      "freeDroppedSpheres": 1,
+      "dropWeight": 1,
+      "linkWeight": 2,
+      "specialMultiplier": 1.5,
+      "rawPerCharge": 2,
+      "maxChargesPerTurn": 6,
+      "boardClearCharges": 4,
+      "strongChargeRaw": 8
+    }
+  },
   "modeUnlocks": {
     "order": ["campaign", "daily", "endless", "classic", "puzzle", "blitz", "flux", "cascade", "boss_rush"],
     "always": ["campaign", "daily"],

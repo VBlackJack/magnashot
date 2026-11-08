@@ -144,6 +144,7 @@ export const engineTurnResolutionMethods = {
     }
 
     if (anyChainMatched) {
+      this.noteVersusLink();
       this.detachAndRewardAvalanche();
       if (this.outOfShotsGraceFrames > 0 && this.physicsWorld.balls.length > 0) {
         this.outOfShotsGraceFrames = this.physicsConfig.simulation.outOfShotsGraceFrames;
@@ -574,6 +575,7 @@ export const engineTurnResolutionMethods = {
     if (detached.length > 0) {
       const scoring = this.gameConfig.scoring;
       const juice = this.gameConfig.juice;
+      this.noteVersusDrop(detached.length);
       const dropPoints = detached.length * scoring.droppedBallPoints * Math.max(1, this.combo);
       this.addScore(dropPoints);
       this.addOvercharge(detached.length * scoring.overchargePerDroppedBall);

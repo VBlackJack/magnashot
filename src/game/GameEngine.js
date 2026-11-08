@@ -41,6 +41,7 @@ import { engineBoardMethods } from './EngineBoard.js';
 import { engineLauncherMethods } from './EngineLauncher.js';
 import { engineDiscoveryMethods } from './EngineDiscovery.js';
 import { engineControlsMethods } from './EngineControls.js';
+import { engineVersusMethods } from './EngineVersus.js';
 import { engineTurnResolutionMethods } from './EngineTurnResolution.js';
 import { engineRoundFlowMethods } from './EngineRoundFlow.js';
 import { engineProgressMethods } from './EngineProgress.js';
@@ -104,6 +105,8 @@ export class GameEngine {
     /** Optional () => number in [0, 1) feeding the unseeded run streams; Math.random when null. */
     this.seedSource = typeof seedSource === 'function' ? seedSource : null;
 
+    /** Versus state of a duel board (charges, attack counters); null outside a duel. */
+    this.versus = null;
     this.physicsWorld = new PhysicsWorld(physicsConfig, gameConfig, ballsConfig);
     // Daily runs draw avalanche drift from the seeded stream so scores stay reproducible
     this.physicsWorld.setRandomSource(() => this.random());
@@ -1208,6 +1211,7 @@ export class GameEngine {
     this.sampleShotTimeline();
     this.evaluateGhostShot();
     this.countShotForStats();
+    this.beginVersusTurn(this.currentBall);
     const ballCfg = this.physicsConfig.ball;
     const projectile = this.currentBall;
     this.levelIntro = null;
@@ -1502,3 +1506,4 @@ installMethods(GameEngine, engineTurnResolutionMethods);
 installMethods(GameEngine, engineRoundFlowMethods);
 installMethods(GameEngine, engineProgressMethods);
 installMethods(GameEngine, engineGhostDuelMethods);
+installMethods(GameEngine, engineVersusMethods);
