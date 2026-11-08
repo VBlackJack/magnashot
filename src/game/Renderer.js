@@ -19,6 +19,7 @@ import { t } from '../core/I18n.js';
 import { isChainLink, isTetherLink } from '../physics/PhysicsWorld.js';
 import { Ball } from '../entities/Ball.js';
 import { predictImpact } from './ImpactPreview.js';
+import { SAG_STEPS } from './SagMeter.js';
 
 const BOND_STYLE = Object.freeze({
   STRESSED: 0,
@@ -45,6 +46,30 @@ const PATTERNS = Object.freeze({
 const INTRO_EASE_POWER = 3;
 /** Fixed render clock under reduced motion: pulses and field waves hold their resting frame. */
 const REDUCED_MOTION_CLOCK_MS = 0;
+/** Sag meter drawing: shapes and timings that are not worth a config key. */
+const SAG_DRAW = Object.freeze({
+  PHASE_WARN: 'warn',
+  PHASE_FULL: 'full',
+  PHASE_CALM: 'calm',
+  EASE_POWER: 3,
+  EMPTY_ALPHA: 0.22,
+  OUTLINE_PADDING: 3,
+  OUTLINE_WIDTH: 1.5,
+  WARN_DASH: Object.freeze([4, 3]),
+  CHEVRON_HALF_WIDTH: 6,
+  CHEVRON_HEIGHT: 5,
+  CHEVRON_GAP: 5,
+  CHEVRON_WIDTH: 2,
+  HATCH_WIDTH: 1,
+  HATCH_COLOR: 'rgba(0, 0, 0, 0.55)',
+  RAIL_THICKNESS: 6,
+  RAIL_PULSE_PERIOD_MS: 380,
+  RAIL_PULSE_DEPTH: 0.35,
+  RAIL_SHADE_COLOR: '#000000',
+  RAIL_SHADE_PER_DROP: 0.07,
+  RAIL_SHADE_MAX: 0.6,
+  RAIL_HATCH_STEP: 12
+});
 
 /** Media query matching exactly the given device pixel ratio. */
 export function buildResolutionQuery(dpr) {
@@ -442,13 +467,16 @@ export class Renderer {
     this.drawDangerZone(ctx, width, height, theme, engineState.physicsWorld.balls, now, alpha);
 
     // A new Flux shape slides down into place; only the drawing moves, not the physics.
-    const introOffset = this.getStageIntroOffset(engineState);
+    // After a Sag step the cluster is already lower in the physics: it eases down from its
+    // old place, drawing only.
+    const introOffset = this.getStageIntroOffset(engineState) + this.getRailLowerOffset(engineState);
     if (introOffset > 0) {
       ctx.save();
       ctx.translate(0, -introOffset);
     }
     this.drawObstacles(ctx, engineState.physicsWorld.obstacles, now, alpha);
     this.drawRails(ctx, engineState.physicsWorld);
+    this.drawAnchorRail(ctx, engineState, theme, now);
     this.drawMagneticBonds(ctx, engineState.physicsWorld, theme, now, alpha);
     this.drawTethers(ctx, engineState.physicsWorld, alpha);
 
@@ -486,6 +514,7 @@ export class Renderer {
     }
 
     this.drawLauncher(ctx, engineState, theme, now);
+    this.drawSagGauge(ctx, engineState, theme);
     this.drawParticles(ctx, engineState.particleSystem, alpha);
     this.drawSlowMoOverlay(ctx, engineState, width, height, alpha);
     ctx.restore();
@@ -1929,6 +1958,159 @@ export class Renderer {
       this.drawBallAt(ctx, engineState.nextBall, nx, ny, now);
       this.drawUpcomingBalls(ctx, engineState.upcomingColorIds, nx, ny, engineState.nextBall.radius, now);
     }
+  }
+
+  /**
+   * Vertical distance the cluster is still drawn above its physical place after a Sag step.
+   * Zero under reduced motion, with no step in flight, or in a mode without a Sag meter.
+   */
+  getRailLowerOffset(engineState) {
+    const remaining = engineState.railLowerFrames;
+    const sagCfg = this.gameConfig.sag;
+    if (!(remaining > 0) || this.isReducedMotion || !sagCfg || !(sagCfg.lowerFrames > 0)) {
+      return 0;
+    }
+    if (!sagCfg.modes?.[engineState.mode]) {
+      return 0;
+    }
+    const stepY = this.gameConfig[engineState.mode]?.descentStepY ?? this.gameConfig.endless.descentStepY;
+    const ratio = Math.min(1, remaining / sagCfg.lowerFrames);
+    return stepY * ratio ** SAG_DRAW.EASE_POWER;
+  }
+
+  /**
+   * The top rail of a rail-step mode: a bar through the anchor row that darkens with every
+   * drop and turns amber then red as the Sag meter fills. Pulses in warning (held still
+   * under reduced motion).
+   */
+  drawAnchorRail(ctx, engineState, theme, now) {
+    const sagCfg = this.gameConfig.sag;
+    if (!sagCfg || typeof engineState.getSagState !== 'function') {
+      return;
+    }
+    if (sagCfg.modes?.[engineState.mode]?.step !== SAG_STEPS.RAIL) {
+      return;
+    }
+    let top = Infinity;
+    let minX = Infinity;
+    let maxX = -Infinity;
+    for (const ball of engineState.physicsWorld.balls) {
+      if (!ball.isAnchor) {
+        continue;
+      }
+      top = Math.min(top, ball.y);
+      minX = Math.min(minX, ball.x - ball.radius);
+      maxX = Math.max(maxX, ball.x + ball.radius);
+    }
+    if (!Number.isFinite(top)) {
+      return;
+    }
+    const sag = engineState.getSagState();
+    const color = sag.phase === SAG_DRAW.PHASE_FULL
+      ? sagCfg.railCritColor
+      : sag.phase === SAG_DRAW.PHASE_WARN ? sagCfg.railWarnColor : sagCfg.railColor;
+    const half = SAG_DRAW.RAIL_THICKNESS * MATH_CONSTANTS.HALF;
+    ctx.save();
+    if (sag.phase === SAG_DRAW.PHASE_WARN && !this.isReducedMotion) {
+      const wave = Math.sin((now / SAG_DRAW.RAIL_PULSE_PERIOD_MS) * MATH_CONSTANTS.TWO_PI);
+      ctx.globalAlpha = 1 - SAG_DRAW.RAIL_PULSE_DEPTH * (MATH_CONSTANTS.HALF + MATH_CONSTANTS.HALF * wave);
+    }
+    ctx.fillStyle = color;
+    ctx.fillRect(minX, top - half, maxX - minX, SAG_DRAW.RAIL_THICKNESS);
+    const shade = Math.min(SAG_DRAW.RAIL_SHADE_MAX, sag.railDrops * SAG_DRAW.RAIL_SHADE_PER_DROP);
+    if (shade > 0) {
+      ctx.globalAlpha = shade;
+      ctx.fillStyle = SAG_DRAW.RAIL_SHADE_COLOR;
+      ctx.fillRect(minX, top - half, maxX - minX, SAG_DRAW.RAIL_THICKNESS);
+      ctx.globalAlpha = 1;
+    }
+    if (sag.phase !== SAG_DRAW.PHASE_CALM && (this.colorPatterns || this.highContrast)) {
+      // Shape cue besides the color: diagonal hatching on the rail while it is stressed.
+      ctx.strokeStyle = SAG_DRAW.HATCH_COLOR;
+      ctx.lineWidth = SAG_DRAW.HATCH_WIDTH;
+      ctx.beginPath();
+      for (let x = minX; x < maxX; x += SAG_DRAW.RAIL_HATCH_STEP) {
+        ctx.moveTo(x, top + half);
+        ctx.lineTo(x + SAG_DRAW.RAIL_THICKNESS, top - half);
+      }
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  /**
+   * Segmented Sag gauge beside the launcher: neutral when calm, amber with a dashed outline
+   * in warning, red with a chevron when full. Hatching backs the color when color patterns
+   * or high contrast are on, so the phase never rests on hue alone.
+   */
+  drawSagGauge(ctx, engineState, theme) {
+    const sagCfg = this.gameConfig.sag;
+    if (!sagCfg || typeof engineState.getSagState !== 'function') {
+      return;
+    }
+    const sag = engineState.getSagState();
+    if (!sag.active || sag.size <= 0) {
+      return;
+    }
+    const gauge = sagCfg.gauge;
+    const canvasCfg = this.gameConfig.canvas;
+    const pitch = gauge.segmentHeight + gauge.segmentGap;
+    const totalHeight = sag.size * pitch - gauge.segmentGap;
+    const left = canvasCfg.launcherX + gauge.offsetX;
+    const bottom = canvasCfg.launcherY + gauge.offsetY;
+    const top = bottom - totalHeight;
+    const isWarn = sag.phase === SAG_DRAW.PHASE_WARN;
+    const isFull = sag.phase === SAG_DRAW.PHASE_FULL;
+    const fill = isFull ? sagCfg.railCritColor : isWarn ? sagCfg.railWarnColor : sagCfg.railColor;
+    const hatch = this.colorPatterns || this.highContrast;
+    ctx.save();
+    for (let i = 0; i < sag.size; i++) {
+      const y = bottom - (i + 1) * pitch + gauge.segmentGap;
+      if (i < sag.level) {
+        ctx.fillStyle = fill;
+        ctx.fillRect(left, y, gauge.width, gauge.segmentHeight);
+        if (hatch && (isWarn || isFull)) {
+          ctx.strokeStyle = SAG_DRAW.HATCH_COLOR;
+          ctx.lineWidth = SAG_DRAW.HATCH_WIDTH;
+          ctx.beginPath();
+          ctx.moveTo(left, y + gauge.segmentHeight);
+          ctx.lineTo(left + gauge.width, y);
+          if (isFull) {
+            ctx.moveTo(left, y);
+            ctx.lineTo(left + gauge.width, y + gauge.segmentHeight);
+          }
+          ctx.stroke();
+        }
+      } else {
+        ctx.globalAlpha = SAG_DRAW.EMPTY_ALPHA;
+        ctx.fillStyle = theme.launcherAccentColor;
+        ctx.fillRect(left, y, gauge.width, gauge.segmentHeight);
+        ctx.globalAlpha = 1;
+      }
+    }
+    if (isWarn) {
+      ctx.strokeStyle = fill;
+      ctx.lineWidth = SAG_DRAW.OUTLINE_WIDTH;
+      ctx.setLineDash(SAG_DRAW.WARN_DASH);
+      ctx.strokeRect(
+        left - SAG_DRAW.OUTLINE_PADDING,
+        top - SAG_DRAW.OUTLINE_PADDING,
+        gauge.width + SAG_DRAW.OUTLINE_PADDING * 2,
+        totalHeight + SAG_DRAW.OUTLINE_PADDING * 2
+      );
+      ctx.setLineDash(EMPTY_DASH);
+    } else if (isFull) {
+      const cx = left + gauge.width * MATH_CONSTANTS.HALF;
+      const tipY = top - SAG_DRAW.CHEVRON_GAP;
+      ctx.strokeStyle = fill;
+      ctx.lineWidth = SAG_DRAW.CHEVRON_WIDTH;
+      ctx.beginPath();
+      ctx.moveTo(cx - SAG_DRAW.CHEVRON_HALF_WIDTH, tipY - SAG_DRAW.CHEVRON_HEIGHT);
+      ctx.lineTo(cx, tipY);
+      ctx.lineTo(cx + SAG_DRAW.CHEVRON_HALF_WIDTH, tipY - SAG_DRAW.CHEVRON_HEIGHT);
+      ctx.stroke();
+    }
+    ctx.restore();
   }
 
   /** The queued colors after the next ball, smaller and in loading order, away from the launcher. */

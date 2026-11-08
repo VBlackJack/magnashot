@@ -259,3 +259,41 @@ test('A candidate passes only on both floors, and a missing measure fails its fl
   assert.deepEqual(failedFloors(noArsenal, FLOORS), [BOT_POLICIES.ARSENAL]);
   assert.deepEqual(failedFloors(measuredAt(0, 0), FLOORS), [BOT_POLICIES.GREEDY, BOT_POLICIES.ARSENAL]);
 });
+
+const classicCalibration = await import('../scripts/calibrate-classic.mjs');
+const { playClassic } = await import('../scripts/bot/CampaignBot.js');
+const HAS_CLASSIC = typeof GameEngine.prototype.startClassicMode === 'function';
+
+test('Classic calibration reads its options', () => {
+  assert.deepEqual(classicCalibration.parseArgs([], 16), { seeds: 16 });
+  assert.deepEqual(classicCalibration.parseArgs(['--seeds', '40'], 16), { seeds: 40 });
+  for (const bad of [['--seeds'], ['--seeds', 'x'], ['--seeds', '0'], ['--nope']]) {
+    assert.throws(() => classicCalibration.parseArgs(bad, 16), classicCalibration.UsageError);
+  }
+});
+
+test('Classic calibration summarizes the share that clears stage 1 and reaches stage 3', () => {
+  const results = [
+    { clearedFirst: false, stageReached: 1 },
+    { clearedFirst: true, stageReached: 2 },
+    { clearedFirst: true, stageReached: 3 },
+    { clearedFirst: true, stageReached: 4 }
+  ];
+  assert.deepEqual(classicCalibration.summarize(results), { clearStage1: 0.75, reachFarStage: 0.5 });
+  assert.deepEqual(classicCalibration.summarize([]), { clearStage1: 0, reachFarStage: 0 });
+});
+
+test('Classic calibration checks the spec targets', () => {
+  const { TARGETS, checkTargets } = classicCalibration;
+  assert.equal(checkTargets({ clearStage1: TARGETS.minClearStage1, reachFarStage: 0 }).ok, true);
+  assert.equal(checkTargets({ clearStage1: TARGETS.minClearStage1 - 0.01, reachFarStage: 0 }).clearStage1, false);
+  assert.equal(checkTargets({ clearStage1: 1, reachFarStage: TARGETS.maxReachFarStage }).reachFarStage, false);
+});
+
+test('The greedy bot plays a Classic run to its end, replayably', { skip: !HAS_CLASSIC && 'startClassicMode is not merged yet' }, () => {
+  const play = () => withFixedRandom(() => playClassic(createEngine(), 1, bot, { stopStage: 2 }));
+  const first = play();
+  assert.ok(first.stageReached >= 1);
+  assert.ok(first.ended || first.stageReached >= 2, 'the run ends or clears the stage within the frame budget');
+  assert.deepEqual(play(), first, 'the same stream replays the same run');
+});
