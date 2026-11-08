@@ -1478,8 +1478,25 @@ const PAD_FRAMES_PER_STEP = 3;
 
 function installPadStub() {
   window.__pads = [];
-  navigator.getGamepads = () => window.__pads;
-  window.__setPad = (pressed = []) => {
+  // Frame counter bumped before the game's own frame callback (registered first, so it runs first).
+  window.__frame = 0;
+  const countFrame = () => {
+    window.__frame += 1;
+    requestAnimationFrame(countFrame);
+  };
+  requestAnimationFrame(countFrame);
+  let tapFrame = -1;
+  navigator.getGamepads = () => {
+    // A tap is visible to exactly one game frame: menu auto-repeat is wall-clock based, so a
+    // press held for a fixed number of frames would repeat on a slow machine.
+    if (tapFrame >= 0 && window.__frame > tapFrame + 1) {
+      window.__setPad([]);
+      tapFrame = -1;
+    }
+    return window.__pads;
+  };
+  window.__setPad = (pressed = [], { tap = false } = {}) => {
+    tapFrame = tap ? window.__frame : -1;
     window.__pads = [
       {
         index: 0,
@@ -1516,9 +1533,9 @@ async function connectPad(page) {
   await waitFrames(page, PAD_FRAMES_PER_STEP);
 }
 
-/** Presses a button for a few frames, then releases it. */
+/** Presses a button for exactly one game frame, then releases it. */
 async function tapPad(page, button) {
-  await page.evaluate((index) => window.__setPad([index]), button);
+  await page.evaluate((index) => window.__setPad([index], { tap: true }), button);
   await waitFrames(page, PAD_FRAMES_PER_STEP);
   await page.evaluate(() => window.__setPad([]));
   await waitFrames(page, PAD_FRAMES_PER_STEP);
