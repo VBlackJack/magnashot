@@ -68,6 +68,8 @@ const PRECACHE_ASSETS = [
   './src/game/EngineVersus.js',
   './src/game/VersusMatch.js',
   './src/game/VersusRules.js',
+  './src/game/MagnetarRules.js',
+  './src/game/EngineMagnetar.js',
   './src/game/SagMeter.js',
   './src/game/EngineProgress.js',
   './src/game/GameEngine.js',

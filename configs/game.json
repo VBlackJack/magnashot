@@ -475,6 +475,55 @@
       "brush": 1
     }
   },
+  "magnetar": {
+    "cadenceByTier": { "1": 3, "2": 3, "3": 2, "4": 2 },
+    "tierUnlocks": {
+      "1": ["invert", "undertow"],
+      "2": ["invert", "undertow", "regrow"],
+      "3": ["invert", "undertow", "regrow", "barrage"],
+      "4": ["invert", "undertow", "regrow", "barrage"]
+    },
+    "maxTier": 4,
+    "fluxStagesPerTier": 5,
+    "undertow": { "radiusFactor": 6, "force": 0.35 },
+    "regrow": { "count": 3 },
+    "barrage": {
+      "countByTier": { "3": 2, "4": 3 },
+      "strongFromTier": 4,
+      "riseTurns": 2
+    },
+    "fall": {
+      "pointsBase": 900,
+      "pointsPerSphere": 40,
+      "coins": 40,
+      "landslideMin": 20
+    },
+    "render": {
+      "coreColor": "#0f172a",
+      "fieldColor": "#a78bfa",
+      "ringCount": 3,
+      "ringSpacingFactor": 0.9,
+      "ringLineWidth": 1.5,
+      "ringPulsePeriodMs": 2400,
+      "mooringColor": "#fbbf24",
+      "mooringLineWidth": 3,
+      "mooringDashFactor": 0.7,
+      "bracketSizeFactor": 0.45,
+      "badgeOffsetFactor": 2.4,
+      "badgeRadiusFactor": 0.85,
+      "badgeColor": "#f8fafc",
+      "badgeBackground": "rgba(15, 23, 42, 0.85)",
+      "slotDashFactor": 0.35,
+      "slotLineWidth": 1.5,
+      "fieldDotFactor": 0.25,
+      "fieldLineWidth": 1.5,
+      "markerSizeFactor": 0.6,
+      "fallExplosionBurst": 36,
+      "fallShockwaveRadius": 180,
+      "fallSlowMoFrames": 36,
+      "fallSlowMoTimeScale": 0.24
+    }
+  },
   "cascade": {
     "gravityMultiplier": 1.65,
     "overlapRadiusFactor": 1.5,
@@ -1330,6 +1379,48 @@
       "tier": "gold",
       "threshold": 10,
       "rewardCoins": 220
+    },
+    "magnetarsGrounded": {
+      "id": "magnetarsGrounded",
+      "tierOf": "magnetarsGrounded",
+      "tier": "bronze",
+      "threshold": 1,
+      "rewardCoins": 80
+    },
+    "magnetarsGroundedSilver": {
+      "id": "magnetarsGroundedSilver",
+      "tierOf": "magnetarsGrounded",
+      "tier": "silver",
+      "threshold": 5,
+      "rewardCoins": 140
+    },
+    "magnetarsGroundedGold": {
+      "id": "magnetarsGroundedGold",
+      "tierOf": "magnetarsGrounded",
+      "tier": "gold",
+      "threshold": 15,
+      "rewardCoins": 240
+    },
+    "magnetarLandslide": {
+      "id": "magnetarLandslide",
+      "tierOf": "magnetarLandslide",
+      "tier": "bronze",
+      "threshold": 1,
+      "rewardCoins": 120
+    },
+    "magnetarLandslideSilver": {
+      "id": "magnetarLandslideSilver",
+      "tierOf": "magnetarLandslide",
+      "tier": "silver",
+      "threshold": 3,
+      "rewardCoins": 180
+    },
+    "magnetarLandslideGold": {
+      "id": "magnetarLandslideGold",
+      "tierOf": "magnetarLandslide",
+      "tier": "gold",
+      "threshold": 10,
+      "rewardCoins": 300
     }
   },
   "onboarding": {
@@ -1352,6 +1443,7 @@
       "barrier",
       "attractor",
       "bossCore",
+      "magnetar",
       "portal",
       "laserLock",
       "singularity",
@@ -1397,6 +1489,10 @@
       "attractor": {},
       "bossCore": {
         "hintKey": "gameplay.tutorial.boss"
+      },
+      "magnetar": {
+        "hintKey": "gameplay.tutorial.magnetar",
+        "interaction": "proximity"
       },
       "portal": {
         "hintKey": "gameplay.tutorial.portal"
@@ -1732,7 +1828,7 @@
   "ghostDuel": {
     "queryParam": "duel",
     "codecVersion": 1,
-    "contentVersion": 1,
+    "contentVersion": 2,
     "maxUrlLength": 1500,
     "maxPayloadChars": 1200,
     "maxSamples": 20000,

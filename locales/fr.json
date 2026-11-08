@@ -126,6 +126,7 @@
         "puzzle": "Mode Puzzle • Niveau {{stage}} / {{total}}",
         "blitz": "Blitz 90s • Vague {{wave}}",
         "bossRush": "Boss Rush • Vague {{wave}} (👑 {{shields}})",
+        "bossRushMagnetar": "Boss Rush • Vague {{wave}} ({{moorings}} amarres)",
         "cascade": "Cascade • Vague {{wave}}",
         "coreRescueProgress": "💎 {{rescued}}/{{total}}",
         "switchHint": "Cliquer pour changer de mode ou de niveau",
@@ -135,7 +136,8 @@
       "shots": {
         "label": "Tirs restants",
         "waveLabel": "Vague dans",
-        "shieldsLabel": "Boucliers Boss"
+        "shieldsLabel": "Boucliers Boss",
+        "mooringsLabel": "Amarres"
       },
       "time": {
         "label": "Temps restant",
@@ -267,6 +269,11 @@
         "behind": "{{name}} prend la tête",
         "ended": "La partie de {{name}} s'est arrêtée à {{score}}",
         "passed": "Tu as dépassé le score final de {{name}}"
+      },
+      "magnetar": {
+        "armed": "Magnetar : {{behaviour}} au prochain tour. {{counter}}",
+        "lastMooring": "Une amarre restante.",
+        "down": "Magnetar terrassé."
       }
     },
     "hints": {
@@ -311,6 +318,9 @@
         "start": "Start",
         "select": "Select"
       }
+    },
+    "magnetar": {
+      "next": "Tour suivant : {{behaviour}}"
     }
   },
   "gameplay": {
@@ -406,6 +416,11 @@
       },
       "classic": {
         "stageCleared": "Étape terminée ! +{{points}}"
+      },
+      "magnetar": {
+        "immune": "INDESTRUCTIBLE : COUPEZ SES AMARRES",
+        "moorings": "AMARRE COUPÉE ! RESTE : {{left}}",
+        "down": "MAGNETAR TERRASSÉ ! +{{points}}"
       }
     },
     "mutators": {
@@ -505,6 +520,7 @@
       "repulsor": "Les coeurs répulsifs courbent votre tir : fiez-vous au laser courbé, et inversez la polarité (🧲) si une sphère le tire du mauvais côté !",
       "portal": "Tirez dans un Portail Quantique pour téléporter votre sphère derrière les barrières !",
       "boss": "Les Noyaux Boss (👑) possèdent 3 boucliers et libèrent une pluie de pièces à leur destruction !",
+      "magnetar": "Un Magnetar ne se brise pas. Coupez les ancres qui le tiennent (traits pointillés) et il tombe. Son badge annonce ce qu'il fera au prochain tour.",
       "laserLock": "Détruisez tous les Verrous (🔒) pour désactiver la barrière énergétique !",
       "singularity": "Les sphères d'avalanche aspirées par la Singularité donnent un bonus de score et de Surcharge !",
       "neutralAnchor": "Les ancres grises (⚓) ne cassent jamais dans un groupe : coupez les sphères autour, elles s'effritent dès que plus rien n'y pend !",
@@ -537,6 +553,20 @@
     },
     "discovery": {
       "hint": "Nouveau : {{icon}} {{name}}. {{description}}"
+    },
+    "magnetar": {
+      "behaviour": {
+        "invert": "Champ inversé",
+        "undertow": "Remous",
+        "regrow": "Repousse",
+        "barrage": "Barrage"
+      },
+      "counter": {
+        "invert": "Inversez la polarité pour l'annuler.",
+        "undertow": "Votre tir va se courber vers le noyau.",
+        "regrow": "Remplissez les emplacements marqués pour le bloquer.",
+        "barrage": "Tirez les charges avec la polarité opposée."
+      }
     }
   },
   "modals": {
@@ -783,6 +813,10 @@
           "rescueCore": {
             "name": "Noyau Captif",
             "description": "Coeur prismatique captif (💎). Libérez tous les Noyaux Captifs du plateau pour déclencher une avalanche totale immédiate !"
+          },
+          "magnetar": {
+            "name": "Magnetar",
+            "description": "Noyau de champ indestructible. Les groupes, bombes, éclairs, roquettes et l'enclume sont sans effet : coupez les Amarres (sphères d'ancrage) qui le tiennent et il tombe en avalanche. Son badge annonce ce qu'il fera au prochain tour."
           }
         },
         "obstacles": {
@@ -830,6 +864,31 @@
             "icon": "💠",
             "name": "Coussin Antimagnétique",
             "description": "Repousse les sphères suspendues de l'amas sans dévier les projectiles tirés."
+          }
+        },
+        "magnetarPatterns": {
+          "title": "Motifs du Magnetar",
+          "patterns": {
+            "invert": {
+              "icon": "⇅",
+              "name": "Champ inversé",
+              "description": "Toutes les courbes de votre tir sont inversées au prochain tour. Inversez la polarité pour l'annuler."
+            },
+            "undertow": {
+              "icon": "◎",
+              "name": "Remous",
+              "description": "Le noyau attire votre tir dans un champ pointillé. Rebondissez à travers vers une Amarre."
+            },
+            "regrow": {
+              "icon": "✚",
+              "name": "Repousse",
+              "description": "Ajoute jusqu'à 3 sphères dans les emplacements en pointillé près du noyau. Remplissez un emplacement ou coupez une Amarre d'abord."
+            },
+            "barrage": {
+              "icon": "±",
+              "name": "Barrage",
+              "description": "Tire des sphères chargées depuis la ligne de danger. Tirez la polarité opposée pour les neutraliser."
+            }
           }
         }
       },
@@ -934,6 +993,30 @@
           "bossRushWavesGold": {
             "name": "Coureur de l'Épreuve III",
             "description": "Atteindre la Vague Boss {{target}} en Boss Rush."
+          },
+          "magnetarsGrounded": {
+            "name": "Brise-Champ",
+            "description": "Terrasser des Magnetars sur l'ensemble de vos parties (objectif : {{target}})."
+          },
+          "magnetarsGroundedSilver": {
+            "name": "Brise-Champ II",
+            "description": "Terrasser des Magnetars sur l'ensemble de vos parties (objectif : {{target}})."
+          },
+          "magnetarsGroundedGold": {
+            "name": "Brise-Champ III",
+            "description": "Terrasser des Magnetars sur l'ensemble de vos parties (objectif : {{target}})."
+          },
+          "magnetarLandslide": {
+            "name": "Éboulement",
+            "description": "Terrasser un Magnetar dans une énorme avalanche (objectif : {{target}})."
+          },
+          "magnetarLandslideSilver": {
+            "name": "Éboulement II",
+            "description": "Terrasser un Magnetar dans une énorme avalanche (objectif : {{target}})."
+          },
+          "magnetarLandslideGold": {
+            "name": "Éboulement III",
+            "description": "Terrasser un Magnetar dans une énorme avalanche (objectif : {{target}})."
           }
         },
         "tier": {
