@@ -1498,7 +1498,7 @@
     "modes": {
       "endless": { "size": 5, "dropsPerDrain": 4, "maxDrainPerTurn": 1, "step": "wave" },
       "daily": { "size": 5, "dropsPerDrain": 4, "maxDrainPerTurn": 1, "step": "wave" },
-      "classic": { "size": 6, "dropsPerDrain": 3, "maxDrainPerTurn": 2, "step": "rail" }
+      "classic": { "size": 3, "dropsPerDrain": 3, "maxDrainPerTurn": 2, "step": "rail" }
     },
     "warnAt": 1,
     "lowerFrames": 18,
@@ -1518,7 +1518,7 @@
     "basePalette": 4,
     "paletteStepStages": 2,
     "maxPalette": 6,
-    "descentStepY": 38,
+    "descentStepY": 48,
     "stageClearBonusBase": 500,
     "seedPrefix": "classic"
   },

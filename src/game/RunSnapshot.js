@@ -38,6 +38,7 @@ const ENGINE_SCALAR_FIELDS = [
   'endlessRowParity',
   'sagLevel',
   'railDrops',
+  'classicRailDropsTotal',
   'classicStage',
   'freezeTurnsRemaining',
   'isCoreFreezeApplied',

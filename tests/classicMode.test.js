@@ -355,3 +355,26 @@ test('A Survival run saved with the old wave countdown restores the matching met
   assert.equal(fresh.sagLevel, gameConfig.sag.modes[GAME_MODES.ENDLESS].size - LEGACY_SHOTS_UNTIL_WAVE);
   assert.equal(fresh.sagLevel, SAVED_SAG_LEVEL);
 });
+
+test('The Classic rail-drop total survives a stage change and a snapshot, and a beaten record is flagged', () => {
+  const engine = createTestEngine();
+  engine.startClassicMode();
+  engine.lowerAnchorRail();
+  engine.lowerAnchorRail();
+  clearBoard(engine);
+  engine.evaluateRoundEnd();
+  engine.lowerAnchorRail();
+  assert.equal(engine.railDrops, 1, 'the per-stage count restarts with the stage');
+  assert.equal(engine.classicRailDropsTotal, 3, 'the run total does not');
+
+  const snapshot = JSON.parse(JSON.stringify(captureRunSnapshot(engine, SNAPSHOT_VERSION)));
+  const fresh = createTestEngine();
+  assert.equal(applyRunSnapshot(fresh, snapshot), true);
+  assert.equal(fresh.classicRailDropsTotal, 3);
+
+  const previousBest = engine.storageManager.getClassicHighScore();
+  assert.ok(previousBest > 0, 'clearing the stage stored a record');
+  engine.score = previousBest + 1;
+  engine.triggerGameOver(GAME_OVER_REASONS.LINE_CROSSED);
+  assert.equal(engine.gameOverSummary.isNewRecord, true);
+});

@@ -115,6 +115,7 @@ export class GameEngine {
     // Sag meter: whiffs so far toward the next step, plus the Classic rail state.
     this.sagLevel = 0;
     this.railDrops = 0;
+    this.classicRailDropsTotal = 0;
     this.railLowerFrames = 0;
     this.classicStage = 0;
     this.freezeTurnsRemaining = 0;
@@ -188,6 +189,7 @@ export class GameEngine {
     this.fluxStage = 0;
     this.sagLevel = 0;
     this.railDrops = 0;
+    this.classicRailDropsTotal = 0;
     this.railLowerFrames = 0;
     this.classicStage = 0;
     this.fluxFamily = null;

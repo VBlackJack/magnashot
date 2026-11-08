@@ -160,6 +160,7 @@ export const engineModeMethods = {
     this.endlessRowParity = 0;
     this.sagLevel = 0;
     this.railDrops = 0;
+    this.classicRailDropsTotal = 0;
     this.specialInventory = Object.fromEntries(Object.values(SPECIAL_TYPES).map((type) => [type, 0]));
 
     this.audioManager.stopAll();

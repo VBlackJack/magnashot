@@ -238,7 +238,7 @@ export function playClassic(engine, stage, bot, { stopStage = DEFAULT_CLASSIC_ST
     engine.state === GAME_STATES.PLAYING && engine.classicStage < stopStage && frame < bot.maxFrames;
     frame++
   ) {
-    if (!engine.physicsWorld.projectile && !(engine.shotsRemaining <= 0)) {
+    if (!engine.physicsWorld.projectile) {
       const angle = pickGreedyAngle(engine, bot, reach);
       if (angle !== null) {
         engine.updateAimFromAngle(angle);

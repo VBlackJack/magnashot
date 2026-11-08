@@ -106,6 +106,7 @@ export const engineRoundFlowMethods = {
       anchor.isAnchor = true;
     }
     this.railDrops = (this.railDrops ?? 0) + 1;
+    this.classicRailDropsTotal = (this.classicRailDropsTotal ?? 0) + 1;
     this.checkDangerLineBreach();
   },
 
@@ -448,6 +449,8 @@ export const engineRoundFlowMethods = {
       previousBestScore = this.storageManager.getCascadeHighScore?.() || 0;
     } else if (this.mode === GAME_MODES.PUZZLE) {
       previousBestScore = this.storageManager.getPuzzleHighScore?.() || 0;
+    } else if (this.mode === GAME_MODES.CLASSIC) {
+      previousBestScore = this.storageManager.getClassicHighScore?.() || 0;
     }
     const isNewRecord = this.mode !== GAME_MODES.CAMPAIGN && previousBestScore > 0 && this.score > previousBestScore;
     const remainingSpheres = this.physicsWorld.balls.length;
