@@ -424,3 +424,102 @@ test('The aim preview turns the spheres hanging under a rotor along with it', ()
     assert.ok(gap < MAX_PREVIEW_GAP, `sphere ${i} predicted ${gap.toFixed(2)} px away from where it ends up`);
   });
 });
+
+const FIELD_STEPS = 40;
+const FIELD_PULL_FORCE = 0.6;
+const FIELD_RADIUS_FACTOR = 8;
+const AIM_ANGLE = -Math.PI / 2;
+const AIM_START_Y = 900;
+const FIELD_OFFSET_Y = RADIUS * 6;
+
+const oppositeOfCrimson = () => {
+  const crimson = ballsConfig.standardColors.find((c) => c.id === 'crimson');
+  return ballsConfig.standardColors.find((c) => c.polarity && c.polarity !== (crimson.polarity || 0));
+};
+
+/** Flies a shot for a few substeps through the real motion code and returns its end state. */
+const flyShot = (world, setup = () => {}) => {
+  setup(world);
+  const shot = createProjectile(CENTER_X, AIM_START_Y, 0, -physicsConfig.ball.projectileSpeed);
+  for (let i = 0; i < FIELD_STEPS; i++) {
+    world.advanceProjectileMotion(shot, DT, false);
+  }
+  return { x: shot.x, y: shot.y, vx: shot.vx, vy: shot.vy };
+};
+
+const addNeighbour = (world, colorId) => {
+  world.addBall(new Ball({ x: CENTER_X + RADIUS * 3, y: AIM_START_Y - FIELD_OFFSET_Y, radius: RADIUS, colorId }));
+};
+
+const addField = (world, force) => {
+  world.projectileFields.push({
+    x: CENTER_X + RADIUS * 4,
+    y: AIM_START_Y - FIELD_OFFSET_Y,
+    radius: RADIUS * FIELD_RADIUS_FACTOR,
+    force
+  });
+};
+
+test('a world has no board inversion and no projectile field by default', () => {
+  const world = createWorld();
+  assert.equal(world.boardPolarityInverted, false);
+  assert.deepEqual(world.projectileFields, []);
+});
+
+test('board polarity inversion mirrors the magnetic curve pull and nothing else', () => {
+  const opposite = oppositeOfCrimson();
+  assert.ok(opposite, 'the palette holds an opposite polarity');
+  const world = createWorld();
+  const plain = world.getProjectileCurvePull('crimson', opposite.id, false);
+  world.boardPolarityInverted = true;
+  assert.equal(world.getProjectileCurvePull('crimson', opposite.id, false), -plain);
+  assert.equal(world.getProjectileCurvePull('crimson', opposite.id, true), plain, 'a flipped shot cancels the inversion');
+});
+
+test('an inverted board bends a shot the other way', () => {
+  const opposite = oppositeOfCrimson();
+  const normal = flyShot(createWorld(), (w) => addNeighbour(w, opposite.id));
+  const inverted = flyShot(createWorld(), (w) => {
+    addNeighbour(w, opposite.id);
+    w.boardPolarityInverted = true;
+  });
+  assert.ok(normal.vx !== 0, 'the neighbour bends the plain shot');
+  assert.equal(Math.sign(inverted.vx), -Math.sign(normal.vx), 'the inverted board bends it the other way');
+});
+
+test('a projectile field bends a shot toward its centre and keeps its speed', () => {
+  const clean = flyShot(createWorld());
+  const fielded = flyShot(createWorld(), (w) => addField(w, FIELD_PULL_FORCE));
+  const repelled = flyShot(createWorld(), (w) => addField(w, -FIELD_PULL_FORCE));
+  assert.equal(clean.vx, 0);
+  assert.ok(fielded.vx > 0, 'the shot bends toward the centre');
+  assert.ok(repelled.vx < 0, 'a negative force pushes it away');
+  assert.ok(Math.abs(Math.hypot(fielded.vx, fielded.vy) - Math.hypot(clean.vx, clean.vy)) < 1e-6);
+});
+
+test('the aim preview sees a projectile field and a board inversion at once', () => {
+  const world = createWorld();
+  const ball = { colorId: 'crimson', specialType: null };
+  const lastX = () => {
+    const path = world.computeAimTrajectory(CENTER_X, AIM_START_Y, AIM_ANGLE, ball);
+    return path[path.length - 1].x;
+  };
+  const before = lastX();
+  addField(world, FIELD_PULL_FORCE);
+  assert.ok(lastX() > before, 'the cached trace is recomputed and bent by the field');
+  world.projectileFields.length = 0;
+  assert.equal(lastX(), before, 'removing the field restores the trace');
+  addNeighbour(world, oppositeOfCrimson().id);
+  const withNeighbour = lastX();
+  world.boardPolarityInverted = true;
+  assert.notEqual(lastX(), withNeighbour, 'the inversion changes the trace without a board change');
+});
+
+test('clear() resets the inversion and the projectile fields', () => {
+  const world = createWorld();
+  world.boardPolarityInverted = true;
+  addField(world, FIELD_PULL_FORCE);
+  world.clear();
+  assert.equal(world.boardPolarityInverted, false);
+  assert.equal(world.projectileFields.length, 0);
+});
