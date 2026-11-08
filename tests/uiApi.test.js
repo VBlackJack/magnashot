@@ -177,7 +177,29 @@ const EXPECTED_PROTOTYPE_NAMES = [
   'updateShareButtonLabel',
   'updateSoundButton',
   'updateStarMeter',
-  'updateTiltButton'
+  'updateTiltButton',
+  'setGamepadInput',
+  'updateGamepadSettings',
+  'getHintInputMode',
+  'pollGamepad',
+  'handleGamepadEvent',
+  'showToast',
+  'routeGamepadGameplay',
+  'cycleSpecialBall',
+  'isPauseDialogTop',
+  'routeGamepadMenuActions',
+  'getMenuRoot',
+  'getMenuFocusables',
+  'focusFromPad',
+  'clearPadFocus',
+  'moveMenuFocus',
+  'stepSelect',
+  'confirmMenuFocus',
+  'cycleMenuTab',
+  'nearestTabList',
+  'setupGamepadControls',
+  'updateGamepadControls',
+  'handleBackAction'
 ];
 
 test('UIManager.prototype exposes exactly the same members after the module split', () => {

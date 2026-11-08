@@ -17,6 +17,7 @@
 import { configRegistry } from './core/ConfigRegistry.js';
 import { i18n, t, resolveInitialLocale } from './core/I18n.js';
 import { StorageManager } from './core/StorageManager.js';
+import { GamepadInput } from './core/GamepadInput.js';
 import { AudioManager } from './core/AudioManager.js';
 import { Renderer } from './game/Renderer.js';
 import { GameEngine } from './game/GameEngine.js';
@@ -95,6 +96,18 @@ class Application {
       });
       uiManager.init();
 
+      const gamepadInput = new GamepadInput({
+        config: gameConfig.gamepad,
+        settings: {
+          enabled: storageManager.getGamepadEnabled(),
+          deadzone: storageManager.getGamepadDeadzone(),
+          aimSpeed: storageManager.getGamepadAimSpeed(),
+          invertX: storageManager.getGamepadInvertX()
+        }
+      });
+      gamepadInput.attach(window);
+      uiManager.setGamepadInput(gamepadInput);
+
       this.bindCanvasInput(canvas, engine, gameConfig, uiManager);
 
       // High scores are only written at run end; also flush them when the page is left mid-run.
@@ -156,6 +169,7 @@ class Application {
         maxAccumulatedMs: physicsConfig.simulation.maxAccumulatedMs,
         idleRenderIntervalMs: gameConfig.canvas.idleRenderIntervalMs,
         scheduleFrame: (callback) => requestAnimationFrame(callback),
+        beforeFrame: (now, elapsedMs) => uiManager.pollGamepad(now, elapsedMs),
         onFatalError: (err) => {
           console.error('Game loop stopped after an unrecoverable error:', err);
           this.renderBootstrapError();

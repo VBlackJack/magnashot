@@ -507,7 +507,7 @@ export const uiHudRefreshMethods = {
             icon: spec?.icon || '',
             name: t(`hud.powerups.${equippedType}.name`),
             desc: t(`hud.powerups.${equippedType}.tooltip`),
-            unequip: t(`hud.launcher.specialEquipped.unequip.${this.inputMode}`)
+            unequip: t(`hud.launcher.specialEquipped.unequip.${this.getHintInputMode()}`)
           }),
           schedule: scheduleNextFrame
         });
