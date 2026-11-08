@@ -4,6 +4,8 @@ All notable changes to **MagnaShot** are documented in this file.
 
 ## [Unreleased]
 
+## [1.16.0] - 2026-11-08
+
 ### Added
 - **Progressive Mode Unlocks (`ModeUnlocks`, `StorageManager`, `UIHudRefresh`)**: New players start with Campaign and the Daily Challenge and unlock the other modes by clearing campaign levels: Survival at 3, Puzzle at 5, Blitz at 7, Flux at 8, Cascade at 10 and Boss Rush at 12. Locked menu buttons stay focusable, say which level opens them, and a newly unlocked mode is marked "New" and announced on the victory screen. Shared Flux links always work and unlock Flux.
 - **Weekly Flux (`WeeklyFlux`, `EngineProgress`)**: A Flux run on one seed per ISO week for every player, a one-time `40 ⬡` bonus per week paid on the first start of the week's seed by any path (never on restart or resume), a weekly best shown in the menu, and a Weekly Flux header in the shared result.
