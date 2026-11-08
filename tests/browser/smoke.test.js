@@ -22,6 +22,7 @@
 
 import { after, before, describe, test } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright';
 
@@ -83,6 +84,23 @@ const DAILY_BONUS_MARK = '+';
 
 const APP_ROOT = fileURLToPath(new URL('../../', import.meta.url));
 
+const GAME_CONFIG = JSON.parse(readFileSync(new URL('../../configs/game.json', import.meta.url), 'utf8'));
+const STORAGE_PREFIX = GAME_CONFIG.storage.prefix;
+const STORAGE_KEYS = GAME_CONFIG.storage.keys;
+
+/** An existing player's save from before the schema was versioned: levels cleared, schema 1. */
+const EXISTING_PLAYER_STORAGE = Object.freeze({
+  [`${STORAGE_PREFIX}${STORAGE_KEYS.unlockedLevel}`]: '5',
+  [`${STORAGE_PREFIX}${STORAGE_KEYS.schemaVersion}`]: '1'
+});
+/** A valid shared Flux seed (length and radix from configs/flux.json). */
+const SHARED_FLUX_SEED = 'abc234';
+/** The gated mode a fresh profile tries first, and the campaign level that opens it. */
+const LOCKED_MODE_BUTTON = '#btn-endless';
+const LOCKED_MODE_REQUIRED_LEVEL = GAME_CONFIG.modeUnlocks.campaignLevelCleared.endless;
+const LOCKED_MODE_BUTTONS = Object.freeze(['#btn-endless', '#btn-flux', '#btn-weekly']);
+const UNLOCKED_MODE_BUTTONS = Object.freeze(['#btn-daily', ...LOCKED_MODE_BUTTONS]);
+
 let server;
 let browser;
 
@@ -100,8 +118,10 @@ after(async () => {
  * Opens the game in a fresh profile and records every console error and uncaught exception.
  * The engine is reached through a prototype hook installed after load, so the game code
  * carries no test-only entry point.
+ * initStorage: localStorage entries seeded before the game starts (a fresh profile when null).
+ * path: page address relative to the server, for shared links.
  */
-async function openGame(viewport) {
+async function openGame(viewport, { initStorage = null, path = '/' } = {}) {
   const context = await browser.newContext({
     viewport: { width: viewport.width, height: viewport.height },
     hasTouch: viewport.isTouch,
@@ -117,7 +137,15 @@ async function openGame(viewport) {
   });
   page.on('pageerror', (error) => errors.push(String(error)));
   page.setDefaultTimeout(WAIT_TIMEOUT_MS);
-  await page.goto(server.origin);
+  if (initStorage) {
+    // Runs before the game's own scripts on every load of this page, like a save left by an earlier visit.
+    await page.addInitScript((entries) => {
+      for (const [key, value] of Object.entries(entries)) {
+        window.localStorage.setItem(key, value);
+      }
+    }, initStorage);
+  }
+  await page.goto(`${server.origin}${path}`);
   await captureEngine(page);
   return { context, page, errors };
 }
@@ -277,6 +305,20 @@ async function loseRun(page) {
   await waitShown(page, '#modal-gameover');
 }
 
+const isMenuItemLocked = (page, selector) =>
+  page.evaluate((sel) => document.querySelector(sel).getAttribute('aria-disabled') === 'true', selector);
+
+/** Starts the Daily Challenge from a known state and waits for the run. */
+async function startDailyRun(page) {
+  await page.evaluate(() => {
+    const engine = window.__fluxEngine;
+    engine.startDailyChallenge();
+    engine.spawnEndlessWave();
+    engine.notifyUI();
+  });
+  await page.waitForFunction((playing) => window.__fluxEngine.state === playing, GAME_STATES.PLAYING);
+}
+
 for (const viewport of VIEWPORTS) {
   describe(`${viewport.name} (${viewport.width}x${viewport.height})`, () => {
     test('boots without console errors, scrolls nowhere and clips no control label', async () => {
@@ -300,14 +342,15 @@ for (const viewport of VIEWPORTS) {
       }
     });
 
-    test('Settings, Levels and Workshop pause the run and Escape closes them', async () => {
+    test('Settings, Levels, Workshop and My stats pause the run and Escape closes them', async () => {
       const { context, page, errors } = await openGame(viewport);
       try {
         await startLevelOne(page);
         for (const { button, dialog } of [
           { button: '#btn-settings', dialog: '#modal-settings' },
           { button: '#btn-levels', dialog: '#modal-levels' },
-          { button: '#btn-shop', dialog: '#modal-shop' }
+          { button: '#btn-shop', dialog: '#modal-shop' },
+          { button: '#btn-stats', dialog: '#modal-stats' }
         ]) {
           await clickMenuButton(page, viewport, button);
           await waitShown(page, dialog);
@@ -321,6 +364,36 @@ for (const viewport of VIEWPORTS) {
           assert.equal(await engineState(page), GAME_STATES.PLAYING, `closing ${dialog} resumes the run`);
           assert.equal(await isShown(page, '#modal-pause'), false, `closing ${dialog} leaves no Pause dialog`);
         }
+        assert.deepEqual(errors, []);
+      } finally {
+        await context.close();
+      }
+    });
+
+    test('a fresh profile finds the gated modes locked; tapping one explains why and changes nothing', async () => {
+      const { context, page, errors } = await openGame(viewport);
+      try {
+        await page.click('#btn-menu');
+        await page.waitForFunction(() => document.querySelector('.app-shell').classList.contains('drawer-open'));
+        for (const selector of LOCKED_MODE_BUTTONS) {
+          assert.equal(await isMenuItemLocked(page, selector), true, `${selector} is locked`);
+        }
+        assert.equal(await isMenuItemLocked(page, '#btn-daily'), false, 'the Daily is always open');
+        await assertLayoutFits(page, 'locked menu');
+        const modeBefore = await page.evaluate(() => window.__fluxEngine.mode);
+        assert.equal(modeBefore, GAME_MODES.CAMPAIGN);
+        // Playwright refuses to click an aria-disabled button: dispatch the click the player's tap would produce.
+        await page.dispatchEvent(LOCKED_MODE_BUTTON, 'click');
+        await page.waitForFunction(() => {
+          const hint = document.querySelector('#nav-mode-lock-hint');
+          return !hint.classList.contains('hidden') && hint.textContent.trim().length > 0;
+        });
+        assert.match(await page.textContent('#nav-mode-lock-hint'), new RegExp(`\\b${LOCKED_MODE_REQUIRED_LEVEL}\\b`));
+        assert.equal(await page.evaluate(() => window.__fluxEngine.mode), modeBefore, 'the mode did not change');
+        assert.ok(
+          await page.evaluate(() => document.querySelector('.app-shell').classList.contains('drawer-open')),
+          'the menu stays open'
+        );
         assert.deepEqual(errors, []);
       } finally {
         await context.close();
@@ -744,6 +817,104 @@ describe('end of round (desktop)', () => {
       }));
       assert.ok(!label.shown.includes(DAILY_BONUS_MARK), `the played Daily has no bonus left: "${label.shown}"`);
       assert.equal(label.shown, label.expected, 'the played Daily says so');
+      assert.deepEqual(errors, []);
+    } finally {
+      await context.close();
+    }
+  });
+
+  test('an existing player keeps every mode, and the save moves to the current schema', async () => {
+    const { context, page, errors } = await openGame(desktop, { initStorage: EXISTING_PLAYER_STORAGE });
+    try {
+      await page.click('#btn-menu');
+      for (const selector of UNLOCKED_MODE_BUTTONS) {
+        assert.equal(await isMenuItemLocked(page, selector), false, `${selector} stays open`);
+      }
+      const saved = await page.evaluate(async (key) => ({
+        version: window.localStorage.getItem(key),
+        current: (await import('/src/core/StorageManager.js')).CURRENT_SAVE_SCHEMA_VERSION
+      }), `${STORAGE_PREFIX}${STORAGE_KEYS.schemaVersion}`);
+      assert.equal(saved.version, String(saved.current));
+      assert.deepEqual(errors, []);
+    } finally {
+      await context.close();
+    }
+  });
+
+  test('a shared Flux link starts Flux on a fresh profile and unlocks the mode', async () => {
+    const { context, page, errors } = await openGame(desktop, { path: `/?flux=${SHARED_FLUX_SEED}` });
+    try {
+      await page.waitForFunction(
+        ([flux, seed]) => window.__fluxEngine.mode === flux && window.__fluxEngine.fluxSeed === seed,
+        [GAME_MODES.FLUX, SHARED_FLUX_SEED]
+      );
+      await page.waitForFunction(() => document.querySelector('#btn-flux').getAttribute('aria-disabled') !== 'true');
+      assert.deepEqual(errors, []);
+    } finally {
+      await context.close();
+    }
+  });
+
+  test('the Weekly Flux button starts the Flux of the current ISO week', async () => {
+    const { context, page, errors } = await openGame(desktop, { initStorage: EXISTING_PLAYER_STORAGE });
+    try {
+      await page.click('#btn-menu');
+      await page.click('#btn-weekly');
+      await page.waitForFunction(
+        ([flux, playing]) => window.__fluxEngine.mode === flux && window.__fluxEngine.state === playing,
+        [GAME_MODES.FLUX, GAME_STATES.PLAYING]
+      );
+      const run = await page.evaluate(async () => {
+        const { getUtcIsoWeekKey, getWeeklyFluxSeed } = await import('/src/game/WeeklyFlux.js');
+        const engine = window.__fluxEngine;
+        const weekKey = getUtcIsoWeekKey(Date.now());
+        return {
+          isWeekly: engine.isWeeklyFluxRun,
+          weekKey: engine.weeklyWeekKey,
+          expectedWeekKey: weekKey,
+          seed: engine.fluxSeed,
+          expectedSeed: getWeeklyFluxSeed(weekKey, engine.fluxConfig.seed, engine.gameConfig.weeklyFlux.seedSalt)
+        };
+      });
+      assert.equal(run.isWeekly, true);
+      assert.equal(run.weekKey, run.expectedWeekKey);
+      assert.equal(run.seed, run.expectedSeed);
+      assert.deepEqual(errors, []);
+    } finally {
+      await context.close();
+    }
+  });
+
+  test('a Daily game over opens My stats on the Daily history with today\'s row, and the stats can be copied', async () => {
+    const { context, page, errors } = await openGame(desktop);
+    try {
+      await context.grantPermissions(['clipboard-read', 'clipboard-write'], { origin: server.origin });
+      await startDailyRun(page);
+      // Only a run with a shot fired is recorded in the history.
+      await page.evaluate(() => {
+        window.__fluxEngine.dismissDiscovery();
+        window.__fluxEngine.shoot();
+      });
+      assert.ok(await page.evaluate(() => window.__fluxEngine.hasFiredInRound), 'one shot is fired');
+      await loseRun(page);
+      await waitShown(page, '#btn-daily-history-gameover');
+      await page.click('#btn-daily-history-gameover');
+      await waitShown(page, '#modal-stats');
+      assert.equal(await page.getAttribute('#tab-stats-daily', 'aria-selected'), 'true');
+      await waitShown(page, '#stats-daily-wrap');
+      assert.equal(await page.locator('#stats-daily-body tr').count(), 1, 'today is the only row');
+      const todayKey = await page.evaluate(() => new Date().toISOString().slice(0, 10));
+      const stored = await page.evaluate(
+        (key) => JSON.parse(window.localStorage.getItem(key)).map((entry) => entry.d),
+        `${STORAGE_PREFIX}${STORAGE_KEYS.dailyHistory}`
+      );
+      assert.deepEqual(stored, [todayKey]);
+
+      await page.evaluate(() => navigator.clipboard.writeText(''));
+      await page.click('#btn-copy-stats');
+      await page.waitForFunction(() => navigator.clipboard.readText().then((text) => text.length > 0));
+      const header = await page.evaluate(async () => (await import('/src/core/I18n.js')).t('stats.copy.header'));
+      assert.equal((await page.evaluate(() => navigator.clipboard.readText())).split(/\r?\n/)[0], header);
       assert.deepEqual(errors, []);
     } finally {
       await context.close();

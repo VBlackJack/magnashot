@@ -22,8 +22,25 @@ import {
   inputModeForPointerType,
   shouldIgnoreRepeatedKey,
   isBrowserShortcut,
-  resolveNextCampaignTarget
+  resolveNextCampaignTarget,
+  isAriaDisabled,
+  isModeUnlocked,
+  MODE_LOCK_BUTTON_KEYS
 } from './UIHelpers.js';
+import { STATS_TABS } from './UIStats.js';
+
+/**
+ * True when a menu button starts a mode that is still locked. A gated mode is judged on the
+ * live storage, like runIfModeUnlocked, so a stale aria-disabled never disagrees with it.
+ */
+function isDrawerButtonLocked(ui, button) {
+  for (const [mode, elementKeys] of Object.entries(MODE_LOCK_BUTTON_KEYS)) {
+    if (elementKeys.some((elementKey) => ui.elements[elementKey] === button)) {
+      return !isModeUnlocked(ui.getModeAccess(), mode);
+    }
+  }
+  return isAriaDisabled(button);
+}
 
 /** Methods installed on UIManager.prototype by UIManager.js. */
 export const uiInputBindingMethods = {
@@ -71,6 +88,10 @@ export const uiInputBindingMethods = {
     if (this.elements.drawer) {
       for (const button of this.elements.drawer.querySelectorAll('[data-closes-drawer]')) {
         button.addEventListener('click', () => {
+          // A locked mode starts nothing: the menu stays open and shows what to do.
+          if (isDrawerButtonLocked(this, button)) {
+            return;
+          }
           this.closeDrawer({ resume: false });
         });
       }
@@ -85,10 +106,12 @@ export const uiInputBindingMethods = {
     });
 
     this.elements.btnEndless.addEventListener('click', () => {
-      this.requestDestructiveAction(() => {
-        this.hideAllModals();
-        this.engine.startEndlessMode();
-      }, () => t('app.nav.button.endless'));
+      this.runIfModeUnlocked(GAME_MODES.ENDLESS, () => {
+        this.requestDestructiveAction(() => {
+          this.hideAllModals();
+          this.engine.startEndlessMode();
+        }, () => t('app.nav.button.endless'));
+      });
     });
 
     if (this.elements.btnDaily) {
@@ -102,12 +125,33 @@ export const uiInputBindingMethods = {
 
     if (this.elements.btnFlux) {
       this.elements.btnFlux.addEventListener('click', () => {
-        this.requestDestructiveAction(() => {
-          this.hideAllModals();
-          this.engine.startFluxRun();
-        }, () => t('app.nav.button.flux'));
+        this.runIfModeUnlocked(GAME_MODES.FLUX, () => {
+          this.requestDestructiveAction(() => {
+            this.hideAllModals();
+            this.engine.startFluxRun();
+          }, () => t('app.nav.button.flux'));
+        });
       });
     }
+
+    if (this.elements.btnWeekly) {
+      this.elements.btnWeekly.addEventListener('click', () => {
+        this.runIfModeUnlocked(GAME_MODES.FLUX, () => {
+          this.requestDestructiveAction(() => {
+            this.hideAllModals();
+            this.startWeeklyFluxRun();
+          }, () => t('app.nav.button.weekly'));
+        });
+      });
+    }
+
+    this.elements.btnStats?.addEventListener('click', () => {
+      this.openStatsModal(STATS_TABS.OVERVIEW);
+    });
+    this.elements.btnDailyHistoryGameOver?.addEventListener('click', () => {
+      this.openStatsModal(STATS_TABS.DAILY);
+    });
+    this.bindStatsEvents();
 
     this.elements.btnShop.addEventListener('click', () => {
       this.openShopModal();
@@ -302,6 +346,9 @@ export const uiInputBindingMethods = {
     bindBackdropDismiss(this.elements.modalSettings, () => {
       this.closeOverlayModal(this.elements.modalSettings);
     });
+    bindBackdropDismiss(this.elements.modalStats, () => {
+      this.closeOverlayModal(this.elements.modalStats);
+    });
     bindBackdropDismiss(this.elements.modalPause, () => {
       if (this.engine.state === GAME_STATES.PAUSED) {
         this.engine.togglePause();
@@ -345,31 +392,39 @@ export const uiInputBindingMethods = {
     });
 
     this.elements.btnModePuzzle?.addEventListener('click', () => {
-      this.requestDestructiveAction(() => {
-        this.hideAllModals();
-        this.engine.startPuzzleMode(this.getSuggestedPuzzleStage());
-      }, () => t('modals.levelSelect.arcade.puzzle'));
+      this.runIfModeUnlocked(GAME_MODES.PUZZLE, () => {
+        this.requestDestructiveAction(() => {
+          this.hideAllModals();
+          this.engine.startPuzzleMode(this.getSuggestedPuzzleStage());
+        }, () => t('modals.levelSelect.arcade.puzzle'));
+      });
     });
 
     this.elements.btnModeBlitz?.addEventListener('click', () => {
-      this.requestDestructiveAction(() => {
-        this.hideAllModals();
-        this.engine.startBlitzMode();
-      }, () => t('modals.levelSelect.arcade.blitz'));
+      this.runIfModeUnlocked(GAME_MODES.BLITZ, () => {
+        this.requestDestructiveAction(() => {
+          this.hideAllModals();
+          this.engine.startBlitzMode();
+        }, () => t('modals.levelSelect.arcade.blitz'));
+      });
     });
 
     this.elements.btnModeBossRush?.addEventListener('click', () => {
-      this.requestDestructiveAction(() => {
-        this.hideAllModals();
-        this.engine.startBossRushMode();
-      }, () => t('modals.levelSelect.arcade.bossRush'));
+      this.runIfModeUnlocked(GAME_MODES.BOSS_RUSH, () => {
+        this.requestDestructiveAction(() => {
+          this.hideAllModals();
+          this.engine.startBossRushMode();
+        }, () => t('modals.levelSelect.arcade.bossRush'));
+      });
     });
 
     this.elements.btnModeCascade?.addEventListener('click', () => {
-      this.requestDestructiveAction(() => {
-        this.hideAllModals();
-        this.engine.startCascadeMode();
-      }, () => t('modals.levelSelect.arcade.cascade'));
+      this.runIfModeUnlocked(GAME_MODES.CASCADE, () => {
+        this.requestDestructiveAction(() => {
+          this.hideAllModals();
+          this.engine.startCascadeMode();
+        }, () => t('modals.levelSelect.arcade.cascade'));
+      });
     });
 
     this.elements.inputFluxSeed?.addEventListener('keydown', (e) => {
@@ -537,6 +592,10 @@ export const uiInputBindingMethods = {
       }
       if (this.elements.modalSettings && !this.elements.modalSettings.classList.contains('hidden')) {
         this.closeOverlayModal(this.elements.modalSettings);
+        return;
+      }
+      if (this.elements.modalStats && !this.elements.modalStats.classList.contains('hidden')) {
+        this.closeOverlayModal(this.elements.modalStats);
         return;
       }
       if (this.isDrawerOpen) {

@@ -66,11 +66,21 @@
         "resetHintsAria": "Show discovery hints again",
         "resetHintsCaption": "Hints",
         "resetHintsDone": "✓",
-        "resetHintsDoneCaption": "Reset ✓"
+        "resetHintsDoneCaption": "Reset ✓",
+        "weekly": "Weekly Flux",
+        "weeklyBonusBadge": "Weekly Flux +{{coins}} ⬡",
+        "weeklyBestBadge": "Weekly Flux ✓ {{score}}"
       },
       "groups": {
         "modes": "Game modes",
         "round": "Current round"
+      },
+      "locked": {
+        "label": "🔒 {{mode}}",
+        "aria": "{{mode}}, locked. Clear campaign level {{level}} to unlock it.",
+        "hint": "Clear campaign level {{level}} to unlock {{mode}}.",
+        "newBadge": "New",
+        "newAria": "{{mode}}, newly unlocked"
       }
     },
     "drawer": {
@@ -79,7 +89,8 @@
       },
       "button": {
         "openAria": "Open menu",
-        "closeAria": "Close menu"
+        "closeAria": "Close menu",
+        "stats": "My stats"
       },
       "stats": {
         "round": "Current run"
@@ -239,7 +250,8 @@
       },
       "flux": {
         "perkChosen": "Perk chosen: {{name}}."
-      }
+      },
+      "modeUnlocked": "New mode unlocked: {{modes}}"
     },
     "hints": {
       "replayAria": "Show this level's hints again"
@@ -340,6 +352,9 @@
       },
       "core": {
         "paint": "PAINT SPLASH x{{count}}!"
+      },
+      "weeklyBonus": {
+        "claimed": "Weekly Flux bonus +{{coins}} ⬡"
       }
     },
     "mutators": {
@@ -537,7 +552,8 @@
         "bossRushDesc": "Titan Core • Overcharge -1 shield",
         "bossRushRecord": "Wave {{wave}} • Best: {{score}}",
         "cascade": "⬇ Cascade",
-        "cascadeDesc": "High-gravity well • Platforms"
+        "cascadeDesc": "High-gravity well • Platforms",
+        "lockedDesc": "Clear level {{level}} to unlock"
       }
     },
     "shop": {
@@ -931,6 +947,10 @@
         "replay": "Replay",
         "levels": "Level Select",
         "backToLevels": "Back to Levels"
+      },
+      "unlock": {
+        "single": "New mode unlocked: {{mode}}. Find it in the menu.",
+        "multiple": "New modes unlocked: {{modes}}. Find them in the menu."
       }
     },
     "gameOver": {
@@ -958,7 +978,8 @@
         "sameSeed": "Same Seed (#{{seed}})",
         "levels": "Select Level",
         "share": "Share",
-        "shareCopied": "Copied ✓"
+        "shareCopied": "Copied ✓",
+        "dailyHistory": "History"
       },
       "share": {
         "field": {
@@ -1048,6 +1069,58 @@
       },
       "stack": "{{stacks}}/{{max}}",
       "stackAria": "{{stacks}} of {{max}}"
+    },
+    "stats": {
+      "title": {
+        "main": "My stats"
+      },
+      "tabs": {
+        "overview": "Overview",
+        "daily": "Daily history"
+      },
+      "overview": {
+        "since": "Recorded since {{date}}",
+        "playTime": "Play time",
+        "playTimeValue": "{{hours}} h {{minutes}} min",
+        "shots": "Shots fired",
+        "modeRuns": "{{runs}} runs, {{wins}} wins, {{quits}} left",
+        "bestScore": "Best {{score}}",
+        "bestStage": "Best {{score}}, shape {{stage}}",
+        "bestWave": "Best {{score}}, wave {{wave}}",
+        "campaignReach": "Level {{level}} reached, {{stars}} ★",
+        "hardestLevel": "Hardest level for you: {{level}} ({{fails}} failed attempts)",
+        "mostLeftLevel": "Most often left: level {{level}} ({{quits}} times)",
+        "empty": "Play a round and your stats will appear here.",
+        "privacy": "Stored on this device only. Nothing is sent anywhere."
+      },
+      "button": {
+        "copy": "Copy my stats",
+        "copied": "Copied",
+        "close": "Close"
+      },
+      "copy": {
+        "fieldLabel": "Your stats, ready to copy:"
+      },
+      "feedback": {
+        "copied": "Stats copied.",
+        "manual": "Select the text below to copy it."
+      },
+      "daily": {
+        "caption": "Your last {{count}} Daily Challenges",
+        "col": {
+          "date": "Date",
+          "challenge": "#",
+          "mutator": "Mutator",
+          "score": "Score",
+          "wave": "Wave",
+          "streak": "Streak"
+        },
+        "streakValue": "{{streak}} days",
+        "graceUsed": "{{streak}} days, grace day used",
+        "unknown": "-",
+        "empty": "Your Daily results will be listed here from now on.",
+        "summary": "Played {{played}} of the last {{days}} days. Best: {{score}} on {{date}}."
+      }
     }
   },
   "levels": {
@@ -1200,7 +1273,8 @@
       "header": "MagnaShot - Flux Mode",
       "headerWithSeed": "MagnaShot - Flux Mode (#{{seed}})",
       "stats": "Shape {{stage}} - {{score}} pts",
-      "assists": "Assists: Workshop +{{levels}} - Ammo {{ammo}} - Continue {{continues}}"
+      "assists": "Assists: Workshop +{{levels}} - Ammo {{ammo}} - Continue {{continues}}",
+      "weeklyHeader": "MagnaShot Weekly Flux {{week}} #{{seed}}"
     },
     "puzzle": {
       "header": "MagnaShot - Puzzle Mode",
@@ -1223,6 +1297,19 @@
       "copied": "Result copied to the clipboard.",
       "manual": "Copy the selected text to share your result.",
       "failed": "Sharing failed. Copy the selected text instead."
+    }
+  },
+  "stats": {
+    "copy": {
+      "header": "MagnaShot stats (anonymous, no personal data)",
+      "since": "Recorded since {{date}}",
+      "playTime": "Play time: {{hours}} h {{minutes}} min",
+      "shots": "Shots fired: {{shots}}",
+      "modeLine": "{{mode}}: {{runs}} runs, {{wins}} wins, {{quits}} left, {{best}}",
+      "modeLineNoBest": "{{mode}}: {{runs}} runs, {{wins}} wins, {{quits}} left",
+      "campaignLine": "Campaign: level {{level}} reached, {{stars}} ★",
+      "hardestLine": "Hardest level: {{level}} ({{fails}} failed attempts)",
+      "schemaLine": "Save schema {{version}}"
     }
   }
 }

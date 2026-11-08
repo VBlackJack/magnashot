@@ -254,3 +254,28 @@ test('buildShareText formats shareable results for Puzzle, Blitz, Boss Rush, and
     [locales.fr.share.cascade.header, `Vague 6 - ${formatFrench(11250)} pts`, shareConfig.url]
   );
 });
+
+test('the Weekly Flux text uses the weekly header with the week key and the seed', () => {
+  const fluxRun = { mode: GAME_MODES.FLUX, stage: 4, score: 9100, seed: 'k9x4m2', url: shareConfig.url };
+  assert.deepEqual(
+    buildShareText({ ...fluxRun, isWeekly: true, weekKey: '2026-W45' }, shareConfig).split('\n'),
+    [
+      'MagnaShot Weekly Flux 2026-W45 #k9x4m2',
+      'Shape 4 - 9,100 pts',
+      buildFluxShareUrl(shareConfig.url, 'k9x4m2')
+    ]
+  );
+  const assisted = buildShareText(
+    { ...fluxRun, isWeekly: true, weekKey: '2026-W45', workshopLevels: 3, ammoBought: 1, continues: 1 },
+    shareConfig
+  ).split('\n');
+  assert.equal(assisted.length, 4);
+  assert.match(assisted[2], /Workshop \+3/);
+  // Without the week key the plain seeded header is used.
+  assert.equal(buildShareText({ ...fluxRun, isWeekly: true }, shareConfig).split('\n')[0], 'MagnaShot - Flux Mode (#k9x4m2)');
+  useLocale('fr');
+  assert.equal(
+    buildShareText({ ...fluxRun, isWeekly: true, weekKey: '2026-W45' }, shareConfig).split('\n')[0],
+    locales.fr.share.flux.weeklyHeader.replace('{{week}}', '2026-W45').replace('{{seed}}', 'k9x4m2')
+  );
+});

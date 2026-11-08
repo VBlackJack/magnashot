@@ -1494,6 +1494,56 @@
       }
     }
   },
+  "modeUnlocks": {
+    "order": ["campaign", "daily", "endless", "puzzle", "blitz", "flux", "cascade", "boss_rush"],
+    "always": ["campaign", "daily"],
+    "campaignLevelCleared": {
+      "endless": 3,
+      "puzzle": 5,
+      "blitz": 7,
+      "flux": 8,
+      "cascade": 10,
+      "boss_rush": 12
+    },
+    "recordKeys": {
+      "endless": ["endlessHighScore"],
+      "puzzle": ["puzzleHighScore", "puzzleBestStage"],
+      "blitz": ["blitzHighScore"],
+      "flux": ["fluxHighScore", "fluxBestStage"],
+      "cascade": ["cascadeHighScore"],
+      "boss_rush": ["bossRushHighScore", "bossRushBestWave"]
+    },
+    "stateNew": "new",
+    "stateSeen": "seen",
+    "grandfather": {
+      "progressKeys": [
+        "levelStats", "endlessHighScore", "fluxHighScore", "fluxBestStage", "blitzHighScore",
+        "bossRushHighScore", "bossRushBestWave", "cascadeHighScore", "puzzleHighScore",
+        "puzzleBestStage", "dailyBest", "dailyLastPlayedDate", "coins", "upgrades",
+        "achievements", "achievementRecords", "unlockedBallStyles", "runSnapshot", "discoveries"
+      ],
+      "emptyValues": ["", "0", "{}", "[]", "null", "false"],
+      "unlockedLevelAbove": 1
+    }
+  },
+  "dailyHistory": {
+    "maxEntries": 60,
+    "timelineEntries": 14
+  },
+  "weeklyFlux": {
+    "firstPlayBonusCoins": 40,
+    "seedSalt": "magnashot-weekly"
+  },
+  "playerStats": {
+    "maxLevelEntries": 100,
+    "flushEveryShots": 25,
+    "flushEveryPlayMs": 60000,
+    "topLevelsInSummary": 3
+  },
+  "shotTimeline": {
+    "formatVersion": 1,
+    "maxPoints": 120
+  },
   "storage": {
     "prefix": "magnashot_v1_",
     "keys": {
@@ -1530,7 +1580,12 @@
       "discoveriesVersion": "discoveries_version",
       "unlockedBallStyles": "ball_styles",
       "activeBallStyle": "ball_style",
-      "schemaVersion": "schema_version"
+      "schemaVersion": "schema_version",
+      "modeUnlocks": "mode_unlocks",
+      "dailyHistory": "daily_history",
+      "weeklyFluxBest": "weekly_flux_best",
+      "weeklyFluxClaimedWeek": "weekly_flux_claimed_week",
+      "playerStats": "player_stats"
     },
     "runSnapshotVersion": 1,
     "legacyMigration": {

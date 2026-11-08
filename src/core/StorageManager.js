@@ -18,8 +18,14 @@ import { configRegistry } from './ConfigRegistry.js';
 import { BALL_STYLES } from './Constants.js';
 import { SeededRandom } from './SeededRandom.js';
 import { countCampaignLevels } from '../game/LevelCatalog.js';
+import { resolveModeAccess, computeNewlyEarned, getNewState, getSeenState } from '../game/ModeUnlocks.js';
+import { normalizeShotTimeline } from '../game/ShotTimeline.js';
+import { normalizePlayerStats, applyPlayerStatsDelta } from '../game/PlayerStats.js';
 
 const MS_PER_UTC_DAY = 86_400_000;
+const DATE_KEY_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+/** Value of a shot timeline's `c` field once its run is over. */
+const COMPLETE_TIMELINE_FLAG = 1;
 
 /**
  * Ordered save schema migrations. Contract: every step is idempotent and never deletes
@@ -27,7 +33,9 @@ const MS_PER_UTC_DAY = 86_400_000;
  * working. A step returns false when it could not complete (it is then retried next launch).
  */
 export const SAVE_MIGRATIONS = Object.freeze([
-  { toVersion: 1, run: (manager) => manager.migrateLegacyKeys() }
+  { toVersion: 1, run: (manager) => manager.migrateLegacyKeys() },
+  { toVersion: 2, run: (manager) => manager.grandfatherModeUnlocks() },
+  { toVersion: 3, run: (manager) => manager.seedDailyHistory() }
 ]);
 export const CURRENT_SAVE_SCHEMA_VERSION = SAVE_MIGRATIONS.at(-1).toVersion;
 
@@ -42,6 +50,11 @@ export class StorageManager {
     this.upgradesConfig = null;
     this.achievementsConfig = null;
     this.dailyConfig = null;
+    this.modeUnlocksConfig = null;
+    this.dailyHistoryConfig = null;
+    this.weeklyFluxConfig = null;
+    this.playerStatsConfig = null;
+    this.shotTimelineConfig = null;
     this.maxCampaignLevel = null;
     this.memoryFallback = new Map();
     this.upgradesCache = null;
@@ -57,6 +70,11 @@ export class StorageManager {
     this.upgradesConfig = gameConfig.upgrades;
     this.achievementsConfig = gameConfig.achievements || {};
     this.dailyConfig = gameConfig.daily || {};
+    this.modeUnlocksConfig = gameConfig.modeUnlocks || {};
+    this.dailyHistoryConfig = gameConfig.dailyHistory || {};
+    this.weeklyFluxConfig = gameConfig.weeklyFlux || {};
+    this.playerStatsConfig = gameConfig.playerStats || {};
+    this.shotTimelineConfig = gameConfig.shotTimeline || {};
     this.maxCampaignLevel = countCampaignLevels(levelsConfig, campaignConfig);
     this.upgradesCache = null;
     this.runSaveMigrations();
@@ -966,6 +984,393 @@ export class StorageManager {
     }
     this.setActiveBallStyle(styleId);
     return true;
+  }
+
+  /**
+   * Migration v2. A player with existing progress keeps every mode: all gated modes are
+   * merged into the stored unlocks as "seen" (no badge). Existing entries are never removed
+   * or downgraded, so reruns change nothing. Reads and writes localStorage directly so a
+   * restricted storage returns false and the step is retried on the next launch.
+   * @returns {boolean} False when storage could not be read or written.
+   */
+  grandfatherModeUnlocks() {
+    const cfg = this.modeUnlocksConfig || {};
+    const grandfather = cfg.grandfather || {};
+    const emptyValues = new Set(Array.isArray(grandfather.emptyValues) ? grandfather.emptyValues : []);
+    const keys = this.storageConfig.keys;
+    try {
+      let hasProgress = false;
+      const unlockedLevel = Number.parseInt(localStorage.getItem(this.buildKey(keys.unlockedLevel)), 10);
+      if (Number.isFinite(unlockedLevel) && unlockedLevel > (grandfather.unlockedLevelAbove ?? 1)) {
+        hasProgress = true;
+      }
+      for (const name of Array.isArray(grandfather.progressKeys) ? grandfather.progressKeys : []) {
+        if (hasProgress) {
+          break;
+        }
+        const suffix = keys[name];
+        const raw = typeof suffix === 'string' ? localStorage.getItem(this.buildKey(suffix)) : null;
+        hasProgress = raw !== null && !emptyValues.has(String(raw).trim());
+      }
+      if (!hasProgress) {
+        return true;
+      }
+      const fullKey = this.buildKey(keys.modeUnlocks);
+      const merged = StorageManager.sanitizeModeUnlocks(JSON.parse(localStorage.getItem(fullKey) || '{}'), cfg);
+      for (const mode of Object.keys(cfg.campaignLevelCleared || {})) {
+        if (!Object.hasOwn(merged, mode)) {
+          merged[mode] = getSeenState(cfg);
+        }
+      }
+      localStorage.setItem(fullKey, JSON.stringify(merged));
+      this.memoryFallback.delete(fullKey);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Migration v3. Seeds the Daily history with the stored daily best (wave and mutator
+   * unknown), only when no history exists yet.
+   * @returns {boolean} False when storage could not be read or written.
+   */
+  seedDailyHistory() {
+    const keys = this.storageConfig.keys;
+    try {
+      const historyKey = this.buildKey(keys.dailyHistory);
+      if (localStorage.getItem(historyKey) !== null) {
+        return true;
+      }
+      const score = Number.parseInt(localStorage.getItem(this.buildKey(keys.dailyBest)), 10);
+      const dateKey = localStorage.getItem(this.buildKey(keys.dailyBestDate));
+      if (!(score > 0) || !StorageManager.isDateKey(dateKey)) {
+        return true;
+      }
+      const streak = Number.parseInt(localStorage.getItem(this.buildKey(keys.dailyStreak)), 10);
+      const streakDate = localStorage.getItem(this.buildKey(keys.dailyStreakDate));
+      const entry = {
+        d: dateKey,
+        s: score,
+        w: null,
+        m: null,
+        k: streakDate === dateKey && streak > 0 ? streak : null,
+        g: false
+      };
+      localStorage.setItem(historyKey, JSON.stringify([entry]));
+      this.memoryFallback.delete(historyKey);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  static isDateKey(value) {
+    return typeof value === 'string' && DATE_KEY_PATTERN.test(value) && Number.isFinite(StorageManager.parseUtcDateKeyMs(value));
+  }
+
+  /** Keeps only the known "new" / "seen" states of a parsed mode_unlocks value. */
+  static sanitizeModeUnlocks(parsed, cfg) {
+    const clean = {};
+    if (!StorageManager.isPlainObject(parsed)) {
+      return clean;
+    }
+    for (const [mode, state] of Object.entries(parsed)) {
+      if (mode !== '__proto__' && (state === getNewState(cfg) || state === getSeenState(cfg))) {
+        clean[mode] = state;
+      }
+    }
+    return clean;
+  }
+
+  /** @returns {Object<string, string>} Stored mode -> "new" | "seen" states. */
+  getModeUnlocks() {
+    const key = this.storageConfig.keys.modeUnlocks;
+    return key ? StorageManager.sanitizeModeUnlocks(this.readJsonObject(key), this.modeUnlocksConfig) : {};
+  }
+
+  /** @returns {number} Highest cleared campaign level, from the unlocked level and the level stats. */
+  getClearedCampaignLevel() {
+    let cleared = this.getUnlockedLevel() - 1;
+    for (const [levelId, entry] of Object.entries(this.getLevelStats())) {
+      const level = Number.parseInt(levelId, 10);
+      if (entry.stars > 0 && Number.isFinite(level)) {
+        cleared = Math.max(cleared, level);
+      }
+    }
+    return Math.max(0, cleared);
+  }
+
+  /**
+   * @returns {Object<string, {unlocked: boolean, isNew: boolean, requiredLevel: number}>}
+   *   Access of every mode: stored entries plus the live campaign rule.
+   */
+  getModeAccess() {
+    const access = resolveModeAccess(this.getModeUnlocks(), this.getClearedCampaignLevel(), this.modeUnlocksConfig);
+    // A mode with a record of its own was played, so it is open (a profile rolled back to an
+    // older version and updated again has records but no stored unlock).
+    for (const [mode, keyNames] of Object.entries(this.modeUnlocksConfig?.recordKeys || {})) {
+      if (access[mode] && !access[mode].unlocked && this.hasModeRecord(keyNames)) {
+        access[mode] = { ...access[mode], unlocked: true };
+      }
+    }
+    return access;
+  }
+
+  /** @returns {boolean} True when one of the stored record keys holds a positive number. */
+  hasModeRecord(keyNames) {
+    const keys = this.storageConfig.keys;
+    return (Array.isArray(keyNames) ? keyNames : []).some((name) => {
+      const suffix = keys[name];
+      return typeof suffix === 'string' && Number.parseInt(this.safeGetItem(suffix), 10) > 0;
+    });
+  }
+
+  /**
+   * Stores "new" for the modes the campaign progress just earned.
+   * @returns {string[]} Newly earned mode ids in configured order (each is returned once).
+   */
+  syncEarnedModeUnlocks() {
+    const stored = this.getModeUnlocks();
+    const earned = computeNewlyEarned(stored, this.getClearedCampaignLevel(), this.modeUnlocksConfig);
+    if (earned.length > 0) {
+      const next = { ...stored };
+      for (const mode of earned) {
+        next[mode] = getNewState(this.modeUnlocksConfig);
+      }
+      this.safeSetItem(this.storageConfig.keys.modeUnlocks, JSON.stringify(next));
+    }
+    return earned;
+  }
+
+  /**
+   * Marks a gated mode as unlocked for good and played ("seen"). Writes only on a change.
+   * @param {string} mode - Mode id.
+   */
+  ensureModeUnlocked(mode) {
+    const cfg = this.modeUnlocksConfig || {};
+    if (!Object.hasOwn(cfg.campaignLevelCleared || {}, mode)) {
+      return;
+    }
+    const stored = this.getModeUnlocks();
+    if (stored[mode] === getSeenState(cfg)) {
+      return;
+    }
+    this.safeSetItem(this.storageConfig.keys.modeUnlocks, JSON.stringify({ ...stored, [mode]: getSeenState(cfg) }));
+  }
+
+  static sanitizeDailyHistoryEntry(raw, timelineConfig) {
+    if (!StorageManager.isPlainObject(raw) || !StorageManager.isDateKey(raw.d)) {
+      return null;
+    }
+    const toCount = (value) => (Number.isSafeInteger(value) && value >= 0 ? value : null);
+    const entry = {
+      d: raw.d,
+      s: toCount(raw.s) ?? 0,
+      w: toCount(raw.w),
+      m: typeof raw.m === 'string' && raw.m.length > 0 ? raw.m : null,
+      k: toCount(raw.k),
+      g: raw.g === true
+    };
+    const timeline = normalizeShotTimeline(raw.tl, timelineConfig);
+    if (timeline) {
+      entry.tl = timeline;
+    }
+    return entry;
+  }
+
+  /** @returns {Array<{d: string, s: number, w: number|null, m: string|null, k: number|null, g: boolean, tl?: object}>} Newest first. */
+  getDailyHistory() {
+    const key = this.storageConfig.keys.dailyHistory;
+    const raw = key ? this.safeGetItem(key) : null;
+    if (!raw) {
+      return [];
+    }
+    let parsed;
+    try {
+      parsed = JSON.parse(raw);
+    } catch {
+      return [];
+    }
+    if (!Array.isArray(parsed)) {
+      return [];
+    }
+    return parsed
+      .map((entry) => StorageManager.sanitizeDailyHistoryEntry(entry, this.shotTimelineConfig))
+      .filter(Boolean)
+      .sort(StorageManager.compareNewestFirst);
+  }
+
+  static compareNewestFirst(first, second) {
+    return second.d.localeCompare(first.d);
+  }
+
+  /**
+   * Records a Daily result for a date. A date keeps its best score (with the wave, mutator and
+   * timeline of that run); the streak and grace fields are refreshed from the streak state.
+   * @param {{dateKey: string, score: number, wave?: number|null, mutatorKey?: string|null, tl?: object|null}} result
+   */
+  recordDailyResult({ dateKey, score, wave = null, mutatorKey = null, tl = null }) {
+    const key = this.storageConfig.keys.dailyHistory;
+    if (!key || !StorageManager.isDateKey(dateKey)) {
+      return;
+    }
+    const cleanScore = Math.max(0, Math.floor(Number(score) || 0));
+    const history = this.getDailyHistory();
+    const index = history.findIndex((entry) => entry.d === dateKey);
+    const streak = this.getDailyStreak(dateKey);
+    const isGrace = this.getDailyStreakGrace(dateKey).usedOn === dateKey;
+    const refreshed = { k: streak > 0 ? streak : null, g: isGrace };
+    const entry = StorageManager.sanitizeDailyHistoryEntry({
+      d: dateKey,
+      s: cleanScore,
+      w: Number.isFinite(wave) ? Math.floor(wave) : null,
+      m: mutatorKey,
+      ...refreshed,
+      tl
+    }, this.shotTimelineConfig);
+    if (index >= 0 && cleanScore <= history[index].s) {
+      history[index] = { ...history[index], ...refreshed };
+      // At an equal score, a complete timeline replaces a partial one.
+      if (cleanScore === history[index].s && entry.tl?.c === COMPLETE_TIMELINE_FLAG && history[index].tl?.c !== COMPLETE_TIMELINE_FLAG) {
+        history[index].tl = entry.tl;
+      }
+    } else {
+      if (index >= 0) {
+        history[index] = entry;
+      } else {
+        history.push(entry);
+      }
+    }
+    history.sort(StorageManager.compareNewestFirst);
+    const maxEntries = this.dailyHistoryConfig?.maxEntries > 0 ? this.dailyHistoryConfig.maxEntries : history.length;
+    const timelineEntries = this.dailyHistoryConfig?.timelineEntries ?? history.length;
+    const trimmed = history.slice(0, maxEntries).map((entry, position) => {
+      if (position < timelineEntries || !entry.tl) {
+        return entry;
+      }
+      const withoutTimeline = { ...entry };
+      delete withoutTimeline.tl;
+      return withoutTimeline;
+    });
+    this.safeSetItem(key, JSON.stringify(trimmed));
+  }
+
+  /**
+   * @param {string} weekKey - Week key such as "2026-W45".
+   * @returns {{week: string, seed: string, score: number, stage: number, tl?: object}|null}
+   *   The best Weekly Flux run of that week, or null.
+   */
+  getWeeklyFluxBest(weekKey) {
+    const key = this.storageConfig.keys.weeklyFluxBest;
+    const raw = key ? this.readJsonObject(key) : {};
+    if (typeof weekKey !== 'string' || raw.week !== weekKey) {
+      return null;
+    }
+    const best = {
+      week: raw.week,
+      seed: typeof raw.seed === 'string' ? raw.seed : '',
+      score: Number.isSafeInteger(raw.score) && raw.score >= 0 ? raw.score : 0,
+      stage: Number.isSafeInteger(raw.stage) && raw.stage >= 0 ? raw.stage : 0
+    };
+    const timeline = normalizeShotTimeline(raw.tl, this.shotTimelineConfig);
+    if (timeline) {
+      best.tl = timeline;
+    }
+    return best;
+  }
+
+  /**
+   * Keeps the best Weekly Flux score and stage of the week (single slot, replaced when the week
+   * changes). The timeline follows the score. A write for a week older than the stored one
+   * (a stale tab, a restored run of last week) is ignored: week keys are zero padded, so they
+   * compare correctly as strings.
+   * @returns {{week: string, seed: string, score: number, stage: number, tl?: object}} The stored best.
+   */
+  setWeeklyFluxBest(weekKey, seed, score, stage, tl = null) {
+    const key = this.storageConfig.keys.weeklyFluxBest;
+    const storedWeek = key ? this.readJsonObject(key).week : null;
+    if (typeof storedWeek === 'string' && typeof weekKey === 'string' && weekKey < storedWeek) {
+      return this.getWeeklyFluxBest(storedWeek);
+    }
+    const cleanScore = Math.max(0, Math.floor(Number(score) || 0));
+    const cleanStage = Math.max(0, Math.floor(Number(stage) || 0));
+    const timeline = normalizeShotTimeline(tl, this.shotTimelineConfig);
+    const current = this.getWeeklyFluxBest(weekKey);
+    const next = { week: weekKey, seed, score: cleanScore, stage: cleanStage };
+    if (timeline) {
+      next.tl = timeline;
+    }
+    if (current) {
+      next.stage = Math.max(current.stage, cleanStage);
+      if (cleanScore <= current.score) {
+        next.score = current.score;
+        delete next.tl;
+        if (current.tl) {
+          next.tl = current.tl;
+        }
+        // At an equal score, a complete timeline replaces a partial one.
+        const incoming = normalizeShotTimeline(timeline, this.shotTimelineConfig);
+        if (cleanScore === current.score && incoming?.c === COMPLETE_TIMELINE_FLAG && current.tl?.c !== COMPLETE_TIMELINE_FLAG) {
+          next.tl = incoming;
+        }
+      }
+    }
+    if (key) {
+      this.safeSetItem(key, JSON.stringify(next));
+    }
+    return next;
+  }
+
+  /**
+   * Pays the once-per-week Weekly Flux bonus.
+   * @returns {boolean} True when the bonus was paid now; false when already claimed this week.
+   */
+  claimWeeklyFluxBonus(weekKey, coins) {
+    const key = this.storageConfig.keys.weeklyFluxClaimedWeek;
+    if (!key || typeof weekKey !== 'string' || weekKey.length === 0 || this.safeGetItem(key) === weekKey) {
+      return false;
+    }
+    this.safeSetItem(key, weekKey);
+    const bonus = Math.max(0, Math.floor(Number(coins) || 0));
+    if (bonus > 0) {
+      this.addCoins(bonus);
+    }
+    return true;
+  }
+
+  /**
+   * @param {string} weekKey - Week key such as "2026-W45".
+   * @returns {boolean} True when the Weekly Flux bonus of that week was already paid.
+   */
+  hasClaimedWeeklyFluxBonus(weekKey) {
+    const key = this.storageConfig.keys.weeklyFluxClaimedWeek;
+    return Boolean(key) && typeof weekKey === 'string' && weekKey.length > 0 && this.safeGetItem(key) === weekKey;
+  }
+
+  /** @returns {object} The local statistics (a clean empty object when none are stored). */
+  getPlayerStats() {
+    const key = this.storageConfig.keys.playerStats;
+    return normalizePlayerStats(key ? this.readJsonObject(key) : {}, 0);
+  }
+
+  /**
+   * Adds an additive delta to the stored statistics (see src/game/PlayerStats.js).
+   * @param {object} delta - Additive delta.
+   * @param {number} [nowMs] - Time used as `since` the first time stats are written.
+   * @returns {object} The stored statistics.
+   */
+  applyPlayerStatsDelta(delta, nowMs = Date.now()) {
+    const key = this.storageConfig.keys.playerStats;
+    const current = this.getPlayerStats();
+    if (current.since === 0) {
+      current.since = Math.max(0, Math.floor(nowMs));
+    }
+    const next = applyPlayerStatsDelta(current, delta, this.playerStatsConfig);
+    if (key) {
+      this.safeSetItem(key, JSON.stringify(next));
+    }
+    return next;
   }
 
   getRunSnapshotVersion() {

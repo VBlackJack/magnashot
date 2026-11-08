@@ -17,6 +17,7 @@
 import { GAME_MODES, GAME_STATES } from '../core/Constants.js';
 import { t } from '../core/I18n.js';
 import { parseFluxSeedInput } from '../game/DailyShare.js';
+import { getUtcIsoWeekKey, getWeeklyFluxSeed } from '../game/WeeklyFlux.js';
 import { buildCodexPane } from './CodexView.js';
 import { SHOP_TABS, rerenderWorkshopKeepingFocus, renderWorkshopContents } from './WorkshopView.js';
 import {
@@ -30,7 +31,9 @@ import {
   revealLiveRegion,
   scheduleNextFrame,
   setTextIfChanged,
-  setAttributeIfChanged
+  setAttributeIfChanged,
+  isModeUnlocked,
+  describeModeLock
 } from './UIHelpers.js';
 
 /** Methods installed on UIManager.prototype by UIManager.js. */
@@ -149,6 +152,53 @@ export const uiModalMethods = {
     setTextIfChanged(button, t(labelKey));
   },
 
+  /** Access of every mode (unlocked, new, required level); empty when storage cannot say. */
+  getModeAccess() {
+    return this.storageManager?.getModeAccess?.() ?? {};
+  },
+
+  /**
+   * Runs a mode start only when the campaign unlocked that mode. A locked mode starts nothing
+   * and says what to do in a polite status line.
+   * @param {string} mode - Mode id.
+   * @param {() => void} start - Starts the mode.
+   * @returns {boolean} True when the start ran.
+   */
+  runIfModeUnlocked(mode, start) {
+    const access = this.getModeAccess();
+    if (isModeUnlocked(access, mode)) {
+      start();
+      return true;
+    }
+    this.showModeLockHint(mode, access);
+    return false;
+  },
+
+  /** Tells the player which campaign level unlocks a locked mode (in the open window's status line). */
+  showModeLockHint(mode, access = this.getModeAccess()) {
+    const lock = describeModeLock(mode, access, t);
+    const isLevelsOpen = Boolean(this.elements.modalLevels) && !this.elements.modalLevels.classList.contains('hidden');
+    const hintEl = isLevelsOpen ? this.elements.levelsChapterHint : this.elements.navModeLockHint;
+    if (!hintEl || !lock.hint) {
+      return;
+    }
+    revealLiveRegion({ region: hintEl, textElement: hintEl, text: lock.hint, schedule: scheduleNextFrame });
+  },
+
+  /**
+   * Starts this week's Flux run. The engine pays the one-time bonus; an engine without the
+   * dedicated entry point gets the same seed through the shared-run path.
+   */
+  startWeeklyFluxRun() {
+    if (typeof this.engine.startWeeklyFlux === 'function') {
+      this.engine.startWeeklyFlux({ isRestart: false });
+      return;
+    }
+    const weekKey = getUtcIsoWeekKey(Date.now());
+    const seed = getWeeklyFluxSeed(weekKey, this.engine.fluxConfig?.seed, this.gameConfig.weeklyFlux?.seedSalt);
+    this.engine.startFluxRun(seed, { isShared: true });
+  },
+
   /** Restarts the Flux run that just ended on its own seed, keeping its shared (tilt-locked) status. */
   retrySameFluxSeed() {
     if (this.engine.fluxSeed) {
@@ -216,7 +266,12 @@ export const uiModalMethods = {
 
   /** Dialogs opened from the menu over a run, which they pause until they close. */
   getOverlayModals() {
-    return [this.elements.modalLevels, this.elements.modalShop, this.elements.modalSettings].filter(Boolean);
+    return [
+      this.elements.modalLevels,
+      this.elements.modalShop,
+      this.elements.modalSettings,
+      this.elements.modalStats
+    ].filter(Boolean);
   },
 
   isAnyOverlayModalOpen() {
@@ -391,6 +446,13 @@ export const uiModalMethods = {
     modalElement.classList.add('hidden');
     if (modalElement === this.elements.modalLevels) {
       this.elements.levelsChapterHint?.classList.add('hidden');
+    }
+    if (modalElement === this.elements.modalStats) {
+      // Opened over the Daily game over: focus returns to its History button.
+      if (this.statsOpener?.isConnected) {
+        this.stackedModalOpener = this.statsOpener;
+      }
+      this.statsOpener = null;
     }
     const otherOverlayStillOpen =
       this.isAnyOverlayModalOpen() ||

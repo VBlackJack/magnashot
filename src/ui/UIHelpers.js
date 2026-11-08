@@ -566,3 +566,178 @@ export function setAttributeIfChanged(element, name, value) {
     element.setAttribute(name, value);
   }
 }
+
+/** Class of a mode button or card that the campaign has not unlocked yet. */
+export const MODE_LOCKED_CLASS = 'is-locked';
+/** Class of a mode button or card unlocked and not played yet. */
+export const MODE_NEW_CLASS = 'is-new';
+/** Class of the "New" badge shown beside a newly unlocked mode. */
+export const MODE_NEW_BADGE_CLASS = 'mode-new-badge';
+
+/** i18n key of each gated mode's name; the lock texts, hints and announcements reuse them. */
+export const MODE_NAME_KEYS = Object.freeze({
+  [GAME_MODES.ENDLESS]: 'app.nav.button.endless',
+  [GAME_MODES.PUZZLE]: 'modals.levelSelect.arcade.puzzle',
+  [GAME_MODES.BLITZ]: 'modals.levelSelect.arcade.blitz',
+  [GAME_MODES.FLUX]: 'app.nav.button.flux',
+  [GAME_MODES.CASCADE]: 'modals.levelSelect.arcade.cascade',
+  [GAME_MODES.BOSS_RUSH]: 'modals.levelSelect.arcade.bossRush'
+});
+
+/** Menu buttons (UIManager.elements keys) of each gated mode. Weekly Flux follows Flux. */
+export const MODE_LOCK_BUTTON_KEYS = Object.freeze({
+  [GAME_MODES.ENDLESS]: Object.freeze(['btnEndless']),
+  [GAME_MODES.FLUX]: Object.freeze(['btnFlux', 'btnWeekly'])
+});
+
+/** Arcade cards of the level select: element keys and the texts a card shows while unlocked. */
+export const ARCADE_CARD_SPECS = Object.freeze({
+  [GAME_MODES.PUZZLE]: Object.freeze({
+    card: 'btnModePuzzle',
+    best: 'arcadeBestPuzzle',
+    titleKey: 'modals.levelSelect.arcade.puzzle',
+    descKey: 'modals.levelSelect.arcade.puzzleDesc'
+  }),
+  [GAME_MODES.BLITZ]: Object.freeze({
+    card: 'btnModeBlitz',
+    best: 'arcadeBestBlitz',
+    titleKey: 'modals.levelSelect.arcade.blitz',
+    descKey: 'modals.levelSelect.arcade.blitzDesc'
+  }),
+  [GAME_MODES.BOSS_RUSH]: Object.freeze({
+    card: 'btnModeBossRush',
+    best: 'arcadeBestBossRush',
+    titleKey: 'modals.levelSelect.arcade.bossRush',
+    descKey: 'modals.levelSelect.arcade.bossRushDesc'
+  }),
+  [GAME_MODES.CASCADE]: Object.freeze({
+    card: 'btnModeCascade',
+    best: 'arcadeBestCascade',
+    titleKey: 'modals.levelSelect.arcade.cascade',
+    descKey: 'modals.levelSelect.arcade.cascadeDesc'
+  })
+});
+
+/** Matches the leading symbols and spaces of a label such as an emoji-prefixed mode name. */
+const LEADING_SYMBOLS_PATTERN = /^[^\p{L}\p{N}]+/u;
+
+/**
+ * A mode name without its leading emoji, for sentences ("Clear level 5 to unlock Puzzle").
+ * @param {string} label - Translated mode name.
+ * @returns {string}
+ */
+export function plainModeName(label) {
+  const text = String(label ?? '');
+  const plain = text.replace(LEADING_SYMBOLS_PATTERN, '').trim();
+  return plain || text;
+}
+
+/**
+ * True when the engine runs the weekly Flux of the given (current) week. A run of an older
+ * week, still open after Monday 00:00 UTC, is not highlighted as the Weekly button.
+ * @param {{mode?: string, isWeeklyFluxRun?: boolean, weeklyWeekKey?: string|null}} engine - Game engine.
+ * @param {string} currentWeekKey - Week key of now.
+ * @returns {boolean}
+ */
+export function isCurrentWeeklyRun(engine, currentWeekKey) {
+  return engine?.mode === GAME_MODES.FLUX
+    && engine.isWeeklyFluxRun === true
+    && engine.weeklyWeekKey === currentWeekKey;
+}
+
+/**
+ * True unless the access table says the mode is locked. A missing entry (always-open modes,
+ * or storage that cannot say) never blocks a start.
+ * @param {Object<string, {unlocked?: boolean}>|null|undefined} access - Storage getModeAccess().
+ * @param {string} mode - Mode id.
+ * @returns {boolean} False only when the access table says the mode is locked.
+ */
+export function isModeUnlocked(access, mode) {
+  return access?.[mode]?.unlocked !== false;
+}
+
+/**
+ * The texts and flags a gated mode control shows for its current access.
+ * @param {string} mode - Mode id.
+ * @param {Object<string, {unlocked?: boolean, isNew?: boolean, requiredLevel?: number}>|null|undefined} access
+ *   Storage getModeAccess().
+ * @param {(key: string, params?: object) => string} translate - Translation function.
+ * @param {string} [nameKey] - Name key override (Weekly Flux shares the Flux access).
+ * @returns {{isLocked: boolean, isNew: boolean, name: string, level: number, label: string,
+ *   ariaLabel: string, hint: string, newBadge: string, newAria: string}}
+ */
+export function describeModeLock(mode, access, translate, nameKey = MODE_NAME_KEYS[mode]) {
+  const entry = access?.[mode];
+  const name = nameKey ? plainModeName(translate(nameKey)) : '';
+  const level = Number(entry?.requiredLevel) || 0;
+  const isLocked = Boolean(entry) && entry.unlocked === false;
+  const isNew = Boolean(entry) && !isLocked && entry.isNew === true;
+  return {
+    isLocked,
+    isNew,
+    name,
+    level,
+    label: isLocked ? translate('app.nav.locked.label', { mode: name }) : '',
+    ariaLabel: isLocked ? translate('app.nav.locked.aria', { mode: name, level }) : '',
+    hint: isLocked ? translate('app.nav.locked.hint', { mode: name, level }) : '',
+    newBadge: isNew ? translate('app.nav.locked.newBadge') : '',
+    newAria: isNew ? translate('app.nav.locked.newAria', { mode: name }) : ''
+  };
+}
+
+/**
+ * Sets a control's label and an optional "New" badge, rebuilding only when something differs
+ * (a translation pass rewrites the text of a data-i18n control, which this notices).
+ * @param {HTMLElement|null} element - Button or card title.
+ * @param {string} label - Label text.
+ * @param {string} [badgeText] - Badge text, or empty for none.
+ */
+export function setModeLabel(element, label, badgeText = '') {
+  if (!element) {
+    return;
+  }
+  const expected = badgeText ? `${label} ${badgeText}` : label;
+  const hasBadge = Boolean(element.querySelector?.(`.${MODE_NEW_BADGE_CLASS}`));
+  if (element.textContent === expected && hasBadge === Boolean(badgeText)) {
+    return;
+  }
+  element.textContent = label;
+  if (badgeText) {
+    const badge = document.createElement('span');
+    badge.className = MODE_NEW_BADGE_CLASS;
+    badge.textContent = badgeText;
+    element.append(' ', badge);
+  }
+}
+
+/** Plain names of the gated modes in a list, joined with the localized list separator. */
+export function formatUnlockedModeNames(modes, translate) {
+  return (Array.isArray(modes) ? modes : [])
+    .filter((mode) => Object.hasOwn(MODE_NAME_KEYS, mode))
+    .map((mode) => plainModeName(translate(MODE_NAME_KEYS[mode])))
+    .join(translate('gameplay.feedback.achievement.listSeparator'));
+}
+
+/**
+ * The victory window line for modes a campaign victory just unlocked.
+ * @param {string[]} modes - Unlocked mode ids.
+ * @param {(key: string, params?: object) => string} translate - Translation function.
+ * @returns {string} Empty when no known gated mode is in the list.
+ */
+export function formatUnlockedModesText(modes, translate) {
+  const known = (Array.isArray(modes) ? modes : []).filter((mode) => Object.hasOwn(MODE_NAME_KEYS, mode));
+  if (known.length === 0) {
+    return '';
+  }
+  if (known.length === 1) {
+    return translate('modals.victory.unlock.single', {
+      mode: plainModeName(translate(MODE_NAME_KEYS[known[0]]))
+    });
+  }
+  return translate('modals.victory.unlock.multiple', { modes: formatUnlockedModeNames(known, translate) });
+}
+
+/** True when a control carries aria-disabled="true" (a locked mode: focusable, but inert). */
+export function isAriaDisabled(element) {
+  return element?.getAttribute?.('aria-disabled') === 'true';
+}

@@ -43,6 +43,7 @@ import { engineDiscoveryMethods } from './EngineDiscovery.js';
 import { engineControlsMethods } from './EngineControls.js';
 import { engineTurnResolutionMethods } from './EngineTurnResolution.js';
 import { engineRoundFlowMethods } from './EngineRoundFlow.js';
+import { engineProgressMethods } from './EngineProgress.js';
 
 /** What a run is measured by when it is compared with the mode's record. */
 export const RUN_BEST_METRICS = Object.freeze({
@@ -119,6 +120,17 @@ export class GameEngine {
     this.pendingBossRushWave = false;
     // True for a Flux run started from a shared seed link.
     this.isSharedFluxRun = false;
+    // Local stats: the run is counted once, shots and play time are buffered then flushed.
+    this.runOutcomeRecorded = false;
+    this.lastRunOutcome = null;
+    this.runShotsFired = 0;
+    this.pendingShots = 0;
+    this.pendingPlayMs = 0;
+    // Weekly Flux: set when the run's seed is the seed of the week it was started in.
+    this.isWeeklyFluxRun = false;
+    this.weeklyWeekKey = null;
+    // Outcomes of the shots of a Daily or weekly Flux run (see ShotTimeline.js).
+    this.shotTimeline = null;
     this.anvilCrushCount = 0;
     this.isCoreFreezeApplied = false;
     this.outOfShotsGraceFrames = 0;
@@ -345,6 +357,7 @@ export class GameEngine {
   getRunBestMetric() {
     switch (this.mode) {
       case GAME_MODES.FLUX:
+        // A weekly run is measured against the week's best (same metric as the Flux record).
         return { metric: RUN_BEST_METRICS.STAGE, current: this.fluxStage };
       case GAME_MODES.BOSS_RUSH:
         return { metric: RUN_BEST_METRICS.WAVE, current: this.bossRushWave };
@@ -373,7 +386,9 @@ export class GameEngine {
     }
     const storage = this.storageManager;
     let best = 0;
-    if (this.mode === GAME_MODES.FLUX) {
+    if (this.mode === GAME_MODES.FLUX && this.isWeeklyFluxRun) {
+      best = storage.getWeeklyFluxBest?.(this.weeklyWeekKey)?.stage || 0;
+    } else if (this.mode === GAME_MODES.FLUX) {
       best = storage.getFluxBestStage?.() || 0;
     } else if (this.mode === GAME_MODES.BOSS_RUSH) {
       best = storage.getBossRushBestWave?.() || 0;
@@ -454,8 +469,26 @@ export class GameEngine {
       this.storageManager.setEndlessHighScore(this.score);
     } else if (this.mode === GAME_MODES.DAILY) {
       this.storageManager.setDailyHighScore(this.score, this.dailySeedKey);
+      if (this.hasFiredInRound || this.runShotsFired > 0) {
+        this.storageManager.recordDailyResult?.({
+          dateKey: this.dailySeedKey,
+          score: this.score,
+          wave: this.waveCount,
+          mutatorKey: this.activeMutatorKey,
+          tl: this.shotTimeline
+        });
+      }
     } else if (this.mode === GAME_MODES.FLUX) {
       this.storageManager.setFluxRecord(this.score, this.fluxStage);
+      if (this.isWeeklyFluxRun && this.weeklyWeekKey && (this.hasFiredInRound || this.runShotsFired > 0)) {
+        this.storageManager.setWeeklyFluxBest?.(
+          this.weeklyWeekKey,
+          this.fluxSeed,
+          this.score,
+          this.fluxStage,
+          this.shotTimeline
+        );
+      }
     } else if (this.mode === GAME_MODES.BLITZ) {
       this.storageManager.setBlitzHighScore?.(this.score);
     } else if (this.mode === GAME_MODES.BOSS_RUSH) {
@@ -560,10 +593,18 @@ export class GameEngine {
    */
   resetRunState(mode) {
     this.persistRunHighScore();
+    this.recordAbandonedRun();
+    this.storageManager.ensureModeUnlocked?.(mode);
     this.flushPendingRunCoins();
     this.storageManager.clearRunSnapshot();
     this.mode = mode;
     this.runBestBaseline = null;
+    this.runOutcomeRecorded = false;
+    this.lastRunOutcome = null;
+    this.runShotsFired = 0;
+    this.isWeeklyFluxRun = false;
+    this.weeklyWeekKey = null;
+    this.shotTimeline = null;
     // clear() keeps the tilt: a run must not start leaning from the previous run's last reading.
     this.physicsWorld.tiltFactor = 0;
     this.score = 0;
@@ -1112,6 +1153,9 @@ export class GameEngine {
     if (this.isAwaitingPerk() || this.isStageChanging() || (this.usesShotBudget() && this.shotsRemaining <= 0)) {
       return;
     }
+    // The previous shot has settled: this is the state it left behind.
+    this.sampleShotTimeline();
+    this.countShotForStats();
     const ballCfg = this.physicsConfig.ball;
     const projectile = this.currentBall;
     this.levelIntro = null;
@@ -1160,6 +1204,7 @@ export class GameEngine {
     if (this.state !== GAME_STATES.PLAYING) {
       return;
     }
+    this.countPlayTimeForStats(this.physicsConfig.simulation?.fixedStepMs || 0);
     if (this.isAwaitingPerk()) {
       this.particleSystem.update(this.gameConfig.juice.shakeDecay);
       return;
@@ -1360,6 +1405,8 @@ export class GameEngine {
       this.startCampaignLevel(this.currentLevelId);
     } else if (this.mode === GAME_MODES.DAILY) {
       this.startDailyChallenge(this.dailySeedKey, true);
+    } else if (this.mode === GAME_MODES.FLUX && this.isWeeklyFluxRun) {
+      this.startWeeklyFlux({ isRestart: true });
     } else if (this.mode === GAME_MODES.FLUX) {
       this.startFluxRun();
     } else if (this.mode === GAME_MODES.PUZZLE) {
@@ -1389,3 +1436,4 @@ installMethods(GameEngine, engineDiscoveryMethods);
 installMethods(GameEngine, engineControlsMethods);
 installMethods(GameEngine, engineTurnResolutionMethods);
 installMethods(GameEngine, engineRoundFlowMethods);
+installMethods(GameEngine, engineProgressMethods);
