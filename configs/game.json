@@ -1590,6 +1590,30 @@
         "flipChance": 1
       }
     },
+    "render": {
+      "bodyFill": "rgba(30, 36, 52, 0.92)",
+      "plusColor": "#ffd166",
+      "minusColor": "#7ee0ff",
+      "glyphSizeFactor": 0.55,
+      "glyphLineWidth": 4,
+      "outlineWidth": 3,
+      "outlineDash": [6, 5],
+      "strengthRingGap": 5,
+      "strengthRingWidth": 2,
+      "threatOutlineWidth": 6,
+      "threatHaloGap": 9,
+      "threatHaloWidth": 2,
+      "threatHaloAlpha": 0.7,
+      "trailSegments": 4,
+      "trailSpacingFactor": 0.7,
+      "trailAlpha": 0.25,
+      "previewRingRadiusFactor": 1.15,
+      "previewRingWidth": 3,
+      "previewRingDash": [4, 4],
+      "previewGlyphSizeFactor": 0.5,
+      "previewGlyphLineWidth": 3,
+      "previewAlpha": 0.9
+    },
     "layout": {
       "splitMinBoardWidthPx": 300,
       "splitMinViewportHeightPx": 520,

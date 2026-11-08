@@ -578,11 +578,122 @@ export class Renderer {
   }
 
   /**
-   * Hook for the Polarity Duel charged spheres. Intentionally empty until the versus
-   * mode fills it; it is only ever called when the engine carries a versus state.
+   * Draws the Polarity Duel charged spheres and the aim-preview charge ring.
+   * Accessibility: the body is neutral, polarity is carried by a large +/- glyph and by the
+   * outline style (solid for +, dashed for -), never by colour alone; strength 2 adds a second
+   * ring and a threatening charge gets a thicker outline plus an outer halo.
+   * Lite boards draw charges too (gameplay-critical) but without the rise trail.
+   * The charge radius is `versus.chargeRadius` times the physics ball radius.
+   * @param {CanvasRenderingContext2D} ctx
+   * @param {Object} engineState Engine carrying `versus.charges` (and optionally
+   *   `versus.threatIds`) and `aimPreview.chargeHit` ({x, y, polarity}).
    */
-  // eslint-disable-next-line no-unused-vars
-  drawVersusCharges(ctx, engineState) {}
+  drawVersusCharges(ctx, engineState) {
+    const versus = engineState.versus;
+    const cfg = this.gameConfig.versus;
+    const renderCfg = cfg?.render;
+    if (!versus || !renderCfg) {
+      return;
+    }
+    const baseRadius = engineState.physicsWorld?.physicsConfig?.ball?.radius;
+    if (!(baseRadius > 0)) {
+      return;
+    }
+    const radius = baseRadius * cfg.chargeRadius;
+    const charges = Array.isArray(versus.charges) ? versus.charges : [];
+    const threatIds = versus.threatIds ? new Set(versus.threatIds) : null;
+    const showTrail = !this.lite && !this.isReducedMotion;
+    for (const charge of charges) {
+      const threatening = Boolean(charge.threatening) || Boolean(threatIds?.has(charge.id));
+      this.drawOneCharge(ctx, charge, radius, renderCfg, threatening, showTrail);
+    }
+    const hit = !this.lite ? engineState.aimPreview?.chargeHit : null;
+    if (hit) {
+      this.drawChargePreviewRing(ctx, hit, radius, renderCfg);
+    }
+  }
+
+  /**
+   * Strokes a large plus (both bars) or minus (horizontal bar only) glyph.
+   * @private
+   */
+  drawPolarityGlyph(ctx, x, y, half, polarity) {
+    ctx.beginPath();
+    ctx.moveTo(x - half, y);
+    ctx.lineTo(x + half, y);
+    if (polarity > 0) {
+      ctx.moveTo(x, y - half);
+      ctx.lineTo(x, y + half);
+    }
+    ctx.stroke();
+  }
+
+  /** @private */
+  drawOneCharge(ctx, charge, radius, renderCfg, threatening, showTrail) {
+    const plus = charge.polarity > 0;
+    const color = plus ? renderCfg.plusColor : renderCfg.minusColor;
+    const dash = plus ? EMPTY_DASH : renderCfg.outlineDash;
+    ctx.save();
+    ctx.lineCap = 'round';
+    if (showTrail) {
+      ctx.fillStyle = color;
+      const segments = renderCfg.trailSegments;
+      for (let i = 1; i <= segments; i++) {
+        const fade = 1 - i / (segments + 1);
+        ctx.globalAlpha = renderCfg.trailAlpha * fade;
+        ctx.beginPath();
+        ctx.arc(charge.x, charge.y + i * radius * renderCfg.trailSpacingFactor, radius * fade, 0, MATH_CONSTANTS.TWO_PI);
+        ctx.fill();
+      }
+      ctx.globalAlpha = 1;
+    }
+    ctx.beginPath();
+    ctx.arc(charge.x, charge.y, radius, 0, MATH_CONSTANTS.TWO_PI);
+    ctx.fillStyle = renderCfg.bodyFill;
+    ctx.fill();
+    ctx.strokeStyle = color;
+    ctx.lineWidth = threatening ? renderCfg.threatOutlineWidth : renderCfg.outlineWidth;
+    ctx.setLineDash(dash);
+    ctx.stroke();
+    ctx.setLineDash(EMPTY_DASH);
+    if (charge.strength >= 2) {
+      ctx.beginPath();
+      ctx.arc(charge.x, charge.y, radius + renderCfg.strengthRingGap, 0, MATH_CONSTANTS.TWO_PI);
+      ctx.lineWidth = renderCfg.strengthRingWidth;
+      ctx.setLineDash(dash);
+      ctx.stroke();
+      ctx.setLineDash(EMPTY_DASH);
+    }
+    if (threatening) {
+      ctx.globalAlpha = renderCfg.threatHaloAlpha;
+      ctx.beginPath();
+      ctx.arc(charge.x, charge.y, radius + renderCfg.threatHaloGap, 0, MATH_CONSTANTS.TWO_PI);
+      ctx.lineWidth = renderCfg.threatHaloWidth;
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+    }
+    ctx.lineWidth = renderCfg.glyphLineWidth;
+    this.drawPolarityGlyph(ctx, charge.x, charge.y, radius * renderCfg.glyphSizeFactor, charge.polarity);
+    ctx.restore();
+  }
+
+  /** @private */
+  drawChargePreviewRing(ctx, hit, radius, renderCfg) {
+    const color = hit.polarity > 0 ? renderCfg.plusColor : renderCfg.minusColor;
+    ctx.save();
+    ctx.globalAlpha = renderCfg.previewAlpha;
+    ctx.strokeStyle = color;
+    ctx.lineCap = 'round';
+    ctx.lineWidth = renderCfg.previewRingWidth;
+    ctx.setLineDash(hit.polarity > 0 ? EMPTY_DASH : renderCfg.previewRingDash);
+    ctx.beginPath();
+    ctx.arc(hit.x, hit.y, radius * renderCfg.previewRingRadiusFactor, 0, MATH_CONSTANTS.TWO_PI);
+    ctx.stroke();
+    ctx.setLineDash(EMPTY_DASH);
+    ctx.lineWidth = renderCfg.previewGlyphLineWidth;
+    this.drawPolarityGlyph(ctx, hit.x, hit.y, radius * renderCfg.previewGlyphSizeFactor, hit.polarity);
+    ctx.restore();
+  }
 
   /**
    * Renders a brief full-arena impact flash and a cinematic perimeter glow while
