@@ -700,3 +700,161 @@ test('equal scores resolve by distance along the direction, then sideways offset
   assert.equal(pickSpatialTarget([from, right, left], 0, { x: 0, y: -1 }), 1);
   assert.equal(pickSpatialTarget([from, left, same, right], 0, { x: 0, y: -1 }), 2, 'the aligned control wins');
 });
+
+// ---------------------------------------------------------------------------------------------
+// Two players on one device: every pad is read on its own
+// ---------------------------------------------------------------------------------------------
+
+const SECOND_PAD = { padIndex: 1, id: 'second pad' };
+const FIRST_PAD = { padIndex: 0, id: 'first pad' };
+const padReading = (pad, actions = [], extra = {}) => ({
+  padIndex: pad.padIndex,
+  id: pad.id,
+  actions,
+  aimDelta: 0,
+  aimSteps: 0,
+  active: actions.length > 0,
+  ...extra
+});
+
+/** A UI whose reader answers pollAll, and whose scene (or lobby) wants every pad apart. */
+function makePerPadUi({ readings = { pads: [], events: [] }, lobby = false, scene = true } = {}) {
+  const made = makeUi();
+  const { ui, log } = made;
+  const sceneLog = [];
+  const asked = [];
+  ui.gamepadInput = {
+    poll: () => {
+      throw new Error('poll() merges the pads: it is not used here');
+    },
+    pollAll: (elapsed, ctx) => {
+      asked.push(ctx);
+      return readings;
+    },
+    settings: {}
+  };
+  ui.showToast = () => {};
+  ui.routeGamepadMenuActions = (actions) => log.push(['menu', actions]);
+  ui.handleLocalPadEvent = (event) => log.push(['padEvent', event.type, event.padIndex]);
+  ui.routeVersusLocalLobbyPads = (results) => log.push(['lobby', results.pads.length]);
+  ui.takeOverLostPad = (padIndex) => {
+    log.push(['takeOver', padIndex]);
+    return true;
+  };
+  ui.getVersusLocalSlots = () => ui.testSlots ?? [];
+  ui.isVersusLocalLobbyOpen = () => lobby;
+  const controller = {
+    multiPad: true,
+    handlePadResults: (results) => sceneLog.push(['results', results.pads.map((pad) => pad.padIndex)]),
+    beforeFrame: (now, elapsedMs) => sceneLog.push(['frame', now, elapsedMs]),
+    handleGamepadActions: () => sceneLog.push(['single']),
+    pause: () => sceneLog.push(['pause'])
+  };
+  if (scene) {
+    ui.setActiveScene('versus', controller);
+  }
+  return { ...made, sceneLog, asked, controller };
+}
+
+test('a scene that wants every pad apart reads them with pollAll and hands the readings to the scene', () => {
+  const readings = { pads: [padReading(FIRST_PAD, [A.SHOOT]), padReading(SECOND_PAD, [A.SWAP])], events: [] };
+  const { ui, sceneLog, asked } = makePerPadUi({ readings });
+  ui.pollGamepad(1000, 16);
+  assert.deepEqual(asked, [{ menuOpen: false }]);
+  assert.deepEqual(sceneLog, [['frame', 1000, 16], ['results', [0, 1]]]);
+});
+
+test('the scene upkeep runs every frame, with or without a controller reader', () => {
+  const { ui, sceneLog } = makePerPadUi();
+  ui.gamepadInput = null;
+  ui.pollGamepad(500, 16);
+  assert.deepEqual(sceneLog, [['frame', 500, 16]]);
+  const single = makeUi();
+  single.ui.gamepadInput = null;
+  single.ui.pollGamepad(0, 16);
+});
+
+test('a quiet frame of the per-pad reading routes nothing', () => {
+  const { ui, sceneLog, log } = makePerPadUi({ readings: { pads: [padReading(FIRST_PAD, [])], events: [] } });
+  ui.pollGamepad(0, 16);
+  assert.deepEqual(sceneLog, [['frame', 0, 16]]);
+  assert.deepEqual(log, []);
+});
+
+test('with a dialog open, each pad that holds a place moves around it and an outsider may take over a lost place', () => {
+  const readings = {
+    pads: [padReading(FIRST_PAD, [A.NAV_DOWN]), padReading(SECOND_PAD, [A.CONFIRM]), padReading({ padIndex: 7, id: 'outsider' }, [A.CONFIRM])],
+    events: []
+  };
+  const { ui, log, asked } = makePerPadUi({ readings });
+  ui.testSlots = [{ device: { type: 'pad', padIndex: 0, id: 'first pad' } }, { device: { type: 'pad', padIndex: 1, id: 'second pad' } }];
+  ui.topModal = { classList: makeClassList() };
+  ui.pollGamepad(0, 16);
+  assert.deepEqual(asked, [{ menuOpen: true }]);
+  assert.deepEqual(log.filter((entry) => Array.isArray(entry)), [
+    ['menu', [A.NAV_DOWN]],
+    ['menu', [A.CONFIRM]],
+    ['takeOver', 7]
+  ]);
+});
+
+test('an outsider that only moves its stick does not take a place over', () => {
+  const readings = { pads: [padReading({ padIndex: 7, id: 'outsider' }, [A.NAV_UP])], events: [] };
+  const { ui, log } = makePerPadUi({ readings });
+  ui.testSlots = [{ device: { type: 'pad', padIndex: 0 } }, { device: { type: 'pad', padIndex: 1 } }];
+  ui.topModal = { classList: makeClassList() };
+  ui.pollGamepad(0, 16);
+  assert.deepEqual(log.filter((entry) => Array.isArray(entry)), []);
+});
+
+test('the lobby gets the readings of every pad, whatever scene is active', () => {
+  const readings = { pads: [padReading(FIRST_PAD, [A.CONFIRM]), padReading(SECOND_PAD, [A.CONFIRM])], events: [] };
+  const { ui, log, asked } = makePerPadUi({ readings, lobby: true, scene: false });
+  ui.topModal = { classList: makeClassList() };
+  ui.pollGamepad(0, 16);
+  assert.deepEqual(asked, [{ menuOpen: true }]);
+  assert.deepEqual(log.filter((entry) => Array.isArray(entry)), [['lobby', 2]]);
+});
+
+test('connection events carry the pad, say it in a message, and a lost pad never pauses through the single pad path', () => {
+  const readings = {
+    pads: [],
+    events: [
+      { type: GAMEPAD_EVENTS.CONNECTED, padIndex: 1, id: 'second pad' },
+      { type: GAMEPAD_EVENTS.DISCONNECTED, padIndex: 0, id: 'first pad' }
+    ]
+  };
+  const { ui, log, sceneLog } = makePerPadUi({ readings });
+  const toasts = [];
+  ui.showToast = (message) => toasts.push(message);
+  ui.pollGamepad(0, 16);
+  assert.equal(toasts.length, 2);
+  assert.deepEqual(log.filter((entry) => Array.isArray(entry)), [['padEvent', 'connected', 1], ['padEvent', 'disconnected', 0]]);
+  assert.deepEqual(sceneLog.filter((entry) => entry[0] === 'pause'), [], 'only the scene itself decides who is missed');
+});
+
+test('a controller seen in play switches the hints to the controller wording', () => {
+  const readings = { pads: [padReading(FIRST_PAD, [A.SHOOT], { active: true })], events: [] };
+  const { ui } = makePerPadUi({ readings });
+  ui.pollGamepad(0, 16);
+  assert.equal(ui.inputMode, INPUT_MODES.GAMEPAD);
+});
+
+test('a scene that does not ask for every pad keeps the single reading (poll), byte for byte', () => {
+  const calls = [];
+  const { ui } = makeUi({
+    poll: (elapsed, ctx) => {
+      calls.push(['poll', elapsed, ctx]);
+      return { actions: [A.SHOOT], aimDelta: 0, active: true, events: [] };
+    }
+  });
+  const sceneCalls = [];
+  ui.setActiveScene('versus', {
+    handleGameplayKey() {},
+    handleGamepadActions: (actions, aimDelta) => sceneCalls.push([actions, aimDelta]),
+    pause() {}
+  });
+  ui.pollGamepad(0, 16);
+  assert.deepEqual(calls, [['poll', 16, { menuOpen: false }]]);
+  assert.deepEqual(sceneCalls, [[[A.SHOOT], 0]]);
+});

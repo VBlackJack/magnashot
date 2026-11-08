@@ -51,7 +51,9 @@ export const uiInputBindingMethods = {
    * Chooses who handles the gameplay controls. In the 'versus' scene the gameplay keys, the
    * controller actions and the auto-pause on a hidden page go to `controller`
    * ({handleGameplayKey(event), handleGamepadActions(actions, aimDelta), pause()}); the
-   * 'main' scene (default) keeps the single-player behaviour.
+   * 'main' scene (default) keeps the single-player behaviour. A controller of the two-player
+   * match adds multiPad: true (every pad is read on its own and reaches handlePadResults(results)),
+   * handleGameplayKeyUp(event), releaseAllKeys() and beforeFrame(now, elapsedMs).
    */
   setActiveScene(scene, controller = null) {
     const isVersus = scene === UI_SCENES.VERSUS && Boolean(controller);
@@ -75,6 +77,27 @@ export const uiInputBindingMethods = {
   /** The controller of the active non-main scene, or null in the main scene. */
   getSceneController() {
     return this.activeScene === UI_SCENES.VERSUS ? this.sceneController || null : null;
+  },
+
+  /** A key was released: the scene that tracks held keys (two-player aim) learns of it, whatever dialog is open. */
+  handleKeyUp(e) {
+    this.getSceneController()?.handleGameplayKeyUp?.(e);
+  },
+
+  /** The window lost focus: the keyup of every held key may never arrive, so none stays held. */
+  handleWindowBlur() {
+    this.getSceneController()?.releaseAllKeys?.();
+  },
+
+  /**
+   * An auto-repeated key is not a new press, but in a two-player match the keys of the layout are
+   * still kept from the page (Enter, the slash quick find, the arrows scroll).
+   */
+  swallowRepeatedLocalKey(e) {
+    const sceneController = this.getSceneController();
+    if (sceneController?.multiPad === true && !this.isAnyModalOpen() && !this.isDrawerOpen && !isBrowserShortcut(e)) {
+      sceneController.handleGameplayKey(e);
+    }
   },
 
   /**
@@ -599,6 +622,12 @@ export const uiInputBindingMethods = {
     window.addEventListener('keydown', (e) => {
       this.handleKeyDown(e);
     });
+    window.addEventListener('keyup', (e) => {
+      this.handleKeyUp(e);
+    });
+    window.addEventListener('blur', () => {
+      this.handleWindowBlur();
+    });
   },
 
   /**
@@ -656,6 +685,7 @@ export const uiInputBindingMethods = {
     }
 
     if (shouldIgnoreRepeatedKey(e.code, e.repeat)) {
+      this.swallowRepeatedLocalKey(e);
       return;
     }
 
