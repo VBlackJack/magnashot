@@ -32,6 +32,7 @@ const EXPECTED_PROTOTYPE_NAMES = [
   'buildFluxStage',
   'buildLevelIntro',
   'buildLevelLayout',
+  'buildPuzzleIntro',
   'buildClassicStage',
   'buySpecialAmmo',
   'canBuySpecialAmmo',
