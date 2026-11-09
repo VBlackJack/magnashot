@@ -51,7 +51,7 @@ const FITTED_TEXT_SELECTOR =
 
 /** Sub-pixel rounding tolerance when comparing scroll and client sizes. */
 const OVERFLOW_TOLERANCE_PX = 1;
-/** A generated level in a later chapter, for the level select test. */
+/** A generated level in a later chapter, for the campaign map tests. */
 const UNLOCKED_GENERATED_LEVEL = 130;
 
 /** Track count of the HUD grid in the wide desktop layout and in the compact phone landscape layout. */
@@ -91,8 +91,9 @@ const STORAGE_PREFIX = GAME_CONFIG.storage.prefix;
 const STORAGE_KEYS = GAME_CONFIG.storage.keys;
 
 /** An existing player's save from before the schema was versioned: levels cleared, schema 1. */
+const EXISTING_PLAYER_UNLOCKED_LEVEL = 5;
 const EXISTING_PLAYER_STORAGE = Object.freeze({
-  [`${STORAGE_PREFIX}${STORAGE_KEYS.unlockedLevel}`]: '5',
+  [`${STORAGE_PREFIX}${STORAGE_KEYS.unlockedLevel}`]: String(EXISTING_PLAYER_UNLOCKED_LEVEL),
   [`${STORAGE_PREFIX}${STORAGE_KEYS.schemaVersion}`]: '1'
 });
 /** A valid shared Flux seed (length and radix from configs/flux.json). */
@@ -101,7 +102,9 @@ const SHARED_FLUX_SEED = 'abc234';
 const LOCKED_MODE_BUTTON = '#btn-endless';
 const LOCKED_MODE_REQUIRED_LEVEL = GAME_CONFIG.modeUnlocks.campaignLevelCleared.endless;
 const LOCKED_MODE_BUTTONS = Object.freeze(['#btn-endless', '#btn-flux', '#btn-weekly']);
-/** The HUD Sag meter, and the Classic card of the level select with the level that opens it. */
+/** Campaign level that opens the Weekly Flux card (it opens with Flux or with this level, whichever comes first). */
+const WEEKLY_REQUIRED_LEVEL = GAME_CONFIG.weeklyFlux.unlockAfterCampaignLevel;
+/** The HUD Sag meter, and the Classic card of the Play hub with the level that opens it. */
 const SAG_METER_SELECTOR = '#hud-sag-meter';
 const CLASSIC_CARD_SELECTOR = '#btn-mode-classic';
 const CLASSIC_REQUIRED_LEVEL = GAME_CONFIG.modeUnlocks.campaignLevelCleared.classic;
@@ -118,6 +121,22 @@ const PLAYER_FINAL_SCORE = 777;
 /** A Daily record to beat, so a normal Daily shows its best-run marker in the badge row. */
 const DAILY_RECORD_TO_BEAT = 5000;
 const UNLOCKED_MODE_BUTTONS = Object.freeze(['#btn-daily', ...LOCKED_MODE_BUTTONS]);
+
+/** Both locale files, read from disk so no assertion hardcodes a UI string. */
+const LOCALES = Object.freeze({
+  en: JSON.parse(readFileSync(new URL('../../locales/en.json', import.meta.url), 'utf8')),
+  fr: JSON.parse(readFileSync(new URL('../../locales/fr.json', import.meta.url), 'utf8'))
+});
+
+/** A text of a locale file by dotted key, with its {{token}} placeholders filled from params. */
+function localeText(language, key, params = {}) {
+  const raw = key.split('.').reduce((node, part) => (node === undefined || node === null ? undefined : node[part]), LOCALES[language]);
+  assert.equal(typeof raw, 'string', `${language} locale has the key ${key}`);
+  return raw.replace(/\{\{(\w+)\}\}/g, (token, name) => (Object.hasOwn(params, name) ? String(params[name]) : token));
+}
+
+/** A profile pinned to a language, whatever the browser language. */
+const languageStorage = (language) => ({ [`${STORAGE_PREFIX}${STORAGE_KEYS.language}`]: language });
 
 /** A player past the level that opens Polarity Duel (a save of schema 1 moves to the current one on load). */
 const VERSUS_PLAYER_STORAGE = Object.freeze({
@@ -252,12 +271,44 @@ async function captureVersusEngines(page) {
   });
 }
 
-/** Opens the level select, then the difficulty picker of Polarity Duel. */
+/** Opens the Play hub from the slide-in menu, the one dialog that lists every mode. */
+async function openPlayHub(page, viewport) {
+  await clickMenuButton(page, viewport, '#btn-play');
+  await waitShown(page, '#modal-play');
+}
+
+/** Opens the Play hub, then the campaign map from its Campaign card. */
+async function openCampaignMap(page, viewport) {
+  await openPlayHub(page, viewport);
+  await page.click('#btn-campaign-map');
+  await waitShown(page, '#modal-levels');
+}
+
+/** Opens the Play hub, then the difficulty picker of Polarity Duel from its Duel card. */
 async function openVersusTierPicker(page, viewport) {
-  await clickMenuButton(page, viewport, '#btn-levels');
+  await openPlayHub(page, viewport);
   await page.click('#btn-mode-versus');
   await waitShown(page, '#modal-versus-tiers');
 }
+
+/**
+ * Unlocks campaign levels on a fresh profile through the storage layer and reloads, so the game
+ * boots on the furthest unlocked level (the save is then already at the current schema, so no
+ * existing-player migration opens modes by itself).
+ */
+async function reloadWithUnlockedLevel(page, levelId) {
+  await page.evaluate((id) => window.__fluxEngine.storageManager.unlockLevel(id), levelId);
+  await page.reload();
+  await captureEngine(page);
+}
+
+/** The text of an element, trimmed (the empty string for a missing element). */
+const textOf = (page, selector) =>
+  page.evaluate((sel) => document.querySelector(sel)?.textContent.trim() ?? '', selector);
+
+/** True when a mode card carries the "New" badge. */
+const hasNewBadge = (page, selector) =>
+  page.evaluate((sel) => Boolean(document.querySelector(sel)?.querySelector('.mode-new-badge')), selector);
 
 /** Starts a match against a tier and waits for the board of the player to be in play. */
 async function startVersusMatch(page, viewport, tier) {
@@ -508,13 +559,13 @@ for (const viewport of VIEWPORTS) {
       }
     });
 
-    test('Settings, Levels, Workshop and My stats pause the run and Escape closes them', async () => {
+    test('Settings, Play, Workshop and My stats pause the run and Escape closes them', async () => {
       const { context, page, errors } = await openGame(viewport);
       try {
         await startLevelOne(page);
         for (const { button, dialog } of [
           { button: '#btn-settings', dialog: '#modal-settings' },
-          { button: '#btn-levels', dialog: '#modal-levels' },
+          { button: '#btn-play', dialog: '#modal-play' },
           { button: '#btn-shop', dialog: '#modal-shop' },
           { button: '#btn-stats', dialog: '#modal-stats' }
         ]) {
@@ -536,30 +587,34 @@ for (const viewport of VIEWPORTS) {
       }
     });
 
-    test('a fresh profile finds the gated modes locked; tapping one explains why and changes nothing', async () => {
+    test('a fresh profile finds the gated modes locked in the Play hub; tapping one explains why and changes nothing', async () => {
       const { context, page, errors } = await openGame(viewport);
       try {
-        await page.click('#btn-menu');
-        await page.waitForFunction(() => document.querySelector('.app-shell').classList.contains('drawer-open'));
+        await openPlayHub(page, viewport);
         for (const selector of LOCKED_MODE_BUTTONS) {
           assert.equal(await isMenuItemLocked(page, selector), true, `${selector} is locked`);
         }
         assert.equal(await isMenuItemLocked(page, '#btn-daily'), false, 'the Daily is always open');
-        await assertLayoutFits(page, 'locked menu');
+        assert.equal(await isMenuItemLocked(page, '#btn-campaign-continue'), false, 'the Campaign is always open');
+        await assertLayoutFits(page, 'locked Play hub');
         const modeBefore = await page.evaluate(() => window.__fluxEngine.mode);
         assert.equal(modeBefore, GAME_MODES.CAMPAIGN);
         // Playwright refuses to click an aria-disabled button: dispatch the click the player's tap would produce.
         await page.dispatchEvent(LOCKED_MODE_BUTTON, 'click');
         await page.waitForFunction(() => {
-          const hint = document.querySelector('#nav-mode-lock-hint');
+          const hint = document.querySelector('#play-hub-hint');
           return !hint.classList.contains('hidden') && hint.textContent.trim().length > 0;
         });
-        assert.match(await page.textContent('#nav-mode-lock-hint'), new RegExp(`\\b${LOCKED_MODE_REQUIRED_LEVEL}\\b`));
+        assert.match(await page.textContent('#play-hub-hint'), new RegExp(`\\b${LOCKED_MODE_REQUIRED_LEVEL}\\b`));
         assert.equal(await page.evaluate(() => window.__fluxEngine.mode), modeBefore, 'the mode did not change');
-        assert.ok(
-          await page.evaluate(() => document.querySelector('.app-shell').classList.contains('drawer-open')),
-          'the menu stays open'
+        // Weekly Flux opens with the campaign (or with Flux): its hint names its own level.
+        await page.dispatchEvent('#btn-weekly', 'click');
+        await page.waitForFunction(
+          (level) => new RegExp(`\\b${level}\\b`).test(document.querySelector('#play-hub-hint').textContent),
+          WEEKLY_REQUIRED_LEVEL
         );
+        assert.equal(await page.evaluate(() => window.__fluxEngine.mode), modeBefore, 'the mode did not change');
+        assert.equal(await isShown(page, '#modal-play'), true, 'the hub stays open');
         assert.deepEqual(errors, []);
       } finally {
         await context.close();
@@ -618,22 +673,21 @@ for (const viewport of VIEWPORTS) {
       }
     });
 
-    test('a fresh profile finds the Classic card locked; tapping it names the level that opens it', async () => {
+    test('a fresh profile finds the Classic card of the Play hub locked; tapping it names the level that opens it', async () => {
       const { context, page, errors } = await openGame(viewport);
       try {
-        await clickMenuButton(page, viewport, '#btn-levels');
-        await waitShown(page, '#modal-levels');
+        await openPlayHub(page, viewport);
         assert.equal(await isMenuItemLocked(page, CLASSIC_CARD_SELECTOR), true, 'the Classic card is locked');
         const modeBefore = await page.evaluate(() => window.__fluxEngine.mode);
         // Playwright refuses to click an aria-disabled button: dispatch the click the player's tap would produce.
         await page.dispatchEvent(CLASSIC_CARD_SELECTOR, 'click');
         await page.waitForFunction(() => {
-          const hint = document.querySelector('#levels-chapter-hint');
+          const hint = document.querySelector('#play-hub-hint');
           return !hint.classList.contains('hidden') && hint.textContent.trim().length > 0;
         });
-        assert.match(await page.textContent('#levels-chapter-hint'), new RegExp(`\\b${CLASSIC_REQUIRED_LEVEL}\\b`));
+        assert.match(await page.textContent('#play-hub-hint'), new RegExp(`\\b${CLASSIC_REQUIRED_LEVEL}\\b`));
         assert.equal(await page.evaluate(() => window.__fluxEngine.mode), modeBefore, 'the mode did not change');
-        await assertLayoutFits(page, 'level select with the Classic card');
+        await assertLayoutFits(page, 'Play hub with the Classic card');
         assert.deepEqual(errors, []);
       } finally {
         await context.close();
@@ -670,57 +724,72 @@ for (const viewport of VIEWPORTS) {
       });
     }
 
-    test('The level select opens on the chapter of the current level and switches chapters', async () => {
+    test('The campaign map opens on the chapter of the current level and switches chapters', async () => {
       const { context, page, errors } = await openGame(viewport);
       try {
         await page.waitForFunction(() => Boolean(window.__fluxEngine));
-        await page.evaluate((levelId) => window.__fluxEngine.storageManager.unlockLevel(levelId), UNLOCKED_GENERATED_LEVEL);
-        // The game opens on the furthest unlocked level, which the dialog then suggests.
-        await page.reload();
-        await captureEngine(page);
-        await clickMenuButton(page, viewport, '#btn-levels');
-        await waitShown(page, '#modal-levels');
-        /** The grid's label reference and the id of the active chapter tab. */
-        const gridLabel = () =>
-          page.evaluate(() => ({
-            labelledBy: document.querySelector('#levels-grid').getAttribute('aria-labelledby'),
-            activeId: document.querySelector('#levels-chapters .level-chapter.active')?.id
-          }));
-        const openedLabel = await gridLabel();
-        assert.ok(openedLabel.activeId, 'the active chapter tab has an id');
-        assert.equal(openedLabel.labelledBy, openedLabel.activeId, 'the grid is labelled by the active chapter');
-        const opened = await page.evaluate(() => ({
-          activeTabs: document.querySelectorAll('#levels-chapters [role="tab"][aria-selected="true"]').length,
-          currentCard: document.querySelector('#levels-grid .level-card.current .level-card-header')?.textContent || '',
-          cardCount: document.querySelectorAll('#levels-grid .level-card').length,
+        // The game opens on the furthest unlocked level, which the map then suggests.
+        await reloadWithUnlockedLevel(page, UNLOCKED_GENERATED_LEVEL);
+        await openCampaignMap(page, viewport);
+        /** The chapter select, the label of the grid, and the chapter name shown in the select. */
+        const chapterState = () =>
+          page.evaluate(() => {
+            const select = document.querySelector('#levels-chapter-select');
+            return {
+              value: select.value,
+              name: select.selectedOptions[0]?.textContent.trim() ?? '',
+              gridLabel: document.querySelector('#levels-grid').getAttribute('aria-label') || '',
+              options: select.options.length,
+              lockedOptions: [...select.options].filter((option) => option.disabled).length
+            };
+          });
+        const opened = await chapterState();
+        assert.ok(opened.name.length > 0, 'the select names the active chapter');
+        assert.ok(opened.gridLabel.includes(opened.name), 'the grid is labelled by the active chapter');
+        assert.ok(opened.lockedOptions >= 1, 'chapters that are not open yet are disabled options');
+        assert.ok(opened.lockedOptions < opened.options, 'at least one chapter is open');
+        const tiles = await page.evaluate(() => ({
+          selected: document.querySelectorAll('#levels-grid [role="option"][aria-selected="true"]').length,
+          currentTile: document.querySelector('#levels-grid .level-tile.current .level-tile-number')?.textContent || '',
+          tileCount: document.querySelectorAll('#levels-grid .level-tile').length,
+          rovingStops: document.querySelectorAll('#levels-grid .level-tile[tabindex="0"]').length,
+          detailHeader: document.querySelector('#levels-detail-header').textContent,
           pageOverflow: document.documentElement.scrollWidth - window.innerWidth
         }));
-        assert.equal(opened.activeTabs, 1, 'one chapter is selected');
-        assert.ok(opened.currentCard.includes(String(UNLOCKED_GENERATED_LEVEL)), `the dialog shows level ${UNLOCKED_GENERATED_LEVEL}`);
-        assert.ok(opened.cardCount < UNLOCKED_GENERATED_LEVEL, 'only the chapter is listed');
-        assert.ok(opened.pageOverflow <= OVERFLOW_TOLERANCE_PX, 'the chapter strip does not widen the page');
+        assert.equal(tiles.selected, 1, 'one level is selected');
+        assert.equal(tiles.rovingStops, 1, 'one tile is the keyboard stop');
+        assert.ok(tiles.currentTile.includes(String(UNLOCKED_GENERATED_LEVEL)), `the map shows level ${UNLOCKED_GENERATED_LEVEL}`);
+        assert.ok(tiles.detailHeader.includes(String(UNLOCKED_GENERATED_LEVEL)), 'the detail panel opens on the current level');
+        assert.ok(tiles.tileCount < UNLOCKED_GENERATED_LEVEL, 'only the chapter is listed');
+        assert.ok(tiles.pageOverflow <= OVERFLOW_TOLERANCE_PX, 'the chapter switcher does not widen the page');
 
-        await page.click('#levels-chapters [role="tab"]:first-child');
-        const firstCard = await page.textContent('#levels-grid .level-card .level-card-header');
-        assert.match(firstCard, /\b1\b/, 'the first chapter starts at level 1');
-        const switchedLabel = await gridLabel();
-        assert.notEqual(switchedLabel.activeId, openedLabel.activeId, 'another chapter is active');
-        assert.equal(switchedLabel.labelledBy, switchedLabel.activeId, 'the grid follows the active chapter');
-
-        // Clicking a locked chapter tab shows the unlock hint without switching chapters.
-        await page.locator('#levels-chapters [role="tab"].locked').first().click({ force: true });
+        await page.selectOption('#levels-chapter-select', { index: 0 });
         await page.waitForFunction(
-          () => {
-            const el = document.querySelector('#levels-chapter-hint');
-            return Boolean(el) && !el.classList.contains('hidden') && (el.textContent || '').trim().length > 0;
-          },
-          null,
-          { timeout: WAIT_TIMEOUT_MS }
+          () => document.querySelector('#levels-grid .level-tile')?.dataset.levelId === '1'
         );
+        const switched = await chapterState();
+        assert.notEqual(switched.value, opened.value, 'another chapter is active');
+        assert.ok(switched.gridLabel.includes(switched.name), 'the grid follows the active chapter');
+        assert.notEqual(switched.gridLabel, opened.gridLabel, 'the grid label changed with the chapter');
+        assert.ok((await textOf(page, '#levels-chapter-progress')).length > 0, 'the chapter states its stars');
+
+        // Next walks to the last open chapter, where it is disabled; a tap there explains the next unlock.
+        for (let step = 0; step < opened.options; step++) {
+          if ((await page.getAttribute('#btn-chapter-next', 'aria-disabled')) === 'true') {
+            break;
+          }
+          await page.click('#btn-chapter-next');
+        }
+        assert.equal(await page.getAttribute('#btn-chapter-next', 'aria-disabled'), 'true', 'Next stops at the last open chapter');
+        const lastOpen = await chapterState();
+        await page.dispatchEvent('#btn-chapter-next', 'click');
+        await page.waitForFunction(() => {
+          const el = document.querySelector('#levels-chapter-hint');
+          return Boolean(el) && !el.classList.contains('hidden') && (el.textContent || '').trim().length > 0;
+        });
         await waitShown(page, '#levels-chapter-hint');
-        const hintText = await page.textContent('#levels-chapter-hint');
-        assert.match(hintText, /\d+/, 'the locked chapter hint names the required level');
-        assert.equal((await gridLabel()).activeId, switchedLabel.activeId, 'the active chapter stays unchanged');
+        assert.match(await page.textContent('#levels-chapter-hint'), /\d+/, 'the locked chapter hint names the required level');
+        assert.equal((await chapterState()).value, lastOpen.value, 'the active chapter stays unchanged');
         assert.deepEqual(errors, []);
       } finally {
         await context.close();
@@ -896,7 +965,7 @@ describe('Polarity Duel (desktop)', () => {
   test('a fresh profile finds the mode locked, and a player past level 6 does not', async () => {
     const fresh = await openGame(desktop);
     try {
-      await clickMenuButton(fresh.page, desktop, '#btn-levels');
+      await openPlayHub(fresh.page, desktop);
       assert.equal(await isMenuItemLocked(fresh.page, '#btn-mode-versus'), true);
       assert.deepEqual(fresh.errors, []);
     } finally {
@@ -904,7 +973,7 @@ describe('Polarity Duel (desktop)', () => {
     }
     const player = await openGame(desktop, { initStorage: VERSUS_PLAYER_STORAGE });
     try {
-      await clickMenuButton(player.page, desktop, '#btn-levels');
+      await openPlayHub(player.page, desktop);
       assert.equal(await isMenuItemLocked(player.page, '#btn-mode-versus'), false);
       assert.deepEqual(player.errors, []);
     } finally {
@@ -921,7 +990,9 @@ describe('Polarity Duel (desktop)', () => {
       assert.equal(await isMenuItemLocked(page, '.versus-tier-btn[data-tier="hard"]'), false);
       await page.keyboard.press('Escape');
       await page.waitForFunction(() => document.querySelector('#modal-versus-tiers').classList.contains('hidden'));
-      assert.equal(await isShown(page, '#modal-levels'), true, 'Escape closes the picker first, the level select stays');
+      assert.equal(await isShown(page, '#modal-play'), true, 'Escape closes the picker first, the hub stays');
+      assert.equal(await isShown(page, '#modal-levels'), false, 'the campaign map was never opened');
+      assert.equal(await page.evaluate(() => document.activeElement?.id), 'btn-mode-versus', 'focus returns to the Duel card');
       assert.deepEqual(errors, []);
     } finally {
       await context.close();
@@ -1124,7 +1195,7 @@ describe('end of round (desktop)', () => {
     }
   });
 
-  test('winning the last level offers the level select, never Survival', async () => {
+  test('winning the last level offers the campaign map, never Survival', async () => {
     const { context, page, errors } = await openGame(desktop);
     try {
       const lastId = await page.evaluate(() => window.__fluxEngine.levelCatalog.lastId);
@@ -1143,7 +1214,7 @@ describe('end of round (desktop)', () => {
           expected: t('modals.victory.button.backToLevels')
         };
       });
-      assert.equal(label.shown, label.expected, 'the button names the level select');
+      assert.equal(label.shown, label.expected, 'the button names the campaign map');
       await page.click('#btn-next-level');
       await waitShown(page, '#modal-levels');
       const after = await page.evaluate(() => ({
@@ -1247,11 +1318,14 @@ describe('end of round (desktop)', () => {
     }
   });
 
-  test('a Daily game over counts down to the next challenge, and the menu marks the Daily as played', async () => {
+  test('a Daily game over counts down to the next challenge, and the Play hub marks the Daily as done', async () => {
     const { context, page, errors } = await openGame(desktop);
     try {
-      const before = await page.textContent('#btn-daily');
+      await openPlayHub(page, desktop);
+      const before = await textOf(page, '#daily-reward');
       assert.ok(before.includes(DAILY_BONUS_MARK), `the unplayed Daily announces its bonus: "${before}"`);
+      await page.click('#btn-close-play');
+      await page.waitForFunction(() => document.querySelector('#modal-play').classList.contains('hidden'));
       await page.evaluate(() => {
         const engine = window.__fluxEngine;
         engine.startDailyChallenge();
@@ -1262,9 +1336,12 @@ describe('end of round (desktop)', () => {
       await loseRun(page);
       await waitShown(page, '#gameover-daily-next');
       assert.match(await page.textContent('#gameover-daily-next'), DAILY_COUNTDOWN_PATTERN);
+      // The game over screen opens the hub with its "Change mode" button; the hub refreshes the Daily chip on open.
+      await page.click('#btn-levels-gameover');
+      await waitShown(page, '#modal-play');
       const label = await page.evaluate(async () => ({
-        shown: document.querySelector('#btn-daily').textContent,
-        expected: (await import('/src/core/I18n.js')).t('app.nav.button.dailyPlayedBadge')
+        shown: document.querySelector('#daily-reward').textContent.trim(),
+        expected: (await import('/src/core/I18n.js')).t('modals.play.daily.done')
       }));
       assert.ok(!label.shown.includes(DAILY_BONUS_MARK), `the played Daily has no bonus left: "${label.shown}"`);
       assert.equal(label.shown, label.expected, 'the played Daily says so');
@@ -1277,7 +1354,7 @@ describe('end of round (desktop)', () => {
   test('an existing player keeps every mode, and the save moves to the current schema', async () => {
     const { context, page, errors } = await openGame(desktop, { initStorage: EXISTING_PLAYER_STORAGE });
     try {
-      await page.click('#btn-menu');
+      await openPlayHub(page, desktop);
       for (const selector of UNLOCKED_MODE_BUTTONS) {
         assert.equal(await isMenuItemLocked(page, selector), false, `${selector} stays open`);
       }
@@ -1292,11 +1369,10 @@ describe('end of round (desktop)', () => {
     }
   });
 
-  test('an existing player starts Classic from the level select', async () => {
+  test('an existing player starts Classic from the Play hub', async () => {
     const { context, page, errors } = await openGame(desktop, { initStorage: EXISTING_PLAYER_STORAGE });
     try {
-      await clickMenuButton(page, desktop, '#btn-levels');
-      await waitShown(page, '#modal-levels');
+      await openPlayHub(page, desktop);
       assert.equal(await isMenuItemLocked(page, CLASSIC_CARD_SELECTOR), false, 'the Classic card is open');
       await page.click(CLASSIC_CARD_SELECTOR);
       await page.waitForFunction(
@@ -1305,6 +1381,7 @@ describe('end of round (desktop)', () => {
       );
       await waitShown(page, SAG_METER_SELECTOR);
       assert.equal(await page.evaluate(() => window.__fluxEngine.classicStage), 1);
+      assert.equal(await isShown(page, '#modal-play'), false, 'starting a mode closes the hub');
       assert.deepEqual(errors, []);
     } finally {
       await context.close();
@@ -1329,11 +1406,14 @@ describe('end of round (desktop)', () => {
     const { context, page, errors } = await openGame(desktop, { initStorage: EXISTING_PLAYER_STORAGE });
     try {
       await page.click('#btn-menu');
+      await page.click('#btn-play');
+      await waitShown(page, '#modal-play');
       await page.click('#btn-weekly');
       await page.waitForFunction(
         ([flux, playing]) => window.__fluxEngine.mode === flux && window.__fluxEngine.state === playing,
         [GAME_MODES.FLUX, GAME_STATES.PLAYING]
       );
+      assert.equal(await isShown(page, '#modal-play'), false, 'starting the Weekly closes the hub');
       const run = await page.evaluate(async () => {
         const { getUtcIsoWeekKey, getWeeklyFluxSeed } = await import('/src/game/WeeklyFlux.js');
         const engine = window.__fluxEngine;
@@ -1349,6 +1429,13 @@ describe('end of round (desktop)', () => {
       assert.equal(run.isWeekly, true);
       assert.equal(run.weekKey, run.expectedWeekKey);
       assert.equal(run.seed, run.expectedSeed);
+      // Only the Weekly card is the running mode: the plain Flux card is not.
+      await openPlayHub(page, desktop);
+      const active = await page.evaluate(() => ({
+        weekly: document.querySelector('#btn-weekly').classList.contains('active-mode'),
+        flux: document.querySelector('#btn-flux').classList.contains('active-mode')
+      }));
+      assert.deepEqual(active, { weekly: true, flux: false }, 'the hub marks the Weekly run, not plain Flux');
       assert.deepEqual(errors, []);
     } finally {
       await context.close();
@@ -2034,7 +2121,7 @@ describe('browser smoke: controller', () => {
 });
 
 /*
- * Polarity Duel, two players on one device. The lobby is opened from the difficulty picker,
+ * Polarity Duel, two players on one device. The lobby is opened from the Play hub (2 players button),
  * players join with W and ArrowUp (keyboard halves) or a button of a controller, and both boards
  * are human. A round is ended by dropping a board through its engine, as the CPU duel does.
  */
@@ -2092,11 +2179,11 @@ function installTwoPadStub() {
   };
 }
 
-/** Opens the level select, the difficulty picker, and the two-player lobby. */
+/** Opens the Play hub and the two-player lobby from its Duel card (the picker opens under the lobby). */
 async function openVersusLocalLobby(page, viewport) {
-  await openVersusTierPicker(page, viewport);
-  await waitShown(page, '#btn-versus-local');
-  await page.click('#btn-versus-local');
+  await openPlayHub(page, viewport);
+  await waitShown(page, '#btn-versus-local-hub');
+  await page.click('#btn-versus-local-hub');
   await waitShown(page, '#modal-versus-local');
 }
 
@@ -2308,7 +2395,12 @@ describe('Polarity Duel, two players entry by layout', () => {
     test(`the two-player entry is ${isHidden ? 'hidden' : 'offered'} on ${viewport.name}`, async () => {
       const { context, page, errors } = await openGame(viewport, { initStorage: LOCAL_PLAYER_STORAGE });
       try {
-        await openVersusTierPicker(page, viewport);
+        await openPlayHub(page, viewport);
+        assert.equal(await isShown(page, '#btn-versus-local-hub'), !isHidden, 'the Play hub offers the entry only where two boards fit');
+        assert.equal(await isShown(page, '#versus-local-hub-hint'), isHidden, 'the hint stands in where the entry is hidden');
+        // The difficulty picker keeps the same entry rule.
+        await page.click('#btn-mode-versus');
+        await waitShown(page, '#modal-versus-tiers');
         assert.equal(await isShown(page, '#btn-versus-local'), !isHidden);
         assert.deepEqual(errors, []);
       } finally {
@@ -2324,11 +2416,12 @@ describe('Polarity Duel, two players entry by layout', () => {
       const { context, page, errors } = await openGame(viewport, { initStorage: LOCAL_PLAYER_STORAGE });
       try {
         await captureVersusEngines(page);
-        await openVersusTierPicker(page, viewport);
-        const isOffered = await isShown(page, '#btn-versus-local');
+        await openPlayHub(page, viewport);
+        const isOffered = await isShown(page, '#btn-versus-local-hub');
         assert.equal(isOffered, height >= LOCAL_SHORT_DESKTOP_FITS_FROM, 'the entry follows the split layout requirement');
+        assert.equal(await isShown(page, '#versus-local-hub-hint'), !isOffered, 'the hint stands in where the entry is hidden');
         if (isOffered) {
-          await page.click('#btn-versus-local');
+          await page.click('#btn-versus-local-hub');
           await waitShown(page, '#modal-versus-local');
           await page.keyboard.press('KeyW');
           await page.keyboard.press('ArrowUp');
@@ -2898,3 +2991,548 @@ for (const viewport of VIEWPORTS) {
     });
   });
 }
+
+
+/*
+ * Play hub and campaign map. The hub (#modal-play) lists every mode; the map (#modal-levels)
+ * is the campaign only: chapter switcher, level tiles and a detail panel. Texts are read from
+ * the locale files, never typed here.
+ */
+
+/** Hub cards by gated mode id, each with the card button of the Play hub. */
+const HUB_CARD_BY_MODE = Object.freeze({
+  endless: '#btn-endless',
+  classic: '#btn-mode-classic',
+  puzzle: '#btn-mode-puzzle',
+  blitz: '#btn-mode-blitz',
+  flux: '#btn-flux',
+  cascade: '#btn-mode-cascade',
+  boss_rush: '#btn-mode-boss-rush',
+  versus: '#btn-mode-versus'
+});
+/** Arcade modes of the hub (the Duel has its own section). */
+const HUB_ARCADE_MODES = Object.freeze(['endless', 'classic', 'puzzle', 'blitz', 'flux', 'cascade', 'boss_rush']);
+/** Sections of the hub, in order, with the locale key of their heading. */
+const HUB_SECTION_KEYS = Object.freeze([
+  'modals.play.section.campaign',
+  'modals.play.section.challenges',
+  'modals.play.section.arcade',
+  'modals.play.section.duel'
+]);
+/** Buttons the slide-in menu keeps now that the modes live in the hub. */
+const DRAWER_BUTTON_IDS = Object.freeze(['btn-play', 'btn-stats', 'btn-settings', 'btn-pause', 'btn-restart', 'btn-shop']);
+/** Smallest tile of the campaign map, in CSS pixels (the touch target size), and the columns the narrowest phone must keep. */
+const MAP_MIN_TILE_PX = 44;
+const MAP_NARROW_MIN_COLUMNS = 4;
+const NARROW_PHONE = 'narrow phone portrait';
+/** An existing player far into the campaign, with Classic, Puzzle and Flux open. */
+const MAP_PLAYER_STORAGE = Object.freeze({
+  [`${STORAGE_PREFIX}${STORAGE_KEYS.unlockedLevel}`]: String(UNLOCKED_GENERATED_LEVEL),
+  [`${STORAGE_PREFIX}${STORAGE_KEYS.schemaVersion}`]: '1'
+});
+/** Standard-mapping buttons the hub and the map answer to, from the gamepad config. */
+const HUB_PAD_BUTTONS = Object.freeze({
+  back: GAME_CONFIG.gamepad.buttons.back[0],
+  chapterPrev: GAME_CONFIG.gamepad.buttons.specialPrev[0],
+  chapterNext: GAME_CONFIG.gamepad.buttons.specialNext[0],
+  dpadRight: GAME_CONFIG.gamepad.buttons.right,
+  dpadLeft: GAME_CONFIG.gamepad.buttons.left
+});
+
+/** Fails when a hub card or its text runs past its box, or the dialog scrolls sideways. */
+async function assertHubFits(page, label) {
+  const found = await page.evaluate((tolerance) => {
+    const card = document.querySelector('#modal-play .modal-card');
+    const cardRect = card.getBoundingClientRect();
+    const clipped = [...document.querySelectorAll('#modal-play .arcade-mode-card, #modal-play .arcade-mode-card > *, #modal-play [class*="arcade-card-"]')]
+      .filter((el) => el.checkVisibility() && el.clientWidth > 0)
+      .filter((el) => el.scrollWidth > el.clientWidth + tolerance)
+      .map((el) => el.id || el.className);
+    const outside = [...document.querySelectorAll('#modal-play .arcade-mode-card, #modal-play button')]
+      .filter((el) => el.checkVisibility())
+      .filter((el) => {
+        const rect = el.getBoundingClientRect();
+        return rect.left < cardRect.left - tolerance || rect.right > cardRect.right + tolerance;
+      })
+      .map((el) => el.id || el.className);
+    return { clipped, outside, dialogScroll: card.scrollWidth - card.clientWidth };
+  }, OVERFLOW_TOLERANCE_PX);
+  assert.deepEqual(found.clipped, [], `${label}: text runs past its card`);
+  assert.deepEqual(found.outside, [], `${label}: controls leave the dialog sideways`);
+  assert.ok(found.dialogScroll <= OVERFLOW_TOLERANCE_PX, `${label}: the dialog scrolls sideways`);
+  await assertLayoutFits(page, label);
+}
+
+/** The state of the campaign map: tiles in order, the selected and focused level, the roving stop and the chapter. */
+const readMapState = (page) =>
+  page.evaluate(() => {
+    const tiles = [...document.querySelectorAll('#levels-grid .level-tile')];
+    const selected = tiles.find((tile) => tile.getAttribute('aria-selected') === 'true');
+    return {
+      ids: tiles.map((tile) => tile.dataset.levelId),
+      lockedIds: tiles.filter((tile) => tile.getAttribute('aria-disabled') === 'true').map((tile) => tile.dataset.levelId),
+      selectedId: selected?.dataset.levelId ?? null,
+      selectedCount: tiles.filter((tile) => tile.getAttribute('aria-selected') === 'true').length,
+      focusedId: document.activeElement?.dataset?.levelId ?? null,
+      stops: tiles.filter((tile) => tile.tabIndex === 0).length,
+      header: document.querySelector('#levels-detail-header').textContent,
+      chapter: document.querySelector('#levels-chapter-select').value,
+      pageOverflow: document.documentElement.scrollWidth - window.innerWidth
+    };
+  });
+
+for (const viewport of VIEWPORTS) {
+  describe(`play hub: ${viewport.name} (${viewport.width}x${viewport.height})`, () => {
+    for (const language of Object.keys(LOCALES)) {
+      test(`the Play hub opens over the run, pauses it, lists its four sections and fits the window (${language})`, async () => {
+        const { context, page, errors } = await openGame(viewport, { initStorage: languageStorage(language) });
+        try {
+          await startLevelOne(page);
+          await clickMenuButton(page, viewport, '#btn-play');
+          await waitShown(page, '#modal-play');
+          assert.equal(await engineState(page), GAME_STATES.PAUSED, 'the hub pauses the run');
+          assert.ok(await page.evaluate(() => document.querySelector('#modal-play').contains(document.activeElement)), 'the hub takes focus');
+          assert.equal(await focusedId(page), 'btn-campaign-continue', 'a campaign run opens the hub on its Continue button');
+          assert.equal(await page.evaluate(() => document.querySelector('.app-shell').inert), true, 'the shell is out of reach');
+          assert.equal(await textOf(page, '#modal-play-title'), localeText(language, 'modals.play.title'));
+          assert.equal(
+            await textOf(page, '#btn-campaign-continue'),
+            localeText(language, 'modals.levelSelect.button.resume', { level: 1 }),
+            'the running level is offered for resuming'
+          );
+          const headings = await page.evaluate(() =>
+            [...document.querySelectorAll('#modal-play section[aria-labelledby]')].map(
+              (section) => document.getElementById(section.getAttribute('aria-labelledby'))?.textContent.trim() ?? ''
+            )
+          );
+          assert.deepEqual(headings, HUB_SECTION_KEYS.map((key) => localeText(language, key)), 'four sections, in order');
+          await assertHubFits(page, `Play hub (${language})`);
+
+          await page.keyboard.press('Escape');
+          await page.waitForFunction(() => document.querySelector('#modal-play').classList.contains('hidden'));
+          assert.equal(await engineState(page), GAME_STATES.PLAYING, 'closing the hub resumes the run');
+          assert.equal(await isShown(page, '#modal-pause'), false, 'closing the hub leaves no Pause dialog');
+          assert.deepEqual(errors, []);
+        } finally {
+          await context.close();
+        }
+      });
+    }
+
+    test('a fresh profile finds every gated card locked in the hub; a tap names the level that opens it', async () => {
+      const { context, page, errors } = await openGame(viewport);
+      try {
+        await openPlayHub(page, viewport);
+        const required = GAME_CONFIG.modeUnlocks.campaignLevelCleared;
+        const gated = [
+          ...Object.entries(HUB_CARD_BY_MODE).map(([mode, selector]) => ({ selector, level: required[mode] })),
+          { selector: '#btn-weekly', level: WEEKLY_REQUIRED_LEVEL }
+        ];
+        const modeBefore = await page.evaluate(() => window.__fluxEngine.mode);
+        for (const { selector, level } of gated) {
+          assert.equal(await isMenuItemLocked(page, selector), true, `${selector} is locked`);
+          assert.equal(
+            await page.evaluate((sel) => document.querySelector(sel).classList.contains('is-locked'), selector),
+            true,
+            `${selector} looks locked`
+          );
+          assert.ok(
+            await page.evaluate((sel) => (document.querySelector(sel).getAttribute('title') || '').trim().length > 0, selector),
+            `${selector} states why in its tooltip`
+          );
+          // Playwright refuses to click an aria-disabled button: dispatch the click the player's tap would produce.
+          await page.dispatchEvent(selector, 'click');
+          await page.waitForFunction(
+            (needed) => {
+              const hint = document.querySelector('#play-hub-hint');
+              return !hint.classList.contains('hidden') && new RegExp(`\\b${needed}\\b`).test(hint.textContent);
+            },
+            level
+          );
+          assert.equal(await page.evaluate(() => window.__fluxEngine.mode), modeBefore, `${selector} changed nothing`);
+        }
+        for (const selector of ['#btn-daily', '#btn-campaign-continue', '#btn-campaign-map']) {
+          assert.equal(await isMenuItemLocked(page, selector), false, `${selector} is always open`);
+        }
+        await assertHubFits(page, 'locked Play hub');
+        assert.deepEqual(errors, []);
+      } finally {
+        await context.close();
+      }
+    });
+
+    test('Weekly Flux opens at the campaign level of its own, with Flux still locked, and never carries a New badge', async () => {
+      const { context, page, errors } = await openGame(viewport);
+      try {
+        // One level short: the unlocked level is one past the cleared one.
+        await reloadWithUnlockedLevel(page, WEEKLY_REQUIRED_LEVEL);
+        await openPlayHub(page, viewport);
+        assert.equal(await isMenuItemLocked(page, '#btn-weekly'), true, 'the Weekly waits for the campaign');
+        await page.dispatchEvent('#btn-weekly', 'click');
+        await page.waitForFunction(
+          (needed) => new RegExp(`\\b${needed}\\b`).test(document.querySelector('#play-hub-hint').textContent),
+          WEEKLY_REQUIRED_LEVEL
+        );
+        await page.keyboard.press('Escape');
+        await page.waitForFunction(() => document.querySelector('#modal-play').classList.contains('hidden'));
+
+        await reloadWithUnlockedLevel(page, WEEKLY_REQUIRED_LEVEL + 1);
+        await openPlayHub(page, viewport);
+        assert.equal(await isMenuItemLocked(page, '#btn-weekly'), false, 'the Weekly is open');
+        assert.equal(await isMenuItemLocked(page, '#btn-flux'), true, 'Flux itself is still locked');
+        assert.equal(await hasNewBadge(page, '#btn-weekly'), false, 'the Weekly never wears a New badge');
+        await page.click('#btn-weekly');
+        await page.waitForFunction(
+          ([flux, playing]) =>
+            window.__fluxEngine.mode === flux && window.__fluxEngine.state === playing && window.__fluxEngine.isWeeklyFluxRun,
+          [GAME_MODES.FLUX, GAME_STATES.PLAYING]
+        );
+        assert.deepEqual(errors, []);
+      } finally {
+        await context.close();
+      }
+    });
+
+    test('the arcade cards follow the unlock order, and the Duel card opens its picker without the campaign map', async () => {
+      const { context, page, errors } = await openGame(viewport, { initStorage: LOCAL_PLAYER_STORAGE });
+      try {
+        await openPlayHub(page, viewport);
+        const cardIdOf = (mode) => HUB_CARD_BY_MODE[mode].slice(1);
+        const required = GAME_CONFIG.modeUnlocks.campaignLevelCleared;
+        const expectedOrder = [...HUB_ARCADE_MODES].sort((a, b) => required[a] - required[b]).map(cardIdOf);
+        const arcadeIds = new Set(HUB_ARCADE_MODES.map(cardIdOf));
+        const domOrder = await page.evaluate(
+          (ids) => [...document.querySelectorAll('#modal-play .arcade-mode-card')].map((card) => card.id).filter((id) => ids.includes(id)),
+          [...arcadeIds]
+        );
+        assert.deepEqual(domOrder, expectedOrder, 'the arcade cards are listed in the order the campaign opens them');
+
+        const isHidden = LOCAL_ENTRY_HIDDEN_VIEWPORTS.includes(viewport.name);
+        assert.equal(await isShown(page, '#btn-versus-local-hub'), !isHidden, 'the 2 players entry follows the room for two boards');
+        assert.equal(await isShown(page, '#versus-local-hub-hint'), isHidden, 'the hint explains where the entry is hidden');
+
+        await page.click('#btn-mode-versus');
+        await waitShown(page, '#modal-versus-tiers');
+        assert.equal(await isShown(page, '#modal-levels'), false, 'the picker opens without the campaign map');
+        await page.keyboard.press('Escape');
+        await page.waitForFunction(() => document.querySelector('#modal-versus-tiers').classList.contains('hidden'));
+        assert.equal(await isShown(page, '#modal-play'), true, 'Escape leaves the hub open');
+        assert.equal(await focusedId(page), 'btn-mode-versus', 'focus returns to the Duel card');
+        assert.deepEqual(errors, []);
+      } finally {
+        await context.close();
+      }
+    });
+
+    test('the slide-in menu keeps Play, My stats, Settings and the round actions, and Play wears the New badge', async () => {
+      const newMode = GAME_CONFIG.modeUnlocks.stateNew;
+      const { context, page, errors } = await openGame(viewport, {
+        initStorage: {
+          ...languageStorage('en'),
+          [`${STORAGE_PREFIX}${STORAGE_KEYS.unlockedLevel}`]: String(LOCKED_MODE_REQUIRED_LEVEL + 1),
+          [`${STORAGE_PREFIX}${STORAGE_KEYS.schemaVersion}`]: '1',
+          [`${STORAGE_PREFIX}${STORAGE_KEYS.modeUnlocks}`]: JSON.stringify({ endless: newMode })
+        }
+      });
+      try {
+        await page.click('#btn-menu');
+        await page.waitForFunction(() => document.querySelector('.app-shell').classList.contains('drawer-open'));
+        const drawer = await page.evaluate(() => ({
+          buttons: [...document.querySelectorAll('#app-drawer button.nav-btn')].map((button) => button.id).sort(),
+          mode: [...document.querySelectorAll('#app-drawer .mode-btn')].map((button) => button.id),
+          removed: ['#btn-levels', '#nav-mode-lock-hint', '#levels-chapters'].filter((selector) => document.querySelector(selector))
+        }));
+        assert.deepEqual(drawer.buttons, [...DRAWER_BUTTON_IDS].sort(), 'the menu lists no mode button');
+        assert.deepEqual(drawer.removed, [], 'the old level select entry points are gone');
+        assert.equal(await hasNewBadge(page, '#btn-play'), true, 'Play announces the newly unlocked mode');
+        assert.equal(
+          await page.getAttribute('#btn-play', 'aria-label'),
+          localeText('en', 'app.drawer.button.playNewAria'),
+          'Play says so to screen readers'
+        );
+        await assertLayoutFits(page, 'slide-in menu with the New badge');
+        await page.click('#btn-play');
+        await waitShown(page, '#modal-play');
+        assert.equal(await hasNewBadge(page, '#btn-endless'), true, 'the Survival card carries the badge');
+        assert.equal(await hasNewBadge(page, '#btn-weekly'), false, 'the Weekly never does');
+        assert.deepEqual(errors, []);
+      } finally {
+        await context.close();
+      }
+    });
+
+    test('a fresh profile shows no New badge on Play', async () => {
+      const { context, page, errors } = await openGame(viewport);
+      try {
+        await page.click('#btn-menu');
+        await page.waitForFunction(() => document.querySelector('.app-shell').classList.contains('drawer-open'));
+        assert.equal(await hasNewBadge(page, '#btn-play'), false);
+        assert.deepEqual(errors, []);
+      } finally {
+        await context.close();
+      }
+    });
+
+    test('the campaign map is driven from the keyboard: arrows select and follow focus, Enter plays, filter and jump keep the page narrow', async () => {
+      const { context, page, errors } = await openGame(viewport);
+      try {
+        await reloadWithUnlockedLevel(page, UNLOCKED_GENERATED_LEVEL);
+        await openCampaignMap(page, viewport);
+        const opened = await readMapState(page);
+        const currentId = String(UNLOCKED_GENERATED_LEVEL);
+        assert.equal(opened.selectedId, currentId, 'the current level is pre-selected');
+        assert.equal(opened.selectedCount, 1, 'one tile is selected');
+        assert.equal(opened.stops, 1, 'one tile is the keyboard stop');
+        assert.equal(opened.focusedId, currentId, 'the map opens on the selected tile');
+        assert.ok(opened.header.includes(currentId), 'the detail panel describes the selected level');
+        assert.ok(opened.pageOverflow <= OVERFLOW_TOLERANCE_PX, 'the map does not widen the page');
+
+        const grid = await page.evaluate(() => {
+          const gridEl = document.querySelector('#levels-grid');
+          const tile = gridEl.querySelector('.level-tile');
+          return {
+            columns: getComputedStyle(gridEl).gridTemplateColumns.split(' ').filter(Boolean).length,
+            tileWidth: tile.getBoundingClientRect().width,
+            tileHeight: tile.getBoundingClientRect().height
+          };
+        });
+        assert.ok(grid.tileWidth >= MAP_MIN_TILE_PX && grid.tileHeight >= MAP_MIN_TILE_PX, `tiles are ${grid.tileWidth}x${grid.tileHeight}px, under ${MAP_MIN_TILE_PX}px`);
+        if (viewport.name === NARROW_PHONE) {
+          assert.ok(grid.columns >= MAP_NARROW_MIN_COLUMNS, `${grid.columns} columns, under ${MAP_NARROW_MIN_COLUMNS}`);
+        }
+        await assertLayoutFits(page, 'campaign map');
+
+        // Selection follows focus: the arrow moves both, and the detail panel follows.
+        const index = opened.ids.indexOf(currentId);
+        assert.ok(index > 0 && index < opened.ids.length - 1, 'the test level has neighbours in its chapter');
+        await page.keyboard.press('ArrowRight');
+        const next = await readMapState(page);
+        assert.equal(next.selectedId, opened.ids[index + 1], 'ArrowRight selects the next level');
+        assert.equal(next.focusedId, next.selectedId, 'focus follows the selection');
+        assert.ok(next.header.includes(next.selectedId), 'the detail panel follows the selection');
+        assert.equal(next.stops, 1, 'still one keyboard stop');
+        await page.keyboard.press('ArrowLeft');
+        assert.equal((await readMapState(page)).selectedId, currentId, 'ArrowLeft goes back');
+        await page.keyboard.press('End');
+        const last = await readMapState(page);
+        assert.equal(last.selectedId, opened.ids[opened.ids.length - 1], 'End selects the last level of the chapter');
+        await page.keyboard.press('Home');
+        assert.equal((await readMapState(page)).selectedId, opened.ids[0], 'Home selects the first level of the chapter');
+        // A locked level can be selected and read, but not played.
+        const lockedLevel = last.lockedIds[0];
+        if (lockedLevel !== undefined) {
+          await page.keyboard.press('End');
+          await page.keyboard.press('Enter');
+          assert.equal(await isShown(page, '#modal-levels'), true, 'Enter on a locked level plays nothing');
+          assert.equal(await page.evaluate(() => window.__fluxEngine.currentLevelId), UNLOCKED_GENERATED_LEVEL, 'the run did not change');
+          assert.equal(await isMenuItemLocked(page, '#btn-play-level-modal'), true, 'the detail panel disables Play for a locked level');
+          assert.equal(await isShown(page, '#levels-detail-lock'), true, 'the detail panel says why');
+        }
+
+        // A chapter key changes chapter and keeps focus on a tile; Current level brings the player back.
+        await page.keyboard.press('PageUp');
+        const previousChapter = await readMapState(page);
+        assert.notEqual(previousChapter.chapter, opened.chapter, 'PageUp opens the previous chapter');
+        assert.ok(previousChapter.focusedId !== null, 'focus stays on a tile');
+        await page.click('#btn-levels-jump-current');
+        const jumped = await readMapState(page);
+        assert.equal(jumped.chapter, opened.chapter, 'Current level returns to the chapter of the run');
+        assert.equal(jumped.selectedId, currentId, 'Current level selects the level of the run');
+        assert.equal(jumped.focusedId, currentId, 'Current level focuses it');
+
+        // The filter keeps open, unfinished levels, and its toggle restores the chapter.
+        await page.click('#btn-levels-filter-incomplete');
+        assert.equal(await page.getAttribute('#btn-levels-filter-incomplete', 'aria-pressed'), 'true');
+        const filtered = await readMapState(page);
+        assert.ok(filtered.ids.length > 0 && filtered.ids.length <= opened.ids.length, 'the filter lists a part of the chapter');
+        assert.deepEqual(filtered.lockedIds, [], 'the filter lists no locked level');
+        assert.equal(filtered.stops, 1, 'one keyboard stop after filtering');
+        assert.equal(filtered.selectedCount, 1, 'one selection after filtering');
+        await page.click('#btn-levels-filter-incomplete');
+        assert.equal(await page.getAttribute('#btn-levels-filter-incomplete', 'aria-pressed'), 'false');
+        assert.deepEqual((await readMapState(page)).ids, opened.ids, 'unfiltering restores the chapter');
+        await assertLayoutFits(page, 'campaign map after navigation');
+
+        // A click on another level selects it; Enter on the selected level plays it.
+        const target = opened.ids[index - 1];
+        await page.click(`#levels-grid .level-tile[data-level-id="${target}"]`);
+        assert.equal((await readMapState(page)).selectedId, target, 'a tap selects the level');
+        assert.equal(await isShown(page, '#modal-levels'), true, 'a tap on another level does not start it');
+        assert.equal(await page.evaluate(() => window.__fluxEngine.currentLevelId), UNLOCKED_GENERATED_LEVEL);
+        await page.focus(`#levels-grid .level-tile[data-level-id="${target}"]`);
+        await page.keyboard.press('Enter');
+        await page.waitForFunction(
+          ([id, playing]) => window.__fluxEngine.currentLevelId === id && window.__fluxEngine.state === playing,
+          [Number(target), GAME_STATES.PLAYING]
+        );
+        assert.equal(await isShown(page, '#modal-levels'), false, 'playing a level closes the map');
+        assert.equal(await isShown(page, '#modal-play'), false, 'and the hub under it');
+        assert.deepEqual(errors, []);
+      } finally {
+        await context.close();
+      }
+    });
+  });
+}
+
+describe('play hub (desktop)', () => {
+  const desktop = VIEWPORTS[0];
+
+  test('the d-pad moves through the hub and the map tiles, the bumpers change chapter, and Back unwinds the map then the hub', async () => {
+    const { context, page, errors } = await openGame(desktop, { initStorage: MAP_PLAYER_STORAGE, initScript: installPadStub });
+    try {
+      await connectPad(page);
+      await openPlayHub(page, desktop);
+      const hubStart = await focusedId(page);
+      assert.equal(hubStart, 'btn-campaign-continue');
+      await tapPad(page, PAD_BUTTONS.dpadDown);
+      assert.notEqual(await focusedId(page), hubStart, 'the d-pad moves focus off Continue');
+      assert.equal(await page.evaluate(() => document.activeElement.classList.contains('pad-focus')), true, 'the pad focus ring follows');
+
+      await page.click('#btn-campaign-map');
+      await waitShown(page, '#modal-levels');
+      const opened = await readMapState(page);
+      const index = opened.ids.indexOf(opened.selectedId);
+      const button = index < opened.ids.length - 1 ? HUB_PAD_BUTTONS.dpadRight : HUB_PAD_BUTTONS.dpadLeft;
+      await tapPad(page, button);
+      const moved = await readMapState(page);
+      assert.equal(moved.selectedId, opened.ids[index + (button === HUB_PAD_BUTTONS.dpadRight ? 1 : -1)], 'the d-pad selects the neighbour tile');
+      assert.equal(moved.focusedId, moved.selectedId, 'focus follows the selection');
+
+      await tapPad(page, HUB_PAD_BUTTONS.chapterPrev);
+      const previous = await readMapState(page);
+      assert.notEqual(previous.chapter, opened.chapter, 'the left bumper opens the previous chapter');
+      await tapPad(page, HUB_PAD_BUTTONS.chapterNext);
+      assert.equal((await readMapState(page)).chapter, opened.chapter, 'the right bumper comes back');
+
+      await tapPad(page, HUB_PAD_BUTTONS.back);
+      await page.waitForFunction(() => document.querySelector('#modal-levels').classList.contains('hidden'));
+      assert.equal(await isShown(page, '#modal-play'), true, 'Back closes the map and leaves the hub');
+      await tapPad(page, HUB_PAD_BUTTONS.back);
+      await page.waitForFunction(() => document.querySelector('#modal-play').classList.contains('hidden'));
+      assert.deepEqual(errors, []);
+    } finally {
+      await context.close();
+    }
+  });
+
+  test('the Puzzle and seed disclosures open one at a time, a puzzle stage starts at once, and a seed is checked', async () => {
+    const { context, page, errors } = await openGame(desktop, { initStorage: EXISTING_PLAYER_STORAGE });
+    try {
+      await openPlayHub(page, desktop);
+      assert.equal(await isShown(page, '#puzzle-stages-strip'), false, 'the stages start folded');
+      assert.equal(await page.getAttribute('#btn-puzzle-stages-toggle', 'aria-expanded'), 'false');
+      await page.click('#btn-puzzle-stages-toggle');
+      await waitShown(page, '#puzzle-stages-strip');
+      assert.equal(await page.getAttribute('#btn-puzzle-stages-toggle', 'aria-expanded'), 'true');
+      await page.click('#btn-flux-seed-toggle');
+      await waitShown(page, '#flux-seed-entry');
+      assert.equal(await isShown(page, '#puzzle-stages-strip'), false, 'opening the seed entry folds the stages');
+      assert.equal(await page.getAttribute('#btn-puzzle-stages-toggle', 'aria-expanded'), 'false');
+      assert.equal(await page.getAttribute('#btn-flux-seed-toggle', 'aria-expanded'), 'true');
+
+      // An invalid seed is explained and starts nothing; a valid one starts the shared Flux.
+      const modeBefore = await page.evaluate(() => window.__fluxEngine.mode);
+      await page.fill('#input-flux-seed', SHARED_FLUX_SEED.slice(0, 1));
+      await page.click('#btn-flux-seed-go');
+      await page.waitForFunction(() => {
+        const hint = document.querySelector('#play-hub-hint');
+        return !hint.classList.contains('hidden') && hint.textContent.trim().length > 0;
+      });
+      assert.equal(await page.evaluate(() => window.__fluxEngine.mode), modeBefore, 'an invalid seed starts nothing');
+      assert.equal(await isShown(page, '#modal-play'), true, 'the hub stays open');
+
+      await page.click('#btn-puzzle-stages-toggle');
+      await waitShown(page, '#puzzle-stages-strip');
+      await page.click('#puzzle-stages-strip .puzzle-stage-btn[data-puzzle-stage="1"]');
+      await page.waitForFunction(
+        ([mode, playing]) =>
+          window.__fluxEngine.mode === mode && window.__fluxEngine.state === playing && window.__fluxEngine.currentPuzzleStage === 1,
+        [GAME_MODES.PUZZLE, GAME_STATES.PLAYING]
+      );
+      assert.equal(await isShown(page, '#modal-play'), false, 'a stage closes the hub');
+      assert.deepEqual(errors, []);
+    } finally {
+      await context.close();
+    }
+  });
+
+  test('the seed entry works on a fresh profile while Flux is locked, and starts the shared seed', async () => {
+    const { context, page, errors } = await openGame(desktop);
+    try {
+      await openPlayHub(page, desktop);
+      assert.equal(await isMenuItemLocked(page, '#btn-flux'), true, 'Flux is locked');
+      await page.click('#btn-flux-seed-toggle');
+      await waitShown(page, '#flux-seed-entry');
+      await page.fill('#input-flux-seed', SHARED_FLUX_SEED);
+      await page.click('#btn-flux-seed-go');
+      await page.waitForFunction(
+        ([flux, seed]) => window.__fluxEngine.mode === flux && window.__fluxEngine.fluxSeed === seed,
+        [GAME_MODES.FLUX, SHARED_FLUX_SEED]
+      );
+      assert.deepEqual(errors, []);
+    } finally {
+      await context.close();
+    }
+  });
+
+  test('while Survival runs the hub opens on its card, marks it, and Continue returns to the suggested campaign level', async () => {
+    const { context, page, errors } = await openGame(desktop, { initStorage: { ...EXISTING_PLAYER_STORAGE, ...languageStorage('en') } });
+    try {
+      await page.evaluate(() => {
+        const engine = window.__fluxEngine;
+        engine.startEndlessMode();
+        engine.notifyUI();
+      });
+      await page.waitForFunction((playing) => window.__fluxEngine.state === playing, GAME_STATES.PLAYING);
+      await openPlayHub(page, desktop);
+      assert.equal(await focusedId(page), 'btn-endless', 'the hub opens on the running mode');
+      const marks = await page.evaluate(() => ({
+        survival: document.querySelector('#btn-endless').classList.contains('active-mode'),
+        survivalCurrent: document.querySelector('#btn-endless').hasAttribute('aria-current'),
+        daily: document.querySelector('#btn-daily').classList.contains('active-mode'),
+        campaign: document.querySelector('#btn-campaign-continue').closest('section').classList.contains('active-mode')
+      }));
+      assert.deepEqual(marks, { survival: true, survivalCurrent: true, daily: false, campaign: false });
+      const suggested = EXISTING_PLAYER_UNLOCKED_LEVEL;
+      assert.equal(
+        await textOf(page, '#btn-campaign-continue'),
+        localeText('en', 'modals.play.campaign.continue', { level: suggested }),
+        'no campaign run: Continue offers the furthest level'
+      );
+      await page.click('#btn-campaign-continue');
+      await page.waitForFunction(
+        ([mode, level, playing]) =>
+          window.__fluxEngine.mode === mode && window.__fluxEngine.currentLevelId === level && window.__fluxEngine.state === playing,
+        [GAME_MODES.CAMPAIGN, suggested, GAME_STATES.PLAYING]
+      );
+      assert.equal(await isShown(page, '#modal-play'), false, 'Continue closes the hub');
+      assert.deepEqual(errors, []);
+    } finally {
+      await context.close();
+    }
+  });
+
+  test('in forced colors the selected level of the map is told apart from the others', async () => {
+    const { context, page, errors } = await openGame(desktop);
+    try {
+      await reloadWithUnlockedLevel(page, UNLOCKED_GENERATED_LEVEL);
+      await page.emulateMedia({ forcedColors: 'active' });
+      await openCampaignMap(page, desktop);
+      const looks = await page.evaluate(() => {
+        const signatureOf = (tile) => {
+          const style = getComputedStyle(tile);
+          return [style.backgroundColor, style.color, style.outlineStyle, style.outlineWidth, style.outlineColor, style.borderTopColor, style.borderTopWidth].join('|');
+        };
+        const tiles = [...document.querySelectorAll('#levels-grid .level-tile')];
+        const selected = tiles.find((tile) => tile.getAttribute('aria-selected') === 'true');
+        const other = tiles.find((tile) => tile !== selected && !tile.classList.contains('current') && tile.getAttribute('aria-disabled') !== 'true');
+        return { selected: signatureOf(selected), other: signatureOf(other) };
+      });
+      assert.notEqual(looks.selected, looks.other, 'the selected tile does not rely on a colour forced colors would drop');
+      assert.deepEqual(errors, []);
+    } finally {
+      await context.close();
+    }
+  });
+});
