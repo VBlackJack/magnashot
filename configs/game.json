@@ -122,7 +122,14 @@
       "startingShots": 0,
       "collectorMagnet": 0
     },
-    "dailyAllowsSpecialAmmo": false
+    "dailyAllowsSpecialAmmo": false,
+    "puzzleUpgradeLevels": {
+      "laserSight": 0,
+      "blastRadius": 0,
+      "overchargeRate": 0,
+      "startingShots": 0,
+      "collectorMagnet": 0
+    }
   },
   "upgrades": {
     "laserSight": {
@@ -630,9 +637,9 @@
         "brush": 0
       },
       "starThresholds": [
-        400,
-        900,
-        1400
+        0,
+        1470,
+        1470
       ],
       "obstacles": [],
       "balls": [
@@ -690,9 +697,9 @@
         "brush": 1
       },
       "starThresholds": [
-        500,
-        1000,
-        1600
+        0,
+        970,
+        970
       ],
       "obstacles": [],
       "balls": [
@@ -747,9 +754,9 @@
         "brush": 0
       },
       "starThresholds": [
-        400,
-        800,
-        1200
+        0,
+        700,
+        820
       ],
       "obstacles": [],
       "balls": [
@@ -788,7 +795,7 @@
       "objective": "coreRescue",
       "queue": [
         {
-          "colorId": "amber",
+          "colorId": "crimson",
           "specialType": null
         },
         {
@@ -797,7 +804,7 @@
         }
       ],
       "specialInventory": {
-        "bomb": 1,
+        "bomb": 0,
         "lightning": 0,
         "rainbow": 0,
         "anvil": 0,
@@ -806,9 +813,9 @@
         "brush": 0
       },
       "starThresholds": [
-        600,
-        1200,
-        1800
+        0,
+        1110,
+        1110
       ],
       "obstacles": [
         {
@@ -836,7 +843,7 @@
         {
           "dx": 36,
           "y": 212,
-          "colorId": "crimson"
+          "colorId": "amber"
         }
       ]
     },
@@ -860,13 +867,13 @@
         "rainbow": 1,
         "anvil": 0,
         "freeze": 0,
-        "rocket": 1,
+        "rocket": 0,
         "brush": 0
       },
       "starThresholds": [
-        800,
-        1500,
-        2200
+        0,
+        1720,
+        1720
       ],
       "obstacles": [],
       "balls": [
@@ -921,9 +928,9 @@
         "brush": 0
       },
       "starThresholds": [
-        600,
-        1200,
-        1800
+        0,
+        930,
+        930
       ],
       "obstacles": [
         {
@@ -993,9 +1000,9 @@
         "brush": 0
       },
       "starThresholds": [
-        700,
-        1400,
-        2100
+        0,
+        1480,
+        1960
       ],
       "obstacles": [
         {
@@ -1065,9 +1072,9 @@
         "brush": 0
       },
       "starThresholds": [
-        700,
-        1400,
-        2100
+        0,
+        1740,
+        1740
       ],
       "obstacles": [],
       "balls": [
@@ -1079,25 +1086,32 @@
           "clusterModifier": "neutralAnchor"
         },
         {
+          "dx": -72,
+          "y": 123,
+          "colorId": "violet",
+          "isAnchor": true
+        },
+        {
           "dx": -36,
-          "y": 141,
+          "y": 123,
           "colorId": "violet",
           "clusterModifier": "paintCore"
         },
         {
-          "dx": 0,
-          "y": 141,
-          "colorId": "violet"
+          "dx": 36,
+          "y": 123,
+          "colorId": "violet",
+          "isAnchor": true
         },
         {
-          "dx": 36,
+          "dx": 0,
           "y": 141,
           "colorId": null,
           "clusterModifier": "rust"
         },
         {
-          "dx": 0,
-          "y": 177,
+          "dx": 30,
+          "y": 170,
           "colorId": "amber",
           "clusterModifier": "rescueCore"
         }
@@ -1123,9 +1137,9 @@
         "brush": 0
       },
       "starThresholds": [
-        800,
-        1500,
-        2300
+        0,
+        740,
+        760
       ],
       "obstacles": [],
       "balls": [
@@ -1173,11 +1187,11 @@
       "objective": "coreRescue",
       "queue": [
         {
-          "colorId": "crimson",
+          "colorId": "cobalt",
           "specialType": null
         },
         {
-          "colorId": "crimson",
+          "colorId": "cobalt",
           "specialType": null
         }
       ],
@@ -1187,13 +1201,13 @@
         "rainbow": 0,
         "anvil": 0,
         "freeze": 0,
-        "rocket": 1,
+        "rocket": 0,
         "brush": 0
       },
       "starThresholds": [
-        900,
-        1700,
-        2500
+        0,
+        1290,
+        1290
       ],
       "obstacles": [
         {
@@ -1979,6 +1993,7 @@
       "cascadeHighScore": "cascade_high_score",
       "puzzleHighScore": "puzzle_high_score",
       "puzzleBestStage": "puzzle_best_stage",
+      "puzzleStageStats": "puzzle_stage_stats",
       "classicHighScore": "classic_high_score",
       "classicBestStage": "classic_best_stage",
       "versusRecords": "versus_records",
