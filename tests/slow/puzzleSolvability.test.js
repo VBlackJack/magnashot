@@ -61,7 +61,6 @@ const ROTOR_PRE_FRAMES_STEP = 20;
 const SWAP_SWEEP_STAGE = 4;
 const IDLE_FRAMES = 3600;
 const TWO_SHOT_STAGES = Object.freeze(puzzles.filter((puzzle) => puzzle.shots >= 2).map((puzzle) => puzzle.id));
-const R1_PENDING = 'needs R1 (Lot R): no launcher swap in Puzzle';
 
 const roundAngle = (angle) => Math.round(angle * ANGLE_SCALE) / ANGLE_SCALE;
 
@@ -269,7 +268,7 @@ test('(d) a stage left idle never reaches the danger line', async () => {
   });
 });
 
-test('(P12) a launcher swap attempt changes nothing in Puzzle', { todo: R1_PENDING }, async () => {
+test('(P12) a launcher swap attempt changes nothing in Puzzle', async () => {
   const pin = solutions.twoShot[SWAP_SWEEP_STAGE];
   const { minDeg, maxDeg } = aimRangeDegrees({ game: gameConfig });
   const jobs = [];
