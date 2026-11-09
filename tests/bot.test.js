@@ -56,6 +56,8 @@ const ENDGAME_BOMB_COUNT = 1000;
 const createEngine = () => {
   const storageManager = new StorageManager();
   storageManager.init();
+  // Calibrated difficulty is measured without the Resonance bonus, which is for humans only.
+  storageManager.setResonanceEnabled(false);
   return new GameEngine({
     gameConfig: configs.game,
     physicsConfig: configs.physics,

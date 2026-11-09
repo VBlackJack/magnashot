@@ -237,6 +237,10 @@
       <p id="versus-tiers-rules" class="modal-subtext" data-i18n="versus.lobby.rules"></p>
       <div id="versus-tier-list" class="versus-tier-list" role="group" data-i18n-aria-label="versus.lobby.pickTier">
       </div>
+      <label class="settings-controller-field versus-setup-option">
+        <input id="input-versus-resonance" type="checkbox">
+        <span data-i18n="versus.setup.resonance"></span>
+      </label>
       <p id="versus-tier-hint" class="modal-subtext hidden" role="status" aria-live="polite"></p>
       <p id="versus-local-entry-hint" class="modal-subtext hidden" data-i18n="versus.local.entryHint"></p>
       <div class="modal-actions">
@@ -426,6 +430,22 @@
           <span class="pause-setting-caption" data-caption-for="btn-anim-speed" aria-hidden="true"></span>
         </div>
         <div class="pause-setting">
+          <button id="btn-music" type="button" class="nav-btn icon-btn"></button>
+          <span class="pause-setting-caption" data-caption-for="btn-music" aria-hidden="true"></span>
+        </div>
+        <div class="pause-setting">
+          <button id="btn-music-volume" type="button" class="nav-btn badge-btn"></button>
+          <span class="pause-setting-caption" data-caption-for="btn-music-volume" aria-hidden="true"></span>
+        </div>
+        <div class="pause-setting">
+          <button id="btn-resonance" type="button" class="nav-btn icon-btn"></button>
+          <span class="pause-setting-caption" data-caption-for="btn-resonance" aria-hidden="true"></span>
+        </div>
+        <div class="pause-setting">
+          <button id="btn-calibrate" type="button" class="nav-btn icon-btn" aria-haspopup="dialog" data-i18n="app.nav.button.calibrateIcon" data-i18n-aria-label="app.settings.calibrate.title" data-i18n-title="app.settings.calibrate.title"></button>
+          <span class="pause-setting-caption" data-i18n="app.settings.calibrate.title" aria-hidden="true"></span>
+        </div>
+        <div class="pause-setting">
           <button id="btn-fullscreen" type="button" class="nav-btn icon-btn"></button>
           <span class="pause-setting-caption" data-caption-for="btn-fullscreen" aria-hidden="true"></span>
         </div>
@@ -474,6 +494,25 @@
       </div>
       <div class="modal-actions">
         <button id="btn-close-settings" type="button" class="modal-btn primary" data-i18n="modals.settings.button.close"></button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Rhythm calibration: tap along with the beat ring; stacked over Settings -->
+  <div id="modal-calibrate" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="modal-calibrate-title" aria-describedby="calibrate-intro">
+    <div class="modal-card">
+      <h2 id="modal-calibrate-title" class="modal-title" data-i18n="app.settings.calibrate.title"></h2>
+      <p id="calibrate-intro" class="modal-subtext"></p>
+      <div class="calibrate-stage" aria-hidden="true">
+        <span id="calibrate-ring" class="calibrate-ring is-idle"></span>
+        <span class="calibrate-core"></span>
+      </div>
+      <button id="btn-calibrate-tap" type="button" class="modal-btn primary calibrate-tap" data-i18n="app.settings.calibrate.tap"></button>
+      <p id="calibrate-progress" class="modal-subtext" role="status" aria-live="off"></p>
+      <p id="calibrate-result" class="modal-stat-line" role="status" aria-live="polite"></p>
+      <div class="modal-actions">
+        <button id="btn-calibrate-reset" type="button" class="modal-btn" data-i18n="app.settings.calibrate.reset"></button>
+        <button id="btn-calibrate-done" type="button" class="modal-btn primary" data-i18n="app.settings.calibrate.done"></button>
       </div>
     </div>
   </div>

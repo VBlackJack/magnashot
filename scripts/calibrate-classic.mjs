@@ -79,6 +79,8 @@ const SILENT_AUDIO = Object.freeze({ playEffect() {}, stopAll() {}, isMuted: () 
 function createEngine(configs) {
   const storageManager = new StorageManager();
   storageManager.init();
+  // Calibrated difficulty is measured without the Resonance bonus, which is for humans only.
+  storageManager.setResonanceEnabled(false);
   return new GameEngine({
     gameConfig: configs.game,
     physicsConfig: configs.physics,

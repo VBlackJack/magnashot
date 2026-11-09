@@ -29,7 +29,7 @@
 
 const SINGLE_BALL = 1;
 const DOUBLE_BALL = 2;
-const OPPOSITE_STRENGTH_LOSS = 1;
+export const OPPOSITE_STRENGTH_LOSS = 1;
 const NO_STRENGTH = 0;
 const FULL_PROGRESS = 1;
 const NO_PROGRESS = 0;
@@ -137,9 +137,10 @@ export function isChargeThreatening(charge, cfg) {
  * Same polarity: the charge is untouched and the projectile is pushed away, still flying.
  * @param {object} charge - From createCharge.
  * @param {{polarity:number}} shot - Shot polarity (see shotPolarity).
+ * @param {number} [loss] - Strength an opposite-polarity hit removes (more for a Resonant shot).
  * @returns {{outcome:string, charge:object, projectileConsumed:boolean, projectileVxFlip:boolean}}
  */
-export function resolveChargeHit(charge, shot) {
+export function resolveChargeHit(charge, shot, loss = OPPOSITE_STRENGTH_LOSS) {
   if (shot.polarity === charge.polarity) {
     return {
       outcome: CHARGE_OUTCOMES.DEFLECTED,
@@ -148,7 +149,7 @@ export function resolveChargeHit(charge, shot) {
       projectileVxFlip: true
     };
   }
-  const strength = Math.max(NO_STRENGTH, charge.strength - OPPOSITE_STRENGTH_LOSS);
+  const strength = Math.max(NO_STRENGTH, charge.strength - loss);
   return {
     outcome: strength === NO_STRENGTH ? CHARGE_OUTCOMES.NEUTRALISED : CHARGE_OUTCOMES.WEAKENED,
     charge: { ...charge, strength },

@@ -696,11 +696,21 @@ export const engineTurnResolutionMethods = {
     if (!this.isRunPlaying()) {
       return;
     }
+    const gained = rawAmount * this.getOverchargeMultiplier();
+    if (this.turnResonant) {
+      // What this turn earned, so a Resonant turn that matched or dropped can be topped up.
+      this.turnOverchargeEarned += gained;
+    }
+    this.settleOvercharge(gained);
+  },
+
+  /** Adds Overcharge already scaled by the perks and pays out every full meter. */
+  settleOvercharge(gained) {
     const max = this.getOverchargeCap();
     // A strike can clear the wave: later iterations still grant their special ball but
     // must not hit the next wave's boss.
     const startWave = this.bossRushWave;
-    this.overcharge += rawAmount * this.getOverchargeMultiplier();
+    this.overcharge += gained;
     while (this.overcharge >= max) {
       this.overcharge -= max;
       if (this.versus) {
@@ -801,6 +811,7 @@ export const engineTurnResolutionMethods = {
 
   handlePostTurnCleanup(madeMatch, appliedFreeze = false) {
     const dropped = this.detachAndRewardAvalanche();
+    this.settleTurnResonance(madeMatch || dropped > 0);
     this.shiftChameleonBalls();
     // A Freeze Core that went off during this turn (the shot or its avalanche) counts as a
     // freeze applied this turn. Read after the avalanche so a core it sets off is consumed here.

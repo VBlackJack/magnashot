@@ -647,6 +647,10 @@ export const uiInputBindingMethods = {
     if (this.handleVersusBack()) {
       return;
     }
+    if (this.isCalibrationOpen()) {
+      this.closeCalibration();
+      return;
+    }
     if (!this.elements.modalLevels.classList.contains('hidden')) {
       this.closeOverlayModal(this.elements.modalLevels);
       return;

@@ -144,6 +144,8 @@ export function checkThresholds(summary, calibration) {
 function playMatch({ seed, cpuTiers, configs, calibration }) {
   const storageManager = new StorageManager();
   storageManager.init();
+  // Calibrated difficulty is measured without the Resonance bonus, which is for humans only.
+  storageManager.setResonanceEnabled(false);
   const match = createVersusMatch({
     seed,
     mode: 'cpu',

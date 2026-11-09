@@ -385,6 +385,8 @@ const playFrozenScenario = ({ name, ...options }) => {
     configs,
     storageManager: createManager(),
     audioManager: SPY_AUDIO,
+    // The fixture predates Resonance: it is replayed with the match option off.
+    resonance: false,
     ...options
   });
   const result = match.run(MATCH_FRAME_CAP);

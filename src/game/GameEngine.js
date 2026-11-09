@@ -33,6 +33,7 @@ import { captureRunSnapshot, isValidRunSnapshot, applyRunSnapshot, isRunSnapshot
 import { LevelCatalog } from './LevelCatalog.js';
 import { DISCOVERY_INTERACTIONS } from './Discovery.js';
 
+const FIRST_PLAYED_FRAME = 1;
 const ACHIEVEMENT_TIER_ORDER = Object.freeze(['bronze', 'silver', 'gold']);
 
 import { installMethods } from '../core/installMethods.js';
@@ -47,6 +48,7 @@ import { engineTurnResolutionMethods } from './EngineTurnResolution.js';
 import { engineRoundFlowMethods } from './EngineRoundFlow.js';
 import { engineProgressMethods } from './EngineProgress.js';
 import { engineGhostDuelMethods } from './EngineGhostDuel.js';
+import { enginePulseMethods } from './EnginePulse.js';
 
 /** What a run is measured by when it is compared with the mode's record. */
 export const RUN_BEST_METRICS = Object.freeze({
@@ -163,6 +165,16 @@ export class GameEngine {
     // Ghost Duel: the rival run being raced (see EngineGhostDuel.js) and the replay of a past Daily.
     this.ghostDuel = null;
     this.isDailyRematch = false;
+    // Pulse: the beat clock (update() calls while PLAYING), the Resonance of the turn in
+    // progress and the Overcharge it earned, the launcher flash, and the duel-only controls
+    // (the match option and the CPU roll; see EnginePulse.js).
+    this.beatFrame = 0;
+    this.turnResonant = false;
+    this.turnOverchargeEarned = 0;
+    this.resonanceFlashFrames = 0;
+    this.versusResonanceOption = undefined;
+    this.isBotResonanceBoard = false;
+    this.botResonanceRoll = null;
     this.anvilCrushCount = 0;
     this.isCoreFreezeApplied = false;
     this.outOfShotsGraceFrames = 0;
@@ -657,6 +669,12 @@ export class GameEngine {
     this.versus = null;
     this.clearMagnetar();
     this.isDailyRematch = false;
+    this.beatFrame = 0;
+    this.refreshPulseSettings();
+    this.turnResonant = false;
+    this.turnOverchargeEarned = 0;
+    this.resonanceFlashFrames = 0;
+    this.botResonanceRoll = null;
     // clear() keeps the tilt: a run must not start leaning from the previous run's last reading.
     this.physicsWorld.tiltFactor = 0;
     this.score = 0;
@@ -1230,6 +1248,7 @@ export class GameEngine {
     }
     projectile.isProjectile = true;
     projectile.isPolarityFlipped = this.isPolarityFlipped;
+    this.markResonantShot(projectile);
     projectile.x = this.gameConfig.canvas.launcherX;
     projectile.y = this.gameConfig.canvas.launcherY;
     projectile.savePreviousPosition();
@@ -1267,6 +1286,13 @@ export class GameEngine {
     }
     if (this.state !== GAME_STATES.PLAYING) {
       return;
+    }
+    this.beatFrame++;
+    if (this.beatFrame === FIRST_PLAYED_FRAME) {
+      this.announceResonanceDisabled();
+    }
+    if (this.resonanceFlashFrames > 0) {
+      this.resonanceFlashFrames--;
     }
     this.countPlayTimeForStats(this.physicsConfig.simulation?.fixedStepMs || 0);
     if (this.railLowerFrames > 0) {
@@ -1531,3 +1557,4 @@ installMethods(GameEngine, engineProgressMethods);
 installMethods(GameEngine, engineGhostDuelMethods);
 installMethods(GameEngine, engineVersusMethods);
 installMethods(GameEngine, engineMagnetarMethods);
+installMethods(GameEngine, enginePulseMethods);

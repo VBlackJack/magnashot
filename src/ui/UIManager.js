@@ -65,6 +65,7 @@ import { uiHudRefreshMethods } from './UIHudRefresh.js';
 import { uiStatsMethods, STATS_TABS } from './UIStats.js';
 import { uiGhostDuelMethods } from './UIGhostDuel.js';
 import { uiVersusMethods } from './UIVersus.js';
+import { uiCalibrationMethods } from './UICalibration.js';
 import { uiVersusLocalMethods } from './UIVersusLocal.js';
 
 export {
@@ -170,6 +171,18 @@ export class UIManager {
       btnTilt: document.getElementById('btn-tilt'),
       btnMotion: document.getElementById('btn-motion'),
       btnAnimSpeed: document.getElementById('btn-anim-speed'),
+      btnMusic: document.getElementById('btn-music'),
+      btnMusicVolume: document.getElementById('btn-music-volume'),
+      btnResonance: document.getElementById('btn-resonance'),
+      btnCalibrate: document.getElementById('btn-calibrate'),
+      modalCalibrate: document.getElementById('modal-calibrate'),
+      btnCalibrateTap: document.getElementById('btn-calibrate-tap'),
+      btnCalibrateReset: document.getElementById('btn-calibrate-reset'),
+      btnCalibrateDone: document.getElementById('btn-calibrate-done'),
+      calibrateRing: document.getElementById('calibrate-ring'),
+      calibrateIntro: document.getElementById('calibrate-intro'),
+      calibrateProgress: document.getElementById('calibrate-progress'),
+      calibrateResult: document.getElementById('calibrate-result'),
       btnFullscreen: document.getElementById('btn-fullscreen'),
       btnFullscreenHud: document.getElementById('btn-fullscreen-hud'),
       btnResetHints: document.getElementById('btn-reset-hints'),
@@ -318,6 +331,7 @@ export class UIManager {
       modalVersusTiers: document.getElementById('modal-versus-tiers'),
       versusTierList: document.getElementById('versus-tier-list'),
       versusTierHint: document.getElementById('versus-tier-hint'),
+      versusResonanceOption: document.getElementById('input-versus-resonance'),
       btnVersusTiersBack: document.getElementById('btn-versus-tiers-back'),
       btnVersusLocal: document.getElementById('btn-versus-local'),
       versusLocalEntryHint: document.getElementById('versus-local-entry-hint'),
@@ -380,6 +394,12 @@ export class UIManager {
     this.lastFocusedElement = null;
     this.wasAnyModalOpen = false;
     this.stackedModalOpener = null;
+    // Pulse: the music driver (built on the first frame) and the rhythm calibration in progress.
+    this.pulseDriver = null;
+    this.calibration = null;
+    this.calibrationFrameId = null;
+    this.calibrationPressHandled = false;
+    this.calibrationClickEnabled = false;
     this.prevEngineState = null;
     this.isVictoryModalRevealed = false;
     this.isVictoryPresented = false;
@@ -504,6 +524,9 @@ export class UIManager {
     this.setupTiltControl();
     this.updateMotionButton();
     this.updateAnimSpeedButton();
+    this.setupPulseControls();
+    this.setupCalibration();
+    this.bindAudioUnlock();
     this.setupGamepadControls();
     this.setupFullscreenControl();
     this.updateLanguageButton();
@@ -519,6 +542,10 @@ export class UIManager {
       this.updateTiltButton();
       this.updateMotionButton();
       this.updateAnimSpeedButton();
+      this.updateMusicButton();
+      this.updateMusicVolumeButton();
+      this.updateResonanceButton();
+      this.refreshCalibrationText();
       this.updateGamepadControls();
       this.updateFullscreenButton();
       this.updateLanguageButton();
@@ -1404,3 +1431,4 @@ installMethods(UIManager, uiStatsMethods);
 installMethods(UIManager, uiGhostDuelMethods);
 installMethods(UIManager, uiVersusMethods);
 installMethods(UIManager, uiVersusLocalMethods);
+installMethods(UIManager, uiCalibrationMethods);

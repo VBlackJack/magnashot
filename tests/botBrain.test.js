@@ -57,6 +57,8 @@ const SEED_C = 11;
 const createEngine = () => {
   const storageManager = new StorageManager();
   storageManager.init();
+  // Calibrated difficulty is measured without the Resonance bonus, which is for humans only.
+  storageManager.setResonanceEnabled(false);
   const engine = new GameEngine({
     gameConfig: configs.game,
     physicsConfig: configs.physics,

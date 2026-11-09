@@ -69,7 +69,21 @@
         "resetHintsDoneCaption": "Reset ✓",
         "weekly": "Weekly Flux",
         "weeklyBonusBadge": "Weekly Flux +{{coins}} ⬡",
-        "weeklyBestBadge": "Weekly Flux ✓ {{score}}"
+        "weeklyBestBadge": "Weekly Flux ✓ {{score}}",
+        "musicOn": "🎵",
+        "musicOff": "🔕",
+        "musicOnAria": "Music: ON",
+        "musicOffAria": "Music: OFF",
+        "musicAria": "Music",
+        "musicVolume": "{{volume}}%",
+        "musicVolumeAria": "Music volume: {{volume}}%",
+        "musicVolumeCaption": "Music: {{volume}}%",
+        "resonanceOn": "◎",
+        "resonanceOff": "○",
+        "resonanceOnAria": "Resonance: ON",
+        "resonanceOffAria": "Resonance: OFF",
+        "resonanceAria": "Resonance (shoot on the beat)",
+        "calibrateIcon": "⏱"
       },
       "groups": {
         "modes": "Game modes",
@@ -94,6 +108,18 @@
       },
       "stats": {
         "round": "Current run"
+      }
+    },
+    "settings": {
+      "calibrate": {
+        "title": "Calibrate rhythm",
+        "intro": "Tap along with the beat ring {{count}} times. The offset only shifts how your timing is judged.",
+        "tap": "Tap on the beat",
+        "result": "Offset: {{offset}} ms",
+        "reset": "Reset",
+        "done": "Done",
+        "progress": "{{done}} / {{total}} taps",
+        "tooFew": "Not enough taps (at least {{min}}). Press the button to try again."
       }
     }
   },
@@ -422,7 +448,8 @@
         "immune": "UNBREAKABLE: SNAP ITS MOORINGS",
         "moorings": "MOORING SNAPPED! {{left}} LEFT",
         "down": "MAGNETAR DOWN! +{{points}}"
-      }
+      },
+      "resonance": "Resonance!"
     },
     "mutators": {
       "hyperGravity": "Hyper Gravity",
@@ -568,6 +595,9 @@
         "regrow": "Fill the marked slots to block it.",
         "barrage": "Shoot charges with the opposite polarity."
       }
+    },
+    "resonance": {
+      "disabledCompetitive": "Resonance is off in competitive modes"
     }
   },
   "modals": {
@@ -1684,6 +1714,9 @@
     "share": {
       "won": "MagnaShot Polarity Duel: beat CPU {{tier}} {{score}}, {{neutralised}} charges neutralized, {{pulses}} pulses",
       "lost": "MagnaShot Polarity Duel: lost to CPU {{tier}} {{score}}, {{neutralised}} charges neutralized, {{pulses}} pulses"
+    },
+    "setup": {
+      "resonance": "Resonance"
     }
   },
   "toast": {

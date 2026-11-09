@@ -15,6 +15,7 @@
  */
 
 import { configRegistry } from './ConfigRegistry.js';
+import { MusicEngine } from './MusicEngine.js';
 
 const CONTEXT_STATES = Object.freeze({
   RUNNING: 'running',
@@ -47,12 +48,20 @@ export class AudioManager {
     };
     // Timer id of a suspend waiting for the mute fade to end, or null when none is pending.
     this.pendingSuspend = null;
+    // Music settings and the lazily created engine; the bus sits between the engine and
+    // the limiter so music has its own voice budget and level, separate from the effects.
+    this.musicEnabled = true;
+    this.musicVolume = 0;
+    this.musicBus = null;
+    this.music = null;
   }
 
-  init(initialMuted = false, initialReducedMotion = false) {
+  init(initialMuted = false, initialReducedMotion = false, { musicEnabled = true, musicVolume } = {}) {
     this.config = configRegistry.get('audio');
     this.muted = initialMuted;
     this.reducedMotion = Boolean(initialReducedMotion);
+    this.musicEnabled = Boolean(musicEnabled);
+    this.musicVolume = Number.isFinite(musicVolume) ? musicVolume : this.config.music.defaultVolume;
     this.bindVisibility();
   }
 
@@ -79,12 +88,97 @@ export class AudioManager {
       return;
     }
     if (this.muted || this.isDocumentHidden()) {
+      this.music?.pause();
       if (this.ctx.state === CONTEXT_STATES.RUNNING) {
         Promise.resolve(this.ctx.suspend()).catch(() => {});
       }
-    } else if (this.ctx.state === CONTEXT_STATES.SUSPENDED) {
-      Promise.resolve(this.ctx.resume()).catch(() => {});
+    } else if (this.ctx.state !== CONTEXT_STATES.RUNNING) {
+      // Suspended, or interrupted (Safari): the music waits until the context really runs.
+      this.music?.pause();
+      const resuming = Promise.resolve(this.ctx.resume());
+      this.handleContextStateChange();
+      resuming.then(() => this.handleContextStateChange()).catch(() => {});
+    } else {
+      this.music?.resume();
     }
+  }
+
+  /**
+   * Follows the context state: any non-running state (suspended, interrupted) pauses the
+   * music timer, and a return to running re-anchors and resumes it unless muted or hidden.
+   */
+  handleContextStateChange() {
+    if (!this.ctx || !this.music) {
+      return;
+    }
+    if (this.ctx.state !== CONTEXT_STATES.RUNNING || this.muted || this.isDocumentHidden()) {
+      this.music.pause();
+      return;
+    }
+    this.music.resume();
+    this.music.onContextResumed();
+  }
+
+  /** True when music may sound: switched on in settings and not muted. */
+  isMusicActive() {
+    return this.musicEnabled && !this.muted;
+  }
+
+  /** Builds the music bus and engine once the context exists. */
+  createMusic() {
+    if (this.music || !this.ctx || !this.config?.music) {
+      return;
+    }
+    this.musicBus = this.ctx.createGain();
+    this.musicBus.gain.setValueAtTime(1, this.ctx.currentTime);
+    this.musicBus.connect(this.output);
+    this.music = new MusicEngine({
+      ctx: this.ctx,
+      output: this.musicBus,
+      timers: { set: (fn, ms) => this.timers.set(fn, ms), clear: (id) => this.timers.clear(id) },
+      config: this.config.music,
+      enabled: this.isMusicActive()
+    });
+    this.music.setVolume(this.musicVolume);
+  }
+
+  /**
+   * Starts the music for a mode. Creates nothing when muted or switched off, and needs a
+   * context that a user gesture already created (ensureContext from a shot or tap).
+   *
+   * @returns {boolean} True when the music is playing that mode.
+   */
+  startMusic(modeKey) {
+    if (!this.isMusicActive() || !this.music) {
+      return false;
+    }
+    return this.music.start(modeKey);
+  }
+
+  setMusicEnabled(enabled) {
+    this.musicEnabled = Boolean(enabled);
+    this.music?.setEnabled(this.isMusicActive());
+  }
+
+  setMusicVolume(volume) {
+    const value = Number(volume);
+    if (!Number.isFinite(value)) {
+      return;
+    }
+    this.musicVolume = Math.max(0, Math.min(1, value));
+    this.music?.setVolume(this.musicVolume);
+  }
+
+  getMusicState() {
+    const engineState = this.music ? this.music.getState() : null;
+    return {
+      enabled: this.musicEnabled,
+      active: this.isMusicActive(),
+      volume: this.musicVolume,
+      running: Boolean(engineState?.running),
+      paused: Boolean(engineState?.paused),
+      modeKey: engineState?.modeKey ?? null
+    };
   }
 
   setReducedMotion(reduced) {
@@ -115,8 +209,10 @@ export class AudioManager {
       if (AudioCtx) {
         this.ctx = new AudioCtx();
         this.output = this.createLimiter(this.ctx);
+        this.ctx.onstatechange = () => this.handleContextStateChange();
       }
     }
+    this.createMusic();
     this.syncContextState();
   }
 
@@ -187,6 +283,7 @@ export class AudioManager {
    */
   setMuted(muted) {
     this.muted = Boolean(muted);
+    this.music?.setEnabled(this.isMusicActive());
     this.cancelPendingSuspend();
     if (this.muted && this.stopAll()) {
       this.pendingSuspend = this.timers.set(() => {
@@ -317,6 +414,7 @@ export class AudioManager {
     if (Array.isArray(fx.notes)) {
       if (effectName === 'victory' || effectName === 'gameOver') {
         this.stopAll();
+        this.music?.stop(this.config.music.endFadeSec);
       }
       const waveType = this.config.arpeggioWaveType;
       const stepRatio = this.config.arpeggioStepRatio;

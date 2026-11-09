@@ -15,6 +15,7 @@
  */
 
 import { GAME_MODES } from '../core/Constants.js';
+import { FULL_PERCENT } from './WorkshopView.js';
 import { i18n, t, formatNumber } from '../core/I18n.js';
 import { SeededRandom } from '../core/SeededRandom.js';
 import { buildShareText, formatDailyCountdown, getMsUntilNextDaily } from '../game/DailyShare.js';
@@ -218,6 +219,88 @@ export const uiSettingsControlMethods = {
     btn.title = ariaLabel;
     btn.classList?.toggle?.('active', speed !== defaultSpeed);
     setTextIfChanged(document.querySelector(`[data-caption-for="${btn.id}"]`), caption);
+  },
+
+  /**
+   * Applies the stored music settings to the audio manager and wires the Music, Music volume
+   * and Resonance buttons. Music itself starts from the run, never from here.
+   */
+  setupPulseControls() {
+    this.audioManager.setMusicEnabled?.(this.storageManager.getMusicEnabled());
+    this.audioManager.setMusicVolume?.(this.storageManager.getMusicVolume());
+    this.elements.btnMusic?.addEventListener('click', () => {
+      this.toggleMusic();
+    });
+    this.elements.btnMusicVolume?.addEventListener('click', () => {
+      this.cycleMusicVolume();
+    });
+    this.elements.btnResonance?.addEventListener('click', () => {
+      this.toggleResonance();
+    });
+    this.updateMusicButton();
+    this.updateMusicVolumeButton();
+    this.updateResonanceButton();
+  },
+
+  toggleMusic() {
+    const next = !this.storageManager.getMusicEnabled();
+    this.storageManager.setMusicEnabled(next);
+    this.audioManager.setMusicEnabled?.(next);
+    this.updateMusicButton();
+  },
+
+  updateMusicButton() {
+    const isOn = this.storageManager.getMusicEnabled();
+    this.applyToggleState([this.elements.btnMusic], {
+      label: t(isOn ? 'app.nav.button.musicOn' : 'app.nav.button.musicOff'),
+      ariaLabel: t('app.nav.button.musicAria'),
+      tooltip: t(isOn ? 'app.nav.button.musicOnAria' : 'app.nav.button.musicOffAria'),
+      pressed: isOn
+    });
+  },
+
+  /** Moves to the next configured music volume step, wrapping after the last one. */
+  cycleMusicVolume() {
+    const steps = this.gameConfig.defaults.musicVolumeSteps;
+    const idx = steps.indexOf(this.storageManager.getMusicVolume());
+    const next = steps[(idx + 1) % steps.length];
+    this.storageManager.setMusicVolume(next);
+    this.audioManager.setMusicVolume?.(next);
+    this.updateMusicVolumeButton();
+  },
+
+  updateMusicVolumeButton() {
+    const btn = this.elements?.btnMusicVolume;
+    if (!btn) {
+      return;
+    }
+    const defaultVolume = this.gameConfig.defaults.musicVolume;
+    const volume = this.storageManager?.getMusicVolume?.() ?? defaultVolume;
+    const percent = formatNumber(Math.round(volume * FULL_PERCENT));
+    const label = t('app.nav.button.musicVolume', { volume: percent });
+    const ariaLabel = t('app.nav.button.musicVolumeAria', { volume: percent });
+    const caption = t('app.nav.button.musicVolumeCaption', { volume: percent });
+    setTextIfChanged(btn, label);
+    setAttributeIfChanged(btn, 'aria-label', ariaLabel);
+    btn.title = ariaLabel;
+    btn.classList?.toggle?.('active', volume !== defaultVolume);
+    setTextIfChanged(document.querySelector(`[data-caption-for="${btn.id}"]`), caption);
+  },
+
+  toggleResonance() {
+    this.storageManager.setResonanceEnabled(!this.storageManager.getResonanceEnabled());
+    this.refreshPulseSettings();
+    this.updateResonanceButton();
+  },
+
+  updateResonanceButton() {
+    const isOn = this.storageManager.getResonanceEnabled();
+    this.applyToggleState([this.elements.btnResonance], {
+      label: t(isOn ? 'app.nav.button.resonanceOn' : 'app.nav.button.resonanceOff'),
+      ariaLabel: t('app.nav.button.resonanceAria'),
+      tooltip: t(isOn ? 'app.nav.button.resonanceOnAria' : 'app.nav.button.resonanceOffAria'),
+      pressed: isOn
+    });
   },
 
   /**

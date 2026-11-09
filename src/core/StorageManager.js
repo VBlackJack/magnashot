@@ -45,6 +45,15 @@ export const SAVE_MIGRATIONS = Object.freeze([
 ]);
 export const CURRENT_SAVE_SCHEMA_VERSION = SAVE_MIGRATIONS.at(-1).toVersion;
 
+/** Clamps a latency offset to +-maxMs and rounds it to whole milliseconds; garbage becomes 0. */
+function clampRhythmOffsetMs(maxMs = 0, value) {
+  const num = Number(value);
+  if (!Number.isFinite(num)) {
+    return 0;
+  }
+  return Math.max(-maxMs, Math.min(maxMs, Math.round(num)));
+}
+
 /**
  * Manages persistent player progress, settings, currency, and upgrades
  * with an automatic in-memory fallback when localStorage is unavailable.
@@ -82,6 +91,7 @@ export class StorageManager {
     this.dailyConfig = gameConfig.daily || {};
     this.modeUnlocksConfig = gameConfig.modeUnlocks || {};
     this.versusConfig = gameConfig.versus || {};
+    this.resonanceConfig = gameConfig.resonance || {};
     this.dailyHistoryConfig = gameConfig.dailyHistory || {};
     this.weeklyFluxConfig = gameConfig.weeklyFlux || {};
     this.playerStatsConfig = gameConfig.playerStats || {};
@@ -443,6 +453,56 @@ export class StorageManager {
     if (Array.isArray(allowed) && allowed.includes(num) && this.storageConfig.keys.animationSpeed) {
       this.safeSetItem(this.storageConfig.keys.animationSpeed, num);
     }
+  }
+
+  /** @returns {boolean} Whether the procedural music plays (default on). */
+  getMusicEnabled() {
+    const raw = this.safeGetItem(this.storageConfig.keys.musicEnabled);
+    return raw === null ? this.defaultsConfig.musicEnabled !== false : raw === 'true';
+  }
+
+  setMusicEnabled(enabled) {
+    this.safeSetItem(this.storageConfig.keys.musicEnabled, Boolean(enabled));
+  }
+
+  /** @returns {number} Stored music volume, one of the configured steps, or the default. */
+  getMusicVolume() {
+    const fallback = this.defaultsConfig.musicVolume;
+    const raw = this.safeGetItem(this.storageConfig.keys.musicVolume);
+    if (raw === null) {
+      return fallback;
+    }
+    const num = Number.parseFloat(raw);
+    const allowed = this.defaultsConfig.musicVolumeSteps;
+    return Array.isArray(allowed) && allowed.includes(num) ? num : fallback;
+  }
+
+  setMusicVolume(volume) {
+    const allowed = this.defaultsConfig.musicVolumeSteps;
+    const num = Number(volume);
+    if (Array.isArray(allowed) && allowed.includes(num)) {
+      this.safeSetItem(this.storageConfig.keys.musicVolume, num);
+    }
+  }
+
+  /** @returns {boolean} Whether the Resonance beat bonus is on (default per config). */
+  getResonanceEnabled() {
+    const raw = this.safeGetItem(this.storageConfig.keys.resonanceEnabled);
+    return raw === null ? this.resonanceConfig.enabledByDefault !== false : raw === 'true';
+  }
+
+  setResonanceEnabled(enabled) {
+    this.safeSetItem(this.storageConfig.keys.resonanceEnabled, Boolean(enabled));
+  }
+
+  /** @returns {number} Stored rhythm calibration offset in ms (0 when unset). */
+  getRhythmOffsetMs() {
+    const raw = this.safeGetItem(this.storageConfig.keys.rhythmOffsetMs);
+    return raw === null ? 0 : clampRhythmOffsetMs(this.resonanceConfig.maxOffsetMs, Number.parseFloat(raw));
+  }
+
+  setRhythmOffsetMs(offsetMs) {
+    this.safeSetItem(this.storageConfig.keys.rhythmOffsetMs, clampRhythmOffsetMs(this.resonanceConfig.maxOffsetMs, offsetMs));
   }
 
   hasPlayedDailyToday(dateKey) {

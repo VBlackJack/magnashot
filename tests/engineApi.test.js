@@ -276,7 +276,24 @@ const EXPECTED_PROTOTYPE_NAMES = [
   'countMagnetarAchievement',
   'restoreMagnetar',
   'getMagnetarSnapshot',
-  'getMagnetarView'
+  'getMagnetarView',
+  'getResonanceMode',
+  'isResonanceEnabled',
+  'getPulseSettings',
+  'refreshPulseSettings',
+  'announceResonanceDisabled',
+  'getPulseTiming',
+  'setBotResonanceDriven',
+  'queueBotResonanceRoll',
+  'setVersusResonanceOption',
+  'judgeResonantShot',
+  'markResonantShot',
+  'clearTurnResonance',
+  'settleTurnResonance',
+  'getMusicIntensity',
+  'getBeatState',
+  'getPulseState',
+  'settleOvercharge'
 ];
 
 test('GameEngine.prototype exposes exactly the same members after the module split', () => {
