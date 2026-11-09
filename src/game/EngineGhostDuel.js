@@ -17,7 +17,14 @@
 import { GAME_MODES } from '../core/Constants.js';
 import { t } from '../core/I18n.js';
 import { SeededRandom } from '../core/SeededRandom.js';
-import { contentVersionFor, decodeGhost, encodeGhost, ghostFromTimeline, DUEL_STATUS } from './GhostCodec.js';
+import {
+  contentVersionFor,
+  decodeGhost,
+  encodeGhost,
+  ghostFromTimeline,
+  resolveReplayContentVersion,
+  DUEL_STATUS
+} from './GhostCodec.js';
 import {
   compareToGhost,
   createDuelAnnouncementState,
@@ -64,7 +71,13 @@ export const engineGhostDuelMethods = {
       const isRematch = ghost.key !== SeededRandom.getTodayDateKey();
       this.startDailyChallenge(ghost.key, false, { isRematch });
     } else {
-      this.startFluxRun(ghost.key, { isShared: true });
+      const contentVersion = resolveReplayContentVersion(
+        this.gameConfig.ghostDuel,
+        this.fluxConfig.shapeSettle,
+        GHOST_MODE_FLUX,
+        ghost.cv
+      );
+      this.startFluxRun(ghost.key, { isShared: true, contentVersion });
     }
     return this.attachGhost(ghost);
   },
@@ -246,7 +259,7 @@ export const engineGhostDuelMethods = {
       this.shotTimeline,
       {
         key: isDaily ? this.dailySeedKey : this.fluxSeed,
-        cv: contentVersionFor(cfg, isDaily ? GHOST_MODE_DAILY : GHOST_MODE_FLUX),
+        cv: isDaily ? contentVersionFor(cfg, GHOST_MODE_DAILY) : this.fluxContentVersion,
         alias: this.storageManager.getGhostAlias?.() || '',
         assists: {
           workshop: this.getRunWorkshopLevels(),

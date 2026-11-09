@@ -276,6 +276,9 @@ export function captureRunSnapshot(engine, version) {
     // Optional fields: runs saved before weekly Flux and shot timelines hold neither.
     isWeeklyFluxRun: Boolean(engine.isWeeklyFluxRun),
     weeklyWeekKey: engine.weeklyWeekKey ?? null,
+    // Optional, Flux only: the shape generation the run was built with. A run saved before the
+    // settled shapes holds none and resumes on the shapes it was saved on.
+    ...(engine.mode === GAME_MODES.FLUX ? { fluxContentVersion: engine.fluxContentVersion } : {}),
     shotTimeline: engine.shotTimeline
       ? { ...engine.shotTimeline, s: [...engine.shotTimeline.s], b: [...engine.shotTimeline.b] }
       : null,
@@ -381,7 +384,18 @@ export function applyRunSnapshot(engine, snapshot) {
   } else if (snapshot.mode === GAME_MODES.DAILY) {
     engine.startDailyChallenge(snapshot.dailySeedKey, true);
   } else if (snapshot.mode === GAME_MODES.FLUX) {
-    engine.restoreFluxRun(snapshot.engine.fluxSeed, snapshot.engine.fluxStage, snapshot.engine.fluxPreviousFamily);
+    // A save without a version predates the settled shapes: it resumes on the shapes it was saved on.
+    const savedVersion = snapshot.fluxContentVersion;
+    const currentVersion = engine.gameConfig.ghostDuel.contentVersion.flux;
+    const contentVersion = Number.isInteger(savedVersion) && savedVersion >= 1 && savedVersion <= currentVersion
+      ? savedVersion
+      : engine.fluxConfig.shapeSettle.sinceContentVersion - 1;
+    engine.restoreFluxRun(
+      snapshot.engine.fluxSeed,
+      snapshot.engine.fluxStage,
+      snapshot.engine.fluxPreviousFamily,
+      contentVersion
+    );
   } else if (snapshot.mode === GAME_MODES.PUZZLE) {
     engine.startPuzzleMode(snapshot.engine.currentPuzzleStage || 1);
   } else if (snapshot.mode === GAME_MODES.BLITZ) {

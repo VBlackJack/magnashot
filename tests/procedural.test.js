@@ -38,6 +38,7 @@ const campaignConfig = loadJson('./configs/campaign.json');
 const campaignTuning = loadJson('./configs/campaignTuning.json');
 const audioConfig = loadJson('./configs/audio.json');
 const fluxConfig = loadJson('./configs/flux.json');
+const fluxShapeTuning = loadJson('./configs/fluxShapeTuning.json');
 
 configRegistry.configs.set('game', gameConfig);
 configRegistry.configs.set('physics', physicsConfig);
@@ -50,6 +51,8 @@ configRegistry.configs.set('flux', fluxConfig);
 
 const BALL_RADIUS = physicsConfig.ball.radius;
 const SWEEP_SEED_COUNT = 30;
+/** How many times more seeds than the sweep are tried to find a board the settled pool changes. */
+const SEED_SEARCH_FACTOR = 10;
 const SWEEP_STAGE_COUNT = 25;
 /**
  * Spirals, crosses, pendulum anchors and nested rings place some bonded balls closer than
@@ -103,6 +106,7 @@ const createFluxEngine = (storageManager = createTestStorage(), onStateChange = 
     campaignConfig,
     campaignTuning,
     fluxConfig,
+    fluxShapeTuning,
     audioManager: { playEffect: () => {}, stopAll: () => {}, isMuted: () => true, setMuted: () => {} },
     storageManager,
     onStateChange
@@ -468,5 +472,77 @@ test('Late Flux stages roll chains, bubbles and the three new cores', () => {
   }
   for (const mod of ['bubble', 'chained', 'freezeCore', 'lightningCore', 'paintCore']) {
     assert.ok(seen.has(mod), `${mod} never rolled in late Flux stages`);
+  }
+});
+
+/** First Flux seed whose first stage draws other shapes with and without the settled pool. */
+const findSettledChangeSeed = () => {
+  const options = { stage: 1, previousFamily: null, fluxConfig, obstaclesConfig, ballRadius: BALL_RADIUS };
+  for (let index = 0; index < SWEEP_SEED_COUNT * SEED_SEARCH_FACTOR; index++) {
+    const seed = `settled-${index}`;
+    const legacy = generateFluxStage({ ...options, seed }).shapeIds;
+    const settled = generateFluxStage({ ...options, seed, shapeMargins: fluxShapeTuning.margins }).shapeIds;
+    if (legacy[0] !== settled[0]) {
+      return { seed, legacy, settled };
+    }
+  }
+  return null;
+};
+
+test('A new Flux run draws the settled shapes and saves the version it plays on', () => {
+  const change = findSettledChangeSeed();
+  assert.ok(change, 'some seed must draw other shapes with the settled pool');
+  const storage = createTestStorage();
+  const engine = createFluxEngine(storage);
+  engine.startFluxRun(change.seed);
+  assert.equal(engine.fluxContentVersion, gameConfig.ghostDuel.contentVersion.flux);
+  assert.deepEqual(engine.fluxShapeIds, change.settled);
+  advanceFluxStage(engine);
+  assert.equal(storage.loadRunSnapshot().fluxContentVersion, gameConfig.ghostDuel.contentVersion.flux);
+
+  const resumed = createFluxEngine(storage);
+  assert.equal(resumed.restoreSavedRun(), true);
+  assert.equal(resumed.fluxContentVersion, gameConfig.ghostDuel.contentVersion.flux);
+  assert.deepEqual(resumed.fluxShapeIds, engine.fluxShapeIds);
+});
+
+test('A Flux run saved before the settled shapes resumes on the shapes it was saved on', () => {
+  const change = findSettledChangeSeed();
+  assert.ok(change, 'some seed must draw other shapes with the settled pool');
+  const legacyVersion = fluxConfig.shapeSettle.sinceContentVersion - 1;
+  const storage = createTestStorage();
+  const engine = createFluxEngine(storage);
+  engine.startFluxRun(change.seed, { contentVersion: legacyVersion });
+  assert.deepEqual(engine.fluxShapeIds, change.legacy, 'a legacy run draws from every shape');
+  advanceFluxStage(engine);
+  const snapshot = storage.loadRunSnapshot();
+  assert.equal(snapshot.fluxContentVersion, legacyVersion);
+  // A save written before the update holds no version at all.
+  delete snapshot.fluxContentVersion;
+  storage.saveRunSnapshot(snapshot);
+
+  const resumed = createFluxEngine(storage);
+  assert.equal(resumed.restoreSavedRun(), true, 'the saved run is not cleared');
+  assert.equal(resumed.fluxContentVersion, legacyVersion);
+  assert.deepEqual(resumed.fluxShapeIds, engine.fluxShapeIds);
+  assert.equal(resumed.physicsWorld.balls.length, engine.physicsWorld.balls.length);
+  assert.deepEqual(
+    resumed.physicsWorld.obstacles.map((o) => o.type),
+    engine.physicsWorld.obstacles.map((o) => o.type)
+  );
+});
+
+test('A damaged Flux version in a save falls back to the previous shapes', () => {
+  const storage = createTestStorage();
+  const engine = createFluxEngine(storage);
+  engine.startFluxRun('bad-version');
+  advanceFluxStage(engine);
+  for (const damaged of ['3', 0, 99, null, 2.5]) {
+    const snapshot = storage.loadRunSnapshot();
+    snapshot.fluxContentVersion = damaged;
+    storage.saveRunSnapshot(snapshot);
+    const resumed = createFluxEngine(storage);
+    assert.equal(resumed.restoreSavedRun(), true);
+    assert.equal(resumed.fluxContentVersion, fluxConfig.shapeSettle.sinceContentVersion - 1, `version ${damaged}`);
   }
 });

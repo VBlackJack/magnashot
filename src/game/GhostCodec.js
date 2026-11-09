@@ -109,6 +109,25 @@ export function contentVersionFor(cfg, mode) {
 }
 
 /**
+ * Content version a duel is replayed on. A link recorded on the current version replays on it.
+ * A Flux link recorded on the version just before the settled shapes replays on those exact
+ * shapes, so it still meets the board it was recorded on; any other version cannot be rebuilt
+ * and replays on the current one (the card then warns that the board may differ).
+ * @param {{contentVersion: Object<string, number>}} cfg - The `ghostDuel` config section.
+ * @param {{sinceContentVersion: number}} settleCfg - The `flux.shapeSettle` config section.
+ * @param {string} mode - 'daily' or 'flux'.
+ * @param {number} cv - Content version carried by the link.
+ * @returns {number} The version to start the run with.
+ */
+export function resolveReplayContentVersion(cfg, settleCfg, mode, cv) {
+  const current = contentVersionFor(cfg, mode);
+  if (cv === current) {
+    return current;
+  }
+  return mode === MODE_FLUX && cv === settleCfg.sinceContentVersion - 1 ? cv : current;
+}
+
+/**
  * Cleans an alias: Unicode letters, digits and single spaces only, trimmed and cut to the
  * configured length (in code points). Never throws.
  * @param {unknown} raw - Candidate alias.

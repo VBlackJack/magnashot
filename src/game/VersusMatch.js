@@ -308,7 +308,7 @@ function createBoardEngine({ configs, storageManager, audioManager, isMuted, boa
  * @param {number[]} [options.riseMultipliers] - Local handicap: charge rise time factor of each board (default none).
  * @param {string|object} [options.cpuTier='normal'] - Tier of the CPU opposite the player.
  * @param {Array<string|object>} [options.cpuTiers] - Both tiers for CPU vs CPU.
- * @param {object} options.configs - {gameConfig, physicsConfig, ballsConfig, obstaclesConfig, levelsConfig, campaignConfig, campaignTuning, fluxConfig}.
+ * @param {object} options.configs - {gameConfig, physicsConfig, ballsConfig, obstaclesConfig, levelsConfig, campaignConfig, campaignTuning, fluxConfig, fluxShapeTuning}.
  * @param {object} [options.bot] - Bot tuning, default campaignConfig.generated.calibration.bot.
  * @param {object} options.storageManager - Real storage manager, seen only through the versus view.
  * @param {object} [options.audioManager] - Shared audio manager, seen only through channels.

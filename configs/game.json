@@ -1892,7 +1892,7 @@
     "codecVersion": 1,
     "contentVersion": {
       "daily": 1,
-      "flux": 2
+      "flux": 3
     },
     "maxUrlLength": 1500,
     "maxPayloadChars": 1200,

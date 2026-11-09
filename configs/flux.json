@@ -142,6 +142,12 @@
     "mask": 0.0875,
     "composite": 0.05
   },
+  "shapeSettle": {
+    "frames": 1800,
+    "minMarginPx": 96,
+    "settleSeedBase": 4242,
+    "sinceContentVersion": 3
+  },
   "generated": {
     "minStage": 1,
     "neutralAnchorChance": 0.25,

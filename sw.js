@@ -122,6 +122,7 @@ const PRECACHE_ASSETS = [
   './configs/campaign.json',
   './configs/campaignTuning.json',
   './configs/flux.json',
+  './configs/fluxShapeTuning.json',
   './configs/game.json',
   './configs/levels.json',
   './configs/obstacles.json',

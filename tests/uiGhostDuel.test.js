@@ -28,6 +28,7 @@ import { DUEL_STATUS } from '../src/game/GhostCodec.js';
 
 const loadJson = (p) => JSON.parse(fs.readFileSync(p, 'utf8'));
 const gameConfig = loadJson('./configs/game.json');
+const fluxConfig = loadJson('./configs/flux.json');
 const indexHtml = fs.readFileSync('./index.html', 'utf8');
 const swSource = fs.readFileSync('./sw.js', 'utf8');
 const locales = { en: loadJson('./locales/en.json'), fr: loadJson('./locales/fr.json') };
@@ -132,7 +133,12 @@ function makeUi() {
       getGhostDuelRecord: () => ({ won: 0, lost: 0, tie: 0 }),
       getGhostAlias: () => ''
     },
-    engine: { startGhostDuel: (g) => calls.started.push(g), state: GAME_STATES.PLAYING, mode: GAME_MODES.CAMPAIGN },
+    engine: {
+      startGhostDuel: (g) => calls.started.push(g),
+      state: GAME_STATES.PLAYING,
+      mode: GAME_MODES.CAMPAIGN,
+      fluxConfig
+    },
     openOverlayModal(modal, focus) {
       modal.classList.remove('hidden');
       calls.opened.push({ modal, focus });
@@ -217,11 +223,14 @@ test('an old Daily link (content version 1) shows no version notice, an old Flux
     return elements.duelCardNotes.children.map((item) => item.textContent);
   };
   assert.equal(gameConfig.ghostDuel.contentVersion.daily, 1);
-  assert.equal(gameConfig.ghostDuel.contentVersion.flux, 2);
+  assert.equal(gameConfig.ghostDuel.contentVersion.flux, 3);
   const daily = makeGhost({ mode: 'daily', key: yesterdayKey(), cv: 1 });
   assert.equal(notesOf(daily).includes(versionNote), false);
   assert.equal(notesOf(makeGhost({ mode: 'flux', cv: 1 })).includes(versionNote), true);
+  // Version 2 is replayed on its exact shapes: no notice. The current version has none either.
   assert.equal(notesOf(makeGhost({ mode: 'flux', cv: 2 })).includes(versionNote), false);
+  assert.equal(notesOf(makeGhost({ mode: 'flux', cv: 3 })).includes(versionNote), false);
+  assert.equal(notesOf(makeGhost({ mode: 'flux', cv: 4 })).includes(versionNote), true);
 });
 
 test('a Flux card uses the default name without an alias and has no extra notes', () => {

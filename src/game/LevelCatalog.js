@@ -329,6 +329,8 @@ export class LevelCatalog {
     // Variant 0 keeps the plain seed; a calibration may swap a level for another variant.
     const seedParts = [generated.seedPrefix, levelId, ...(variant > 0 ? [variant] : [])];
 
+    // Deliberately no shapeMargins: the campaign keeps drawing from every valid shape, and its
+    // calibration (campaignTuning.json) was measured on those boards. Only the Flux run settles.
     const buildStage = (candidate) => generateFluxStage({
       seed: [...seedParts, ...(candidate > 0 ? [candidate] : [])].join(LEVEL_SEED_SEPARATOR),
       stage: Math.round(lerp(generated.fluxStageRange, difficulty)),

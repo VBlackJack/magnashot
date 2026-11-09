@@ -686,14 +686,19 @@ export const engineModeMethods = {
    * @param {{isShared?: boolean, weekKey?: string, isRestart?: boolean}} [options] - isShared
    *   marks a run started from a shared seed link, which locks the device tilt so every player
    *   gets the same physics; weekKey is the week a weekly restart belongs to (this week by
-   *   default); isRestart marks a restart, which never pays the weekly bonus.
+   *   default); isRestart marks a restart, which never pays the weekly bonus; contentVersion is
+   *   the generation the shapes come from (the current one by default): a duel replays an older
+   *   one so a link recorded before a generation change meets the shapes it was recorded on.
    */
-  startFluxRun(seed = null, { isShared = false, weekKey = undefined, isRestart = false } = {}) {
+  startFluxRun(seed = null, { isShared = false, weekKey = undefined, isRestart = false, contentVersion = undefined } = {}) {
+    const currentVersion = this.gameConfig.ghostDuel.contentVersion.flux;
+    const version = contentVersion ?? currentVersion;
     const runSeed = seed || this.createFluxSeed();
-    this.initFluxRun(runSeed);
+    this.initFluxRun(runSeed, version);
     this.isSharedFluxRun = Boolean(isShared);
-    // A run on this week's seed is the weekly run, however it was started.
-    const isWeekly = this.detectWeeklyFlux(runSeed, weekKey);
+    // A run on this week's seed is the weekly run, however it was started, unless it replays
+    // older shapes: the weekly board is the current one, so those runs never reach its records.
+    const isWeekly = version === currentVersion && this.detectWeeklyFlux(runSeed, weekKey);
     this.buildFluxStage({ persist: false });
     this.currentBall = this.createRandomLauncherBall();
     this.nextBall = this.createRandomLauncherBall();
@@ -710,9 +715,10 @@ export const engineModeMethods = {
   /**
    * Rebuilds a saved Flux run at its stage: same seed, same shape, same obstacles. The
    * caller (applyRunSnapshot) then puts the saved balls and counters back.
+   * @param {number} [contentVersion] - Generation the run was saved with (the current one by default).
    */
-  restoreFluxRun(seed, stage, previousFamily) {
-    this.initFluxRun(seed);
+  restoreFluxRun(seed, stage, previousFamily, contentVersion = undefined) {
+    this.initFluxRun(seed, contentVersion);
     this.fluxStage = stage;
     this.fluxPreviousFamily = previousFamily;
     this.buildFluxStage({ persist: false });
@@ -729,8 +735,20 @@ export const engineModeMethods = {
       .padStart(length, '0');
   },
 
-  initFluxRun(seed) {
+  /**
+   * Resets the engine for a Flux run. The run keeps the generation it starts with, so its shapes,
+   * its save and its ghost always agree; a generation that needs the settle table falls back to
+   * the one before it when the table is not loaded.
+   * @param {string} seed - Run seed.
+   * @param {number} [contentVersion] - Generation of the shapes (the current one by default).
+   */
+  initFluxRun(seed, contentVersion = undefined) {
     this.resetRunState(GAME_MODES.FLUX);
+    const requested = contentVersion ?? this.gameConfig.ghostDuel.contentVersion.flux;
+    const sinceVersion = this.fluxConfig.shapeSettle.sinceContentVersion;
+    this.fluxContentVersion = requested >= sinceVersion && !this.fluxShapeTuning?.margins
+      ? sinceVersion - 1
+      : requested;
     this.fluxSeed = seed;
     this.seededRng = new SeededRandom(seed);
     this.fluxStage = 1;
@@ -749,17 +767,22 @@ export const engineModeMethods = {
 
   /**
    * Replaces the board with the generated shape of the current Flux stage.
-   * @param {{persist: boolean}} options - persist stores the run right away, so a reload
-   *   resumes on the new shape; restoring a saved run passes false to keep that save.
+   * @param {{persist: boolean, stageOptions?: object|null}} options - persist stores the run right
+   *   away, so a reload resumes on the new shape; restoring a saved run passes false to keep that
+   *   save. stageOptions are extra generateFluxStage options (the settle calibration forces a family).
    */
-  buildFluxStage({ persist }) {
+  buildFluxStage({ persist, stageOptions = null }) {
+    // Runs of the generation that settles its shapes draw only shapes that hang clear of the line.
+    const isSettled = this.fluxContentVersion >= this.fluxConfig.shapeSettle.sinceContentVersion;
     const stageDef = generateFluxStage({
+      shapeMargins: isSettled ? this.fluxShapeTuning?.margins ?? null : null,
       seed: this.fluxSeed,
       stage: this.fluxStage,
       previousFamily: this.fluxPreviousFamily,
       fluxConfig: this.fluxConfig,
       obstaclesConfig: this.obstaclesConfig,
-      ballRadius: this.physicsConfig.ball.radius
+      ballRadius: this.physicsConfig.ball.radius,
+      ...stageOptions
     });
 
     this.physicsWorld.clear();
