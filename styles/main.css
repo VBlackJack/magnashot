@@ -1303,31 +1303,6 @@ body {
   border-color: var(--accent-amber);
 }
 
-.arcade-modes-section {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  background: var(--surface-sunken);
-  border: 1px solid var(--border-subtle);
-  border-radius: 10px;
-  padding: 8px 10px;
-}
-
-.arcade-modes-header {
-  font-size: 0.72rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--text-gold-soft);
-  text-align: left;
-}
-
-.arcade-modes-strip {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(145px, 1fr));
-  gap: 6px;
-}
-
 .arcade-mode-card {
   display: flex;
   flex-direction: column;
@@ -1635,53 +1610,6 @@ body {
   scrollbar-width: thin;
 }
 
-.level-chapter {
-  display: flex;
-  flex: 0 0 auto;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 2px;
-  min-height: var(--touch-target);
-  padding: 6px 12px;
-  background: var(--surface-sunken);
-  color: var(--text-muted);
-  border: 1px solid var(--border-subtle);
-  border-radius: 8px;
-  font: inherit;
-  cursor: pointer;
-}
-
-.level-chapter-title {
-  font-size: 0.85rem;
-  font-weight: 700;
-  white-space: nowrap;
-}
-
-.level-chapter-stars {
-  font-size: 0.75rem;
-  white-space: nowrap;
-}
-
-.level-chapter.active {
-  background: var(--accent-amber-alpha-20);
-  color: var(--text-gold-soft);
-  border-color: var(--accent-amber);
-}
-
-.level-chapter.completed:not(.active) {
-  border-color: var(--accent-amber-alpha-45);
-}
-
-.level-chapter.completed .level-chapter-stars {
-  color: var(--text-gold);
-  font-weight: 700;
-}
-
-.level-chapter.locked {
-  opacity: 0.55;
-  cursor: not-allowed;
-}
-
 #levels-grid {
   flex: 1 1 auto;
   max-height: none;
@@ -1691,6 +1619,424 @@ body {
 #modal-levels .modal-card {
   height: calc(100dvh - var(--modal-pad-top) - var(--modal-pad-bottom));
   max-width: 880px;
+}
+
+/*
+ * Play hub (#modal-play): one section per family of modes. Phones stack one column of sections
+ * with two-column card grids; tablets widen the grids; desktops put Campaign beside Challenges;
+ * short landscape screens split the hub in two columns. Nothing here is nowrap: card text wraps.
+ */
+#modal-play .modal-card {
+  max-width: 960px;
+  text-align: left;
+}
+
+.play-hub-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 12px;
+}
+
+.play-hub-section {
+  --play-hub-columns: 2;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+  padding: 10px 12px;
+  background: var(--surface-sunken);
+  border: 1px solid var(--border-subtle);
+  border-radius: 10px;
+}
+
+.play-hub-section.active-mode {
+  border-color: var(--accent-purple);
+  box-shadow: 0 0 10px var(--accent-purple-alpha-45);
+}
+
+.play-hub-section > h3 {
+  margin: 0;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-gold-soft);
+}
+
+.play-hub-grid {
+  display: grid;
+  grid-template-columns: repeat(var(--play-hub-columns), minmax(0, 1fr));
+  gap: 6px;
+  align-items: stretch;
+}
+
+/* A card and its disclosure toggle share one grid cell. */
+.play-hub-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.play-hub-cell > .arcade-mode-card {
+  flex: 1 1 auto;
+}
+
+.play-hub-campaign-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+#btn-campaign-continue,
+#btn-campaign-map {
+  flex: 1 1 150px;
+  min-width: 0;
+  min-height: var(--touch-target);
+  white-space: normal;
+}
+
+#play-campaign-summary {
+  margin: 0;
+  font-size: 0.85rem;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+#modal-play .arcade-mode-card {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-content: center;
+  min-width: 0;
+  min-height: var(--touch-target);
+  padding: 6px 10px;
+  overflow-wrap: anywhere;
+  white-space: normal;
+  transition: transform 0.12s ease, border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
+}
+
+#modal-play .arcade-mode-card:hover:not(.is-locked) {
+  transform: translateY(-1px);
+}
+
+#modal-play .arcade-mode-card > * {
+  grid-column: 2;
+  min-width: 0;
+}
+
+#modal-play .arcade-mode-card > .arcade-card-icon {
+  grid-column: 1;
+  grid-row: 1 / span 3;
+  align-self: center;
+  margin-inline-end: 8px;
+  font-size: 1.1rem;
+  line-height: 1;
+}
+
+#modal-play .arcade-card-title {
+  font-size: 0.85rem;
+}
+
+#modal-play .arcade-card-desc {
+  font-size: var(--desc-font-size);
+}
+
+#modal-play .arcade-card-best {
+  font-size: var(--desc-font-size);
+  color: var(--text-gold-soft);
+}
+
+.arcade-mode-card.is-locked .arcade-card-best {
+  display: none;
+}
+
+/* Reward chips on the Daily and Weekly cards. */
+#daily-reward,
+#weekly-reward {
+  justify-self: start;
+  padding: 0 8px;
+  border: 1px solid var(--accent-amber-alpha-45);
+  border-radius: 999px;
+  background: var(--accent-amber-alpha-20);
+  color: var(--text-gold-soft);
+  font-size: 0.7rem;
+  font-weight: 700;
+  line-height: 1.6;
+}
+
+/* Disclosure toggles under a card: full width of the cell, chevron drawn as text. */
+#btn-puzzle-stages-toggle,
+#btn-flux-seed-toggle {
+  min-height: var(--touch-target);
+  width: 100%;
+  white-space: normal;
+}
+
+#btn-puzzle-stages-toggle::after,
+#btn-flux-seed-toggle::after {
+  content: '\25BE';
+  margin-inline-start: 6px;
+}
+
+#btn-puzzle-stages-toggle[aria-expanded='true']::after,
+#btn-flux-seed-toggle[aria-expanded='true']::after {
+  content: '\25B4';
+}
+
+/* Disclosures sit after the arcade grid, across every column. */
+#puzzle-stages-strip,
+#flux-seed-entry {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+#flux-seed-entry .flux-seed-input {
+  flex: 1 1 148px;
+  width: auto;
+  min-width: 0;
+}
+
+#btn-versus-local-hub {
+  min-height: var(--touch-target);
+  white-space: normal;
+}
+
+#versus-local-hub-hint {
+  grid-column: 1 / -1;
+}
+
+#play-hub-hint,
+#versus-local-hub-hint,
+#levels-chapter-hint {
+  margin: 0;
+  font-size: var(--caption-font-size);
+  line-height: var(--caption-line-height);
+  color: var(--text-gold-soft);
+  text-align: left;
+  overflow-wrap: anywhere;
+}
+
+/*
+ * Campaign map (#modal-levels): chapter switcher, compact square tiles, detail panel.
+ * The switcher never scrolls sideways: the select takes the free width and ellipsizes.
+ */
+.levels-switcher {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 8px;
+  /* Holds the focus outline plus its offset (3px + 2px), so the ring is not clipped. */
+  padding: 6px;
+}
+
+.levels-switcher .nav-btn {
+  flex: 0 0 auto;
+  min-width: var(--touch-target);
+  min-height: var(--touch-target);
+}
+
+.levels-switcher .nav-btn[aria-disabled='true'] {
+  color: var(--text-secondary);
+  border-style: dashed;
+  cursor: not-allowed;
+}
+
+#levels-chapter-select {
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: var(--touch-target);
+  padding: 6px 10px;
+  background: var(--surface-sunken);
+  color: var(--text-main);
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  font: inherit;
+  font-size: var(--caption-font-size);
+  font-weight: 700;
+  text-overflow: ellipsis;
+}
+
+#levels-chapter-progress {
+  margin: 0;
+  font-size: var(--caption-font-size);
+  color: var(--text-secondary);
+  text-align: left;
+}
+
+#btn-levels-filter-incomplete,
+#btn-levels-jump-current {
+  min-height: var(--touch-target);
+}
+
+/* Grid and detail panel side by side; the grid is the one scroller. */
+.levels-body {
+  --levels-detail-width: 260px;
+  display: flex;
+  flex: 1 1 auto;
+  gap: 12px;
+  min-height: 0;
+}
+
+#levels-grid {
+  min-width: 0;
+}
+
+.level-tiles {
+  --level-tile-size: calc(var(--touch-target) + 12px);
+  grid-template-columns: repeat(auto-fill, minmax(var(--level-tile-size), 1fr));
+  grid-auto-rows: min-content;
+  align-content: start;
+  gap: 6px;
+  min-height: 0;
+  /* At least the focus outline plus its offset (3px + 2px), so the ring is not clipped. */
+  padding: 6px;
+}
+
+.level-tile {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  min-width: 0;
+  min-height: var(--level-tile-size);
+  aspect-ratio: 1;
+  padding: 4px;
+  background: var(--surface-raised);
+  color: var(--text-main);
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  font: inherit;
+  cursor: pointer;
+  transition: transform 0.12s ease, border-color 0.15s ease, background 0.15s ease;
+}
+
+.level-tile:not(.locked):hover {
+  transform: translateY(-1px);
+  border-color: var(--accent-blue);
+}
+
+.level-tile-number {
+  font-size: 1rem;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.level-tile-stars {
+  color: var(--accent-amber);
+  font-size: 0.6rem;
+  line-height: 1;
+  letter-spacing: 0;
+}
+
+.level-tile-mark {
+  position: absolute;
+  top: 2px;
+  right: 3px;
+  font-size: 0.7rem;
+  line-height: 1;
+}
+
+.level-tile[aria-selected='true'] {
+  background: var(--accent-blue-alpha-22);
+  border-color: var(--accent-blue);
+}
+
+/* Current level: amber ring and a dot, so it reads without color alone. */
+.level-tile.current {
+  box-shadow: 0 0 0 2px var(--accent-amber);
+}
+
+.level-tile.current::after {
+  content: '';
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent-amber);
+}
+
+/* Locked: sunken fill and dashed border (never opacity); the lock glyph replaces the stars. */
+.level-tile.locked {
+  background: var(--surface-locked);
+  color: var(--text-secondary);
+  border-style: dashed;
+  cursor: not-allowed;
+}
+
+.level-tile.locked .level-tile-stars {
+  display: none;
+}
+
+.level-tile.locked::before {
+  content: '\1F512';
+  font-size: 0.8rem;
+  line-height: 1;
+}
+
+#levels-detail {
+  display: flex;
+  flex: 0 0 var(--levels-detail-width);
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  padding: 12px;
+  background: var(--surface-sunken);
+  border: 1px solid var(--border-subtle);
+  border-radius: 10px;
+  text-align: left;
+  overflow-y: auto;
+  overflow-wrap: anywhere;
+}
+
+#levels-detail-header {
+  font-size: 0.74rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--accent-blue);
+}
+
+#levels-detail-title {
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+#levels-detail-badge {
+  align-self: flex-start;
+  margin-left: 0;
+}
+
+#levels-detail-desc {
+  font-size: var(--caption-font-size);
+  line-height: var(--caption-line-height);
+  color: var(--text-muted);
+}
+
+#levels-detail-stars {
+  color: var(--accent-amber);
+  letter-spacing: 2px;
+}
+
+#levels-detail-best {
+  font-size: var(--caption-font-size);
+  color: var(--text-secondary);
+}
+
+#levels-detail-lock {
+  font-size: var(--caption-font-size);
+  color: var(--text-gold-soft);
+}
+
+#btn-play-level-modal {
+  min-height: var(--touch-target);
+  margin-top: auto;
 }
 
 .modal-subtitle {
@@ -3002,6 +3348,118 @@ body {
   }
 }
 
+/* Play hub and campaign map breakpoints, after the shared phone rules they extend. */
+@media (min-width: 681px) {
+  .play-hub-arcade {
+    --play-hub-columns: 3;
+  }
+}
+
+@media (min-width: 900px) {
+  .play-hub-layout {
+    grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+    grid-template-areas:
+      'campaign challenges'
+      'arcade arcade'
+      'duel duel';
+  }
+  .play-hub-campaign {
+    grid-area: campaign;
+  }
+  .play-hub-challenges {
+    grid-area: challenges;
+    --play-hub-columns: 1;
+  }
+  .play-hub-arcade {
+    grid-area: arcade;
+    --play-hub-columns: 4;
+  }
+  .play-hub-duel {
+    grid-area: duel;
+  }
+}
+
+/* Phones: descriptions step aside; a locked card keeps its lock line, clamped to two lines. */
+@media (max-width: 680px), (orientation: landscape) and (max-height: 500px) {
+  .arcade-mode-card .arcade-card-desc {
+    display: none;
+  }
+  .arcade-mode-card.is-locked .arcade-card-desc {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    overflow: hidden;
+  }
+  #levels-detail-desc {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 3;
+    line-clamp: 3;
+    overflow: hidden;
+  }
+}
+
+/* Short landscape: two columns, Campaign and Challenges on the left, Arcade and Duel on the right. */
+@media (orientation: landscape) and (max-height: 500px) {
+  .play-hub-layout {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    grid-template-areas:
+      'campaign arcade'
+      'challenges arcade'
+      'challenges duel';
+    gap: 8px;
+  }
+  .play-hub-section {
+    gap: 6px;
+    padding: 6px 8px;
+  }
+  .play-hub-campaign {
+    grid-area: campaign;
+  }
+  .play-hub-challenges {
+    grid-area: challenges;
+    --play-hub-columns: 2;
+  }
+  .play-hub-arcade {
+    grid-area: arcade;
+    --play-hub-columns: 2;
+  }
+  .play-hub-duel {
+    grid-area: duel;
+    --play-hub-columns: 2;
+  }
+}
+
+/* Phone portrait: the detail panel becomes a footer under the grid, which keeps the free height. */
+@media (max-width: 680px) {
+  .levels-body {
+    flex-direction: column;
+    gap: 8px;
+  }
+  #levels-detail {
+    flex: 0 0 auto;
+    max-height: 40dvh;
+    padding: 8px 10px;
+    gap: 4px;
+  }
+}
+
+/* Short landscape: narrower right column. */
+@media (orientation: landscape) and (max-height: 500px) {
+  .levels-body {
+    --levels-detail-width: 220px;
+    flex-direction: row;
+    gap: 8px;
+  }
+  #levels-detail {
+    flex: 0 0 var(--levels-detail-width);
+    max-height: none;
+    padding: 8px 10px;
+    gap: 4px;
+  }
+}
+
 /*
  * Forced colors (Windows contrast themes): backgrounds and glows are dropped by the
  * browser, so controls get an explicit system-colored border, the selected state a
@@ -3018,9 +3476,15 @@ body {
   .hud-mode-banner,
   .drawer-close-btn,
   .tutorial-dismiss-btn,
-  .level-chapter,
   .flux-seed-input,
   .arcade-mode-card,
+  .play-hub-section,
+  .level-tile,
+  #levels-detail,
+  #levels-chapter-select,
+  #play-campaign-meter,
+  #daily-reward,
+  #weekly-reward,
   .puzzle-stage-btn,
   .codex-card,
   .ammo-card,
@@ -3034,19 +3498,41 @@ body {
   .level-card.unlocked {
     border: 1px solid ButtonText;
   }
-  .level-chapter.locked {
-    color: GrayText;
-    border-color: GrayText;
-  }
   .level-card.locked {
     color: GrayText;
     border: 1px dashed GrayText;
   }
   .nav-btn.is-locked,
   .arcade-mode-card.is-locked,
-  .arcade-mode-card.is-locked .arcade-card-desc {
+  .arcade-mode-card.is-locked .arcade-card-desc,
+  .level-tile.locked,
+  .levels-switcher .nav-btn[aria-disabled='true'] {
     color: GrayText;
     border: 1px dashed GrayText;
+  }
+  .level-tile.locked .level-tile-number {
+    color: GrayText;
+  }
+  .level-tile[aria-selected='true'],
+  .level-tile[aria-selected='true'] > * {
+    background: Highlight;
+    color: HighlightText;
+    border-color: Highlight;
+  }
+  .level-tile.current {
+    box-shadow: none;
+    outline: 3px dashed ButtonText;
+    outline-offset: 1px;
+  }
+  .level-tile.current::after {
+    background: ButtonText;
+  }
+  .level-tile.current:focus-visible {
+    outline: 3px solid Highlight;
+  }
+  #play-campaign-meter-fill,
+  #levels-chapter-meter-fill {
+    background: Highlight;
   }
   .mode-new-badge {
     border: 1px solid ButtonText;
@@ -3055,9 +3541,9 @@ body {
   }
   .nav-btn.active-mode,
   .arcade-mode-card.active-mode,
+  .play-hub-section.active-mode,
   .puzzle-stage-btn.active,
   .modal-tab.active,
-  .level-chapter.active,
   .powerup-btn.equipped,
   .polarity-floating-btn.active,
   .nav-btn.badge-btn.active {
@@ -3110,7 +3596,9 @@ body {
   .nav-btn:hover,
   .hud-mode-banner:hover,
   .powerup-btn:hover:not(:disabled),
-  .level-card.unlocked:hover {
+  .level-card.unlocked:hover,
+  #modal-play .arcade-mode-card:hover:not(.is-locked),
+  .level-tile:not(.locked):hover {
     transform: none;
   }
   .tutorial-banner {
@@ -3136,7 +3624,9 @@ body {
 :root.reduced-motion .nav-btn:hover,
 :root.reduced-motion .hud-mode-banner:hover,
 :root.reduced-motion .powerup-btn:hover:not(:disabled),
-:root.reduced-motion .level-card.unlocked:hover {
+:root.reduced-motion .level-card.unlocked:hover,
+:root.reduced-motion #modal-play .arcade-mode-card:hover:not(.is-locked),
+:root.reduced-motion .level-tile:not(.locked):hover {
   transform: none;
 }
 
