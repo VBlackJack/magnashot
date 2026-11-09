@@ -17,7 +17,7 @@
 import { GAME_MODES, GAME_STATES } from '../core/Constants.js';
 import { t, formatNumber, i18n } from '../core/I18n.js';
 import { SeededRandom } from '../core/SeededRandom.js';
-import { DUEL_STATUS, buildDuelUrl, contentVersionFor, stripDuelFromUrl } from '../game/GhostCodec.js';
+import { DUEL_STATUS, buildDuelUrl, resolveReplayContentVersion, stripDuelFromUrl } from '../game/GhostCodec.js';
 import { FLUX_SEED_QUERY_PARAM, getDailyChallengeNumber, stripFluxSeedFromUrl } from '../game/DailyShare.js';
 import {
   REDUCED_MOTION_CLASS,
@@ -196,7 +196,14 @@ export const uiGhostDuelMethods = {
       if (assists.tiltFree) {
         notes.push(t('duel.card.tiltFree'));
       }
-      if (ghost.cv !== contentVersionFor(this.gameConfig.ghostDuel, ghost.mode)) {
+      // The notice shows when the duel will not replay on the version the link was recorded on.
+      const replayVersion = resolveReplayContentVersion(
+        this.gameConfig.ghostDuel,
+        this.engine.fluxConfig.shapeSettle,
+        ghost.mode,
+        ghost.cv
+      );
+      if (ghost.cv !== replayVersion) {
         notes.push(t('duel.card.version'));
       }
     } else {

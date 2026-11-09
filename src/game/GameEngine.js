@@ -77,6 +77,7 @@ export class GameEngine {
     levelsConfig,
     campaignConfig,
     campaignTuning = null,
+    fluxShapeTuning = null,
     fluxConfig,
     audioManager,
     storageManager,
@@ -90,6 +91,8 @@ export class GameEngine {
     this.obstaclesConfig = obstaclesConfig;
     this.levelsConfig = levelsConfig;
     this.fluxConfig = fluxConfig;
+    /** Idle settle margins of the generated Flux shapes (configs/fluxShapeTuning.json); null draws every shape. */
+    this.fluxShapeTuning = fluxShapeTuning;
     this.levelCatalog = new LevelCatalog({
       levelsConfig,
       campaignConfig,
@@ -224,6 +227,7 @@ export class GameEngine {
     this.specialGrantIndex = 0;
     this.specialAmmoBoughtInRun = 0;
     this.fluxSeed = null;
+    this.fluxContentVersion = this.gameConfig.ghostDuel.contentVersion.flux;
     this.fluxStage = 0;
     this.sagLevel = 0;
     this.railDrops = 0;
@@ -730,6 +734,7 @@ export class GameEngine {
     this.specialGrantIndex = 0;
     this.specialAmmoBoughtInRun = 0;
     this.fluxSeed = null;
+    this.fluxContentVersion = this.gameConfig.ghostDuel.contentVersion.flux;
     this.fluxStage = 0;
     this.fluxFamily = null;
     this.fluxPreviousFamily = null;
@@ -1516,7 +1521,13 @@ export class GameEngine {
     } else if (this.mode === GAME_MODES.DAILY) {
       this.startDailyChallenge(this.dailySeedKey, true, { isRematch: this.isDailyRematch });
     } else if (this.mode === GAME_MODES.FLUX && ghost) {
-      this.startFluxRun(this.fluxSeed, { isShared: true, isRestart: true, weekKey: this.weeklyWeekKey ?? undefined });
+      // Same board, same shapes: a duel replayed on older shapes restarts on them.
+      this.startFluxRun(this.fluxSeed, {
+        isShared: true,
+        isRestart: true,
+        weekKey: this.weeklyWeekKey ?? undefined,
+        contentVersion: this.fluxContentVersion
+      });
     } else if (this.mode === GAME_MODES.FLUX && this.isWeeklyFluxRun) {
       this.startWeeklyFlux({ isRestart: true });
     } else if (this.mode === GAME_MODES.FLUX) {

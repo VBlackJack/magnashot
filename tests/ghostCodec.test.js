@@ -27,6 +27,7 @@ import {
   fnv1a16,
   ghostFromTimeline,
   readDuelFromSearch,
+  resolveReplayContentVersion,
   sanitizeAlias,
   stripDuelFromUrl
 } from '../src/game/GhostCodec.js';
@@ -596,4 +597,21 @@ test('fuzz: body mutations with a recomputed checksum reach the semantic checks 
   assert.ok(accepted > 0, 'some mutations stay valid and must re-encode identically');
   assert.ok(Object.keys(statusCounts).length >= 2, 'rejections come from several semantic checks, not one');
   assert.ok(!(DUEL_STATUS.VALID in statusCounts), 'a rejected payload never reports a valid status');
+});
+
+test('a duel replays on its own content version, or on the one before the settled Flux shapes', () => {
+  const duelCfg = gameConfig.ghostDuel;
+  const settleCfg = fluxConfig.shapeSettle;
+  const current = duelCfg.contentVersion.flux;
+  const previous = settleCfg.sinceContentVersion - 1;
+  assert.equal(resolveReplayContentVersion(duelCfg, settleCfg, 'flux', current), current);
+  assert.equal(resolveReplayContentVersion(duelCfg, settleCfg, 'flux', previous), previous, 'the previous version replays exactly');
+  assert.equal(resolveReplayContentVersion(duelCfg, settleCfg, 'flux', previous - 1), current, 'older versions cannot be rebuilt');
+  assert.equal(resolveReplayContentVersion(duelCfg, settleCfg, 'flux', current + 1), current, 'newer versions cannot be rebuilt');
+  assert.equal(resolveReplayContentVersion(duelCfg, settleCfg, 'daily', duelCfg.contentVersion.daily), duelCfg.contentVersion.daily);
+  assert.equal(
+    resolveReplayContentVersion(duelCfg, settleCfg, 'daily', previous),
+    duelCfg.contentVersion.daily,
+    'the Flux exception never applies to a Daily'
+  );
 });

@@ -43,6 +43,7 @@ class Application {
       const levelsConfig = configRegistry.get('levels');
       const campaignConfig = configRegistry.get('campaign');
       const campaignTuning = configRegistry.get('campaign_tuning');
+      const fluxShapeTuning = configRegistry.get('flux_shape_tuning');
       const fluxConfig = configRegistry.get('flux');
 
       const storageManager = new StorageManager();
@@ -75,6 +76,7 @@ class Application {
         levelsConfig,
         campaignConfig,
         campaignTuning,
+        fluxShapeTuning,
         fluxConfig,
         audioManager,
         storageManager,
@@ -104,6 +106,7 @@ class Application {
           levelsConfig,
           campaignConfig,
           campaignTuning,
+          fluxShapeTuning,
           fluxConfig
         }
       });

@@ -27,6 +27,8 @@ import { ghostFromTimeline } from '../src/game/GhostCodec.js';
 import { GAME_MODES, GAME_OVER_REASONS } from '../src/core/Constants.js';
 import { applyWorldGeometry } from '../src/core/WorldGeometry.js';
 import { getUtcIsoWeekKey, getWeeklyFluxSeed } from '../src/game/WeeklyFlux.js';
+import { UIManager } from '../src/ui/UIManager.js';
+import { generateFluxStage } from '../src/game/layouts/FluxStageGenerator.js';
 
 const loadJson = (p) => JSON.parse(fs.readFileSync(p, 'utf8'));
 
@@ -38,6 +40,7 @@ const levelsConfig = loadJson('./configs/levels.json');
 const campaignConfig = loadJson('./configs/campaign.json');
 const campaignTuning = loadJson('./configs/campaignTuning.json');
 const fluxConfig = loadJson('./configs/flux.json');
+const fluxShapeTuning = loadJson('./configs/fluxShapeTuning.json');
 const audioConfig = loadJson('./configs/audio.json');
 
 configRegistry.configs.set('game', gameConfig);
@@ -56,6 +59,10 @@ const MS_PER_DAY = 86_400_000;
 const GHOST_FINAL = 50;
 const SHOTS_FIRED = 3;
 const TOP_UP_COINS = 10_000;
+/** Seeds tried to find a board the settled pool changes. */
+const SEED_SEARCH_LIMIT = 300;
+const SEED_RADIX = fluxConfig.seed.radix;
+const SEED_LENGTH = fluxConfig.seed.length;
 
 const createFakeStorage = () => {
   const data = new Map();
@@ -94,6 +101,7 @@ const withEngine = (fn) => {
       campaignConfig,
       campaignTuning,
       fluxConfig,
+      fluxShapeTuning,
       audioManager,
       storageManager,
       onStateChange: (_engine, extra) => extras.push(extra)
@@ -428,5 +436,116 @@ test('restarting a duel on a weekly seed keeps the week of the run', () => {
     assert.equal(engine.isWeeklyFluxRun, true);
     assert.equal(engine.weeklyWeekKey, pastWeek);
     assert.ok(engine.ghostDuel);
+  });
+});
+
+/** Content version of the Flux shapes before the settled pool (the version the old links carry). */
+const LEGACY_FLUX_VERSION = fluxConfig.shapeSettle.sinceContentVersion - 1;
+
+/** Ends the run the engine plays and builds the challenge ghost it leaves. */
+const challengeAfterRun = (engine) => {
+  engine.score = GHOST_FINAL;
+  engine.triggerGameOver(GAME_OVER_REASONS.LINE_CROSSED);
+  return engine.buildChallengeGhost();
+};
+
+/** First seed whose first Flux stage differs between the legacy pool and the settled pool. */
+const findSeedWithSettledChange = () => {
+  const options = { stage: 1, previousFamily: null, fluxConfig, obstaclesConfig, ballRadius: physicsConfig.ball.radius };
+  for (let index = 0; index < SEED_SEARCH_LIMIT; index++) {
+    const seed = index.toString(SEED_RADIX).padStart(SEED_LENGTH, '0');
+    const legacy = generateFluxStage({ ...options, seed });
+    const settled = generateFluxStage({ ...options, seed, shapeMargins: fluxShapeTuning.margins });
+    if (legacy.shapeIds[0] !== settled.shapeIds[0]) {
+      return { seed, legacy: legacy.shapeIds, settled: settled.shapeIds };
+    }
+  }
+  return null;
+};
+
+test('a Flux challenge ghost carries the content version of the shapes the run played on', () => {
+  withEngine((engine) => {
+    engine.startFluxRun(FLUX_SEED);
+    fireShots(engine, SHOTS_FIRED);
+    assert.equal(challengeAfterRun(engine).cv, DUEL_CFG.contentVersion.flux);
+  });
+  withEngine((engine) => {
+    engine.startGhostDuel({ ...makeGhost('flux', FLUX_SEED), cv: LEGACY_FLUX_VERSION });
+    fireShots(engine, SHOTS_FIRED);
+    assert.equal(challengeAfterRun(engine).cv, LEGACY_FLUX_VERSION, 'a legacy duel hands on a legacy ghost');
+  });
+});
+
+test('a Flux duel recorded on the previous content version replays its exact shapes', () => {
+  const change = findSeedWithSettledChange();
+  assert.ok(change, 'some seed must draw other shapes with and without the settled pool');
+  withEngine((engine) => {
+    engine.startGhostDuel({ ...makeGhost('flux', change.seed), cv: LEGACY_FLUX_VERSION });
+    assert.equal(engine.fluxContentVersion, LEGACY_FLUX_VERSION);
+    assert.deepEqual(engine.fluxShapeIds, change.legacy);
+    assert.ok(engine.ghostDuel, 'the duel is attached');
+    // A restart keeps the shapes of the duel.
+    engine.restartCurrent();
+    assert.equal(engine.fluxContentVersion, LEGACY_FLUX_VERSION);
+    assert.deepEqual(engine.fluxShapeIds, change.legacy);
+  });
+  for (const cv of [1, DUEL_CFG.contentVersion.flux, DUEL_CFG.contentVersion.flux + 1]) {
+    withEngine((engine) => {
+      engine.startGhostDuel({ ...makeGhost('flux', change.seed), cv });
+      assert.equal(engine.fluxContentVersion, DUEL_CFG.contentVersion.flux, `cv ${cv} starts on the current shapes`);
+      assert.deepEqual(engine.fluxShapeIds, change.settled);
+    });
+  }
+});
+
+test('Same Seed after a legacy duel keeps the legacy shapes and is not a Weekly run', () => {
+  const change = findSeedWithSettledChange();
+  assert.ok(change, 'some seed must draw other shapes with and without the settled pool');
+  withEngine((engine) => {
+    engine.startGhostDuel({ ...makeGhost('flux', change.seed), cv: LEGACY_FLUX_VERSION });
+    const ui = Object.create(UIManager.prototype);
+    ui.engine = engine;
+    ui.hideAllModals = () => {};
+    ui.refresh = () => {};
+    ui.retrySameFluxSeed();
+    assert.equal(engine.fluxContentVersion, LEGACY_FLUX_VERSION);
+    assert.deepEqual(engine.fluxShapeIds, change.legacy);
+    assert.ok(engine.ghostDuel, 'the rival is attached again');
+    assert.equal(engine.isWeeklyFluxRun, false);
+  });
+});
+
+test('a duel on legacy shapes is not a Weekly run, so it never writes weekly records', () => {
+  const seed = getWeeklyFluxSeed(getUtcIsoWeekKey(Date.now()), fluxConfig.seed, gameConfig.weeklyFlux.seedSalt);
+  withEngine((engine) => {
+    engine.startGhostDuel({ ...makeGhost('flux', seed), cv: LEGACY_FLUX_VERSION });
+    assert.equal(engine.isWeeklyFluxRun, false);
+    assert.equal(engine.weeklyWeekKey, null);
+  });
+  withEngine((engine) => {
+    engine.startGhostDuel(makeGhost('flux', seed));
+    assert.equal(engine.isWeeklyFluxRun, true, 'control: the same seed on current shapes is the weekly run');
+  });
+});
+
+test('an engine without the settle table keeps the previous shapes, and so does its ghost', () => {
+  withEngine((_engine, storageManager) => {
+    const engine = new GameEngine({
+      gameConfig,
+      physicsConfig,
+      ballsConfig,
+      obstaclesConfig,
+      levelsConfig,
+      campaignConfig,
+      campaignTuning,
+      fluxConfig,
+      audioManager: { playEffect: () => {}, stopAll: () => {}, isMuted: () => true, setMuted: () => {} },
+      storageManager,
+      onStateChange: () => {}
+    });
+    engine.startFluxRun(FLUX_SEED);
+    assert.equal(engine.fluxContentVersion, LEGACY_FLUX_VERSION);
+    fireShots(engine, SHOTS_FIRED);
+    assert.equal(challengeAfterRun(engine).cv, LEGACY_FLUX_VERSION);
   });
 });

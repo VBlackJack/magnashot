@@ -23,7 +23,8 @@ export const CONFIG_PATHS = Object.freeze({
   CAMPAIGN: './configs/campaign.json',
   CAMPAIGN_TUNING: './configs/campaignTuning.json',
   AUDIO: './configs/audio.json',
-  FLUX: './configs/flux.json'
+  FLUX: './configs/flux.json',
+  FLUX_SHAPE_TUNING: './configs/fluxShapeTuning.json'
 });
 
 /**

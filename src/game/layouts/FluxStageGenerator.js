@@ -40,21 +40,45 @@ const REPEATABLE_FAMILIES = Object.freeze(new Set([FLUX_FAMILIES.GENERATED]));
 
 /** Generated parameter sets that pass the quality filter, computed once per config. */
 const validGeneratedParamsCache = new WeakMap();
+/** Settled subsets of that list, by config, then by margin table, then by threshold. */
+const settledGeneratedParamsCache = new WeakMap();
 
 /**
  * Parameter sets of generated shapes that pass the quality filter, in a fixed order so a
  * seed always draws the same shape.
  * @param {object} generatedConfig - fluxConfig.generated.
+ * @param {Object<string, number>|null} [shapeMargins] - Idle settle margin in pixels by shape
+ *   id (configs/fluxShapeTuning.json). When given, only the shapes whose margin reaches
+ *   `minMarginPx` are listed; a shape missing from the table is rejected. Null keeps every shape.
+ * @param {number} [minMarginPx] - Smallest margin a listed shape may have; used with shapeMargins.
  * @returns {object[]} Parameter sets, rotation resolved.
  */
-export function listValidGeneratedParams(generatedConfig) {
+export function listValidGeneratedParams(generatedConfig, shapeMargins = null, minMarginPx = 0) {
   if (!validGeneratedParamsCache.has(generatedConfig)) {
     const valid = listGeneratedShapeParams(generatedConfig)
       .map(resolveGeneratedParams)
       .filter((params) => buildGeneratedRows(params, generatedConfig.limits) !== null);
     validGeneratedParamsCache.set(generatedConfig, valid);
   }
-  return validGeneratedParamsCache.get(generatedConfig);
+  const all = validGeneratedParamsCache.get(generatedConfig);
+  if (!shapeMargins) {
+    return all;
+  }
+  if (!settledGeneratedParamsCache.has(generatedConfig)) {
+    settledGeneratedParamsCache.set(generatedConfig, new WeakMap());
+  }
+  const byMargins = settledGeneratedParamsCache.get(generatedConfig);
+  if (!byMargins.has(shapeMargins)) {
+    byMargins.set(shapeMargins, new Map());
+  }
+  const byThreshold = byMargins.get(shapeMargins);
+  if (!byThreshold.has(minMarginPx)) {
+    byThreshold.set(
+      minMarginPx,
+      all.filter((params) => shapeMargins[encodeGeneratedShapeId({ ...params, neutralAnchors: false })] >= minMarginPx)
+    );
+  }
+  return byThreshold.get(minMarginPx);
 }
 
 /** Separator between the seed and the stage number in a stage's RNG key. */
@@ -90,6 +114,10 @@ export function pickStageTableEntry(table, stage) {
  * @param {number} options.ballRadius - Cluster ball radius.
  * @param {string|null} [options.family] - Family to build instead of drawing one.
  * @param {boolean|null} [options.isBoss] - Boss stage or not, instead of the stage interval.
+ * @param {Object<string, number>|null} [options.shapeMargins] - Settle margins by generated
+ *   shape id (configs/fluxShapeTuning.json): generated stages then draw only shapes that hang
+ *   clear of the danger line (`fluxConfig.shapeSettle.minMarginPx`). Null draws from every
+ *   valid shape, as the campaign does. The random draws are the same either way.
  * @returns {{stage: number, family: string, shapeIds: string[], isBoss: boolean,
  *   paletteCount: number, modifierWeights: object, obstacles: object[],
  *   spec: {balls: object[], bonds: number[][]}, bossBallIndex: number|null}}
@@ -102,7 +130,8 @@ export function generateFluxStage({
   obstaclesConfig,
   ballRadius,
   family: forcedFamily = null,
-  isBoss: forcedBoss = null
+  isBoss: forcedBoss = null,
+  shapeMargins = null
 }) {
   const rng = new SeededRandom(`${seed}${STAGE_SEED_SEPARATOR}${stage}`);
   const rand = () => rng.next();
@@ -122,7 +151,16 @@ export function generateFluxStage({
   });
 
   const family = forcedFamily ?? pickFamily(fluxConfig, stage, previousFamily, rand);
-  const parts = buildFamilyParts(family, { fluxConfig, stage, pickInt, pickFloat, pickOne, pivotAt, rand });
+  const parts = buildFamilyParts(family, {
+    fluxConfig,
+    stage,
+    pickInt,
+    pickFloat,
+    pickOne,
+    pivotAt,
+    rand,
+    shapeMargins
+  });
 
   const pivots = parts.flatMap((part) => part.pivots);
   let pivotSlotOffset = 0;
@@ -228,11 +266,11 @@ function buildFamilyParts(family, ctx) {
  * A generated silhouette sized for the stage: the largest radius allowed grows with the
  * difficulty, and some shapes hang from neutral anchors.
  */
-function buildGeneratedPart({ fluxConfig, pickFloat, pickOne, rand }) {
+function buildGeneratedPart({ fluxConfig, pickFloat, pickOne, rand, shapeMargins }) {
   const generated = fluxConfig.generated;
   const radii = generated.radiusCells;
   const maxRadius = pickFloat([radii[0], radii[radii.length - 1]]);
-  const valid = listValidGeneratedParams(generated);
+  const valid = listValidGeneratedParams(generated, shapeMargins, fluxConfig.shapeSettle?.minMarginPx);
   const fitting = valid.filter((params) => params.radiusCells <= maxRadius);
   const params = { ...pickOne(fitting.length > 0 ? fitting : valid), neutralAnchors: rand() < generated.neutralAnchorChance };
   const rows = buildGeneratedRows(params, generated.limits);

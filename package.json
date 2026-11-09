@@ -14,6 +14,7 @@
     "release": "node scripts/release.mjs",
     "test": "node --test \"tests/*.test.js\"",
     "calibrate:versus": "node scripts/calibrate-versus.mjs",
+    "calibrate:flux": "node scripts/calibrate-flux-shapes.mjs",
     "test:slow": "node --test --test-timeout=1800000 \"tests/slow/*.test.js\"",
     "test:browser": "node --test --test-concurrency=1 \"tests/browser/*.test.js\""
   },
