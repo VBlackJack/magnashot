@@ -213,6 +213,8 @@ const EXPECTED_PROTOTYPE_NAMES = [
   'pollGamepad',
   'rumbleGamepad',
   'handleGamepadEvent',
+  'hasConnectedGamepad',
+  'refreshControllerFields',
   'showToast',
   'routeGamepadGameplay',
   'cycleSpecialBall',

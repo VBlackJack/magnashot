@@ -56,7 +56,9 @@ class Application {
       await i18n.init(initialLang, gameConfig.defaults.language);
 
       const audioManager = new AudioManager();
-      audioManager.init(storageManager.getMuted(), storageManager.getReducedMotion());
+      audioManager.init(storageManager.getMuted(), storageManager.getReducedMotion(), {
+        vibrationEnabled: storageManager.getGamepadRumble()
+      });
 
       const canvas = document.getElementById('game-canvas');
       const renderer = new Renderer(canvas, gameConfig, ballsConfig, obstaclesConfig);

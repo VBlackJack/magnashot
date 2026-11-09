@@ -243,6 +243,7 @@ export const uiGamepadMethods = {
     const message = t(isConnected ? 'toast.gamepad.connected' : 'toast.gamepad.disconnected');
     this.showToast(message);
     this.announce(message);
+    this.refreshControllerFields();
     if (event !== GAMEPAD_EVENTS.DISCONNECTED) {
       return;
     }
@@ -549,8 +550,28 @@ export const uiGamepadMethods = {
     el.inputGamepadRumble?.addEventListener('change', () => {
       this.storageManager.setGamepadRumble(el.inputGamepadRumble.checked);
       this.updateGamepadSettings({ rumble: el.inputGamepadRumble.checked });
+      this.audioManager?.setVibrationEnabled?.(el.inputGamepadRumble.checked);
     });
+    this.audioManager?.setVibrationEnabled?.(this.storageManager.getGamepadRumble());
     this.updateGamepadControls();
+    this.refreshControllerFields();
+  },
+
+  /** @returns {boolean} Whether the browser reports at least one connected controller. */
+  hasConnectedGamepad() {
+    try {
+      const pads = typeof navigator !== 'undefined' ? navigator.getGamepads?.() : null;
+      return Array.from(pads ?? []).some((pad) => pad && pad.connected !== false);
+    } catch {
+      return false;
+    }
+  },
+
+  /** Shows the controller fields only while a pad is connected, else the no-controller message. */
+  refreshControllerFields() {
+    const connected = this.hasConnectedGamepad();
+    this.elements.settingsControllerFields?.classList.toggle('hidden', !connected);
+    this.elements.settingsControllerNoPad?.classList.toggle('hidden', connected);
   },
 
   /** Rebuilds the option labels (language change) and shows the stored values. */

@@ -328,6 +328,8 @@ export class UIManager {
       selectGamepadDeadzone: document.getElementById('select-gamepad-deadzone'),
       selectGamepadAimSpeed: document.getElementById('select-gamepad-aim-speed'),
       inputGamepadInvertX: document.getElementById('input-gamepad-invert-x'),
+      settingsControllerFields: document.getElementById('settings-controller-fields'),
+      settingsControllerNoPad: document.getElementById('settings-controller-nopad'),
       modalVersusTiers: document.getElementById('modal-versus-tiers'),
       versusTierList: document.getElementById('versus-tier-list'),
       versusTierHint: document.getElementById('versus-tier-hint'),

@@ -299,6 +299,7 @@ export const uiModalMethods = {
       return;
     }
     if (modal === this.elements.modalSettings) {
+      this.refreshControllerFields();
       this.syncDuelNameField();
     }
     if (modal === this.elements.modalSettings && this.hintsResetConfirmed) {
