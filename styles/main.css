@@ -3342,6 +3342,40 @@ body {
   margin-top: 8px;
 }
 
+/* The Settings sections: a rule and an even gap between groups, the heading centred above its controls. */
+.settings-group {
+  --settings-group-gap: 12px;
+  width: 100%;
+  margin-top: var(--settings-group-gap);
+  padding-top: var(--settings-group-gap);
+  border-top: 1px solid var(--border-subtle);
+}
+
+.settings-group:first-of-type {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: 0;
+}
+
+.settings-group > .stats-section-title {
+  margin: 0;
+  text-align: center;
+}
+
+.settings-group .pause-settings-row {
+  margin-bottom: 0;
+}
+
+.settings-group .install-hint {
+  margin: 0;
+}
+
+@media (forced-colors: active) {
+  .settings-group {
+    border-top-color: CanvasText;
+  }
+}
+
 .settings-controller-field {
   display: flex;
   align-items: center;

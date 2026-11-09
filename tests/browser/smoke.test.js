@@ -2528,7 +2528,19 @@ const CALIBRATION_RUN_VIEWPORTS = new Set(['desktop', 'phone portrait']);
 const RESONANCE_CONFIG = GAME_CONFIG.resonance;
 const CALIBRATION_BEAT_MS = 60000 / RESONANCE_CONFIG.calibrationBpm;
 const CALIBRATION_RUN_MS = (RESONANCE_CONFIG.calibrationLeadBeats + RESONANCE_CONFIG.calibrationBeats + 3) * CALIBRATION_BEAT_MS;
+/** How early the scripted calibration taps land, ahead of each pulse. */
+const CALIBRATION_EARLY_MS = 40;
+/** Rounding slack between the scripted early amount and the saved offset. */
+const CALIBRATION_OFFSET_TOLERANCE_MS = 1;
 const RING_WAIT_MS = 500;
+const SETTINGS_GROUPS = Object.freeze([
+  { titleId: 'settings-group-audio-title', contains: ['#btn-sound', '#btn-music', '#btn-music-volume'] },
+  { titleId: 'settings-group-gameplay-title', contains: ['#btn-resonance', '#btn-calibrate', '#btn-tilt', '#btn-lang', '#input-duel-name'] },
+  { titleId: 'settings-group-accessibility-title', contains: ['#btn-contrast', '#btn-patterns', '#btn-motion', '#input-gamepad-rumble'] },
+  { titleId: 'settings-controller-title', contains: ['#settings-controller-nopad', '#settings-controller-fields'] }
+]);
+/** Sub-pixel slack when comparing boxes. */
+const SETTINGS_BOX_TOLERANCE_PX = 0.5;
 /** A profile that cleared the campaign up to the Resonance unlock (resonance.unlockAfterCampaignLevel). */
 const RESONANCE_UNLOCKED_STORAGE = Object.freeze({
   [`${STORAGE_PREFIX}${STORAGE_KEYS.unlockedLevel}`]: String(RESONANCE_CONFIG.unlockAfterCampaignLevel + 1)
@@ -2677,20 +2689,38 @@ for (const viewport of VIEWPORTS) {
           await page.locator('#btn-calibrate').scrollIntoViewIfNeeded();
           await page.click('#btn-calibrate');
           await waitShown(page, '#modal-calibrate');
-          // Tap each time the ring opens its window: always early by the same amount.
-          await page.evaluate(() => {
+          // Tap every counted pulse a fixed amount early. The tap carries its own timestamp (the
+          // pulse time minus the early amount, from the calibration's own clock), so the result does
+          // not depend on how late a frame callback runs. The ring window is only observed.
+          await page.evaluate(({ earlyMs, leadBeats, totalBeats }) => {
             const ui = window.__calibrationUi;
             const ring = document.querySelector('#calibrate-ring');
-            let wasOpen = false;
+            const stepMs = ui.engine.physicsConfig.simulation.fixedStepMs;
+            const sent = new Set();
+            window.__ringWindowSeen = false;
             const watch = () => {
-              const isOpen = ring.getAttribute('data-window') === 'true';
-              if (isOpen && !wasOpen && ui.calibration) {
-                ui.registerCalibrationTap(performance.now());
+              if (ring.getAttribute('data-window') === 'true') {
+                window.__ringWindowSeen = true;
               }
-              wasOpen = isOpen;
+              const calibration = ui.calibration;
+              if (calibration) {
+                const now = performance.now();
+                const startAt = now - calibration.getFrame(now, stepMs) * stepMs;
+                for (let index = leadBeats; index < totalBeats; index += 1) {
+                  const tapAt = startAt + index * calibration.beatMs - earlyMs;
+                  if (!sent.has(index) && now >= tapAt) {
+                    sent.add(index);
+                    ui.registerCalibrationTap(tapAt);
+                  }
+                }
+              }
               requestAnimationFrame(watch);
             };
             requestAnimationFrame(watch);
+          }, {
+            earlyMs: CALIBRATION_EARLY_MS,
+            leadBeats: RESONANCE_CONFIG.calibrationLeadBeats,
+            totalBeats: RESONANCE_CONFIG.calibrationLeadBeats + RESONANCE_CONFIG.calibrationBeats
           });
           const offsetKey = `${STORAGE_PREFIX}${STORAGE_KEYS.rhythmOffsetMs}`;
           await page.waitForFunction(
@@ -2700,6 +2730,11 @@ for (const viewport of VIEWPORTS) {
           );
           const saved = Number(await page.evaluate((key) => window.localStorage.getItem(key), offsetKey));
           assert.ok(saved < 0 && saved >= -RESONANCE_CONFIG.maxOffsetMs, `early taps save a negative offset (${saved})`);
+          assert.ok(
+            Math.abs(saved + CALIBRATION_EARLY_MS) <= CALIBRATION_OFFSET_TOLERANCE_MS,
+            `the offset is the scripted early amount (${saved})`
+          );
+          assert.equal(await page.evaluate(() => window.__ringWindowSeen), true, 'the ring opened its window during the run');
           assert.match(await page.textContent('#calibrate-result'), new RegExp(String(Math.abs(saved))));
           await page.click('#btn-calibrate-reset');
           await page.waitForFunction(
@@ -2714,6 +2749,114 @@ for (const viewport of VIEWPORTS) {
         }
       });
     }
+
+    test('Settings has its four groups, each with a visible heading, inside the window', async () => {
+      const { context, page, errors } = await openGame(viewport);
+      try {
+        await startLevelOne(page);
+        await clickMenuButton(page, viewport, '#btn-settings');
+        await waitShown(page, '#modal-settings');
+        const groups = await page.evaluate((specs) => {
+          const cardRect = document.querySelector('#modal-settings .modal-card').getBoundingClientRect();
+          return specs.map(({ titleId, contains }) => {
+            const title = document.getElementById(titleId);
+            const group = title?.closest('section.settings-group');
+            const rect = group?.getBoundingClientRect();
+            const titleRect = title?.getBoundingClientRect();
+            return {
+              titleId,
+              hasGroup: Boolean(group),
+              labelledBy: group?.getAttribute('aria-labelledby') ?? null,
+              titleText: title?.textContent.trim() ?? '',
+              titleTag: title?.tagName ?? '',
+              contained: contains.map((selector) => Boolean(group?.querySelector(selector))),
+              fitsWidth: Boolean(rect)
+                && rect.left >= cardRect.left - 1 && rect.right <= cardRect.right + 1
+                && rect.right <= window.innerWidth + 1 && rect.left >= -1,
+              titleInside: Boolean(titleRect) && Boolean(rect)
+                && titleRect.left >= rect.left - 1 && titleRect.right <= rect.right + 1
+                && titleRect.height > 0,
+              top: rect?.top ?? 0
+            };
+          });
+        }, SETTINGS_GROUPS);
+        for (const group of groups) {
+          assert.equal(group.hasGroup, true, `${group.titleId} sits in a settings group`);
+          assert.equal(group.titleTag, 'H3', `${group.titleId} is a level 3 heading`);
+          assert.equal(group.labelledBy, group.titleId, `${group.titleId} labels its group`);
+          assert.ok(group.titleText.length > 0, `${group.titleId} has text`);
+          assert.ok(group.contained.every(Boolean), `${group.titleId} holds its controls (${group.contained})`);
+          assert.equal(group.fitsWidth, true, `${group.titleId} group fits the dialog`);
+          assert.equal(group.titleInside, true, `${group.titleId} heading fits its group`);
+        }
+        const tops = groups.map((group) => group.top);
+        assert.deepEqual([...tops].sort((a, b) => a - b), tops, 'the groups keep their order from top to bottom');
+        await assertDialogFits(page, '#modal-settings', 'Settings groups');
+        await assertLayoutFits(page, 'settings groups');
+        assert.deepEqual(errors, []);
+      } finally {
+        await context.close();
+      }
+    });
+
+    test('the Vibration checkbox is in the Accessibility group', async () => {
+      const { context, page, errors } = await openGame(viewport);
+      try {
+        await startLevelOne(page);
+        await clickMenuButton(page, viewport, '#btn-settings');
+        await waitShown(page, '#modal-settings');
+        const groupTitleId = await page.evaluate(
+          () => document.querySelector('#input-gamepad-rumble')?.closest('section.settings-group')?.getAttribute('aria-labelledby') ?? null
+        );
+        assert.equal(groupTitleId, 'settings-group-accessibility-title');
+        await page.locator('#input-gamepad-rumble').scrollIntoViewIfNeeded();
+        assert.equal(await isShown(page, '#input-gamepad-rumble'), true, 'the checkbox is shown without a pad');
+        const label = await page.evaluate(() => document.querySelector('#input-gamepad-rumble').closest('label').textContent.trim());
+        assert.ok(label.length > 0, 'the checkbox has a label');
+        assert.deepEqual(errors, []);
+      } finally {
+        await context.close();
+      }
+    });
+
+    test('the controller fields are hidden without a pad and shown once one is connected', async () => {
+      const { context, page, errors } = await openGame(viewport, { initScript: installPadStub });
+      try {
+        await startLevelOne(page);
+        await clickMenuButton(page, viewport, '#btn-settings');
+        await waitShown(page, '#modal-settings');
+        await page.locator('#settings-controller-nopad').scrollIntoViewIfNeeded();
+        assert.equal(await isShown(page, '#settings-controller-fields'), false, 'no pad: the fields are hidden');
+        assert.equal(await isShown(page, '#settings-controller-nopad'), true, 'no pad: the hint is shown');
+        const hiddenHeight = await page.evaluate(() => document.querySelector('#settings-controller-fields').getBoundingClientRect().height);
+        assert.ok(hiddenHeight <= SETTINGS_BOX_TOLERANCE_PX, 'the hidden fields take no room');
+        await connectPad(page);
+        await page.locator('#settings-controller-fields').scrollIntoViewIfNeeded();
+        assert.equal(await isShown(page, '#settings-controller-fields'), true, 'a connected pad shows the fields');
+        assert.equal(await isShown(page, '#settings-controller-nopad'), false, 'a connected pad hides the hint');
+        for (const selector of ['#input-gamepad-enabled', '#select-gamepad-deadzone', '#select-gamepad-aim-speed', '#input-gamepad-invert-x']) {
+          assert.equal(await isShown(page, selector), true, `${selector} is shown with a pad`);
+        }
+        await assertDialogFits(page, '#modal-settings', 'Settings with a pad');
+        await assertLayoutFits(page, 'settings with a pad');
+        // The state of the pad survives reopening the dialog; a pad that is gone hides the fields again.
+        await page.click('#btn-close-settings');
+        await clickMenuButton(page, viewport, '#btn-settings');
+        await waitShown(page, '#modal-settings');
+        assert.equal(await isShown(page, '#settings-controller-fields'), true, 'the fields stay on reopening');
+        await page.evaluate(() => {
+          const pad = window.__pads[0];
+          window.__pads = [];
+          const event = new Event('gamepaddisconnected');
+          event.gamepad = pad;
+          window.dispatchEvent(event);
+        });
+        await page.waitForFunction(() => document.querySelector('#settings-controller-fields').classList.contains('hidden'));
+        assert.deepEqual(errors, []);
+      } finally {
+        await context.close();
+      }
+    });
 
     test('a fresh profile has no beat ring on level 1', async () => {
       const { context, page, errors } = await openGame(viewport);
