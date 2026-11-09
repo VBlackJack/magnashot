@@ -23,23 +23,172 @@ import {
   shouldIgnoreRepeatedKey,
   isBrowserShortcut,
   resolveNextCampaignTarget,
-  isAriaDisabled,
-  isModeUnlocked,
-  MODE_LOCK_BUTTON_KEYS
+  WEEKLY_ACCESS_KEY
 } from './UIHelpers.js';
+import { PLAY_HUB_DISCLOSURES } from './PlayHubView.js';
 import { STATS_TABS } from './UIStats.js';
 
+const HIDDEN_CLASS = 'hidden';
+const LEVEL_TILE_SELECTOR = '[data-level-id]';
+/** Chapter step of the PageUp and PageDown keys and of the previous and next buttons. */
+const CHAPTER_STEP = 1;
+const GRID_ARROW_STEPS = Object.freeze({
+  ArrowLeft: Object.freeze({ dx: -1, dy: 0 }),
+  ArrowRight: Object.freeze({ dx: 1, dy: 0 }),
+  ArrowUp: Object.freeze({ dx: 0, dy: -1 }),
+  ArrowDown: Object.freeze({ dx: 0, dy: 1 })
+});
+
 /**
- * True when a menu button starts a mode that is still locked. A gated mode is judged on the
- * live storage, like runIfModeUnlocked, so a stale aria-disabled never disagrees with it.
+ * Binds a Play hub card: activating the card of the running mode resumes it (A18), otherwise the
+ * mode starts through its unlock gate and the destructive-action check.
+ * @param {object} ui - UIManager.
+ * @param {HTMLElement|null|undefined} element - Card button.
+ * @param {object} spec
+ * @param {string} spec.modeKey - Game mode id, or WEEKLY_ACCESS_KEY, matched against the running mode.
+ * @param {string|null} spec.accessKey - Key judged by runIfModeUnlocked; null for an always open mode.
+ * @param {string} spec.labelKey - Localization key of the mode name shown in the replace confirmation.
+ * @param {() => void} spec.start - Starts the mode (called after the hub is gone).
  */
-function isDrawerButtonLocked(ui, button) {
-  for (const [mode, elementKeys] of Object.entries(MODE_LOCK_BUTTON_KEYS)) {
-    if (elementKeys.some((elementKey) => ui.elements[elementKey] === button)) {
-      return !isModeUnlocked(ui.getModeAccess(), mode);
+export function bindModeCard(ui, element, { modeKey, accessKey, labelKey, start }) {
+  element?.addEventListener('click', () => {
+    if (ui.resumePlayHubModeIfRunning(modeKey)) {
+      return;
     }
+    const launch = () => {
+      ui.requestDestructiveAction(() => {
+        ui.hideAllModals();
+        start();
+      }, () => t(labelKey));
+    };
+    if (accessKey) {
+      ui.runIfModeUnlocked(accessKey, launch);
+    } else {
+      launch();
+    }
+  });
+}
+
+/** Click on the campaign map grid: a tile selects, the selected tile plays (one tap on the current level). */
+export function handleLevelGridClick(ui, event) {
+  const tile = event.target?.closest?.(LEVEL_TILE_SELECTOR);
+  if (!tile) {
+    return;
   }
-  return isAriaDisabled(button);
+  const levelId = Number(tile.dataset.levelId);
+  if (levelId === ui.levelsSelectedId) {
+    ui.playSelectedLevel();
+  } else {
+    ui.selectLevelTile(levelId, { focus: true });
+  }
+}
+
+/**
+ * Keys on the campaign map grid (A22): arrows move the selection and the focus with it, Home and
+ * End jump to the ends, PageUp and PageDown change chapter (focus lands on the new selected tile,
+ * A12), Enter plays the selected tile.
+ */
+export function handleLevelGridKeydown(ui, event) {
+  const tile = event.target?.closest?.(LEVEL_TILE_SELECTOR);
+  if (!tile) {
+    return;
+  }
+  const arrow = GRID_ARROW_STEPS[event.key];
+  if (arrow) {
+    event.preventDefault();
+    ui.moveLevelTileFocus(arrow.dx, arrow.dy, { wrapRows: false })?.focus();
+    return;
+  }
+  switch (event.key) {
+    case 'Home':
+    case 'End': {
+      event.preventDefault();
+      const tiles = Array.from(ui.elements.levelsGrid.children).filter((child) => child.dataset?.levelId !== undefined);
+      const edge = event.key === 'Home' ? tiles[0] : tiles.at(-1);
+      if (edge) {
+        ui.selectLevelTile(Number(edge.dataset.levelId), { focus: true });
+      }
+      break;
+    }
+    case 'PageUp':
+    case 'PageDown':
+      event.preventDefault();
+      ui.stepLevelChapter(event.key === 'PageUp' ? -CHAPTER_STEP : CHAPTER_STEP, { focus: true });
+      break;
+    case 'Enter':
+    case 'NumpadEnter':
+      // Enter plays; swallowing it keeps the button from also firing a click.
+      event.preventDefault();
+      if (Number(tile.dataset.levelId) !== ui.levelsSelectedId) {
+        ui.selectLevelTile(Number(tile.dataset.levelId));
+      }
+      ui.playSelectedLevel();
+      break;
+    default:
+      break;
+  }
+}
+
+/** Play hub: open and close, Campaign card, disclosures and the two-player entry. */
+function bindPlayHubEvents(ui) {
+  const els = ui.elements;
+  els.btnPlay?.addEventListener('click', () => {
+    ui.openPlayHub();
+  });
+  els.btnClosePlay?.addEventListener('click', () => {
+    ui.closeOverlayModal(els.modalPlay);
+  });
+  els.btnCampaignContinue?.addEventListener('click', () => {
+    ui.activatePlayHubContinue();
+  });
+  els.btnCampaignMap?.addEventListener('click', () => {
+    ui.openLevelsModal();
+  });
+  for (const [name, { toggle }] of Object.entries(PLAY_HUB_DISCLOSURES)) {
+    els[toggle]?.addEventListener('click', () => {
+      ui.togglePlayHubDisclosure(name);
+    });
+  }
+  els.btnVersusLocalHub?.addEventListener('click', () => {
+    ui.openPlayHubVersusLocal();
+  });
+}
+
+/** Campaign map: chapter switcher, jump, filter, the tile grid (one delegated listener) and the detail Play. */
+function bindCampaignMapEvents(ui) {
+  const els = ui.elements;
+  els.btnChapterPrev?.addEventListener('click', () => {
+    ui.stepLevelChapter(-CHAPTER_STEP);
+  });
+  els.btnChapterNext?.addEventListener('click', () => {
+    ui.stepLevelChapter(CHAPTER_STEP);
+  });
+  // A locked chapter is refused by selectLevelChapter, which restores the select and says why (A11).
+  els.levelsChapterSelect?.addEventListener('change', () => {
+    ui.selectLevelChapter(Number(els.levelsChapterSelect.value));
+  });
+  els.btnLevelsJumpCurrent?.addEventListener('click', () => {
+    ui.jumpToCurrentLevel();
+  });
+  els.btnLevelsFilterIncomplete?.addEventListener('click', () => {
+    ui.levelsFilterIncomplete = !ui.levelsFilterIncomplete;
+    els.levelsChapterHint?.classList.add(HIDDEN_CLASS);
+    ui.syncLevelsFilterButton();
+    ui.renderLevelTiles(ui.getSuggestedLevelId());
+    ui.renderLevelDetail(ui.levelsSelectedId);
+    ui.announce(
+      t(
+        ui.levelsFilterIncomplete
+          ? 'modals.levelSelect.filter.announcedIncomplete'
+          : 'modals.levelSelect.filter.announcedAll'
+      )
+    );
+  });
+  els.levelsGrid?.addEventListener('click', (event) => handleLevelGridClick(ui, event));
+  els.levelsGrid?.addEventListener('keydown', (event) => handleLevelGridKeydown(ui, event));
+  els.btnCloseLevels.addEventListener('click', () => {
+    ui.closeOverlayModal(els.modalLevels);
+  });
 }
 
 /** Scenes that can own the gameplay controls. */
@@ -144,10 +293,6 @@ export const uiInputBindingMethods = {
     if (this.elements.drawer) {
       for (const button of this.elements.drawer.querySelectorAll('[data-closes-drawer]')) {
         button.addEventListener('click', () => {
-          // A locked mode starts nothing: the menu stays open and shows what to do.
-          if (isDrawerButtonLocked(this, button)) {
-            return;
-          }
           this.closeDrawer({ resume: false });
         });
       }
@@ -157,49 +302,33 @@ export const uiInputBindingMethods = {
   bindEvents() {
     this.bindDrawerEvents();
 
-    this.elements.btnLevels.addEventListener('click', () => {
-      this.openLevelsModal();
+    bindPlayHubEvents(this);
+    bindCampaignMapEvents(this);
+
+    bindModeCard(this, this.elements.btnEndless, {
+      modeKey: GAME_MODES.ENDLESS,
+      accessKey: GAME_MODES.ENDLESS,
+      labelKey: 'app.nav.button.endless',
+      start: () => this.engine.startEndlessMode()
     });
-
-    this.elements.btnEndless.addEventListener('click', () => {
-      this.runIfModeUnlocked(GAME_MODES.ENDLESS, () => {
-        this.requestDestructiveAction(() => {
-          this.hideAllModals();
-          this.engine.startEndlessMode();
-        }, () => t('app.nav.button.endless'));
-      });
+    bindModeCard(this, this.elements.btnDaily, {
+      modeKey: GAME_MODES.DAILY,
+      accessKey: null,
+      labelKey: 'app.nav.button.daily',
+      start: () => this.engine.startDailyChallenge()
     });
-
-    if (this.elements.btnDaily) {
-      this.elements.btnDaily.addEventListener('click', () => {
-        this.requestDestructiveAction(() => {
-          this.hideAllModals();
-          this.engine.startDailyChallenge();
-        }, () => t('app.nav.button.daily'));
-      });
-    }
-
-    if (this.elements.btnFlux) {
-      this.elements.btnFlux.addEventListener('click', () => {
-        this.runIfModeUnlocked(GAME_MODES.FLUX, () => {
-          this.requestDestructiveAction(() => {
-            this.hideAllModals();
-            this.engine.startFluxRun();
-          }, () => t('app.nav.button.flux'));
-        });
-      });
-    }
-
-    if (this.elements.btnWeekly) {
-      this.elements.btnWeekly.addEventListener('click', () => {
-        this.runIfModeUnlocked(GAME_MODES.FLUX, () => {
-          this.requestDestructiveAction(() => {
-            this.hideAllModals();
-            this.startWeeklyFluxRun();
-          }, () => t('app.nav.button.weekly'));
-        });
-      });
-    }
+    bindModeCard(this, this.elements.btnFlux, {
+      modeKey: GAME_MODES.FLUX,
+      accessKey: GAME_MODES.FLUX,
+      labelKey: 'app.nav.button.flux',
+      start: () => this.engine.startFluxRun()
+    });
+    bindModeCard(this, this.elements.btnWeekly, {
+      modeKey: WEEKLY_ACCESS_KEY,
+      accessKey: WEEKLY_ACCESS_KEY,
+      labelKey: 'app.nav.button.weekly',
+      start: () => this.startWeeklyFluxRun()
+    });
 
     this.elements.btnStats?.addEventListener('click', () => {
       this.openStatsModal(STATS_TABS.OVERVIEW);
@@ -391,6 +520,9 @@ export const uiInputBindingMethods = {
       });
     };
 
+    bindBackdropDismiss(this.elements.modalPlay, () => {
+      this.closeOverlayModal(this.elements.modalPlay);
+    });
     bindBackdropDismiss(this.elements.modalLevels, () => {
       this.closeOverlayModal(this.elements.modalLevels);
     });
@@ -412,82 +544,50 @@ export const uiInputBindingMethods = {
       this.dismissConfirm();
     });
 
-    this.elements.btnCloseLevels.addEventListener('click', () => {
-      this.closeOverlayModal(this.elements.modalLevels);
-    });
-
-    this.elements.btnLevelsFilterIncomplete?.addEventListener('click', () => {
-      this.levelsFilterIncomplete = !this.levelsFilterIncomplete;
-      this.elements.levelsChapterHint?.classList.add('hidden');
-      this.syncLevelsFilterButton();
-      this.renderLevelCards(this.getSuggestedLevelId());
-      this.announce(
-        t(
-          this.levelsFilterIncomplete
-            ? 'modals.levelSelect.filter.announcedIncomplete'
-            : 'modals.levelSelect.filter.announcedAll'
-        )
-      );
-    });
-
     this.elements.btnFluxSeedGo?.addEventListener('click', () => {
       this.submitFluxSeedInput();
     });
 
     this.elements.modeBanner?.addEventListener('click', () => {
-      this.openLevelsModal();
+      this.openPlayHub();
     });
 
     this.elements.modeBanner?.addEventListener('keydown', (e) => {
       if (e.key === 'Enter' || e.key === ' ') {
         e.preventDefault();
-        this.openLevelsModal();
+        this.openPlayHub();
       }
     });
 
-    this.elements.btnModePuzzle?.addEventListener('click', () => {
-      this.runIfModeUnlocked(GAME_MODES.PUZZLE, () => {
-        this.requestDestructiveAction(() => {
-          this.hideAllModals();
-          this.engine.startPuzzleMode(this.getSuggestedPuzzleStage());
-        }, () => t('modals.levelSelect.arcade.puzzle'));
-      });
+    bindModeCard(this, this.elements.btnModePuzzle, {
+      modeKey: GAME_MODES.PUZZLE,
+      accessKey: GAME_MODES.PUZZLE,
+      labelKey: 'modals.levelSelect.arcade.puzzle',
+      start: () => this.engine.startPuzzleMode(this.getSuggestedPuzzleStage())
     });
-
-    this.elements.btnModeClassic?.addEventListener('click', () => {
-      this.runIfModeUnlocked(GAME_MODES.CLASSIC, () => {
-        this.requestDestructiveAction(() => {
-          this.hideAllModals();
-          this.engine.startClassicMode();
-        }, () => t('modals.levelSelect.arcade.classic'));
-      });
+    bindModeCard(this, this.elements.btnModeClassic, {
+      modeKey: GAME_MODES.CLASSIC,
+      accessKey: GAME_MODES.CLASSIC,
+      labelKey: 'modals.levelSelect.arcade.classic',
+      start: () => this.engine.startClassicMode()
     });
-
-    this.elements.btnModeBlitz?.addEventListener('click', () => {
-      this.runIfModeUnlocked(GAME_MODES.BLITZ, () => {
-        this.requestDestructiveAction(() => {
-          this.hideAllModals();
-          this.engine.startBlitzMode();
-        }, () => t('modals.levelSelect.arcade.blitz'));
-      });
+    bindModeCard(this, this.elements.btnModeBlitz, {
+      modeKey: GAME_MODES.BLITZ,
+      accessKey: GAME_MODES.BLITZ,
+      labelKey: 'modals.levelSelect.arcade.blitz',
+      start: () => this.engine.startBlitzMode()
     });
-
-    this.elements.btnModeBossRush?.addEventListener('click', () => {
-      this.runIfModeUnlocked(GAME_MODES.BOSS_RUSH, () => {
-        this.requestDestructiveAction(() => {
-          this.hideAllModals();
-          this.engine.startBossRushMode();
-        }, () => t('modals.levelSelect.arcade.bossRush'));
-      });
+    bindModeCard(this, this.elements.btnModeBossRush, {
+      modeKey: GAME_MODES.BOSS_RUSH,
+      accessKey: GAME_MODES.BOSS_RUSH,
+      labelKey: 'modals.levelSelect.arcade.bossRush',
+      start: () => this.engine.startBossRushMode()
     });
-
-    this.elements.btnModeCascade?.addEventListener('click', () => {
-      this.runIfModeUnlocked(GAME_MODES.CASCADE, () => {
-        this.requestDestructiveAction(() => {
-          this.hideAllModals();
-          this.engine.startCascadeMode();
-        }, () => t('modals.levelSelect.arcade.cascade'));
-      });
+    bindModeCard(this, this.elements.btnModeCascade, {
+      modeKey: GAME_MODES.CASCADE,
+      accessKey: GAME_MODES.CASCADE,
+      labelKey: 'modals.levelSelect.arcade.cascade',
+      start: () => this.engine.startCascadeMode()
     });
 
     this.elements.inputFluxSeed?.addEventListener('keydown', (e) => {
@@ -503,20 +603,7 @@ export const uiInputBindingMethods = {
     });
 
     this.elements.btnPlayLevelModal.addEventListener('click', () => {
-      if (this.isCampaignRunActive()) {
-        if (!this.autoPausedByOverlay && this.engine.state === GAME_STATES.PAUSED) {
-          this.engine.togglePause();
-        }
-        this.closeOverlayModal(this.elements.modalLevels);
-        return;
-      }
-      this.requestDestructiveAction(
-        () => {
-          this.hideAllModals();
-          this.engine.startCampaignLevel(this.getSuggestedLevelId());
-        },
-        () => t('modals.levelSelect.button.play', { level: this.getSuggestedLevelId() })
-      );
+      this.playSelectedLevel();
     });
 
     this.elements.btnNextLevel.addEventListener('click', () => {
@@ -526,7 +613,7 @@ export const uiInputBindingMethods = {
         if (this.engine.currentPuzzleStage < totalPuzzles) {
           this.engine.startPuzzleMode(this.engine.currentPuzzleStage + 1);
         } else {
-          this.openLevelsModal();
+          this.openPlayHub({ expand: 'puzzle' });
         }
         return;
       }
@@ -549,8 +636,13 @@ export const uiInputBindingMethods = {
     });
 
     this.elements.btnLevelsVictory.addEventListener('click', () => {
+      const mode = this.engine.mode;
       this.hideAllModals();
-      this.openLevelsModal();
+      if (mode === GAME_MODES.CAMPAIGN) {
+        this.openLevelsModal();
+      } else {
+        this.openPlayHub({ expand: mode === GAME_MODES.PUZZLE ? 'puzzle' : undefined });
+      }
     });
 
     this.elements.btnContinueGameOver?.addEventListener('click', () => {
@@ -569,7 +661,7 @@ export const uiInputBindingMethods = {
 
     this.elements.btnLevelsGameOver.addEventListener('click', () => {
       this.hideAllModals();
-      this.openLevelsModal();
+      this.openPlayHub();
     });
 
     this.elements.btnShareGameOver?.addEventListener('click', () => {
@@ -598,7 +690,7 @@ export const uiInputBindingMethods = {
     });
 
     this.elements.btnLevelsPause?.addEventListener('click', () => {
-      this.openLevelsModal();
+      this.openPlayHub();
       this.elements.modalPause.classList.add('hidden');
       this.syncModalInertState();
     });
@@ -619,6 +711,15 @@ export const uiInputBindingMethods = {
       { capture: true }
     );
 
+    // A window that shrinks or turns while the hub is open may no longer fit two boards.
+    for (const type of ['resize', 'orientationchange']) {
+      window.addEventListener(type, () => {
+        if (this.isPlayHubOpen()) {
+          this.syncPlayHubVersusLocal();
+        }
+      });
+    }
+
     window.addEventListener('keydown', (e) => {
       this.handleKeyDown(e);
     });
@@ -631,7 +732,7 @@ export const uiInputBindingMethods = {
   },
 
   /**
-   * Unwinds the topmost layer: Confirm, duel card, a dialog, the menu, then the run's pause.
+   * Unwinds the topmost layer: Confirm, duel card, a dialog (campaign map, then Play hub), the menu, then the run's pause.
    * Shared by Escape and the controller's back button.
    */
   handleBackAction() {
@@ -651,8 +752,12 @@ export const uiInputBindingMethods = {
       this.closeCalibration();
       return;
     }
-    if (!this.elements.modalLevels.classList.contains('hidden')) {
+    if (!this.elements.modalLevels.classList.contains(HIDDEN_CLASS)) {
       this.closeOverlayModal(this.elements.modalLevels);
+      return;
+    }
+    if (this.elements.modalPlay && !this.elements.modalPlay.classList.contains(HIDDEN_CLASS)) {
+      this.closeOverlayModal(this.elements.modalPlay);
       return;
     }
     if (!this.elements.modalShop.classList.contains('hidden')) {
