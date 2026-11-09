@@ -506,3 +506,136 @@ export class VersusHud {
     return isShown !== wasShown;
   }
 }
+
+/** Id of the dialog and of its parts (suffixes), kept together so the markup has one source. */
+const TUTORIAL_DIALOG_ID = 'versus-tutorial';
+const TUTORIAL_FIRST_STEP = 0;
+const TUTORIAL_STEP_OFFSET = 1;
+const TAB_KEY = 'Tab';
+
+/**
+ * First-duel tutorial: a short dialog with one card per step (charges, polarity guard, field
+ * pulse). It builds its own DOM (no markup in index.html), moves the real focus into itself, is
+ * skippable at every step, and keeps Tab inside. The caller owns when it opens and what closing
+ * means (resume the match, remember it was seen).
+ *
+ * @param {object} options
+ * @param {string[]} options.steps - Step ids; their text lives under `${stepKeyPrefix}.<id>.title|body`.
+ * @param {string} options.stepKeyPrefix - Locale prefix of the step cards.
+ * @param {(reason: 'done'|'skip') => void} options.onClose - Called once when the dialog closes.
+ * @param {Function} [options.translate] - Translation function.
+ * @param {(tag: string) => object} [options.createElement] - Element factory.
+ * @returns {{element: object, index: number, open: Function, close: Function, next: Function, refresh: Function, isOpen: Function}}
+ */
+export function createVersusTutorial({
+  steps,
+  stepKeyPrefix,
+  onClose,
+  translate = t,
+  createElement = (tag) => document.createElement(tag)
+}) {
+  const make = (tag, className, id) => {
+    const el = createElement(tag);
+    if (className) {
+      el.className = className;
+    }
+    if (id) {
+      el.id = id;
+    }
+    return el;
+  };
+  const root = make('div', 'modal-backdrop hidden', TUTORIAL_DIALOG_ID);
+  root.setAttribute('role', 'dialog');
+  root.setAttribute('aria-modal', 'true');
+  root.setAttribute('aria-labelledby', `${TUTORIAL_DIALOG_ID}-title`);
+  root.setAttribute('aria-describedby', `${TUTORIAL_DIALOG_ID}-body`);
+  const card = make('div', 'modal-card');
+  const title = make('h2', 'modal-title', `${TUTORIAL_DIALOG_ID}-title`);
+  const progress = make('p', 'modal-subtext', `${TUTORIAL_DIALOG_ID}-progress`);
+  const live = make('div', null, `${TUTORIAL_DIALOG_ID}-live`);
+  live.setAttribute('aria-live', 'polite');
+  const stepTitle = make('h3', 'stats-section-title', `${TUTORIAL_DIALOG_ID}-step`);
+  const body = make('p', 'modal-subtext', `${TUTORIAL_DIALOG_ID}-body`);
+  live.append(stepTitle, body);
+  const actions = make('div', 'modal-actions');
+  const nextButton = make('button', 'modal-btn primary', `${TUTORIAL_DIALOG_ID}-next`);
+  nextButton.type = 'button';
+  const skipButton = make('button', 'modal-btn', `${TUTORIAL_DIALOG_ID}-skip`);
+  skipButton.type = 'button';
+  actions.append(nextButton, skipButton);
+  card.append(title, progress, live, actions);
+  root.append(card);
+
+  const state = { index: TUTORIAL_FIRST_STEP, isOpen: false };
+  const lastIndex = steps.length - TUTORIAL_STEP_OFFSET;
+
+  const api = {
+    element: root,
+    get index() {
+      return state.index;
+    },
+    isOpen: () => state.isOpen,
+    /** Rewrites every text for the current step and language. */
+    refresh() {
+      const id = steps[state.index];
+      const isLast = state.index === lastIndex;
+      title.textContent = translate('versus.tutorial.title');
+      progress.textContent = translate('versus.tutorial.progress', {
+        current: state.index + TUTORIAL_STEP_OFFSET,
+        total: steps.length
+      });
+      stepTitle.textContent = translate(`${stepKeyPrefix}.${id}.title`);
+      body.textContent = translate(`${stepKeyPrefix}.${id}.body`);
+      nextButton.textContent = translate(isLast ? 'versus.tutorial.done' : 'versus.tutorial.next');
+      skipButton.textContent = translate('versus.tutorial.skip');
+      skipButton.classList.toggle(HIDDEN_CLASS, isLast);
+    },
+    open() {
+      state.index = TUTORIAL_FIRST_STEP;
+      state.isOpen = true;
+      api.refresh();
+      root.classList.remove(HIDDEN_CLASS);
+      nextButton.focus?.();
+    },
+    /** Moves to the next card, or closes after the last one. */
+    next() {
+      if (!state.isOpen) {
+        return;
+      }
+      if (state.index >= lastIndex) {
+        api.close('done');
+        return;
+      }
+      state.index += TUTORIAL_STEP_OFFSET;
+      api.refresh();
+    },
+    close(reason = 'skip') {
+      if (!state.isOpen) {
+        return;
+      }
+      state.isOpen = false;
+      root.classList.add(HIDDEN_CLASS);
+      onClose(reason);
+    }
+  };
+
+  nextButton.addEventListener('click', () => api.next());
+  skipButton.addEventListener('click', () => api.close('skip'));
+  root.addEventListener('keydown', (event) => {
+    if (event.key !== TAB_KEY) {
+      return;
+    }
+    const buttons = [nextButton, skipButton].filter((button) => !button.classList.contains(HIDDEN_CLASS));
+    const first = buttons[0];
+    const last = buttons[buttons.length - TUTORIAL_STEP_OFFSET];
+    const active = typeof document !== 'undefined' ? document.activeElement : null;
+    if (event.shiftKey && active === first) {
+      event.preventDefault();
+      last.focus?.();
+    } else if (!event.shiftKey && active === last) {
+      event.preventDefault();
+      first.focus?.();
+    }
+  });
+  return api;
+}

@@ -90,6 +90,7 @@ export const VERSUS_STORAGE_POLICY = Object.freeze({
   getGamepadDeadzone: P.FORWARD,
   getGamepadAimSpeed: P.FORWARD,
   getGamepadInvertX: P.FORWARD,
+  getGamepadRumble: P.FORWARD,
   getAnimationSpeed: P.FORWARD,
   getUnlockedBallStyles: P.FORWARD,
   isBallStyleUnlocked: P.FORWARD,
@@ -108,6 +109,7 @@ export const VERSUS_STORAGE_POLICY = Object.freeze({
   setGamepadDeadzone: P.NOOP,
   setGamepadAimSpeed: P.NOOP,
   setGamepadInvertX: P.NOOP,
+  setGamepadRumble: P.NOOP,
   setAnimationSpeed: P.NOOP,
   setActiveBallStyle: P.NOOP,
   purchaseBallStyle: P.FALSE,
@@ -167,6 +169,8 @@ export const VERSUS_STORAGE_POLICY = Object.freeze({
   recordVersusResult: P.NOOP,
   getVersusLocalMatches: P.ZERO,
   recordVersusLocalMatch: P.NOOP,
+  getVersusTutorialSeen: P.FALSE,
+  setVersusTutorialSeen: P.NOOP,
   isVersusTierUnlocked: P.FALSE,
 
   // Economy.

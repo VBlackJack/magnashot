@@ -100,7 +100,7 @@ Branchez ou associez une manette au format standard et appuyez sur un bouton : l
 | **Menus : se déplacer / valider / retour** | Croix ou stick gauche / bouton du bas / bouton de droite |
 | **Menus : onglet précédent / suivant** | Bumper gauche / droit |
 
-Si la manette se déconnecte pendant une partie, le jeu se met en pause. Dans les **Réglages**, la ligne **Manette** active ou coupe la manette et règle la zone morte des sticks (petite, moyenne, grande), la vitesse de visée (lente, normale, rapide) et l'inversion de la visée horizontale ; les choix sont conservés localement.
+Si la manette se déconnecte pendant une partie, le jeu se met en pause. Dans les **Réglages**, la ligne **Manette** active ou coupe la manette et règle la zone morte des sticks (petite, moyenne, grande), la vitesse de visée (lente, normale, rapide) et l'inversion de la visée horizontale ; les choix sont conservés localement. Une option **Vibration** (activée par défaut) fait vibrer une manette compatible quand une charge atterrit sur votre plateau, quand une impulsion de champ vous touche et quand vous perdez une manche ; elle reste silencieuse avec le mouvement réduit.
 
 ---
 
@@ -114,6 +114,8 @@ Un mode en tête-à-tête contre l'ordinateur, ouvert au niveau 6 de la campagne
 - **Impulsion de champ** : neutraliser des charges remplit la jauge de Surcharge ; une jauge pleine déclenche une impulsion de champ qui abaisse d'un cran le rail d'ancrage de l'adversaire.
 - **Match** : au meilleur des 3 manches ; une manche est perdue quand un plateau franchit sa ligne de danger. Si les deux tombent ensemble, la manche est rejouée. Après 3 minutes, la **mort subite** abaisse les deux rails toutes les 20 secondes.
 - **Écrans** : sur grand écran (tablettes, ordinateur) les deux plateaux sont côte à côte ; sur téléphone, le plateau de l'ordinateur devient une mini-vue à côté ou au-dessus du vôtre. Les commandes d'une partie solo fonctionnent, et la manette est prise en charge.
+- **Tutoriel du premier duel** : la première fois que vous lancez un duel sur un appareil, une courte fenêtre explique les charges, la garde de polarité et l'impulsion de champ en trois étapes pendant que le match attend. Passez-la à tout moment (Échap, le bouton Passer ou le bouton retour de la manette) ; elle ne revient pas.
+- **Son** : chaque plateau joue de son côté du champ stéréo (le premier plateau à gauche, le second à droite).
 - **Records** : vos victoires et défaites par difficulté sont conservées localement et affichées dans **Mes statistiques** ; la carte de résultat propose un bouton Partager.
 
 ### Deux joueurs sur le même appareil

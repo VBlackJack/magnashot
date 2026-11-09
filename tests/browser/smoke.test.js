@@ -122,7 +122,9 @@ const UNLOCKED_MODE_BUTTONS = Object.freeze(['#btn-daily', ...LOCKED_MODE_BUTTON
 /** A player past the level that opens Polarity Duel (a save of schema 1 moves to the current one on load). */
 const VERSUS_PLAYER_STORAGE = Object.freeze({
   [`${STORAGE_PREFIX}${STORAGE_KEYS.unlockedLevel}`]: String(GAME_CONFIG.modeUnlocks.campaignLevelCleared.versus + 2),
-  [`${STORAGE_PREFIX}${STORAGE_KEYS.schemaVersion}`]: '1'
+  [`${STORAGE_PREFIX}${STORAGE_KEYS.schemaVersion}`]: '1',
+  // The first-duel tutorial holds the match; the tests that are not about it start with it already seen.
+  [`${STORAGE_PREFIX}${STORAGE_KEYS.versusTutorialSeen}`]: 'true'
 });
 /** The arrangement of the two boards that the room of each layout allows (versus.layout). */
 const VERSUS_LAYOUT_BY_VIEWPORT = Object.freeze({
@@ -2383,6 +2385,91 @@ describe('Magnetar boss', () => {
       assert.equal(cards.length, 4, 'one card per behaviour');
       assert.equal(new Set(cards).size, 4, 'each card has its own name');
       assert.ok(cards.every((name) => name.length > 0));
+      assert.deepEqual(errors, []);
+    } finally {
+      await context.close();
+    }
+  });
+});
+
+/** Opens the versus screen without waiting for the boards to run (a held match never updates them). */
+async function openVersusMatchScreen(page, viewport, tier) {
+  await openVersusTierPicker(page, viewport);
+  await page.click(`.versus-tier-btn[data-tier="${tier}"]`);
+  await waitShown(page, '#versus-screen');
+}
+
+/** The first-duel tutorial: a profile that never saw it. */
+const TUTORIAL_UNSEEN_STORAGE = Object.freeze({
+  ...VERSUS_PLAYER_STORAGE,
+  [`${STORAGE_PREFIX}${STORAGE_KEYS.versusTutorialSeen}`]: 'false'
+});
+const TUTORIAL_HOLD_WAIT_MS = 400;
+const TUTORIAL_STEP_COUNT = GAME_CONFIG.versus.tutorial.steps.length;
+
+describe('Polarity Duel first-duel tutorial', () => {
+  test('the tutorial opens on the first duel, holds the match, walks its steps and is never shown again', async () => {
+    const viewport = VIEWPORTS[0];
+    const { context, page, errors } = await openGame(viewport, { initStorage: TUTORIAL_UNSEEN_STORAGE });
+    try {
+      await captureVersusEngines(page);
+      await openVersusMatchScreen(page, viewport, 'easy');
+      await waitShown(page, '#versus-tutorial');
+      const dialog = await page.evaluate(() => {
+        const el = document.querySelector('#versus-tutorial');
+        return {
+          role: el.getAttribute('role'),
+          modal: el.getAttribute('aria-modal'),
+          focusInside: el.contains(document.activeElement)
+        };
+      });
+      assert.deepEqual(dialog, { role: 'dialog', modal: 'true', focusInside: true });
+      const held = await page.evaluate(() => window.__versusUpdates);
+      await page.waitForTimeout(TUTORIAL_HOLD_WAIT_MS);
+      assert.equal(await page.evaluate(() => window.__versusUpdates), held, 'the match is held while the tutorial is open');
+      for (let step = 1; step < TUTORIAL_STEP_COUNT; step++) {
+        await page.click('#versus-tutorial-next');
+      }
+      await page.click('#versus-tutorial-next');
+      await page.waitForFunction(() => !document.querySelector('#versus-tutorial'));
+      await page.waitForFunction((before) => window.__versusUpdates > before, held);
+      const stored = await page.evaluate(
+        (key) => localStorage.getItem(key),
+        `${STORAGE_PREFIX}${STORAGE_KEYS.versusTutorialSeen}`
+      );
+      assert.equal(stored, 'true');
+
+      // A second duel in the same session does not bring it back.
+      await page.click('#btn-versus-pause');
+      await waitShown(page, '#modal-duel-pause');
+      await page.click('#btn-versus-quit');
+      await page.waitForFunction(() => document.querySelector('#versus-screen').classList.contains('hidden'));
+      await page.evaluate(() => {
+        window.__versusUpdates = 0;
+      });
+      await waitShown(page, '#modal-pause');
+      await page.click('#btn-resume');
+      await openVersusMatchScreen(page, viewport, 'easy');
+      await page.waitForFunction(() => window.__versusUpdates > 0);
+      assert.equal(await page.evaluate(() => Boolean(document.querySelector('#versus-tutorial'))), false);
+      assert.deepEqual(errors, []);
+    } finally {
+      await context.close();
+    }
+  });
+
+  test('Escape skips the tutorial at once and the match runs', async () => {
+    const viewport = VIEWPORTS[0];
+    const { context, page, errors } = await openGame(viewport, { initStorage: TUTORIAL_UNSEEN_STORAGE });
+    try {
+      await captureVersusEngines(page);
+      await openVersusMatchScreen(page, viewport, 'easy');
+      await waitShown(page, '#versus-tutorial');
+      const held = await page.evaluate(() => window.__versusUpdates);
+      await page.keyboard.press('Escape');
+      await page.waitForFunction(() => !document.querySelector('#versus-tutorial'));
+      await page.waitForFunction((before) => window.__versusUpdates > before, held);
+      assert.equal(await isShown(page, '#modal-duel-pause'), false, 'skipping resumes, it does not open the pause dialog');
       assert.deepEqual(errors, []);
     } finally {
       await context.close();
