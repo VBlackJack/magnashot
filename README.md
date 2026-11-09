@@ -140,6 +140,18 @@ Each player picks a device in the lobby, and pressing a join key or a controller
 
 ---
 
+## Pulse: music and Resonance
+
+- **Music**: an original procedural score synthesised in the browser, with its own tempo, key and chord progression for each of the ten modes (Campaign 96 BPM up to Blitz 132). It plays only while a run is being played: opening a menu, pausing, losing or winning fades it out, and nothing plays on the menus. It builds with the pressure on the board: a pad and a bass at rest, then an arpeggio, busier hats and a filter that opens as the Sag meter fills, the cluster nears the danger line or charges close in on your board. It never uses the random streams of a run. The music starts after your first tap or key press (browsers refuse sound before that).
+- **Settings**: the **Sound** button still mutes everything. **Music** switches the score on or off (effects keep playing) and **Music volume** cycles 0, 25, 50, 75 and 100 percent. All are stored locally.
+- **Resonance**: a shot released within about 7 frames (roughly a tenth of a second) of the beat is **Resonant**. A beat ring around the launcher shrinks onto it every beat; while the window is open the ring turns solid and thick, outside it is thin and dashed, so the cue never depends on colour alone. A Resonant release flashes the launcher, shows "Resonance!" and plays a short arpeggio.
+  - **Solo modes**: if a Resonant shot's turn makes at least one match or drops at least one sphere, all the Overcharge earned that turn is multiplied by 1.5. A whiff earns nothing extra.
+  - **Polarity Duel**: a Resonant shot that hits a charge of the opposite polarity removes 2 strength instead of 1 (what you send is unchanged). The CPU gets Resonant shots by a dice roll per difficulty (Easy never, Normal 35 percent, Hard 65 percent) drawn from its own seeded stream, so it never changes the rest of the match. The difficulty picker has a **Resonance** option, set from your global setting each time it opens.
+  - **Where it is off, and why**: the **Daily Challenge** (rematches included), the **Weekly Flux**, Flux runs from a **shared seed link** and **Ghost Duels** never use Resonance, whatever the setting, so that their scores stay comparable. The music still plays there; only the ring is hidden.
+  - **Settings**: the **Resonance** button turns the bonus and the ring off for everything else. Resonance is judged on game frames, never on the clock, so a run replays the same way; there is no beat vibration.
+- **Calibrate rhythm** (Settings): tap along with eight ring pulses (with clicks, or silently when muted). The median distance between your taps and the pulses, at most 200 ms either way, becomes an offset that only shifts how your timing is judged; **Reset** clears it.
+
+---
 ## Architecture Overview
 
 The codebase follows a modular, zero-dependency ES module architecture with strict data/logic separation (`configs/*.json` and `locales/*.json`):
@@ -169,7 +181,8 @@ The codebase follows a modular, zero-dependency ES module architecture with stri
 │   │   ├── StorageManager.js # Cached localStorage persistence with in-memory fallback, versioned save schema (ordered migrations, legacy prefix merge)
 │   │   ├── installMethods.js # Installs a domain module's methods on a class prototype
 │   │   ├── WorldGeometry.js  # Launcher, danger line and content offset derived from the world size
-│   │   └── AudioManager.js   # Procedural Web Audio API synthesizer
+│   │   ├── AudioManager.js   # Procedural Web Audio API synthesizer (effects, music bus, mute and visibility handling)
+│   │   └── MusicEngine.js    # Procedural music: look-ahead scheduler, per-mode patterns, intensity layers, phase lock to the beat
 │   ├── entities/
 │   │   ├── Ball.js           # Magnetic sphere entity (bonds, polarity, armor, modifiers)
 │   │   ├── Obstacle.js       # Rotors, bumpers, repulsors, portals, barriers & singularities
@@ -185,6 +198,8 @@ The codebase follows a modular, zero-dependency ES module architecture with stri
 │   │   ├── EngineLauncher.js # GameEngine module: launcher queue, seeded colour rolls & stale colour refresh
 │   │   ├── EngineModes.js    # GameEngine module: starting every mode (Campaign, Survival, Puzzle, Blitz, Boss Rush, Cascade, Daily, Flux), Flux perks & stage transitions
 │   │   ├── EngineRoundFlow.js# GameEngine module: wave types, round end checks, game over & continue pack
+│   │   ├── EnginePulse.js    # GameEngine module: beat clock, Resonance judgement, Overcharge bonus, music pressure and beat state
+│   │   ├── Resonance.js      # Pure Resonance rules: beat window, offset, where it applies, ring shape, calibration median
 │   │   ├── EngineTurnResolution.js # GameEngine module: cluster resolution, chain reactions, avalanche, random special grants & Overcharge
 │   │   ├── GameLoop.js       # Fixed-step loop with interpolation, idle throttling and fatal error stop
 │   │   ├── ImpactPreview.js  # What a shot would destroy, shared by the aim preview and the calibration bot
@@ -225,6 +240,9 @@ The codebase follows a modular, zero-dependency ES module architecture with stri
 │       ├── UIGamepad.js      # UIManager module: controller routing, menu focus navigation, Settings controller row
 │       ├── UIVersus.js       # UIManager module: Polarity Duel difficulty picker, screen, layouts, pause, result and records
 │       ├── UIVersusLocal.js  # UIManager module: two players on one device, entry, lobby, devices and handicap
+│       ├── UICalibration.js  # UIManager module: music driver in the frame hook, audio unlock and the rhythm calibration dialog
+│       ├── PulseDriver.js    # Starts, stops and steers the music from the run on screen
+│       ├── RhythmCalibration.js # Pure state machine of the calibration: pulses, taps, median offset
 │       ├── VersusHud.js      # Polarity Duel HUD: layout choice, announcements, top bar, incoming charges, pulse meter and controls
 │       ├── UIInputBindings.js# UIManager module: install, drawer and keyboard bindings
 │       ├── UIModals.js       # UIManager module: dialogs, shop tabs, focus trap and inert handling

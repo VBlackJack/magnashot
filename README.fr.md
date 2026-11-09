@@ -140,6 +140,18 @@ Chaque joueur choisit son périphérique dans le salon, et appuyer sur une touch
 
 ---
 
+## Pulse : musique et Résonance
+
+- **Musique** : une partition procédurale originale, synthétisée dans le navigateur, avec son propre tempo, sa tonalité et sa suite d'accords pour chacun des dix modes (Campagne à 96 BPM jusqu'à Blitz à 132). Elle ne joue que pendant une partie en cours : ouvrir un menu, mettre en pause, perdre ou gagner la fait s'estomper, et aucune musique ne joue dans les menus. Elle suit la pression sur le plateau : un nappage et une basse au repos, puis un arpège, des charleys plus chargés et un filtre qui s'ouvre quand la jauge d'affaissement se remplit, que l'amas approche de la ligne de danger ou que des charges se rapprochent de votre plateau. Elle n'utilise jamais les flux aléatoires d'une partie. La musique démarre après votre premier toucher ou appui sur une touche (les navigateurs refusent le son avant).
+- **Réglages** : le bouton **Son** coupe toujours tout. **Musique** active ou coupe la partition (les effets continuent) et **Volume de la musique** passe en boucle par 0, 25, 50, 75 et 100 pour cent. Tout est conservé localement.
+- **Résonance** : un tir lâché à environ 7 images (à peu près un dixième de seconde) du temps est **Résonant**. Un anneau de temps autour du lanceur se resserre sur lui à chaque temps ; fenêtre ouverte, l'anneau devient plein et épais, en dehors il est fin et en pointillés, si bien que le repère ne dépend jamais de la couleur seule. Un tir Résonant fait flasher le lanceur, affiche "Résonance !" et joue un court arpège.
+  - **Modes solo** : si le tour d'un tir Résonant fait au moins une combinaison ou fait tomber au moins une sphère, toute la Surcharge gagnée ce tour est multipliée par 1,5. Un tir à vide ne rapporte rien de plus.
+  - **Duel de polarité** : un tir Résonant qui touche une charge de polarité opposée lui retire 2 de force au lieu de 1 (ce que vous envoyez ne change pas). L'ordinateur obtient des tirs Résonants par un tirage selon la difficulté (Facile jamais, Normal 35 pour cent, Difficile 65 pour cent) tiré dans son propre flux graine, qui ne change donc jamais le reste du match. Le choix de difficulté propose une option **Résonance**, reprise de votre réglage global à chaque ouverture.
+  - **Où elle est désactivée, et pourquoi** : le **Défi du jour** (revanches comprises), le **Flux hebdomadaire**, les parties de Flux issues d'un **lien de graine partagé** et les **Duels fantômes** n'utilisent jamais la Résonance, quel que soit le réglage, afin que leurs scores restent comparables. La musique y joue quand même ; seul l'anneau est masqué.
+  - **Réglage** : le bouton **Résonance** coupe le bonus et l'anneau partout ailleurs. La Résonance est jugée sur les images du jeu, jamais sur l'horloge, si bien qu'une partie se rejoue à l'identique ; il n'y a pas de vibration au rythme.
+- **Calibrer le rythme** (Réglages) : tapez en rythme avec huit pulsations de l'anneau (avec des clics, ou en silence si le son est coupé). La distance médiane entre vos taps et les pulsations, de 200 ms au plus dans un sens ou l'autre, devient un décalage qui ne change que la façon dont votre timing est jugé ; **Réinitialiser** l'efface.
+
+---
 ## Architecture
 
 Le code suit une architecture en modules ES sans dépendance, avec une séparation stricte des données et de la logique (`configs/*.json` et `locales/*.json`) :
@@ -168,7 +180,8 @@ Le code suit une architecture en modules ES sans dépendance, avec une séparati
 │   │   ├── StorageManager.js # Persistance localStorage en cache, avec repli en mémoire, schéma de sauvegarde versionné (migrations ordonnées, reprise des sauvegardes d'avant le renommage)
 │   │   ├── installMethods.js # Installe les méthodes d'un module de domaine sur le prototype d'une classe
 │   │   ├── WorldGeometry.js  # Lanceur, ligne de danger et décalage du contenu calculés depuis la taille du monde
-│   │   └── AudioManager.js   # Synthétiseur procédural Web Audio API
+│   │   ├── AudioManager.js   # Synthétiseur procédural Web Audio API (effets, bus de musique, coupure et visibilité)
+│   │   └── MusicEngine.js    # Musique procédurale : ordonnanceur en avance, motifs par mode, couches d'intensité, verrouillage de phase sur le temps
 │   ├── entities/
 │   │   ├── Ball.js           # Sphère magnétique (liens, polarité, blindage, modificateurs)
 │   │   ├── Obstacle.js       # Rotors, bumpers, répulseurs, portails, barrières et singularités
@@ -207,6 +220,8 @@ Le code suit une architecture en modules ES sans dépendance, avec une séparati
 │   │   ├── VersusRules.js    # Règles pures du Duel de polarité : table d'attaque, polarité, montée et impacts des charges, série de garde, manches, mort subite
 │   │   ├── EngineVersus.js   # Module de GameEngine : plateau de duel ensemencé, charges (montée, impacts, atterrissage), impulsion de champ et prédiction de l'aperçu de visée
 │   │   ├── VersusMatch.js    # Contrôleur de match à deux plateaux : niveaux de CPU, routage des attaques, manches, mort subite et annonces (utilisable sans interface)
+│   │   ├── EnginePulse.js    # Module de GameEngine : horloge de temps, jugement de la Résonance, bonus de Surcharge, pression musicale et état du temps
+│   │   ├── Resonance.js      # Règles pures de la Résonance : fenêtre de temps, décalage, où elle s'applique, forme de l'anneau, médiane de calibrage
 │   │   ├── BotBrain.js       # Décisions pures du bot (visée gloutonne, valeur d'un tir, plan d'arsenal) avec flux aléatoire injecté
 │   │   └── layouts/
 │   │       ├── LayoutGenerators.js   # Géométrie pure des formes : pendule, anneaux, hexagone, spirale, croix, masques
@@ -224,6 +239,9 @@ Le code suit une architecture en modules ES sans dépendance, avec une séparati
 │       ├── UIGamepad.js      # Module de UIManager : routage de la manette, navigation du focus dans les menus, ligne Manette des Réglages
 │       ├── UIVersus.js       # Module de UIManager : choix de difficulté du Duel de polarité, écran, dispositions, pause, résultat et records
 │       ├── UIVersusLocal.js  # Module de UIManager : deux joueurs sur le même appareil, entrée, salon, périphériques et handicap
+│       ├── UICalibration.js  # Module de UIManager : pilote de musique dans le crochet d'image, déverrouillage audio et dialogue de calibrage du rythme
+│       ├── PulseDriver.js    # Démarre, arrête et pilote la musique selon la partie à l'écran
+│       ├── RhythmCalibration.js # Machine d'états pure du calibrage : pulsations, taps, décalage médian
 │       ├── VersusHud.js      # Interface du Duel de polarité : choix de disposition, annonces, barre du haut, charges entrantes, jauge d'impulsion et commandes
 │       ├── UIInputBindings.js# Module de UIManager : liaisons d'installation, du tiroir et du clavier
 │       ├── UIModals.js       # Module de UIManager : fenêtres, onglets de la boutique, piège de focus et inert
