@@ -191,19 +191,20 @@ test('Classic is wired like the other gated modes', () => {
   const bindings = readText('../src/ui/UIInputBindings.js');
   assert.match(
     bindings,
-    /btnModeClassic\?\.addEventListener\('click'[\s\S]{0,120}runIfModeUnlocked\(GAME_MODES\.CLASSIC[\s\S]{0,200}startClassicMode\(\)/
+    /bindModeCard\(this, this\.elements\.btnModeClassic, \{[\s\S]{0,120}accessKey: GAME_MODES\.CLASSIC[\s\S]{0,200}startClassicMode\(\)/
   );
 });
 
-test('the markup carries the Sag meter in the shots box and the Classic card first in the arcade strip', () => {
+test('the markup carries the Sag meter in the shots box and the Classic card right after Survival in the Play hub arcade', () => {
   assert.match(
     html,
     /hud-stat-shots[\s\S]*?id="hud-sag-meter"[^>]*role="meter"[^>]*aria-valuemin="0"[^>]*aria-valuenow="0"[^>]*aria-valuetext=""/
   );
   assert.match(html, /id="hud-sag-meter" class="sag-meter hidden"/);
-  const strip = html.slice(html.indexOf('class="arcade-modes-strip"'));
-  assert.ok(strip.indexOf('id="btn-mode-classic"') > 0);
-  assert.ok(strip.indexOf('id="btn-mode-classic"') < strip.indexOf('id="btn-mode-puzzle"'));
+  const arcade = html.slice(html.indexOf('play-hub-arcade'));
+  assert.ok(arcade.indexOf('id="btn-endless"') > 0);
+  assert.ok(arcade.indexOf('id="btn-endless"') < arcade.indexOf('id="btn-mode-classic"'));
+  assert.ok(arcade.indexOf('id="btn-mode-classic"') < arcade.indexOf('id="btn-mode-puzzle"'));
   assert.match(html, /id="arcade-best-classic"/);
 });
 
