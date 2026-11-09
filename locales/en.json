@@ -313,7 +313,28 @@
       "dailyMutatorFair": "Daily Challenge: {{mutator}}. {{effect}} {{fairPlay}}",
       "dailyFairPlay": "Same rules for everyone: Workshop upgrades and shop ammo are off today.",
       "dailyFairPlayUpgrades": "Same rules for everyone: Workshop upgrades are off today.",
-      "dailyFairPlayAmmo": "Same rules for everyone: shop ammo is off today."
+      "dailyFairPlayAmmo": "Same rules for everyone: shop ammo is off today.",
+      "puzzle": "Puzzle {{stage}}/{{total}}: {{objective}} in {{shots}}. {{hint}}",
+      "puzzleObjective": {
+        "coreRescue": "free every core 💎",
+        "clearAll": "clear the board"
+      },
+      "puzzleShots": {
+        "one": "1 shot",
+        "many": "{{shots}} shots"
+      },
+      "puzzleHints": {
+        "stage1": "Complete the group above the core: it falls with the group.",
+        "stage2": "Rust blocks the group: paint it with the Brush.",
+        "stage3": "Clear every sphere: Lightning strikes a whole row.",
+        "stage4": "Two shots, one color: build a group of three with the core on the platform.",
+        "stage5": "Two cores, two tools: a group on one side, the Prism on the other.",
+        "stage6": "The barrier covers the core: go through the portal.",
+        "stage7": "The order is fixed: break the Quantum Lock first, then free the core.",
+        "stage8": "Set off the Paint Core: the rust takes its color and can be grouped.",
+        "stage9": "Wake the Dormant Barrels: their blasts clear the board.",
+        "stage10": "The core hangs from a Chained Sphere on the rotor: build a group of three on it."
+      }
     },
     "ghost": {
       "ahead": "+{{gap}} vs {{name}}",
@@ -557,7 +578,7 @@
       "platform": "Support platforms hold hanging spheres from below while letting your shots pass right through!",
       "antimagnet": "Antimagnet cushions push hanging clusters upward without bending your shots!",
       "rescueCore": "Free all Rescue Cores (💎) by matching or dropping them to trigger an instant avalanche victory!",
-      "puzzle": "One-Shot Puzzle: study the angles and clear the objective with your fixed ammo queue!",
+      "puzzle": "Puzzle: a fixed queue, no swap, no shop and no Workshop upgrades. Read the board, then shoot.",
       "polarity": {
         "pointer": "Click the 🧲 button (or press F) to flip your shot's charge: spheres then pull it the other way, so it curves in the opposite direction.",
         "touch": "Tap the 🧲 button to flip your shot's charge: spheres then pull it the other way, so it curves in the opposite direction.",
@@ -648,8 +669,8 @@
       },
       "arcade": {
         "puzzle": "Puzzle",
-        "puzzleDesc": "10 trick-shot stages • Rescue Cores 💎",
-        "puzzleRecord": "Puzzle {{stage}}/{{total}} • Best: {{score}}",
+        "puzzleDesc": "10 trick-shot stages • 1 or 2 shots",
+        "puzzleRecord": "Puzzle {{stage}}/{{total}} • Stars: {{stars}}/{{maxStars}}",
         "puzzleStage": "Puzzle {{stage}}",
         "puzzleStageLocked": "Clear Puzzle {{previous}} to unlock.",
         "blitz": "Blitz 90s",
@@ -662,7 +683,8 @@
         "lockedDesc": "Clear level {{level}} to unlock",
         "classic": "Purist",
         "classicDesc": "Pure rules: no specials, no upgrades. Misses lower the ceiling.",
-        "classicBest": "Best: stage {{stage}}"
+        "classicBest": "Best: stage {{stage}}",
+        "puzzleStageAria": "Puzzle {{stage}}, {{stars}} of {{maxStars}} stars"
       },
       "jumpCurrent": "Current level",
       "grid": {
@@ -1107,7 +1129,8 @@
         "collectorMagnet": {
           "name": "Collector Magnet",
           "description": "Adds +{{points}} bonus points and +{{overcharge}}% Overcharge per avalanche sphere in the bottom collector bins per rank."
-        }
+        },
+        "puzzleBaselineNote": "Upgrades are paused in Puzzle: every player meets the same puzzle."
       },
       "feedback": {
         "upgradePurchased": "{{name}} upgraded to level {{level}} of {{maxLevel}}.",
