@@ -18,6 +18,7 @@ import { GAME_MODES, GAME_STATES, OBJECTIVE_TYPES } from '../core/Constants.js';
 import { t, formatNumber } from '../core/I18n.js';
 import { SeededRandom } from '../core/SeededRandom.js';
 import { resolveHintText } from '../game/Discovery.js';
+import { MAGNETAR_PHASES } from '../game/MagnetarRules.js';
 import { SAG_PHASES } from '../game/SagMeter.js';
 import { getUtcIsoWeekKey } from '../game/WeeklyFlux.js';
 import { FULL_PERCENT } from './WorkshopView.js';
@@ -52,6 +53,19 @@ const SAG_METER_CLASS_BY_PHASE = Object.freeze({
 });
 
 /** Methods installed on UIManager.prototype by UIManager.js. */
+/**
+ * Locale key of the Flux banner: a Magnetar boss stage also names its Moorings.
+ * @param {boolean} isBossStage - Whether the stage is a boss stage.
+ * @param {object|null} magnetarView - engine.getMagnetarView().
+ * @returns {string} Locale key.
+ */
+export function getFluxBannerKey(isBossStage, magnetarView) {
+  if (!isBossStage) {
+    return 'hud.stats.mode.flux';
+  }
+  return magnetarView ? 'hud.stats.mode.fluxBossMagnetar' : 'hud.stats.mode.fluxBoss';
+}
+
 export const uiHudRefreshMethods = {
   /**
    * Shows the Sag box: label, level/size value, the segmented meter and its accessible
@@ -129,6 +143,54 @@ export const uiHudRefreshMethods = {
     }
   },
 
+  /**
+   * Magnetar bosses: in Boss Rush the Moorings take the shots slot (Flux keeps its shots and
+   * shows the Moorings in the banner), and the telegraph chip names the next behaviour with a glyph and words (never colour alone). The chip is aria-hidden: the
+   * announcements are the one live channel.
+   * @param {object} engine - Game engine.
+   * @param {object|null} view - engine.getMagnetarView().
+   */
+  refreshMagnetarHud(engine, view) {
+    const chip = this.elements.magnetarTelegraph;
+    if (view && engine.mode === GAME_MODES.BOSS_RUSH && !engine.getSagState?.().active) {
+      if (this.elements.shotsLabel) {
+        setTextIfChanged(this.elements.shotsLabel, t('hud.stats.shots.mooringsLabel'));
+      }
+      setTextIfChanged(this.elements.shotsValue, formatNumber(view.moorings));
+      this.elements.shotsValue.classList.toggle('warning', view.moorings <= 1);
+    }
+    if (!chip) {
+      return;
+    }
+    const armed = view && view.phase === MAGNETAR_PHASES.ARMED ? view.armed : null;
+    if (!armed) {
+      chip.classList.add('hidden');
+      return;
+    }
+    const glyph = t(`modals.shop.codex.magnetarPatterns.patterns.${armed}.icon`);
+    const behaviour = t(`gameplay.magnetar.behaviour.${armed}`);
+    setTextIfChanged(chip, `${glyph} ${t('hud.magnetar.next', { behaviour })}`);
+    chip.classList.remove('hidden');
+  },
+
+  /** Polite announcement of a Magnetar event: arming (with its counter), last Mooring, fall. */
+  announceMagnetarEvent(announcement) {
+    if (!announcement?.kind) {
+      return;
+    }
+    if (announcement.kind === 'armed') {
+      const id = announcement.behaviour;
+      this.announce(
+        t('hud.announcer.magnetar.armed', {
+          behaviour: t(`gameplay.magnetar.behaviour.${id}`),
+          counter: t(`gameplay.magnetar.counter.${id}`)
+        })
+      );
+      return;
+    }
+    this.announce(t(`hud.announcer.magnetar.${announcement.kind}`));
+  },
+
   refresh(engine, extra = {}) {
     // One-shot extras (an unlocked achievement, a cleared Flux stage) must not replay
     // when refresh is re-run with lastExtra (language change, input mode change, shop
@@ -136,6 +198,7 @@ export const uiHudRefreshMethods = {
     const { oneShot: { unlockedAchievementIds, fluxStageCleared, classicStageCleared, fluxPerkChosen }, persistentExtra } =
       splitRefreshExtra(extra);
     this.lastExtra = persistentExtra;
+    const magnetarView = engine.getMagnetarView?.() ?? null;
     setTextIfChanged(this.elements.scoreValue, formatNumber(engine.score));
     setTextIfChanged(
       this.elements.coinsValue,
@@ -366,9 +429,10 @@ export const uiHudRefreshMethods = {
     } else if (engine.mode === GAME_MODES.FLUX) {
       setTextIfChanged(
         this.elements.modeBanner,
-        t(engine.fluxIsBossStage ? 'hud.stats.mode.fluxBoss' : 'hud.stats.mode.flux', {
+        t(getFluxBannerKey(engine.fluxIsBossStage, magnetarView), {
           stage: engine.fluxStage,
-          shape: this.formatFluxShapeName(engine.fluxShapeIds)
+          shape: this.formatFluxShapeName(engine.fluxShapeIds),
+          moorings: magnetarView ? formatNumber(magnetarView.moorings) : ''
         })
       );
       if (this.elements.shotsLabel) {
@@ -395,10 +459,15 @@ export const uiHudRefreshMethods = {
         const shields = engine.getBossBall()?.armorHits || 0;
         setTextIfChanged(
           this.elements.modeBanner,
-          t('hud.stats.mode.bossRush', {
-            wave: engine.bossRushWave,
-            shields: formatNumber(shields)
-          })
+          magnetarView
+            ? t('hud.stats.mode.bossRushMagnetar', {
+              wave: engine.bossRushWave,
+              moorings: formatNumber(magnetarView.moorings)
+            })
+            : t('hud.stats.mode.bossRush', {
+              wave: engine.bossRushWave,
+              shields: formatNumber(shields)
+            })
         );
       } else if (engine.mode === GAME_MODES.CASCADE) {
         setTextIfChanged(
@@ -452,6 +521,7 @@ export const uiHudRefreshMethods = {
     if (!engine.getSagState?.().active) {
       this.hideSagMeter();
     }
+    this.refreshMagnetarHud(engine, magnetarView);
 
     if (this.elements.modeBanner) {
       setAttributeIfChanged(
@@ -539,6 +609,12 @@ export const uiHudRefreshMethods = {
 
     const transitionedState = this.prevEngineState !== engine.state;
     this.prevEngineState = engine.state;
+
+    if (extra.magnetarAnnouncement) {
+      this.announceMagnetarEvent(extra.magnetarAnnouncement);
+      // Announced once: a refresh re-run with lastExtra must not repeat it.
+      delete this.lastExtra.magnetarAnnouncement;
+    }
 
     if (extra.ghostAnnouncement) {
       this.announceGhostEvent(extra.ghostAnnouncement);

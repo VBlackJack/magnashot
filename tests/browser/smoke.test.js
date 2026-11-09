@@ -1512,7 +1512,7 @@ function rivalGhost(mode, key) {
   return {
     mode,
     key,
-    cv: DUEL_CONFIG.contentVersion,
+    cv: DUEL_CONFIG.contentVersion[mode],
     n: RIVAL_SHOT_SCORES.length,
     step: 1,
     s: [...RIVAL_SHOT_SCORES],
@@ -2301,6 +2301,95 @@ describe('Polarity Duel, two players entry by layout', () => {
       }
     });
   }
+});
+
+describe('Magnetar boss', () => {
+  const MAGNETAR_WAVE = 3;
+
+  /** Starts Boss Rush on the wave and puts the Magnetar in the armed phase, like a warning would. */
+  const armMagnetar = (page) =>
+    page.evaluate(async (wave) => {
+      const { MAGNETAR_BEHAVIOURS, MAGNETAR_PHASES } = await import('/src/game/MagnetarRules.js');
+      const engine = window.__fluxEngine;
+      engine.startBossRushMode(wave);
+      const magnetar = engine.magnetar;
+      magnetar.phase = MAGNETAR_PHASES.ARMED;
+      magnetar.armed = MAGNETAR_BEHAVIOURS.INVERT;
+      magnetar.plan = engine.planMagnetarBehaviour(engine.getMagnetarBall());
+      engine.applyMagnetarArmedEffects();
+      engine.notifyUI();
+    }, MAGNETAR_WAVE);
+
+  for (const viewport of VIEWPORTS) {
+    test(`${viewport.name}: wave ${MAGNETAR_WAVE} shows the telegraph chip without overlap or HUD change`, async () => {
+      const { context, page, errors } = await openGame(viewport, { initStorage: EXISTING_PLAYER_STORAGE });
+      try {
+        await startLevelOne(page);
+        await page.evaluate(async (wave) => {
+          window.__fluxEngine.startBossRushMode(wave);
+          window.__fluxEngine.notifyUI();
+        }, MAGNETAR_WAVE);
+        const before = await hudTrackCount(page);
+        assert.equal(await isShown(page, '#hud-magnetar-telegraph'), false, 'no warning while the Magnetar rests');
+        await armMagnetar(page);
+        await waitShown(page, '#hud-magnetar-telegraph');
+        const after = await hudTrackCount(page);
+        assert.equal(after.tracks, before.tracks, 'the chip adds no HUD column');
+        const layout = await page.evaluate(() => {
+          const chip = document.querySelector('#hud-magnetar-telegraph');
+          const rect = chip.getBoundingClientRect();
+          const bar = document.querySelector('.hud-bar').getBoundingClientRect();
+          const overlaps = [...document.querySelectorAll('.hud-bar > *, .hud-bar .hud-center-info > * > *')]
+            .filter((el) => el !== chip && !el.contains(chip) && !chip.contains(el) && el.offsetParent !== null)
+            .filter((el) => {
+              const other = el.getBoundingClientRect();
+              return (
+                rect.left < other.right && other.left < rect.right && rect.top < other.bottom && other.top < rect.bottom
+              );
+            })
+            .map((el) => el.id || el.className);
+          return {
+            text: chip.textContent.trim(),
+            ariaHidden: chip.getAttribute('aria-hidden'),
+            insideBar: rect.left >= bar.left - 1 && rect.right <= bar.right + 1,
+            overlaps,
+            slot: document.querySelector('#hud-shots-label').textContent.trim()
+          };
+        });
+        assert.match(layout.text, /^\S+ \S.*\S$/u, 'a glyph, then words');
+        assert.equal(layout.ariaHidden, 'true');
+        assert.equal(layout.insideBar, true, 'the chip stays inside the HUD bar');
+        assert.deepEqual(layout.overlaps, [], 'the chip overlaps no other HUD element');
+        assert.match(layout.slot, /^(Moorings|Amarres)$/);
+        assert.deepEqual(errors, []);
+      } finally {
+        await context.close();
+      }
+    });
+  }
+
+  test('the Codex lists the four Magnetar patterns', async () => {
+    const desktop = VIEWPORTS[0];
+    const { context, page, errors } = await openGame(desktop, { initStorage: EXISTING_PLAYER_STORAGE });
+    try {
+      await startLevelOne(page);
+      await clickMenuButton(page, desktop, '#btn-shop');
+      await waitShown(page, '#modal-shop');
+      await page.click('#tab-shop-codex');
+      await waitShown(page, '#codex-pane');
+      const cards = await page.evaluate(() =>
+        [...document.querySelectorAll('[data-codex-section="magnetarPatterns"] .codex-card')].map((el) =>
+          el.querySelector('.codex-title').textContent.trim()
+        )
+      );
+      assert.equal(cards.length, 4, 'one card per behaviour');
+      assert.equal(new Set(cards).size, 4, 'each card has its own name');
+      assert.ok(cards.every((name) => name.length > 0));
+      assert.deepEqual(errors, []);
+    } finally {
+      await context.close();
+    }
+  });
 });
 
 /** Opens the versus screen without waiting for the boards to run (a held match never updates them). */

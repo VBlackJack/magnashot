@@ -42,6 +42,7 @@ import { engineLauncherMethods } from './EngineLauncher.js';
 import { engineDiscoveryMethods } from './EngineDiscovery.js';
 import { engineControlsMethods } from './EngineControls.js';
 import { engineVersusMethods } from './EngineVersus.js';
+import { engineMagnetarMethods } from './EngineMagnetar.js';
 import { engineTurnResolutionMethods } from './EngineTurnResolution.js';
 import { engineRoundFlowMethods } from './EngineRoundFlow.js';
 import { engineProgressMethods } from './EngineProgress.js';
@@ -107,6 +108,8 @@ export class GameEngine {
 
     /** Versus state of a duel board (charges, attack counters); null outside a duel. */
     this.versus = null;
+    /** Magnetar boss state (Boss Rush, Flux boss stages); null elsewhere (see EngineMagnetar.js). */
+    this.magnetar = null;
     this.physicsWorld = new PhysicsWorld(physicsConfig, gameConfig, ballsConfig);
     // Daily runs draw avalanche drift from the seeded stream so scores stay reproducible
     this.physicsWorld.setRandomSource(() => this.random());
@@ -652,6 +655,7 @@ export class GameEngine {
     this.ghostDuel = null;
     // startVersusBoard sets the versus state again after this reset.
     this.versus = null;
+    this.clearMagnetar();
     this.isDailyRematch = false;
     // clear() keeps the tilt: a run must not start leaning from the previous run's last reading.
     this.physicsWorld.tiltFactor = 0;
@@ -916,6 +920,7 @@ export class GameEngine {
     if (mod === CLUSTER_MODIFIERS.BOSS_CORE) {
       return this.ballsConfig.clusterModifiers.bossCore.initialArmor;
     }
+    // A Magnetar has no shield: it is never broken, only dropped.
     return 0;
   }
 
@@ -924,7 +929,7 @@ export class GameEngine {
    * anchor): such a ball must carry no color, or it would still count in color checks.
    */
   isColorlessModifier(mod) {
-    return mod === CLUSTER_MODIFIERS.RUST || mod === CLUSTER_MODIFIERS.NEUTRAL_ANCHOR;
+    return mod === CLUSTER_MODIFIERS.RUST || mod === CLUSTER_MODIFIERS.NEUTRAL_ANCHOR || mod === CLUSTER_MODIFIERS.MAGNETAR;
   }
 
   createClusterBall(options) {
@@ -1338,6 +1343,9 @@ export class GameEngine {
     if (this.versus) {
       this.stepVersusAfter(flyingProjectile);
     }
+    if (this.magnetar) {
+      this.stepMagnetarAfter(flyingProjectile);
+    }
     if (this.pendingRoundEnd || (this.pendingBossRushWave && !this.physicsWorld.projectile)) {
       this.evaluateRoundEnd();
     }
@@ -1345,6 +1353,7 @@ export class GameEngine {
     if (this.physicsWorld.hasBrokenBondThisStep) {
       this.physicsWorld.hasBrokenBondThisStep = false;
       this.detachAndRewardAvalanche();
+      this.refreshMoorings();
       this.discardBetweenTurnsCoreFreeze();
       // A board cleared by a bond break must not end the round with the shot frozen
       // mid-air: the post-turn cleanup of that shot comes back to evaluateRoundEnd.
@@ -1521,3 +1530,4 @@ installMethods(GameEngine, engineRoundFlowMethods);
 installMethods(GameEngine, engineProgressMethods);
 installMethods(GameEngine, engineGhostDuelMethods);
 installMethods(GameEngine, engineVersusMethods);
+installMethods(GameEngine, engineMagnetarMethods);

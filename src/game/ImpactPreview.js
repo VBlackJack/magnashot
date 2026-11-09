@@ -18,8 +18,13 @@ import { SPECIAL_TYPES, CLUSTER_MODIFIERS } from '../core/Constants.js';
 import { pickRocketTargets } from './SpecialBallController.js';
 import { segmentCircleHitT } from './VersusRules.js';
 
-/** A Boss Core with shields left loses one shield per hit instead of being destroyed. */
-const isShieldedBossCore = (ball) => ball.clusterModifier === CLUSTER_MODIFIERS.BOSS_CORE && ball.armorHits > 1;
+/**
+ * A Boss Core with shields left loses one shield per hit instead of being destroyed; a
+ * Magnetar is never destroyed by a shot at all.
+ */
+const isShieldedBossCore = (ball) =>
+  ball.clusterModifier === CLUSTER_MODIFIERS.MAGNETAR
+  || (ball.clusterModifier === CLUSTER_MODIFIERS.BOSS_CORE && ball.armorHits > 1);
 
 /**
  * What a shot along an aim trajectory would hit, as the aim preview shows it: the spheres
@@ -85,7 +90,7 @@ export function predictImpact(
           if (!seen.has(member.id)) {
             seen.add(member.id);
             highlight.push(member);
-            if (member.armorHits <= 1) {
+            if (member.armorHits <= 1 && !isShieldedBossCore(member)) {
               destroyedIds.add(member.id);
             }
           }
@@ -137,7 +142,7 @@ export function predictImpact(
     isMatch = Boolean(isMatchingColor && highlight.length + 1 >= matchMinCount);
     if (isMatch) {
       for (const member of highlight) {
-        if (member.armorHits <= 1) {
+        if (member.armorHits <= 1 && !isShieldedBossCore(member)) {
           destroyedIds.add(member.id);
         }
       }

@@ -254,7 +254,10 @@ test('Generated Flux stages are playable boards across many seeds', () => {
         }
       }
 
-      const bossCores = balls.filter((b) => b.clusterModifier === CLUSTER_MODIFIERS.BOSS_CORE).length;
+      // A boss stage holds one boss: a Magnetar, or a Boss Core when the shape has no free ball to carry it.
+      const bossCores = balls.filter(
+        (b) => b.clusterModifier === CLUSTER_MODIFIERS.BOSS_CORE || b.clusterModifier === CLUSTER_MODIFIERS.MAGNETAR
+      ).length;
       assert.equal(bossCores, engine.fluxIsBossStage ? 1 : 0, `${label}: boss core count`);
       bossStages += engine.fluxIsBossStage ? 1 : 0;
     }

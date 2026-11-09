@@ -709,7 +709,7 @@ test('Blitz 90s mode counts down timer, auto-fires on hesitation, and triggers t
   assert.equal(storage.getBlitzHighScore(), 1850);
 });
 
-test('Boss Rush mode spawns a central Titan Core, damages its shield on Overcharge, and advances waves on kill', () => {
+test('Boss Rush mode spawns a central Magnetar, snaps a Mooring on Overcharge, and advances waves when it falls', () => {
   const storage = createTestStorage();
   const engine = createTestEngine(storage);
   engine.startBossRushMode();
@@ -717,16 +717,19 @@ test('Boss Rush mode spawns a central Titan Core, damages its shield on Overchar
   assert.equal(engine.mode, 'boss_rush');
   assert.equal(engine.bossRushWave, 1);
   const boss = engine.getBossBall();
-  assert.ok(boss, 'Wave 1 spawns a Boss Core Titan');
-  const initialShields = boss.armorHits;
+  assert.ok(boss, 'Wave 1 spawns a Magnetar');
+  assert.equal(boss.clusterModifier, 'magnetar');
+  const initialMoorings = engine.getMagnetarView().moorings;
 
   engine.addOvercharge(gameConfig.scoring.overchargeMax);
-  assert.equal(boss.armorHits, initialShields - 1, 'Reaching 100% Overcharge strikes the Titan Core for -1 shield');
+  assert.equal(engine.getMagnetarView().moorings, initialMoorings - 1, 'Reaching 100% Overcharge snaps one Mooring');
+  assert.equal(engine.destroyClusterBall(boss), false, 'A strike cannot destroy the Magnetar itself');
 
-  boss.armorHits = 1;
-  engine.destroyClusterBall(boss);
+  for (const id of engine.refreshMoorings(false)) {
+    engine.destroyClusterBall(engine.physicsWorld.ballMap.get(id), '#ffffff', true);
+  }
   engine.handlePostTurnCleanup();
-  assert.equal(engine.bossRushWave, 2, 'Destroying the Titan Core shatters the wave and advances to wave 2');
+  assert.equal(engine.bossRushWave, 2, 'Losing every Mooring drops the Magnetar and advances to wave 2');
   assert.equal(storage.getBossRushBestWave(), 2);
 });
 

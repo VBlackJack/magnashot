@@ -57,6 +57,9 @@ export class PhysicsWorld {
     this.ballMap = new Map();
     this.pendingChainCandidateIds = new Set();
     this.gravityMultiplier = 1.0;
+    // Board-wide inversion of the magnetic curve pull, and extra projectile-only fields {x, y, radius, force}.
+    this.boardPolarityInverted = false;
+    this.projectileFields = [];
     // Sideways share of gravity from the device tilt; 0 when tilt control is off.
     this.tiltFactor = 0;
     this.magnetismMultiplier = 1.0;
@@ -143,7 +146,8 @@ export class PhysicsWorld {
 
   getProjectileCurvePull(projColor, targetColor, isPolarityFlipped = false) {
     const mag = this.physicsConfig.magnetism;
-    const flipSign = isPolarityFlipped ? -1 : 1;
+    // A board-wide inversion flips every pull; combined with a flipped shot it cancels out.
+    const flipSign = (isPolarityFlipped ? -1 : 1) * (this.boardPolarityInverted ? -1 : 1);
     if (!projColor || !targetColor) {
       return mag.projectileCurveInfluence * flipSign * this.magnetismMultiplier;
     }
@@ -198,6 +202,8 @@ export class PhysicsWorld {
     this.ballRootPivots.clear();
     this.spatialGrid.clear();
     this.gravityMultiplier = 1.0;
+    this.boardPolarityInverted = false;
+    this.projectileFields.length = 0;
     this.magnetismMultiplier = 1.0;
     this.rotorSpeedMultiplier = 1.0;
     this.allowTensionBreak = false;
@@ -899,6 +905,36 @@ export class PhysicsWorld {
   }
 
   /**
+   * Bends the projectile toward a field centre (negative force pushes away), keeping its speed.
+   * @param {object} state - Projectile or preview state.
+   * @param {number} fieldX - Field centre x.
+   * @param {number} fieldY - Field centre y.
+   * @param {number} radius - Field radius.
+   * @param {number} force - Signed pull at the centre.
+   * @param {number} dt - Substep time fraction.
+   */
+  applyProjectileField(state, fieldX, fieldY, radius, force, dt) {
+    const dx = fieldX - state.x;
+    const dy = fieldY - state.y;
+    const distSq = dx * dx + dy * dy;
+    if (force === 0 || distSq >= radius * radius) {
+      return;
+    }
+    const dist = Math.sqrt(distSq);
+    if (dist > MATH_CONSTANTS.EPSILON) {
+      const prevSpeed = Math.hypot(state.vx, state.vy);
+      const factor = (1 - dist / radius) * force * dt;
+      state.vx += (dx / dist) * factor;
+      state.vy += (dy / dist) * factor;
+      const newSpeed = Math.hypot(state.vx, state.vy);
+      if (newSpeed > MATH_CONSTANTS.EPSILON && prevSpeed > MATH_CONSTANTS.EPSILON) {
+        state.vx = (state.vx / newSpeed) * prevSpeed;
+        state.vy = (state.vy / newSpeed) * prevSpeed;
+      }
+    }
+  }
+
+  /**
    * Advances a projectile (or preview state) by one substep: field forces, magnetic curve,
    * integration, walls, portals, and solid obstacle collisions.
    * @param {object} state - Projectile or preview state.
@@ -931,24 +967,11 @@ export class PhysicsWorld {
       }
       const activeRadius = obs.type === OBSTACLE_TYPES.SINGULARITY ? obs.pullRadius : obs.fieldRadius;
       const activeForce = obs.type === OBSTACLE_TYPES.SINGULARITY ? obs.projectilePullForce : obs.force;
-      const dx = obs.x - state.x;
-      const dy = obs.y - state.y;
-      const distSq = dx * dx + dy * dy;
-      if (activeForce === 0 || distSq >= activeRadius * activeRadius) {
-        continue;
-      }
-      const dist = Math.sqrt(distSq);
-      if (dist > MATH_CONSTANTS.EPSILON) {
-        const prevSpeed = Math.hypot(state.vx, state.vy);
-        const factor = (1 - dist / activeRadius) * activeForce * dt;
-        state.vx += (dx / dist) * factor;
-        state.vy += (dy / dist) * factor;
-        const newSpeed = Math.hypot(state.vx, state.vy);
-        if (newSpeed > MATH_CONSTANTS.EPSILON && prevSpeed > MATH_CONSTANTS.EPSILON) {
-          state.vx = (state.vx / newSpeed) * prevSpeed;
-          state.vy = (state.vy / newSpeed) * prevSpeed;
-        }
-      }
+      this.applyProjectileField(state, obs.x, obs.y, activeRadius, activeForce, dt);
+    }
+
+    for (const field of this.projectileFields) {
+      this.applyProjectileField(state, field.x, field.y, field.radius, field.force, dt);
     }
 
     if (!isAnvil) {
@@ -1516,8 +1539,13 @@ export class PhysicsWorld {
       this.balls,
       this.obstacles,
       this.balls.length,
-      this.obstacles.length
+      this.obstacles.length,
+      this.boardPolarityInverted,
+      this.projectileFields.length
     );
+    for (const field of this.projectileFields) {
+      out.push(field.x, field.y, field.radius, field.force);
+    }
     for (const ball of this.balls) {
       out.push(
         ball.id,

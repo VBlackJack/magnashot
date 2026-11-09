@@ -279,6 +279,13 @@
       "badge": "⬡",
       "coinReward": 18
     },
+    "magnetar": {
+      "id": "magnetar",
+      "ringColor": "#a78bfa",
+      "highlight": "#c4b5fd",
+      "coreColor": "#0f172a",
+      "badge": "◉"
+    },
     "bossCore": {
       "id": "bossCore",
       "initialArmor": 3,

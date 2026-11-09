@@ -101,7 +101,7 @@ const yesterdayKey = () =>
 const makeGhost = (overrides = {}) => ({
   mode: 'flux',
   key: 'abc123',
-  cv: gameConfig.ghostDuel.contentVersion,
+  cv: gameConfig.ghostDuel.contentVersion.flux,
   n: 4,
   step: 1,
   s: [100, 200, 300, 400],
@@ -189,7 +189,7 @@ test('the ready card names the rival, shows the notes and offers Accept and Not 
   const ghost = makeGhost({
     mode: 'daily',
     key: yesterdayKey(),
-    cv: gameConfig.ghostDuel.contentVersion + 1,
+    cv: gameConfig.ghostDuel.contentVersion.daily + 1,
     assists: { workshop: 3, ammo: 1, continues: 1, tiltFree: true }
   });
   assert.equal(ui.showDuelCard({ status: DUEL_STATUS.VALID, ghost }), true);
@@ -207,6 +207,21 @@ test('the ready card names the rival, shows the notes and offers Accept and Not 
   assert.equal(elements.btnDuelDecline.classList.contains('hidden'), false);
   assert.equal(elements.btnDuelOk.classList.contains('hidden'), true);
   assert.equal(calls.opened[0].focus, elements.btnDuelAccept);
+});
+
+test('an old Daily link (content version 1) shows no version notice, an old Flux link does', () => {
+  const versionNote = 'Made with another version: the board may differ';
+  const notesOf = (ghost) => {
+    const { ui, elements } = makeUi();
+    ui.showDuelCard({ status: DUEL_STATUS.VALID, ghost });
+    return elements.duelCardNotes.children.map((item) => item.textContent);
+  };
+  assert.equal(gameConfig.ghostDuel.contentVersion.daily, 1);
+  assert.equal(gameConfig.ghostDuel.contentVersion.flux, 2);
+  const daily = makeGhost({ mode: 'daily', key: yesterdayKey(), cv: 1 });
+  assert.equal(notesOf(daily).includes(versionNote), false);
+  assert.equal(notesOf(makeGhost({ mode: 'flux', cv: 1 })).includes(versionNote), true);
+  assert.equal(notesOf(makeGhost({ mode: 'flux', cv: 2 })).includes(versionNote), false);
 });
 
 test('a Flux card uses the default name without an alias and has no extra notes', () => {

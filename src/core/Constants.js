@@ -134,6 +134,7 @@ export const CLUSTER_MODIFIERS = Object.freeze({
   CHAMELEON: 'chameleon',
   COIN_CORE: 'coinCore',
   BOSS_CORE: 'bossCore',
+  MAGNETAR: 'magnetar',
   LASER_LOCK: 'laserLock',
   NEUTRAL_ANCHOR: 'neutralAnchor',
   CHAINED: 'chained',

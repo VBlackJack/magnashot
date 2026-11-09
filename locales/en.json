@@ -123,9 +123,11 @@
         "daily": "Daily Challenge ({{mutator}}) • Wave {{wave}}",
         "flux": "Flux Mode • Shape {{stage}}: {{shape}}",
         "fluxBoss": "Flux Mode • Shape {{stage}}: {{shape}} (Boss)",
+        "fluxBossMagnetar": "Flux Mode • Shape {{stage}}: {{shape}} (Boss, {{moorings}} moorings)",
         "puzzle": "Puzzle Mode • Stage {{stage}} / {{total}}",
         "blitz": "Blitz 90s • Wave {{wave}}",
         "bossRush": "Boss Rush • Wave {{wave}} (👑 {{shields}})",
+        "bossRushMagnetar": "Boss Rush • Wave {{wave}} ({{moorings}} moorings)",
         "cascade": "Cascade Drop • Wave {{wave}}",
         "coreRescueProgress": "💎 {{rescued}}/{{total}}",
         "switchHint": "Click to change mode or level",
@@ -135,7 +137,8 @@
       "shots": {
         "label": "Shots Left",
         "waveLabel": "Next Wave",
-        "shieldsLabel": "Boss Shields"
+        "shieldsLabel": "Boss Shields",
+        "mooringsLabel": "Moorings"
       },
       "time": {
         "label": "Time Left",
@@ -267,6 +270,11 @@
         "behind": "{{name}} took the lead",
         "ended": "{{name}}'s run ended at {{score}}",
         "passed": "You passed {{name}}'s final score"
+      },
+      "magnetar": {
+        "armed": "Magnetar: {{behaviour}} next turn. {{counter}}",
+        "lastMooring": "One mooring left.",
+        "down": "Magnetar down."
       }
     },
     "hints": {
@@ -311,6 +319,9 @@
         "start": "Start",
         "select": "Select"
       }
+    },
+    "magnetar": {
+      "next": "Next turn: {{behaviour}}"
     }
   },
   "gameplay": {
@@ -406,6 +417,11 @@
       },
       "classic": {
         "stageCleared": "Stage cleared! +{{points}}"
+      },
+      "magnetar": {
+        "immune": "UNBREAKABLE: SNAP ITS MOORINGS",
+        "moorings": "MOORING SNAPPED! {{left}} LEFT",
+        "down": "MAGNETAR DOWN! +{{points}}"
       }
     },
     "mutators": {
@@ -505,6 +521,7 @@
       "repulsor": "Repulsive cores bend your shot: trust the curved laser, and flip polarity (🧲) if a sphere pulls it the wrong way!",
       "portal": "Shoot into a Quantum Portal to teleport your projectile past moving barriers!",
       "boss": "Boss Cores (👑) have 3 shields and burst into a shower of coins when destroyed!",
+      "magnetar": "A Magnetar can't be broken. Snap the anchors holding it (dashed lines) and it falls. Its badge shows what it does next turn.",
       "laserLock": "Destroy all Lock Cores (🔒) to disable the energy barrier!",
       "singularity": "Avalanche spheres pulled into the Singularity Vortex grant bonus points & Overcharge!",
       "neutralAnchor": "Gray anchors (⚓) never break in a match: cut the spheres around them, and they crumble once nothing hangs from them!",
@@ -537,6 +554,20 @@
     },
     "discovery": {
       "hint": "New: {{icon}} {{name}}. {{description}}"
+    },
+    "magnetar": {
+      "behaviour": {
+        "invert": "Reverse field",
+        "undertow": "Undertow",
+        "regrow": "Regrow",
+        "barrage": "Barrage"
+      },
+      "counter": {
+        "invert": "Flip polarity to cancel it.",
+        "undertow": "Your shot will bend toward the core.",
+        "regrow": "Fill the marked slots to block it.",
+        "barrage": "Shoot charges with the opposite polarity."
+      }
     }
   },
   "modals": {
@@ -783,6 +814,10 @@
           "rescueCore": {
             "name": "Rescue Core",
             "description": "Captive prism core (💎). Free all Rescue Cores on the board to shatter the remaining cluster into an instant avalanche!"
+          },
+          "magnetar": {
+            "name": "Magnetar",
+            "description": "Unbreakable field core. Matches, bombs, lightning, rockets and the anvil do nothing to it: snap the Moorings (anchor spheres) holding it up and it falls in an avalanche. Its badge warns of what it does next turn."
           }
         },
         "obstacles": {
@@ -830,6 +865,31 @@
             "icon": "💠",
             "name": "Antimagnet Cushion",
             "description": "Repels nearby hanging cluster spheres without deflecting fired projectiles."
+          }
+        },
+        "magnetarPatterns": {
+          "title": "Magnetar patterns",
+          "patterns": {
+            "invert": {
+              "icon": "⇅",
+              "name": "Reverse field",
+              "description": "Every curve on your shot is reversed next turn. Flip polarity to cancel it."
+            },
+            "undertow": {
+              "icon": "◎",
+              "name": "Undertow",
+              "description": "The core pulls your shot toward it inside a dotted field. Bank through it into a Mooring."
+            },
+            "regrow": {
+              "icon": "✚",
+              "name": "Regrow",
+              "description": "Adds up to 3 spheres in the dashed slots next to the core. Fill a slot or snap a Mooring first."
+            },
+            "barrage": {
+              "icon": "±",
+              "name": "Barrage",
+              "description": "Fires charged spheres from the danger line. Shoot the opposite polarity to neutralise them."
+            }
           }
         }
       },
@@ -934,6 +994,30 @@
           "bossRushWavesGold": {
             "name": "Gauntlet Runner III",
             "description": "Reach Boss Wave {{target}} in Boss Rush."
+          },
+          "magnetarsGrounded": {
+            "name": "Field Breaker",
+            "description": "Bring down Magnetars across all your runs (goal: {{target}})."
+          },
+          "magnetarsGroundedSilver": {
+            "name": "Field Breaker II",
+            "description": "Bring down Magnetars across all your runs (goal: {{target}})."
+          },
+          "magnetarsGroundedGold": {
+            "name": "Field Breaker III",
+            "description": "Bring down Magnetars across all your runs (goal: {{target}})."
+          },
+          "magnetarLandslide": {
+            "name": "Landslide",
+            "description": "Bring down a Magnetar in a huge avalanche (goal: {{target}})."
+          },
+          "magnetarLandslideSilver": {
+            "name": "Landslide II",
+            "description": "Bring down a Magnetar in a huge avalanche (goal: {{target}})."
+          },
+          "magnetarLandslideGold": {
+            "name": "Landslide III",
+            "description": "Bring down a Magnetar in a huge avalanche (goal: {{target}})."
           }
         },
         "tier": {

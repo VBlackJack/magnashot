@@ -42,6 +42,8 @@ const EXPECTED_PROTOTYPE_NAMES = [
   'announceSagChanges',
   'hideSagMeter',
   'refreshSagMeter',
+  'refreshMagnetarHud',
+  'announceMagnetarEvent',
   'bindStatsEvents',
   'buildStatsRecords',
   'buildStatsText',
