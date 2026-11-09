@@ -152,8 +152,12 @@ test('ringVisual under reduced motion keeps a fixed radius and fades opacity tow
   assert.equal(ringVisual(0, opts).opacity, CFG.ring.windowOpacity);
 });
 
-test('ringVisual honours the calibration offset', () => {
-  const opts = { offsetFrames: 6, framesPerBeat: FPB, windowFrames: WINDOW_FRAMES, cfg: CFG };
-  assert.equal(ringVisual(12, opts).inWindow, true);
-  assert.equal(ringVisual(21, opts).inWindow, false);
+test('ringVisual ignores the calibration offset: the ring keeps the beat clock, only the judgement shifts', () => {
+  const plain = { offsetFrames: 0, framesPerBeat: FPB, windowFrames: WINDOW_FRAMES, cfg: CFG };
+  const calibrated = { ...plain, offsetFrames: 6 };
+  for (const frame of [0, 5, 12, 21, 29]) {
+    assert.deepEqual(ringVisual(frame, calibrated), ringVisual(frame, plain), `frame ${frame}`);
+  }
+  assert.equal(ringVisual(12, calibrated).inWindow, false);
+  assert.equal(ringVisual(3, calibrated).inWindow, true);
 });

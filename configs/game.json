@@ -160,6 +160,7 @@
   "resonance": {
     "enabledByDefault": true,
     "windowFrames": 7,
+    "maxWindowBeatFraction": 0.15,
     "maxOffsetMs": 200,
     "overchargeMultiplier": 1.5,
     "versusStrengthLoss": 2,

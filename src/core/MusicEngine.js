@@ -241,12 +241,16 @@ export class MusicEngine {
     return buffer;
   }
 
+  /** Arms the scheduler timer; never while the context is not running (suspended, interrupted). */
   armTimer() {
     this.clearTimer();
+    if (!this.isContextRunning()) {
+      return;
+    }
     this.timerId = this.timers.set(() => {
       this.timerId = null;
       this.tick();
-      if (this.running && !this.paused) {
+      if (this.running && !this.paused && this.isContextRunning()) {
         this.armTimer();
       }
     }, this.config.timerMs);
@@ -319,6 +323,9 @@ export class MusicEngine {
   /** Re-anchors after the audio context was suspended or interrupted, never bursting. */
   onContextResumed() {
     if (!this.running) {
+      return;
+    }
+    if (!this.isContextRunning()) {
       return;
     }
     this.skipMissedSteps();

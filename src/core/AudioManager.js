@@ -92,14 +92,31 @@ export class AudioManager {
       if (this.ctx.state === CONTEXT_STATES.RUNNING) {
         Promise.resolve(this.ctx.suspend()).catch(() => {});
       }
-    } else if (this.ctx.state === CONTEXT_STATES.SUSPENDED) {
-      this.music?.resume();
-      Promise.resolve(this.ctx.resume())
-        .then(() => this.music?.onContextResumed())
-        .catch(() => {});
+    } else if (this.ctx.state !== CONTEXT_STATES.RUNNING) {
+      // Suspended, or interrupted (Safari): the music waits until the context really runs.
+      this.music?.pause();
+      const resuming = Promise.resolve(this.ctx.resume());
+      this.handleContextStateChange();
+      resuming.then(() => this.handleContextStateChange()).catch(() => {});
     } else {
       this.music?.resume();
     }
+  }
+
+  /**
+   * Follows the context state: any non-running state (suspended, interrupted) pauses the
+   * music timer, and a return to running re-anchors and resumes it unless muted or hidden.
+   */
+  handleContextStateChange() {
+    if (!this.ctx || !this.music) {
+      return;
+    }
+    if (this.ctx.state !== CONTEXT_STATES.RUNNING || this.muted || this.isDocumentHidden()) {
+      this.music.pause();
+      return;
+    }
+    this.music.resume();
+    this.music.onContextResumed();
   }
 
   /** True when music may sound: switched on in settings and not muted. */
@@ -192,6 +209,7 @@ export class AudioManager {
       if (AudioCtx) {
         this.ctx = new AudioCtx();
         this.output = this.createLimiter(this.ctx);
+        this.ctx.onstatechange = () => this.handleContextStateChange();
       }
     }
     this.createMusic();

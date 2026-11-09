@@ -103,10 +103,13 @@ export const uiVersusMethods = {
   getPulseLead() {
     const v = this.versus;
     if (v) {
-      const engine = v.controller?.engines?.[PLAYER_BOARD] ?? null;
-      const isPlaying = Boolean(engine) && v.phase === SCREEN_PHASES.PLAYING
-        && !v.controller.isPaused() && engine.state === GAME_STATES.PLAYING;
-      return { engine, isPlaying };
+      const engines = v.controller?.engines ?? [];
+      const isLive = (candidate) => Boolean(candidate) && v.phase === SCREEN_PHASES.PLAYING
+        && !v.controller.isPaused() && candidate.state === GAME_STATES.PLAYING;
+      // Follow the board still playing: if the lead board stops, the music locks to the other.
+      const playing = engines.find(isLive);
+      const engine = playing ?? engines[PLAYER_BOARD] ?? null;
+      return { engine, isPlaying: Boolean(playing) };
     }
     return { engine: this.engine, isPlaying: this.engine.state === GAME_STATES.PLAYING };
   },

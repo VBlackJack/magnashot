@@ -2364,7 +2364,6 @@ export class Renderer {
     const canvasCfg = this.gameConfig.canvas;
     const baseRadius = canvasCfg.launcher.baseRadius * ring.radiusFactor;
     const visual = ringVisual(pulse.beatFrame, {
-      offsetFrames: pulse.offsetFrames,
       framesPerBeat: pulse.framesPerBeat,
       windowFrames: pulse.windowFrames,
       reducedMotion: this.isReducedMotion,

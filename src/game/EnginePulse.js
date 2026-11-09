@@ -35,6 +35,8 @@ import {
 const NO_TIME = 0;
 const FULL_SHARE = 1;
 const NO_FRAMES = 0;
+const NO_AMOUNT = 0;
+const MIN_WINDOW_FRAMES = 0;
 
 export const enginePulseMethods = {
   /** Mode key used for the tempo and the rules: a duel board plays as Versus. */
@@ -48,7 +50,7 @@ export const enginePulseMethods = {
    */
   isResonanceEnabled() {
     const option = this.versus ? this.versusResonanceOption : undefined;
-    const storedSetting = Boolean(this.storageManager?.getResonanceEnabled?.());
+    const storedSetting = this.getPulseSettings().resonanceEnabled;
     return isResonanceAllowed({
       mode: this.getResonanceMode(),
       isDailyRematch: this.isDailyRematch,
@@ -58,6 +60,42 @@ export const enginePulseMethods = {
       versusOption: option,
       setting: option === true ? true : storedSetting
     });
+  },
+
+  /**
+   * The Resonance setting and the calibration offset, read from storage once per run (and
+   * again on refreshPulseSettings) so the per-frame beat ring and judgement touch no storage.
+   */
+  getPulseSettings() {
+    if (!this.pulseSettings) {
+      this.refreshPulseSettings();
+    }
+    return this.pulseSettings;
+  },
+
+  /** Re-reads the Resonance setting and the offset: at run start and when the player changes them. */
+  refreshPulseSettings() {
+    this.pulseSettings = {
+      resonanceEnabled: Boolean(this.storageManager?.getResonanceEnabled?.()),
+      rhythmOffsetMs: this.storageManager?.getRhythmOffsetMs?.() ?? NO_TIME
+    };
+  },
+
+  /**
+   * Tells the player once per run that Resonance is off here although the setting is on:
+   * the competitive runs (Daily, Weekly Flux, shared seeds, Ghost Duels) never use it.
+   */
+  announceResonanceDisabled() {
+    if (this.versus || !this.getPulseSettings().resonanceEnabled || this.isResonanceEnabled()) {
+      return;
+    }
+    const canvasCfg = this.gameConfig.canvas;
+    this.particleSystem.spawnFloatingText(
+      canvasCfg.launcherX,
+      canvasCfg.launcherY + canvasCfg.launcherPopupOffsetY,
+      t('gameplay.resonance.disabledCompetitive'),
+      this.gameConfig.theme.overchargePopupColor
+    );
   },
 
   /**
@@ -71,11 +109,15 @@ export const enginePulseMethods = {
     if (!cfg || !(bpm > 0) || !(stepMs > 0)) {
       return null;
     }
-    const offsetMs = this.storageManager?.getRhythmOffsetMs?.() ?? NO_TIME;
+    const offsetMs = this.getPulseSettings().rhythmOffsetMs;
+    const beatFrames = framesPerBeat(bpm, stepMs);
     return {
-      framesPerBeat: framesPerBeat(bpm, stepMs),
+      framesPerBeat: beatFrames,
       offsetFrames: offsetMsToFrames(offsetMs, stepMs, cfg.maxOffsetMs),
-      windowFrames: cfg.windowFrames
+      windowFrames: Math.max(
+        MIN_WINDOW_FRAMES,
+        Math.min(cfg.windowFrames, Math.floor(beatFrames * cfg.maxWindowBeatFraction))
+      )
     };
   },
 
@@ -115,7 +157,7 @@ export const enginePulseMethods = {
     const isResonant = this.judgeResonantShot();
     projectile.isResonant = isResonant;
     this.turnResonant = isResonant;
-    this.turnOverchargeEarned = NO_FRAMES;
+    this.turnOverchargeEarned = NO_AMOUNT;
     if (!isResonant) {
       return;
     }
@@ -133,7 +175,7 @@ export const enginePulseMethods = {
   /** Ends the Resonance of the turn, once its shot has been paid out. */
   clearTurnResonance() {
     this.turnResonant = false;
-    this.turnOverchargeEarned = NO_FRAMES;
+    this.turnOverchargeEarned = NO_AMOUNT;
   },
 
   /**
@@ -146,7 +188,7 @@ export const enginePulseMethods = {
     const earned = this.turnOverchargeEarned;
     const wasResonant = this.turnResonant;
     this.clearTurnResonance();
-    if (!wasResonant || !madeProgress || this.versus || earned <= NO_FRAMES || !this.isRunPlaying()) {
+    if (!wasResonant || !madeProgress || this.versus || earned <= NO_AMOUNT || !this.isRunPlaying()) {
       return;
     }
     this.settleOvercharge(earned * (this.gameConfig.resonance.overchargeMultiplier - FULL_SHARE));
@@ -156,7 +198,7 @@ export const enginePulseMethods = {
   getMusicIntensity() {
     const cfg = this.gameConfig.resonance.intensity;
     const sag = this.getSagState();
-    const sagShare = sag.active && sag.size > 0 ? sag.level / sag.size : NO_FRAMES;
+    const sagShare = sag.active && sag.size > 0 ? sag.level / sag.size : NO_AMOUNT;
     const dangerY = this.gameConfig.canvas.dangerLineY;
     let lowest = -Infinity;
     for (const ball of this.physicsWorld.balls) {
@@ -164,26 +206,25 @@ export const enginePulseMethods = {
         lowest = Math.max(lowest, ball.y + ball.radius);
       }
     }
-    const dangerShare = lowest === -Infinity ? NO_FRAMES : FULL_SHARE - (dangerY - lowest) / cfg.dangerSpan;
-    const threats = this.versus ? (this.versus.threatIds?.length ?? NO_FRAMES) / cfg.versusThreatFull : NO_FRAMES;
+    const dangerShare = lowest === -Infinity ? NO_AMOUNT : FULL_SHARE - (dangerY - lowest) / cfg.dangerSpan;
+    const threats = this.versus ? (this.versus.threatIds?.length ?? NO_AMOUNT) / cfg.versusThreatFull : NO_AMOUNT;
     return combineIntensity([sagShare, dangerShare, threats]);
   },
 
   /**
-   * The beat clock and whether Resonance is live on this board: what the beat ring needs.
-   * The phase fields use the calibrated clock, the same one the judgement and the ring use.
+   * The beat clock and whether Resonance is live on this board: what the beat ring and the
+   * music need. The phase is the raw beat clock: the calibration offset only shifts the shot
+   * judgement (judgeResonantShot), so the ring and the music keep their own timing.
    */
   getBeatState() {
     const timing = this.getPulseTiming();
     const isActive = Boolean(timing) && !this.isBotResonanceBoard && this.isResonanceEnabled();
-    const shifted = this.beatFrame - (timing?.offsetFrames ?? NO_FRAMES);
     return {
       beatFrame: this.beatFrame,
       framesPerBeat: timing?.framesPerBeat ?? NO_FRAMES,
-      offsetFrames: timing?.offsetFrames ?? NO_FRAMES,
       windowFrames: timing?.windowFrames ?? NO_FRAMES,
-      beatIndex: timing ? Math.floor(shifted / timing.framesPerBeat) : NO_FRAMES,
-      beatPhase: timing ? beatPhase(shifted, timing.framesPerBeat) : NO_FRAMES,
+      beatIndex: timing ? Math.floor(this.beatFrame / timing.framesPerBeat) : NO_FRAMES,
+      beatPhase: timing ? beatPhase(this.beatFrame, timing.framesPerBeat) : NO_FRAMES,
       resonanceActive: isActive
     };
   },

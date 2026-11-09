@@ -118,9 +118,10 @@ export function resonantStrengthLoss(base, isResonant, cfg) {
  *
  * @returns {{radiusScale: number, inWindow: boolean, opacity: number}}
  */
-export function ringVisual(frame, { offsetFrames = 0, framesPerBeat: fpb, windowFrames, reducedMotion = false, cfg }) {
-  const inWindow = isInBeatWindow(frame, offsetFrames, fpb, windowFrames);
-  const phase = beatPhase(frame - offsetFrames, fpb);
+export function ringVisual(frame, { framesPerBeat: fpb, windowFrames, reducedMotion = false, cfg }) {
+  // The ring runs on the raw beat clock: the calibration offset only shifts the shot judgement.
+  const inWindow = isInBeatWindow(frame, 0, fpb, windowFrames);
+  const phase = beatPhase(frame, fpb);
   const untilBeat = phase === PHASE_ORIGIN ? PHASE_ORIGIN : FULL_PHASE - phase;
   const ring = cfg.ring;
   if (inWindow) {

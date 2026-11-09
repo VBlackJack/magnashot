@@ -99,6 +99,7 @@ const EXPECTED_PROTOTYPE_NAMES = [
   'renderCalibration',
   'refreshCalibrationText',
   'getPulseLead',
+  'refreshPulseSettings',
   'syncVersusResonanceOption',
   'readVersusResonanceOption',
   'setupPulseControls',

@@ -412,3 +412,83 @@ test('settings rows, locale keys and the precache list carry the Pulse controls'
     }
   }
 });
+
+test('an interrupted context counts as paused: the music timer stops and resumes with the state change', () => {
+  withAudio((audio, timers) => {
+    audio.ensureContext();
+    audio.startMusic(MODE);
+    assert.equal(timers.loopCount(), 1);
+    assert.equal(typeof audio.ctx.onstatechange, 'function', 'the manager listens to the context');
+    audio.ctx.state = 'interrupted';
+    audio.ctx.onstatechange();
+    assert.equal(audio.getMusicState().paused, true);
+    assert.equal(timers.loopCount(), 0, 'no timer while interrupted');
+    timers.fire();
+    assert.equal(timers.loopCount(), 0, 'a stale timer never re-arms itself');
+    audio.ctx.state = 'running';
+    audio.ctx.onstatechange();
+    assert.equal(audio.getMusicState().paused, false);
+    assert.equal(timers.loopCount(), 1, 'the timer returns once the context runs');
+  });
+});
+
+test('syncContextState treats a non-running visible context as paused and resumes it', async () => {
+  await withAudioAsync(async (audio, timers) => {
+    audio.ensureContext();
+    audio.startMusic(MODE);
+    audio.ctx.state = 'interrupted';
+    let resumeCalls = 0;
+    const resume = audio.ctx.resume.bind(audio.ctx);
+    audio.ctx.resume = () => {
+      resumeCalls += 1;
+      return new Promise((resolve) => {
+        audio.pendingResolve = () => {
+          resume();
+          resolve();
+        };
+      });
+    };
+    audio.syncContextState();
+    assert.equal(resumeCalls, 1);
+    assert.equal(audio.getMusicState().paused, true, 'paused until the context really runs');
+    assert.equal(timers.loopCount(), 0);
+    audio.pendingResolve();
+    await Promise.resolve();
+    await Promise.resolve();
+    assert.equal(audio.getMusicState().paused, false);
+    assert.equal(timers.loopCount(), 1);
+  });
+});
+
+test('the music engine does not arm its timer while the context is not running', () => {
+  withAudio((audio, timers) => {
+    audio.ensureContext();
+    audio.ctx.state = 'suspended';
+    audio.startMusic(MODE);
+    assert.equal(timers.loopCount(), 0, 'started on a suspended context: no timer yet');
+    audio.music.resume();
+    audio.music.onContextResumed();
+    assert.equal(timers.loopCount(), 0);
+    audio.ctx.state = 'running';
+    audio.music.onContextResumed();
+    assert.equal(timers.loopCount(), 1);
+  });
+});
+
+async function withAudioAsync(fn) {
+  const previousWindow = globalThis.window;
+  globalThis.window = { AudioContext: FakeContext };
+  try {
+    const audio = new AudioManager();
+    audio.init(false, false, { musicEnabled: true, musicVolume: MUSIC.defaultVolume });
+    const timers = new ManualTimers();
+    audio.timers = timers;
+    await fn(audio, timers);
+  } finally {
+    if (previousWindow === undefined) {
+      delete globalThis.window;
+    } else {
+      globalThis.window = previousWindow;
+    }
+  }
+}

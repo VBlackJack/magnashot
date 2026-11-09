@@ -45,10 +45,6 @@ export const SAVE_MIGRATIONS = Object.freeze([
 ]);
 export const CURRENT_SAVE_SCHEMA_VERSION = SAVE_MIGRATIONS.at(-1).toVersion;
 
-/**
- * Manages persistent player progress, settings, currency, and upgrades
- * with an automatic in-memory fallback when localStorage is unavailable.
- */
 /** Clamps a latency offset to +-maxMs and rounds it to whole milliseconds; garbage becomes 0. */
 function clampRhythmOffsetMs(maxMs = 0, value) {
   const num = Number(value);
@@ -58,6 +54,10 @@ function clampRhythmOffsetMs(maxMs = 0, value) {
   return Math.max(-maxMs, Math.min(maxMs, Math.round(num)));
 }
 
+/**
+ * Manages persistent player progress, settings, currency, and upgrades
+ * with an automatic in-memory fallback when localStorage is unavailable.
+ */
 export class StorageManager {
   constructor() {
     this.storageConfig = null;

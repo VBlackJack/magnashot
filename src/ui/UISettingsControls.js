@@ -289,6 +289,7 @@ export const uiSettingsControlMethods = {
 
   toggleResonance() {
     this.storageManager.setResonanceEnabled(!this.storageManager.getResonanceEnabled());
+    this.refreshPulseSettings();
     this.updateResonanceButton();
   },
 

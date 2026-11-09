@@ -33,6 +33,7 @@ import { captureRunSnapshot, isValidRunSnapshot, applyRunSnapshot, isRunSnapshot
 import { LevelCatalog } from './LevelCatalog.js';
 import { DISCOVERY_INTERACTIONS } from './Discovery.js';
 
+const FIRST_PLAYED_FRAME = 1;
 const ACHIEVEMENT_TIER_ORDER = Object.freeze(['bronze', 'silver', 'gold']);
 
 import { installMethods } from '../core/installMethods.js';
@@ -669,6 +670,7 @@ export class GameEngine {
     this.clearMagnetar();
     this.isDailyRematch = false;
     this.beatFrame = 0;
+    this.refreshPulseSettings();
     this.turnResonant = false;
     this.turnOverchargeEarned = 0;
     this.resonanceFlashFrames = 0;
@@ -1286,6 +1288,9 @@ export class GameEngine {
       return;
     }
     this.beatFrame++;
+    if (this.beatFrame === FIRST_PLAYED_FRAME) {
+      this.announceResonanceDisabled();
+    }
     if (this.resonanceFlashFrames > 0) {
       this.resonanceFlashFrames--;
     }

@@ -283,3 +283,16 @@ test('the ring clock counts engine frames from the first pulse', () => {
   assert.equal(calibration.getFrame(1000 + calibration.beatMs, stepMs), 0, 'zero on the first pulse');
   assert.equal(calibration.getFrame(1000 + calibration.beatMs + stepMs * 3, stepMs), 3);
 });
+test('in a local duel the music follows the board that is still playing', () => {
+  const ui = Object.create(UIManager.prototype);
+  ui.engine = { state: GAME_STATES.PLAYING };
+  const first = { state: GAME_STATES.PLAYING };
+  const second = { state: GAME_STATES.PLAYING };
+  ui.versus = { phase: 'playing', controller: { engines: [first, second], isPaused: () => false } };
+  assert.deepEqual(ui.getPulseLead(), { engine: first, isPlaying: true }, 'board 0 leads while it plays');
+  first.state = GAME_STATES.GAME_OVER;
+  assert.deepEqual(ui.getPulseLead(), { engine: second, isPlaying: true }, 'board 1 leads once board 0 stops');
+  second.state = GAME_STATES.GAME_OVER;
+  assert.equal(ui.getPulseLead().isPlaying, false, 'nobody plays');
+  assert.equal(ui.getPulseLead().engine, first);
+});

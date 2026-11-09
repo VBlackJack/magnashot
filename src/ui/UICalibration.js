@@ -58,6 +58,14 @@ export const uiCalibrationMethods = {
     this.pulseDriver.update(now);
   },
 
+  /** Tells the engines on screen that the Resonance setting or the offset changed. */
+  refreshPulseSettings() {
+    this.engine?.refreshPulseSettings?.();
+    for (const engine of this.versus?.controller?.engines ?? []) {
+      engine?.refreshPulseSettings?.();
+    }
+  },
+
   /**
    * Creates the audio context on the first gesture, so the music can start with the first
    * run without waiting for a first sound. A muted page waits for the first gesture after
@@ -146,6 +154,7 @@ export const uiCalibrationMethods = {
   /** Clears the stored offset and runs the pulses again. */
   resetCalibration() {
     this.storageManager.setRhythmOffsetMs(NO_TAPS);
+    this.refreshPulseSettings();
     this.startCalibrationRun();
   },
 
@@ -210,6 +219,7 @@ export const uiCalibrationMethods = {
     const { offsetMs } = this.calibration.getResult();
     if (offsetMs !== null) {
       this.storageManager.setRhythmOffsetMs(offsetMs);
+      this.refreshPulseSettings();
     }
     this.renderCalibration({ isRunning: false, isTooFew: offsetMs === null });
     this.elements.calibrateRing?.removeAttribute(WINDOW_ATTRIBUTE);

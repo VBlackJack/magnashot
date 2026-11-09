@@ -75,6 +75,11 @@ const LCG_MODULUS = 2147483647;
 const LCG_START = 4242;
 const CALIBRATED_OFFSET_MS = 100;
 const HALF = 0.5;
+// Campaign plays at 96 BPM: the window is capped to a fraction of the beat (see the cap test).
+const CAMPAIGN_WINDOW = Math.min(
+  RES.windowFrames,
+  Math.floor(60000 / audioConfig.music.modes.campaign.bpm / STEP_MS * RES.maxWindowBeatFraction)
+);
 
 const createAudioSpy = () => {
   const effects = [];
@@ -183,7 +188,7 @@ test('a shot inside the window is Resonant, one outside is not, and the offset s
   withFixedRandom(() => {
     const inside = createEngine();
     inside.startCampaignLevel(1);
-    inside.beatFrame = RES.windowFrames;
+    inside.beatFrame = CAMPAIGN_WINDOW;
     shootUp(inside);
     assert.equal(inside.physicsWorld.projectile.isResonant, true);
     assert.equal(inside.turnResonant, true);
@@ -192,7 +197,7 @@ test('a shot inside the window is Resonant, one outside is not, and the offset s
 
     const outside = createEngine();
     outside.startCampaignLevel(1);
-    outside.beatFrame = RES.windowFrames + 1;
+    outside.beatFrame = CAMPAIGN_WINDOW + 1;
     shootUp(outside);
     assert.equal(outside.physicsWorld.projectile.isResonant, false);
     assert.equal(outside.turnResonant, false);
@@ -207,7 +212,7 @@ test('a shot inside the window is Resonant, one outside is not, and the offset s
     assert.equal(shifted.turnResonant, true, 'the window follows the calibrated offset');
     const unshifted = createEngine();
     unshifted.startCampaignLevel(1);
-    unshifted.beatFrame = beatAfterOffset + RES.windowFrames;
+    unshifted.beatFrame = beatAfterOffset + CAMPAIGN_WINDOW;
     shootUp(unshifted);
     assert.equal(unshifted.turnResonant, false, 'without the offset the same frame is outside');
   });
@@ -325,6 +330,7 @@ test('the solo modes use Resonance when the setting is on', () => {
       start(engine);
       assert.equal(engine.getBeatState().resonanceActive, true, engine.mode);
       engine.storageManager.setResonanceEnabled(false);
+      engine.refreshPulseSettings();
       assert.equal(engine.getBeatState().resonanceActive, false, `${engine.mode} with the setting off`);
     }
   });
@@ -484,4 +490,98 @@ test('config schema: the Resonance and intensity sections hold the values the en
   assert.ok(RES.ring.radiusFactor > 0 && RES.ring.flashFrames > 0);
   assert.ok(RES.calibrationBeats >= RES.calibrationMinTaps);
   assert.ok(audioConfig.effects.calibrationClick.duration > 0);
+});
+
+test('a calibrated late press is judged in the window while the ring and the music keep the raw beat', () => {
+  withFixedRandom(() => {
+    const offsetFrames = Math.round(CALIBRATED_OFFSET_MS / STEP_MS);
+    const beat = Math.round(beatLength('campaign'));
+    const calibrated = createEngine({ offsetMs: CALIBRATED_OFFSET_MS });
+    calibrated.startCampaignLevel(1);
+    const plain = createEngine();
+    plain.startCampaignLevel(1);
+    // Late by the offset plus the whole window: still Resonant for the calibrated player.
+    calibrated.beatFrame = beat + offsetFrames + CAMPAIGN_WINDOW;
+    plain.beatFrame = calibrated.beatFrame;
+    const calibratedState = calibrated.getBeatState();
+    const plainState = plain.getBeatState();
+    assert.deepEqual(calibratedState, plainState, 'ring and music timing do not depend on the offset');
+    assert.equal(calibratedState.beatPhase, plainState.beatPhase);
+    shootUp(calibrated);
+    shootUp(plain);
+    assert.equal(calibrated.turnResonant, true, 'the late press is in the calibrated window');
+    assert.equal(plain.turnResonant, false, 'the same press is outside without calibration');
+    // One frame later than the shifted window is out.
+    const tooLate = createEngine({ offsetMs: CALIBRATED_OFFSET_MS });
+    tooLate.startCampaignLevel(1);
+    tooLate.beatFrame = beat + offsetFrames + CAMPAIGN_WINDOW + 1;
+    shootUp(tooLate);
+    assert.equal(tooLate.turnResonant, false);
+  });
+});
+
+test('getBeatState and the Resonance judgement read no storage per call', () => {
+  withFixedRandom(() => {
+    const engine = createEngine({ offsetMs: CALIBRATED_OFFSET_MS });
+    engine.startCampaignLevel(1);
+    let reads = 0;
+    for (const name of ['getResonanceEnabled', 'getRhythmOffsetMs']) {
+      const original = engine.storageManager[name].bind(engine.storageManager);
+      engine.storageManager[name] = (...args) => {
+        reads += 1;
+        return original(...args);
+      };
+    }
+    for (let i = 0; i < 20; i++) {
+      engine.update();
+      engine.getBeatState();
+      engine.getPulseState();
+      engine.judgeResonantShot();
+    }
+    assert.equal(reads, 0, 'the setting and the offset are cached for the run');
+    engine.storageManager.setResonanceEnabled(false);
+    assert.equal(engine.getBeatState().resonanceActive, true, 'the cache holds until it is refreshed');
+    engine.refreshPulseSettings();
+    assert.equal(reads, 2, 'a refresh reads both values once');
+    assert.equal(engine.getBeatState().resonanceActive, false);
+  });
+});
+
+test('the beat window is capped to a fraction of the beat so fast tempos stay selective', () => {
+  withFixedRandom(() => {
+    assert.equal(RES.maxWindowBeatFraction, 0.15);
+    const expectedFrames = { puzzle: [84, 6], blitz: [132, 4], campaign: [96, 5] };
+    for (const [mode, [bpm, frames]] of Object.entries(expectedFrames)) {
+      assert.equal(audioConfig.music.modes[mode].bpm, bpm);
+      const engine = createEngine();
+      engine.startCampaignLevel(1);
+      engine.getResonanceMode = () => mode;
+      const timing = engine.getPulseTiming();
+      assert.equal(timing.windowFrames, frames, `${bpm} BPM`);
+      assert.equal(timing.windowFrames, Math.min(RES.windowFrames, Math.floor(beatLength(mode) * RES.maxWindowBeatFraction)));
+      assert.ok((timing.windowFrames * 2 + 1) / timing.framesPerBeat < 0.4, `${bpm} BPM: the window is not most of the beat`);
+    }
+  });
+});
+
+test('a competitive run announces once that Resonance is off; a normal run does not', () => {
+  withFixedRandom(() => {
+    const texts = (engine) => {
+      const seen = [];
+      engine.particleSystem.spawnFloatingText = (x, y, text) => seen.push(text);
+      return seen;
+    };
+    const daily = createEngine();
+    daily.startDailyChallenge(DAILY_SEED);
+    const seen = texts(daily);
+    for (let i = 0; i < 5; i++) {
+      daily.update();
+    }
+    assert.equal(seen.filter((x) => /disabledCompetitive|competitive/.test(x)).length, 1, 'once per run');
+    const solo = createEngine();
+    solo.startCampaignLevel(1);
+    const soloSeen = texts(solo);
+    solo.update();
+    assert.equal(soloSeen.length, 0);
+  });
 });
