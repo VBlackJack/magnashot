@@ -184,7 +184,10 @@ class Application {
         maxAccumulatedMs: physicsConfig.simulation.maxAccumulatedMs,
         idleRenderIntervalMs: gameConfig.canvas.idleRenderIntervalMs,
         scheduleFrame: (callback) => requestAnimationFrame(callback),
-        beforeFrame: (now, elapsedMs) => uiManager.pollGamepad(now, elapsedMs),
+        beforeFrame: (now, elapsedMs) => {
+          uiManager.pollGamepad(now, elapsedMs);
+          uiManager.driveMusic(now);
+        },
         onFatalError: (err) => {
           console.error('Game loop stopped after an unrecoverable error:', err);
           this.renderBootstrapError();

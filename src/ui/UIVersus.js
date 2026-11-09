@@ -95,6 +95,22 @@ export const uiVersusMethods = {
     return this.versusScene ?? this.mainScene;
   },
 
+  /**
+   * The board the music follows and whether its run is being played right now: the human
+   * board of the duel while the screen is open, else the run.
+   * @returns {{engine: object|null, isPlaying: boolean}}
+   */
+  getPulseLead() {
+    const v = this.versus;
+    if (v) {
+      const engine = v.controller?.engines?.[PLAYER_BOARD] ?? null;
+      const isPlaying = Boolean(engine) && v.phase === SCREEN_PHASES.PLAYING
+        && !v.controller.isPaused() && engine.state === GAME_STATES.PLAYING;
+      return { engine, isPlaying };
+    }
+    return { engine: this.engine, isPlaying: this.engine.state === GAME_STATES.PLAYING };
+  },
+
   /** Gives the UI what it needs to build a match (the config sections the engines take). */
   setVersusConfigs(configs) {
     this.versusConfigs = configs || null;

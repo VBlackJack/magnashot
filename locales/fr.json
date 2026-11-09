@@ -82,7 +82,8 @@
         "resonanceOff": "○",
         "resonanceOnAria": "Résonance : activée",
         "resonanceOffAria": "Résonance : désactivée",
-        "resonanceAria": "Résonance (tirer sur le rythme)"
+        "resonanceAria": "Résonance (tirer sur le rythme)",
+        "calibrateIcon": "⏱"
       },
       "groups": {
         "modes": "Modes de jeu",
@@ -116,7 +117,9 @@
         "tap": "Taper sur le temps",
         "result": "Décalage : {{offset}} ms",
         "reset": "Réinitialiser",
-        "done": "Terminé"
+        "done": "Terminé",
+        "progress": "{{done}} / {{total}} taps",
+        "tooFew": "Pas assez de taps (au moins {{min}}). Appuyez sur le bouton pour recommencer."
       }
     }
   },

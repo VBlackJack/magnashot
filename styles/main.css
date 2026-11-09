@@ -3362,6 +3362,68 @@ body {
   min-width: 120px;
 }
 
+.versus-setup-option {
+  justify-content: center;
+}
+
+/* Rhythm calibration: the ring is sized at its widest and scaled down by the script. */
+.calibrate-stage {
+  --calibrate-stage-size: 160px;
+  --calibrate-core-size: 94px;
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: var(--calibrate-stage-size);
+  height: var(--calibrate-stage-size);
+  margin: 12px auto;
+}
+
+.calibrate-core {
+  width: var(--calibrate-core-size);
+  height: var(--calibrate-core-size);
+  border-radius: 50%;
+  background: var(--surface-raised);
+  border: 2px solid var(--accent-blue);
+}
+
+.calibrate-ring {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 2px dashed var(--accent-blue);
+  transform-origin: center;
+  pointer-events: none;
+}
+
+.calibrate-ring[data-window='true'] {
+  border-style: solid;
+  border-width: 5px;
+}
+
+.calibrate-ring.is-idle {
+  opacity: 0.35;
+  transform: scale(1);
+}
+
+:root.high-contrast .calibrate-ring,
+:root.high-contrast .calibrate-core {
+  border-color: var(--text-bright);
+}
+
+.calibrate-tap {
+  display: block;
+  width: 100%;
+  min-height: calc(var(--touch-target) * 1.4);
+  touch-action: manipulation;
+}
+
+@media (forced-colors: active) {
+  .calibrate-ring,
+  .calibrate-core {
+    border-color: CanvasText;
+  }
+}
+
 @media (forced-colors: active) {
   .pad-face {
     forced-color-adjust: none;

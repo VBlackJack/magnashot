@@ -82,7 +82,8 @@
         "resonanceOff": "○",
         "resonanceOnAria": "Resonance: ON",
         "resonanceOffAria": "Resonance: OFF",
-        "resonanceAria": "Resonance (shoot on the beat)"
+        "resonanceAria": "Resonance (shoot on the beat)",
+        "calibrateIcon": "⏱"
       },
       "groups": {
         "modes": "Game modes",
@@ -116,7 +117,9 @@
         "tap": "Tap on the beat",
         "result": "Offset: {{offset}} ms",
         "reset": "Reset",
-        "done": "Done"
+        "done": "Done",
+        "progress": "{{done}} / {{total}} taps",
+        "tooFew": "Not enough taps (at least {{min}}). Press the button to try again."
       }
     }
   },
