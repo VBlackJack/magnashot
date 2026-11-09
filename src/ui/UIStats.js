@@ -32,7 +32,7 @@ export const STATS_TABS = Object.freeze({ OVERVIEW: 'overview', DAILY: 'daily' }
 
 /** Mode names the stats list shows for the modes the Workshop-style name table leaves out. */
 const STATS_EXTRA_MODE_NAME_KEYS = Object.freeze({
-  [GAME_MODES.CAMPAIGN]: 'app.nav.button.levels',
+  [GAME_MODES.CAMPAIGN]: 'modals.play.section.campaign',
   [GAME_MODES.DAILY]: 'app.nav.button.daily'
 });
 

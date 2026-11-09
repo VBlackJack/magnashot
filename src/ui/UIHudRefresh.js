@@ -23,10 +23,9 @@ import { SAG_PHASES } from '../game/SagMeter.js';
 import { getUtcIsoWeekKey } from '../game/WeeklyFlux.js';
 import { FULL_PERCENT } from './WorkshopView.js';
 import { syncFluxPerkModal } from './FluxPerkView.js';
+import { writeRewardChip } from './PlayHubView.js';
 import {
   MODE_BUTTON_KEYS,
-  MODE_NAME_KEYS,
-  MODE_LOCK_BUTTON_KEYS,
   isCurrentWeeklyRun,
   ARCADE_CARD_SPECS,
   MODE_LOCKED_CLASS,
@@ -220,6 +219,11 @@ export const uiHudRefreshMethods = {
       for (const elementKey of elementKeys) {
         const button = this.elements[elementKey];
         if (button) {
+          if (mode === GAME_MODES.CAMPAIGN) {
+            // The Campaign card is a section with two buttons: the section stands out, no button is "current".
+            (button.closest?.('section') ?? button).classList.toggle('active-mode', isActive);
+            continue;
+          }
           button.classList.toggle('active-mode', isActive);
           if (isActive) {
             setAttributeIfChanged(button, 'aria-current', 'true');
@@ -250,19 +254,10 @@ export const uiHudRefreshMethods = {
     }
     this.refreshModeLocks(this.getModeAccess());
     if (this.elements.btnDaily) {
+      // The Daily card shows its state in the reward chip; the card keeps its title and text.
+      writeRewardChip(this.elements.dailyReward, this.describeDailyRewardChip());
       const todayKey = SeededRandom.getTodayDateKey();
-      const dailyBonusCoins = this.gameConfig.daily?.firstPlayBonusCoins || 0;
       const streak = this.storageManager.getDailyStreak?.(todayKey) || 0;
-      let dailyLabel = t('app.nav.button.daily');
-      if (this.storageManager.hasPlayedDailyToday(todayKey)) {
-        // Today's challenge is done: say so rather than fall back to the plain label.
-        dailyLabel = streak > 1
-          ? t('app.nav.button.dailyPlayedStreakBadge', { streak: formatNumber(streak) })
-          : t('app.nav.button.dailyPlayedBadge');
-      } else if (dailyBonusCoins > 0) {
-        dailyLabel = t('app.nav.button.dailyBonusBadge', { coins: formatNumber(dailyBonusCoins) });
-      }
-      setTextIfChanged(this.elements.btnDaily, dailyLabel);
       const graceHint = formatStreakGraceText(streak, this.storageManager.getDailyStreakGrace?.(todayKey), todayKey);
       if (graceHint) {
         setAttributeIfChanged(this.elements.btnDaily, 'title', graceHint);
@@ -894,60 +889,36 @@ export const uiHudRefreshMethods = {
     return this.storageManager?.getWeeklyFluxBest?.(key)?.score || 0;
   },
 
-  /** Weekly Flux menu label: this week's best once played, the bonus until it is claimed. */
-  getWeeklyButtonLabel() {
-    const weekKey = getUtcIsoWeekKey(Date.now());
-    const bestScore = this.getWeeklyFluxBestScore(weekKey);
-    if (bestScore > 0) {
-      return t('app.nav.button.weeklyBestBadge', { score: formatNumber(bestScore) });
-    }
-    const bonusCoins = this.gameConfig.weeklyFlux?.firstPlayBonusCoins || 0;
-    const isClaimed = this.storageManager?.hasClaimedWeeklyFluxBonus?.(weekKey) === true;
-    if (bonusCoins > 0 && !isClaimed) {
-      return t('app.nav.button.weeklyBonusBadge', { coins: formatNumber(bonusCoins) });
-    }
-    return t('app.nav.button.weekly');
-  },
-
   /**
-   * Locked, new and normal look of every gated mode control: the menu buttons and the arcade
-   * cards of the level select. A locked control stays focusable (aria-disabled, not disabled).
+   * Locked, new and normal look of every gated mode card of the Play hub, and the New badge of
+   * the drawer's Play button. A locked card stays focusable (aria-disabled, not disabled).
+   * Daily is never gated, so the Daily card is not touched here.
    * @param {Object<string, {unlocked?: boolean, isNew?: boolean, requiredLevel?: number}>} access
    *   Storage getModeAccess().
    */
   refreshModeLocks(access) {
-    const weeklyLabel = this.getWeeklyButtonLabel();
-    for (const [mode, elementKeys] of Object.entries(MODE_LOCK_BUTTON_KEYS)) {
-      for (const elementKey of elementKeys) {
-        const button = this.elements[elementKey];
-        if (!button) {
-          continue;
-        }
-        const isWeekly = elementKey === 'btnWeekly';
-        const nameKey = isWeekly ? 'app.nav.button.weekly' : MODE_NAME_KEYS[mode];
-        const lock = describeModeLock(mode, access, t, nameKey);
-        // Weekly Flux unlocks with Flux but is not a new mode: only Flux carries the badge.
-        this.applyModeLockState(button, lock, isWeekly ? weeklyLabel : t(nameKey), !isWeekly);
-      }
-    }
+    let isAnyModeNew = false;
     for (const [mode, spec] of Object.entries(ARCADE_CARD_SPECS)) {
       const card = this.elements[spec.card];
       if (!card) {
         continue;
       }
       const lock = describeModeLock(mode, access, t);
+      // Weekly Flux opens with Flux or at its own level, but it is not a new mode.
+      const isNew = lock.isNew && spec.showNew !== false;
+      isAnyModeNew = isAnyModeNew || isNew;
       setModeLabel(
         card.querySelector('.arcade-card-title'),
         lock.isLocked ? lock.label : t(spec.titleKey),
-        lock.newBadge
+        isNew ? lock.newBadge : ''
       );
       setTextIfChanged(
         card.querySelector('.arcade-card-desc'),
         lock.isLocked ? t('modals.levelSelect.arcade.lockedDesc', { level: lock.level }) : t(spec.descKey)
       );
-      this.elements[spec.best]?.classList.toggle('hidden', lock.isLocked);
+      this.refreshModeCardRecord(spec, lock.isLocked);
       card.classList.toggle(MODE_LOCKED_CLASS, lock.isLocked);
-      card.classList.toggle(MODE_NEW_CLASS, lock.isNew);
+      card.classList.toggle(MODE_NEW_CLASS, isNew);
       if (lock.isLocked) {
         setAttributeIfChanged(card, 'aria-disabled', 'true');
         setAttributeIfChanged(card, 'aria-label', lock.ariaLabel);
@@ -957,28 +928,42 @@ export const uiHudRefreshMethods = {
         card.removeAttribute('aria-label');
         card.removeAttribute('title');
       }
+      // Only the toggle follows the lock; the hub alone opens and closes the strip.
       if (mode === GAME_MODES.PUZZLE) {
-        this.elements.puzzleStagesStrip?.classList.toggle('hidden', lock.isLocked);
+        this.elements.btnPuzzleStagesToggle?.classList.toggle('hidden', lock.isLocked);
       }
     }
+    this.refreshPlayNewBadge(isAnyModeNew);
   },
 
-  /** Applies a mode lock to one menu button: label, badge, classes and accessible name. */
-  applyModeLockState(button, lock, baseLabel, showNewBadge) {
-    const hasBadge = showNewBadge && lock.isNew;
-    setModeLabel(button, lock.isLocked ? lock.label : baseLabel, hasBadge ? lock.newBadge : '');
-    button.classList.toggle(MODE_LOCKED_CLASS, lock.isLocked);
-    button.classList.toggle(MODE_NEW_CLASS, hasBadge);
-    if (lock.isLocked) {
-      setAttributeIfChanged(button, 'aria-disabled', 'true');
-      setAttributeIfChanged(button, 'aria-label', lock.ariaLabel);
-      setAttributeIfChanged(button, 'title', lock.hint);
+  /**
+   * Shows or hides the record line (or reward chip) of a hub card: hidden while the card is
+   * locked; a chip also stays hidden when it has nothing to say.
+   * @param {{best: string, isChip?: boolean}} spec - Entry of ARCADE_CARD_SPECS.
+   * @param {boolean} isLocked - Whether the card is locked.
+   */
+  refreshModeCardRecord(spec, isLocked) {
+    const record = this.elements[spec.best];
+    if (!record) {
       return;
     }
-    button.removeAttribute('aria-disabled');
-    button.removeAttribute('title');
-    if (hasBadge) {
-      setAttributeIfChanged(button, 'aria-label', lock.newAria);
+    if (spec.isChip) {
+      writeRewardChip(record, isLocked ? { text: '', ariaLabel: '' } : this.describeWeeklyRewardChip());
+      return;
+    }
+    record.classList.toggle('hidden', isLocked);
+  },
+
+  /** The drawer's Play button says, to sight and to screen readers, that a mode just opened. */
+  refreshPlayNewBadge(isAnyModeNew) {
+    const button = this.elements.btnPlay;
+    this.elements.playNewBadge?.classList.toggle('hidden', !isAnyModeNew);
+    if (!button) {
+      return;
+    }
+    button.classList.toggle(MODE_NEW_CLASS, isAnyModeNew);
+    if (isAnyModeNew) {
+      setAttributeIfChanged(button, 'aria-label', t('app.drawer.button.playNewAria'));
     } else {
       button.removeAttribute('aria-label');
     }

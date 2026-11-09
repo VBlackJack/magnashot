@@ -14,14 +14,13 @@
  * limitations under the License.
  */
 
-import { GAME_MODES, GAME_STATES, INPUT_MODES, MATH_CONSTANTS, SPECIAL_TYPES_ORDER } from '../core/Constants.js';
+import { GAME_MODES, GAME_STATES, INPUT_MODES, SPECIAL_TYPES_ORDER } from '../core/Constants.js';
 import { i18n, t, formatNumber } from '../core/I18n.js';
 import { decodeGeneratedShapeId, isGeneratedShapeId } from '../game/layouts/ShapeGenerator.js';
 import { SPECIAL_ICON_HIGHLIGHT_POSITION, specialIconBackground } from './CodexView.js';
 import { FULL_PERCENT, SHOP_TABS, computeAchievementProgress } from './WorkshopView.js';
 import { renderFluxPerkChips } from './FluxPerkView.js';
 import {
-  LEVEL_CHAPTER_TAB_ID_PREFIX,
   LABELLED_LEVEL_FORMATS,
   LEVEL_FORMAT_BADGE_KEYS,
   resolveLevelFormatBadgeKey,
@@ -29,9 +28,9 @@ import {
   formatLevelName,
   formatLevelDescription,
   formatChapterName,
-  renderLevelChapters,
-  renderLevelCards
+  uiLevelSelectMethods
 } from './LevelSelectView.js';
+import { uiPlayHubMethods } from './PlayHubView.js';
 import { installMethods } from '../core/installMethods.js';
 import {
   STANDALONE_DISPLAY_QUERY,
@@ -74,7 +73,6 @@ export {
   FULL_PERCENT,
   SHOP_TABS,
   computeAchievementProgress,
-  LEVEL_CHAPTER_TAB_ID_PREFIX,
   LABELLED_LEVEL_FORMATS,
   LEVEL_FORMAT_BADGE_KEYS,
   resolveLevelFormatBadgeKey
@@ -155,12 +153,12 @@ export class UIManager {
       powerupsContainer: document.getElementById('powerups-bar'),
       powerupsHeader: document.getElementById('powerups-header'),
       powerupsEmpty: document.getElementById('powerups-empty'),
-      btnLevels: document.getElementById('btn-levels'),
+      btnPlay: document.getElementById('btn-play'),
+      playNewBadge: document.getElementById('play-new-badge'),
       btnEndless: document.getElementById('btn-endless'),
       btnDaily: document.getElementById('btn-daily'),
       btnFlux: document.getElementById('btn-flux'),
       btnWeekly: document.getElementById('btn-weekly'),
-      navModeLockHint: document.getElementById('nav-mode-lock-hint'),
       btnStats: document.getElementById('btn-stats'),
       btnShop: document.getElementById('btn-shop'),
       btnRestart: document.getElementById('btn-restart'),
@@ -209,6 +207,21 @@ export class UIManager {
       btnDismissTutorial: document.getElementById('btn-dismiss-tutorial'),
       specialEquippedBanner: document.getElementById('special-equipped-banner'),
       cancelAimBanner: document.getElementById('cancel-aim-banner'),
+      modalPlay: document.getElementById('modal-play'),
+      btnClosePlay: document.getElementById('btn-close-play'),
+      playHubHint: document.getElementById('play-hub-hint'),
+      btnCampaignContinue: document.getElementById('btn-campaign-continue'),
+      btnCampaignMap: document.getElementById('btn-campaign-map'),
+      playCampaignSummary: document.getElementById('play-campaign-summary'),
+      playCampaignMeter: document.getElementById('play-campaign-meter'),
+      playCampaignMeterFill: document.getElementById('play-campaign-meter-fill'),
+      dailyReward: document.getElementById('daily-reward'),
+      weeklyReward: document.getElementById('weekly-reward'),
+      btnPuzzleStagesToggle: document.getElementById('btn-puzzle-stages-toggle'),
+      btnFluxSeedToggle: document.getElementById('btn-flux-seed-toggle'),
+      fluxSeedEntry: document.getElementById('flux-seed-entry'),
+      btnVersusLocalHub: document.getElementById('btn-versus-local-hub'),
+      versusLocalHubHint: document.getElementById('versus-local-hub-hint'),
       modalLevels: document.getElementById('modal-levels'),
       btnModeClassic: document.getElementById('btn-mode-classic'),
       btnModePuzzle: document.getElementById('btn-mode-puzzle'),
@@ -216,6 +229,8 @@ export class UIManager {
       btnModeBossRush: document.getElementById('btn-mode-boss-rush'),
       btnModeCascade: document.getElementById('btn-mode-cascade'),
       btnModeVersus: document.getElementById('btn-mode-versus'),
+      arcadeBestEndless: document.getElementById('arcade-best-endless'),
+      arcadeBestFlux: document.getElementById('arcade-best-flux'),
       arcadeBestClassic: document.getElementById('arcade-best-classic'),
       arcadeBestPuzzle: document.getElementById('arcade-best-puzzle'),
       arcadeBestBlitz: document.getElementById('arcade-best-blitz'),
@@ -227,9 +242,22 @@ export class UIManager {
       btnLevelsFilterIncomplete: document.getElementById('btn-levels-filter-incomplete'),
       inputFluxSeed: document.getElementById('input-flux-seed'),
       btnFluxSeedGo: document.getElementById('btn-flux-seed-go'),
-      levelsChapters: document.getElementById('levels-chapters'),
+      btnChapterPrev: document.getElementById('btn-chapter-prev'),
+      levelsChapterSelect: document.getElementById('levels-chapter-select'),
+      btnChapterNext: document.getElementById('btn-chapter-next'),
+      levelsChapterProgress: document.getElementById('levels-chapter-progress'),
+      levelsChapterMeterFill: document.getElementById('levels-chapter-meter-fill'),
+      btnLevelsJumpCurrent: document.getElementById('btn-levels-jump-current'),
       levelsChapterHint: document.getElementById('levels-chapter-hint'),
       levelsGrid: document.getElementById('levels-grid'),
+      levelsDetail: document.getElementById('levels-detail'),
+      levelsDetailHeader: document.getElementById('levels-detail-header'),
+      levelsDetailTitle: document.getElementById('levels-detail-title'),
+      levelsDetailBadge: document.getElementById('levels-detail-badge'),
+      levelsDetailDesc: document.getElementById('levels-detail-desc'),
+      levelsDetailStars: document.getElementById('levels-detail-stars'),
+      levelsDetailBest: document.getElementById('levels-detail-best'),
+      levelsDetailLock: document.getElementById('levels-detail-lock'),
       btnCloseLevels: document.getElementById('btn-close-levels'),
       btnPlayLevelModal: document.getElementById('btn-play-level-modal'),
       modalShop: document.getElementById('modal-shop'),
@@ -391,11 +419,14 @@ export class UIManager {
     // The deferred install prompt, kept until the player asks for it from Settings.
     this.installPromptEvent = null;
     this.levelsChapterIndex = 0;
+    this.levelsSelectedId = null;
     this.levelsFilterIncomplete = false;
     this.autoPausedByOverlay = false;
     this.lastFocusedElement = null;
     this.wasAnyModalOpen = false;
     this.stackedModalOpener = null;
+    // The button the duel tier picker hands focus back to when the hub opened it (null: default).
+    this.versusTierOpener = null;
     // Pulse: the music driver (built on the first frame) and the rhythm calibration in progress.
     this.pulseDriver = null;
     this.calibration = null;
@@ -840,7 +871,6 @@ export class UIManager {
       return;
     }
     this.isDrawerOpen = false;
-    this.elements.navModeLockHint?.classList.add('hidden');
     this.syncDrawerState();
     if (this.elements.btnMenu && this.isDrawerLayout()) {
       this.elements.btnMenu.focus();
@@ -1117,127 +1147,12 @@ export class UIManager {
     return unlockedStage;
   }
 
-  /**
-   * Initial focus target in the Modes & Level Select dialog: the active Arcade control or
-   * Close button during an active non-Campaign run, otherwise the Campaign play/resume CTA.
-   */
-  getLevelsModalInitialFocus(playButton) {
-    if (!this.isRunActive?.() || this.isCampaignRunActive()) {
-      return playButton;
-    }
-    if (this.engine?.mode === GAME_MODES.PUZZLE) {
-      return (
-        this.elements?.puzzleStagesStrip?.querySelector?.('.puzzle-stage-btn.active') ||
-        this.elements?.btnModePuzzle ||
-        this.elements?.btnCloseLevels ||
-        playButton
-      );
-    }
-    if (this.engine?.mode === GAME_MODES.CLASSIC) {
-      return this.elements?.btnModeClassic || this.elements?.btnCloseLevels || playButton;
-    }
-    if (this.engine?.mode === GAME_MODES.BLITZ) {
-      return this.elements?.btnModeBlitz || this.elements?.btnCloseLevels || playButton;
-    }
-    if (this.engine?.mode === GAME_MODES.BOSS_RUSH) {
-      return this.elements?.btnModeBossRush || this.elements?.btnCloseLevels || playButton;
-    }
-    if (this.engine?.mode === GAME_MODES.CASCADE) {
-      return this.elements?.btnModeCascade || this.elements?.btnCloseLevels || playButton;
-    }
-    return this.elements?.btnCloseLevels || playButton;
-  }
-
-  /** The level the select dialog puts forward: the one being played, else the furthest unlocked. */
+  /** The level the campaign map and the Play hub put forward: the one being played, else the furthest unlocked. */
   getSuggestedLevelId() {
     if (this.engine.mode === GAME_MODES.CAMPAIGN && this.engine.currentLevelId) {
       return this.engine.currentLevelId;
     }
     return Math.min(this.storageManager.getUnlockedLevel(), this.engine.levelCatalog.lastId);
-  }
-
-  syncLevelsFilterButton() {
-    const btn = this.elements?.btnLevelsFilterIncomplete;
-    if (!btn) {
-      return;
-    }
-    btn.classList.toggle('active', Boolean(this.levelsFilterIncomplete));
-    btn.setAttribute('aria-pressed', String(Boolean(this.levelsFilterIncomplete)));
-  }
-
-  openLevelsModal() {
-    const suggestedLevelId = this.getSuggestedLevelId();
-    this.syncLevelsFilterButton();
-
-    const totalPuzzles = Math.max(1, this.gameConfig.puzzles?.length || 1);
-    const bestPuzzleStage = Math.min(
-      totalPuzzles,
-      Math.max(1, this.storageManager.getPuzzleBestStage?.() || 1)
-    );
-    setTextIfChanged(
-      this.elements.arcadeBestPuzzle,
-      t('modals.levelSelect.arcade.puzzleRecord', {
-        stage: formatNumber(bestPuzzleStage),
-        total: formatNumber(totalPuzzles),
-        score: formatNumber(this.storageManager.getPuzzleHighScore())
-      })
-    );
-    setTextIfChanged(
-      this.elements.arcadeBestBlitz,
-      t('modals.levelSelect.card.bestScore', { score: formatNumber(this.storageManager.getBlitzHighScore()) })
-    );
-    setTextIfChanged(
-      this.elements.arcadeBestBossRush,
-      t('modals.levelSelect.arcade.bossRushRecord', {
-        wave: formatNumber(Math.max(1, this.storageManager.getBossRushBestWave?.() || 1)),
-        score: formatNumber(this.storageManager.getBossRushHighScore())
-      })
-    );
-    setTextIfChanged(
-      this.elements.arcadeBestCascade,
-      t('modals.levelSelect.card.bestScore', { score: formatNumber(this.storageManager.getCascadeHighScore()) })
-    );
-    setTextIfChanged(
-      this.elements.arcadeBestClassic,
-      t('modals.levelSelect.arcade.classicBest', {
-        stage: formatNumber(Math.max(1, this.storageManager.getClassicBestStage?.() || 1))
-      })
-    );
-    this.renderPuzzleStagesStrip();
-    this.refreshVersusCard();
-    this.refreshModeLocks(this.getModeAccess());
-
-    if (this.elements.levelsStarsSummary) {
-      const totalStars = this.storageManager.getTotalStars();
-      const maxCampaignStars = this.engine.levelCatalog.count * this.gameConfig.scoring.maxStars;
-      this.elements.levelsStarsSummary.textContent = t('modals.levelSelect.starsTotal', {
-        stars: formatNumber(totalStars),
-        maxStars: formatNumber(maxCampaignStars)
-      });
-    }
-
-    // The dialog opens on the chapter of the suggested level.
-    this.elements.levelsChapterHint?.classList.add('hidden');
-    this.levelsChapterIndex = this.engine.levelCatalog.chapterIndexOf(suggestedLevelId);
-    this.renderLevelChapters();
-    const suggestedCard = this.renderLevelCards(suggestedLevelId);
-    const grid = this.elements.levelsGrid;
-
-    const playButton = this.elements.btnPlayLevelModal;
-    setTextIfChanged(
-      playButton,
-      t(this.isCampaignRunActive() ? 'modals.levelSelect.button.resume' : 'modals.levelSelect.button.play', {
-        level: suggestedLevelId
-      })
-    );
-    this.openOverlayModal(this.elements.modalLevels, this.getLevelsModalInitialFocus(playButton));
-    this.centerActiveChapter();
-    if (suggestedCard) {
-      // Only the grid scrolls: scrollIntoView would also move the dialog inside its backdrop.
-      const gridRect = grid.getBoundingClientRect();
-      const cardRect = suggestedCard.getBoundingClientRect();
-      grid.scrollTop += cardRect.top - gridRect.top - (gridRect.height - cardRect.height) * MATH_CONSTANTS.HALF;
-    }
   }
 
   /** Display name of a chapter of the level select. */
@@ -1343,74 +1258,6 @@ export class UIManager {
     return '';
   }
 
-  /**
-   * Fills the chapter strip of the level select: one tab per chapter with the stars won in
-   * it. A chapter whose first level is still locked cannot be opened.
-   */
-  renderLevelChapters() {
-    renderLevelChapters.call(this);
-  }
-
-  /**
-   * Reveals the locked chapter or level requirement in the polite live region above the grid.
-   * @param {number} requiredLevel - Level number that must be cleared first.
-   * @param {string} [hintKey] - Localization key for the requirement message.
-   */
-  showLockedLevelHint(requiredLevel, hintKey = 'modals.levelSelect.chapterLockedHint') {
-    const hintEl = this.elements?.levelsChapterHint;
-    if (!hintEl) {
-      return;
-    }
-    revealLiveRegion({
-      region: hintEl,
-      textElement: hintEl,
-      text: t(hintKey, { level: requiredLevel, previous: requiredLevel }),
-      schedule: scheduleNextFrame
-    });
-  }
-
-  /** Scrolls the chapter strip, and only it, so the active chapter sits in the middle. */
-  centerActiveChapter() {
-    const strip = this.elements.levelsChapters;
-    const active = strip?.querySelector('.level-chapter.active');
-    if (!active) {
-      return;
-    }
-    const stripRect = strip.getBoundingClientRect();
-    const activeRect = active.getBoundingClientRect();
-    strip.scrollLeft += activeRect.left - stripRect.left - (stripRect.width - activeRect.width) * MATH_CONSTANTS.HALF;
-  }
-
-  /**
-   * Shows the levels of another chapter. A locked chapter is left closed.
-   * @param {number} index - Chapter index from the level catalog.
-   * @param {{focus?: boolean}} options - focus moves the keyboard focus to the new tab.
-   */
-  selectLevelChapter(index, { focus = false } = {}) {
-    const chapter = this.engine.levelCatalog.listChapters()[index];
-    if (!chapter || chapter.firstId > this.storageManager.getUnlockedLevel()) {
-      return;
-    }
-    this.elements.levelsChapterHint?.classList.add('hidden');
-    this.levelsChapterIndex = index;
-    this.renderLevelChapters();
-    this.renderLevelCards(this.getSuggestedLevelId());
-    this.elements.levelsGrid.scrollTop = 0;
-    this.centerActiveChapter();
-    if (focus) {
-      this.elements.levelsChapters.querySelector('.level-chapter.active')?.focus();
-    }
-  }
-
-  /**
-   * Fills the level grid with the cards of the selected chapter.
-   * @param {number} suggestedLevelId - Level marked as the current one.
-   * @returns {HTMLElement|null} The card of the suggested level, when it is in the chapter.
-   */
-  renderLevelCards(suggestedLevelId) {
-    return renderLevelCards.call(this, suggestedLevelId);
-  }
-
   /** Fills the gauge from the last star earned toward the next one. */
   updateStarMeter(score, thresholds, nextThreshold) {
     const meter = this.elements.starMeter;
@@ -1434,3 +1281,5 @@ installMethods(UIManager, uiGhostDuelMethods);
 installMethods(UIManager, uiVersusMethods);
 installMethods(UIManager, uiVersusLocalMethods);
 installMethods(UIManager, uiCalibrationMethods);
+installMethods(UIManager, uiPlayHubMethods);
+installMethods(UIManager, uiLevelSelectMethods);

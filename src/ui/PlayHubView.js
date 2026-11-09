@@ -232,7 +232,7 @@ function describeCoinBonus(bonusCoins, translate) {
 }
 
 /** Writes a reward chip: text, accessible name and visibility. */
-function writeRewardChip(chip, reward) {
+export function writeRewardChip(chip, reward) {
   if (!chip) {
     return;
   }

@@ -33,8 +33,23 @@ import {
   setTextIfChanged,
   setAttributeIfChanged,
   isModeUnlocked,
-  describeModeLock
+  describeModeLock,
+  WEEKLY_ACCESS_KEY
 } from './UIHelpers.js';
+
+/**
+ * Gives a button its label and keeps data-i18n in step, so a language switch keeps the
+ * right wording.
+ * @param {HTMLElement|null} button - The button.
+ * @param {string} labelKey - Localization key of its label.
+ */
+function setButtonLabelKey(button, labelKey) {
+  if (!button) {
+    return;
+  }
+  setAttributeIfChanged(button, 'data-i18n', labelKey);
+  setTextIfChanged(button, t(labelKey));
+}
 
 /** Methods installed on UIManager.prototype by UIManager.js. */
 export const uiModalMethods = {
@@ -131,14 +146,18 @@ export const uiModalMethods = {
     if (!button) {
       return;
     }
+    // The third button opens the window that fits the mode: the campaign map, or the Play hub.
+    setButtonLabelKey(
+      this.elements.btnLevelsVictory,
+      engine.mode === GAME_MODES.CAMPAIGN ? 'modals.victory.button.levels' : 'modals.play.changeMode'
+    );
     if (engine.mode === GAME_MODES.PUZZLE) {
       const totalPuzzles = this.gameConfig.puzzles?.length || 0;
-      const action = engine.currentPuzzleStage < totalPuzzles
-        ? VICTORY_NEXT_ACTIONS.NEXT_LEVEL
-        : VICTORY_NEXT_ACTIONS.LEVEL_SELECT;
-      const labelKey = VICTORY_NEXT_LABEL_KEYS[action];
-      setAttributeIfChanged(button, 'data-i18n', labelKey);
-      setTextIfChanged(button, t(labelKey));
+      // After the last puzzle there is no next one: the button offers the other modes.
+      const labelKey = engine.currentPuzzleStage < totalPuzzles
+        ? VICTORY_NEXT_LABEL_KEYS[VICTORY_NEXT_ACTIONS.NEXT_LEVEL]
+        : 'modals.play.changeMode';
+      setButtonLabelKey(button, labelKey);
       return;
     }
     const { action } = resolveNextCampaignTarget(
@@ -146,15 +165,29 @@ export const uiModalMethods = {
       engine.levelCatalog,
       this.getVictoryTargetOptions()
     );
-    const labelKey = VICTORY_NEXT_LABEL_KEYS[action];
-    // data-i18n follows, so a language switch keeps the right wording.
-    setAttributeIfChanged(button, 'data-i18n', labelKey);
-    setTextIfChanged(button, t(labelKey));
+    setButtonLabelKey(button, VICTORY_NEXT_LABEL_KEYS[action]);
   },
 
-  /** Access of every mode (unlocked, new, required level); empty when storage cannot say. */
+  /**
+   * Access of every mode (unlocked, new, required level); empty when storage cannot say. Weekly
+   * Flux is added under its pseudo key: open with Flux or at its own campaign level, never new,
+   * and nothing about it is stored.
+   */
   getModeAccess() {
-    return this.storageManager?.getModeAccess?.() ?? {};
+    if (typeof this.storageManager?.getModeAccess !== 'function') {
+      return {};
+    }
+    const access = this.storageManager.getModeAccess();
+    const requiredLevel = this.gameConfig?.weeklyFlux?.unlockAfterCampaignLevel ?? 0;
+    const cleared = this.storageManager.getClearedCampaignLevel?.() ?? 0;
+    return {
+      ...access,
+      [WEEKLY_ACCESS_KEY]: {
+        unlocked: access[GAME_MODES.FLUX]?.unlocked === true || cleared >= requiredLevel,
+        isNew: false,
+        requiredLevel
+      }
+    };
   },
 
   /**
@@ -177,9 +210,12 @@ export const uiModalMethods = {
   /** Tells the player which campaign level unlocks a locked mode (in the open window's status line). */
   showModeLockHint(mode, access = this.getModeAccess()) {
     const lock = describeModeLock(mode, access, t);
-    const isLevelsOpen = Boolean(this.elements.modalLevels) && !this.elements.modalLevels.classList.contains('hidden');
-    const hintEl = isLevelsOpen ? this.elements.levelsChapterHint : this.elements.navModeLockHint;
-    if (!hintEl || !lock.hint) {
+    if (!lock.hint) {
+      return;
+    }
+    const hintEl = this.getStatusHintTarget();
+    if (!hintEl) {
+      this.announce?.(lock.hint);
       return;
     }
     revealLiveRegion({ region: hintEl, textElement: hintEl, text: lock.hint, schedule: scheduleNextFrame });
@@ -213,8 +249,8 @@ export const uiModalMethods = {
   },
 
   /**
-   * Parses the Flux seed field in the Level Select toolbar and launches the seeded Flux run,
-   * or reveals an invalid-seed message in the polite hint banner.
+   * Parses the Flux seed field of the Play hub and launches the seeded Flux run, or reveals
+   * an invalid-seed message in the hub's polite hint banner.
    */
   submitFluxSeedInput() {
     const input = this.elements?.inputFluxSeed;
@@ -224,7 +260,7 @@ export const uiModalMethods = {
     const seedConfig = this.engine.fluxConfig?.seed;
     const seed = parseFluxSeedInput(input.value, seedConfig);
     if (!seed) {
-      const hintEl = this.elements?.levelsChapterHint;
+      const hintEl = this.elements?.playHubHint;
       if (hintEl) {
         revealLiveRegion({
           region: hintEl,
@@ -235,7 +271,7 @@ export const uiModalMethods = {
       }
       return;
     }
-    this.elements.levelsChapterHint?.classList.add('hidden');
+    this.elements.playHubHint?.classList.add('hidden');
     this.requestDestructiveAction(
       () => {
         input.value = '';
@@ -278,6 +314,7 @@ export const uiModalMethods = {
       this.elements.modalVersusLocal,
       this.elements.modalVersusTiers,
       this.elements.modalLevels,
+      this.elements.modalPlay,
       this.elements.modalShop,
       this.elements.modalSettings,
       this.elements.modalStats,
@@ -473,8 +510,17 @@ export const uiModalMethods = {
 
   closeOverlayModal(modalElement) {
     modalElement.classList.add('hidden');
+    const isMapOrHub = modalElement === this.elements.modalLevels || modalElement === this.elements.modalPlay;
     if (modalElement === this.elements.modalLevels) {
       this.elements.levelsChapterHint?.classList.add('hidden');
+      // The map opened from the hub hands focus back to the button that opened it.
+      const hub = this.elements.modalPlay;
+      if (hub && !hub.classList.contains('hidden')) {
+        this.stackedModalOpener = this.elements.btnCampaignMap;
+      }
+    }
+    if (modalElement === this.elements.modalPlay) {
+      this.elements.playHubHint?.classList.add('hidden');
     }
     if (modalElement === this.elements.modalStats) {
       // Opened over the Daily game over: focus returns to its History button.
@@ -496,10 +542,16 @@ export const uiModalMethods = {
         this.isVictoryModalRevealed = true;
         this.updateNextLevelButton(this.engine);
         this.elements.modalVictory.classList.remove('hidden');
+        if (isMapOrHub) {
+          this.stackedModalOpener = this.elements.btnLevelsVictory;
+        }
       } else if (this.engine.state === GAME_STATES.GAME_OVER) {
         this.elements.modalGameOver.classList.remove('hidden');
+        if (isMapOrHub) {
+          this.stackedModalOpener = this.elements.btnLevelsGameOver;
+        }
       } else if (this.engine.state === GAME_STATES.PAUSED && !this.isRunHeldByUi()) {
-        if (modalElement === this.elements.modalLevels) {
+        if (isMapOrHub) {
           this.stackedModalOpener = this.elements.btnLevelsPause;
         } else if (modalElement === this.elements.modalSettings) {
           this.stackedModalOpener = this.elements.btnSettingsPause;
@@ -521,6 +573,7 @@ export const uiModalMethods = {
     this.pendingConfirmLabelResolver = null;
     this.stopDailyCountdown();
     this.elements.levelsChapterHint?.classList.add('hidden');
+    this.elements.playHubHint?.classList.add('hidden');
     for (const modal of this.getModalsByPriority()) {
       modal.classList.add('hidden');
     }

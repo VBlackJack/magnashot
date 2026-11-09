@@ -98,7 +98,7 @@ export const EMPTY_POWERUP_CLASS = 'is-empty';
 
 /** Mode buttons, keyed by the game mode each one starts. */
 export const MODE_BUTTON_KEYS = Object.freeze({
-  [GAME_MODES.CAMPAIGN]: ['btnLevels'],
+  [GAME_MODES.CAMPAIGN]: ['btnCampaignContinue'],
   [GAME_MODES.ENDLESS]: ['btnEndless'],
   [GAME_MODES.DAILY]: ['btnDaily'],
   [GAME_MODES.CLASSIC]: ['btnModeClassic'],
@@ -592,17 +592,22 @@ export const MODE_NAME_KEYS = Object.freeze({
   [GAME_MODES.FLUX]: 'app.nav.button.flux',
   [GAME_MODES.CASCADE]: 'modals.levelSelect.arcade.cascade',
   [GAME_MODES.BOSS_RUSH]: 'modals.levelSelect.arcade.bossRush',
-  [GAME_MODES.VERSUS]: 'versus.mode.name'
+  [GAME_MODES.VERSUS]: 'versus.mode.name',
+  [WEEKLY_ACCESS_KEY]: 'app.nav.button.weekly'
 });
 
-/** Menu buttons (UIManager.elements keys) of each gated mode. Weekly Flux follows Flux. */
-export const MODE_LOCK_BUTTON_KEYS = Object.freeze({
-  [GAME_MODES.ENDLESS]: Object.freeze(['btnEndless']),
-  [GAME_MODES.FLUX]: Object.freeze(['btnFlux', 'btnWeekly'])
-});
-
-/** Arcade cards of the level select: element keys and the texts a card shows while unlocked. */
+/**
+ * Cards of the Play hub, keyed by the mode each one starts (Weekly Flux by its pseudo key):
+ * element keys and the texts a card shows while unlocked. Object order is the unlock order of
+ * the Arcade cards; the Duel card and Weekly Flux sit in their own sections of the hub.
+ */
 export const ARCADE_CARD_SPECS = Object.freeze({
+  [GAME_MODES.ENDLESS]: Object.freeze({
+    card: 'btnEndless',
+    best: 'arcadeBestEndless',
+    titleKey: 'app.nav.button.endless',
+    descKey: 'modals.play.arcade.endlessDesc'
+  }),
   [GAME_MODES.CLASSIC]: Object.freeze({
     card: 'btnModeClassic',
     best: 'arcadeBestClassic',
@@ -621,11 +626,11 @@ export const ARCADE_CARD_SPECS = Object.freeze({
     titleKey: 'modals.levelSelect.arcade.blitz',
     descKey: 'modals.levelSelect.arcade.blitzDesc'
   }),
-  [GAME_MODES.BOSS_RUSH]: Object.freeze({
-    card: 'btnModeBossRush',
-    best: 'arcadeBestBossRush',
-    titleKey: 'modals.levelSelect.arcade.bossRush',
-    descKey: 'modals.levelSelect.arcade.bossRushDesc'
+  [GAME_MODES.FLUX]: Object.freeze({
+    card: 'btnFlux',
+    best: 'arcadeBestFlux',
+    titleKey: 'app.nav.button.flux',
+    descKey: 'modals.play.arcade.fluxDesc'
   }),
   [GAME_MODES.CASCADE]: Object.freeze({
     card: 'btnModeCascade',
@@ -633,11 +638,27 @@ export const ARCADE_CARD_SPECS = Object.freeze({
     titleKey: 'modals.levelSelect.arcade.cascade',
     descKey: 'modals.levelSelect.arcade.cascadeDesc'
   }),
+  [GAME_MODES.BOSS_RUSH]: Object.freeze({
+    card: 'btnModeBossRush',
+    best: 'arcadeBestBossRush',
+    titleKey: 'modals.levelSelect.arcade.bossRush',
+    descKey: 'modals.levelSelect.arcade.bossRushDesc'
+  }),
   [GAME_MODES.VERSUS]: Object.freeze({
     card: 'btnModeVersus',
     best: 'arcadeBestVersus',
     titleKey: 'versus.card.title',
     descKey: 'versus.card.description'
+  }),
+  // Weekly Flux is not a game mode and never a new one. Its chip (the reward, or the week's
+  // best) is written by the hub, so the card only hides and shows it.
+  [WEEKLY_ACCESS_KEY]: Object.freeze({
+    card: 'btnWeekly',
+    best: 'weeklyReward',
+    titleKey: 'app.nav.button.weekly',
+    descKey: 'modals.play.weekly.desc',
+    showNew: false,
+    isChip: true
   })
 });
 
