@@ -4,6 +4,8 @@ All notable changes to **MagnaShot** are documented in this file.
 
 ## [Unreleased]
 
+## [1.23.0] - 2026-11-09
+
 ### Added
 - **Puzzle Records per Stage (`StorageManager`, `StorageView`, `EngineRoundFlow`, `UIManager`, `UIHudRefresh`, `PlayHubView`, `game.json`)**: Each Puzzle stage keeps its own best score, stars, attempts and cleared flag (`puzzle_stage_stats`). The stage selector shows the stars of every cleared stage, the HUD best is the best of the current stage, and a new record is judged per stage. Save schema 7 gives every stage below the saved best stage one star and an attempts count that caps it there (its real history is unknown); the last stage is not recorded by the old save, so it is treated as never cleared. Nothing is deleted and the migration runs once.
 - **Puzzle Stage Intro (`EngineModes`, `UIHelpers`, `UIManager`, `locales`)**: Every start and retry of a Puzzle stage shows a goal banner: stage number, objective, number of shots and a one-line hint that names no color. The rules reminder shows on every Puzzle attempt until the first stage is cleared. It never pauses the run, the first shot closes it, it is announced once per stage (a retry is not announced again), and it waits behind a discovery card until the card is closed; if the first shot comes first, the goal is still announced to screen readers.
