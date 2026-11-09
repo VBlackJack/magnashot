@@ -2476,3 +2476,220 @@ describe('Polarity Duel first-duel tutorial', () => {
     }
   });
 });
+
+// Pulse: the music and Resonance settings, the calibration dialog and the beat ring.
+
+const PULSE_SETTING_BUTTONS = Object.freeze(['#btn-music', '#btn-music-volume', '#btn-resonance', '#btn-calibrate']);
+/** Viewports where a whole calibration run (about ten beats) is played; the others check the dialog only. */
+const CALIBRATION_RUN_VIEWPORTS = new Set(['desktop', 'phone portrait']);
+const RESONANCE_CONFIG = GAME_CONFIG.resonance;
+const CALIBRATION_BEAT_MS = 60000 / RESONANCE_CONFIG.calibrationBpm;
+const CALIBRATION_RUN_MS = (RESONANCE_CONFIG.calibrationLeadBeats + RESONANCE_CONFIG.calibrationBeats + 3) * CALIBRATION_BEAT_MS;
+const RING_WAIT_MS = 500;
+
+/** Fails when a dialog is wider than the window or its card scrolls sideways. */
+async function assertDialogFits(page, selector, label) {
+  const fit = await page.evaluate(
+    ({ sel, tolerance }) => {
+      const modal = document.querySelector(sel);
+      const card = modal.querySelector('.modal-card');
+      return {
+        page: document.documentElement.scrollWidth - window.innerWidth,
+        card: card.scrollWidth - card.clientWidth,
+        right: card.getBoundingClientRect().right - window.innerWidth + tolerance
+      };
+    },
+    { sel: selector, tolerance: OVERFLOW_TOLERANCE_PX }
+  );
+  assert.ok(fit.page <= OVERFLOW_TOLERANCE_PX, `${label}: the page scrolls sideways by ${fit.page}px`);
+  assert.ok(fit.card <= OVERFLOW_TOLERANCE_PX, `${label}: the card scrolls sideways by ${fit.card}px`);
+  assert.ok(fit.right <= OVERFLOW_TOLERANCE_PX * 2, `${label}: the card leaves the window`);
+}
+
+/** Counts the frames in which the beat ring was drawn, through a hook on the renderer. */
+async function hookBeatRing(page) {
+  await page.evaluate(async () => {
+    const { Renderer } = await import('/src/game/Renderer.js');
+    const original = Renderer.prototype.drawBeatRing;
+    window.__ringFrames = 0;
+    Renderer.prototype.drawBeatRing = function countRing(ctx, ...args) {
+      let arcs = 0;
+      const arc = ctx.arc;
+      ctx.arc = function countArc(...arcArgs) {
+        arcs += 1;
+        return arc.apply(this, arcArgs);
+      };
+      try {
+        return original.call(this, ctx, ...args);
+      } finally {
+        delete ctx.arc;
+        if (arcs > 0) {
+          window.__ringFrames += 1;
+        }
+      }
+    };
+  });
+}
+
+for (const viewport of VIEWPORTS) {
+  describe(`pulse: ${viewport.name} (${viewport.width}x${viewport.height})`, () => {
+    test('Settings lists Music, Music volume, Resonance and Calibrate rhythm, named and inside the window', async () => {
+      const { context, page, errors } = await openGame(viewport);
+      try {
+        await startLevelOne(page);
+        await clickMenuButton(page, viewport, '#btn-settings');
+        await waitShown(page, '#modal-settings');
+        for (const selector of PULSE_SETTING_BUTTONS) {
+          await page.locator(selector).scrollIntoViewIfNeeded();
+          assert.equal(await isShown(page, selector), true, `${selector} is shown`);
+          const name = await page.evaluate(
+            (sel) => document.querySelector(sel).getAttribute('aria-label') || document.querySelector(sel).textContent.trim(),
+            selector
+          );
+          assert.ok(name.length > 0, `${selector} has an accessible name`);
+        }
+        await assertDialogFits(page, '#modal-settings', 'Settings');
+        await assertLayoutFits(page, 'settings with the pulse rows');
+        assert.deepEqual(errors, []);
+      } finally {
+        await context.close();
+      }
+    });
+
+    test('the Music button and the volume button change and keep their settings', async () => {
+      const { context, page, errors } = await openGame(viewport);
+      try {
+        await startLevelOne(page);
+        await clickMenuButton(page, viewport, '#btn-settings');
+        await waitShown(page, '#modal-settings');
+        const musicKey = `${STORAGE_PREFIX}${STORAGE_KEYS.musicEnabled}`;
+        const volumeKey = `${STORAGE_PREFIX}${STORAGE_KEYS.musicVolume}`;
+        const resonanceKey = `${STORAGE_PREFIX}${STORAGE_KEYS.resonanceEnabled}`;
+        await page.locator('#btn-music').scrollIntoViewIfNeeded();
+        await page.click('#btn-music');
+        assert.equal(await page.evaluate((key) => window.localStorage.getItem(key), musicKey), 'false');
+        assert.equal(await page.getAttribute('#btn-music', 'aria-pressed'), 'false');
+        await page.click('#btn-music-volume');
+        assert.notEqual(await page.evaluate((key) => window.localStorage.getItem(key), volumeKey), null);
+        await page.locator('#btn-resonance').scrollIntoViewIfNeeded();
+        await page.click('#btn-resonance');
+        assert.equal(await page.evaluate((key) => window.localStorage.getItem(key), resonanceKey), 'false');
+        assert.equal(
+          await page.evaluate(() => window.__fluxEngine.getBeatState().resonanceActive),
+          false,
+          'the setting off hides the ring in the Campaign'
+        );
+        assert.deepEqual(errors, []);
+      } finally {
+        await context.close();
+      }
+    });
+
+    test('the calibration dialog opens over Settings, fits the window and Escape closes only it', async () => {
+      const { context, page, errors } = await openGame(viewport);
+      try {
+        await startLevelOne(page);
+        await clickMenuButton(page, viewport, '#btn-settings');
+        await waitShown(page, '#modal-settings');
+        await page.locator('#btn-calibrate').scrollIntoViewIfNeeded();
+        await page.click('#btn-calibrate');
+        await waitShown(page, '#modal-calibrate');
+        assert.ok(
+          await page.evaluate(() => document.querySelector('#modal-calibrate').contains(document.activeElement)),
+          'the dialog takes focus'
+        );
+        assert.equal(await page.getAttribute('#modal-calibrate', 'aria-modal'), 'true');
+        await assertDialogFits(page, '#modal-calibrate', 'Calibration');
+        const intro = await page.textContent('#calibrate-intro');
+        assert.ok(intro.includes(String(RESONANCE_CONFIG.calibrationBeats)), 'the intro states the number of taps');
+        await page.keyboard.press('Escape');
+        await page.waitForFunction(() => document.querySelector('#modal-calibrate').classList.contains('hidden'));
+        assert.equal(await isShown(page, '#modal-settings'), true, 'Settings stays open under it');
+        assert.equal(await engineState(page), GAME_STATES.PAUSED, 'the run stays paused');
+        assert.deepEqual(errors, []);
+      } finally {
+        await context.close();
+      }
+    });
+
+    if (CALIBRATION_RUN_VIEWPORTS.has(viewport.name)) {
+      test('a calibration run saves the offset of the taps, and Reset clears it', async () => {
+        const { context, page, errors } = await openGame(viewport);
+        try {
+          await startLevelOne(page);
+          await page.evaluate(async () => {
+            const { UIManager } = await import('/src/ui/UIManager.js');
+            const original = UIManager.prototype.startCalibrationRun;
+            UIManager.prototype.startCalibrationRun = function captureUi(...args) {
+              window.__calibrationUi = this;
+              return original.apply(this, args);
+            };
+          });
+          await clickMenuButton(page, viewport, '#btn-settings');
+          await waitShown(page, '#modal-settings');
+          await page.locator('#btn-calibrate').scrollIntoViewIfNeeded();
+          await page.click('#btn-calibrate');
+          await waitShown(page, '#modal-calibrate');
+          // Tap each time the ring opens its window: always early by the same amount.
+          await page.evaluate(() => {
+            const ui = window.__calibrationUi;
+            const ring = document.querySelector('#calibrate-ring');
+            let wasOpen = false;
+            const watch = () => {
+              const isOpen = ring.getAttribute('data-window') === 'true';
+              if (isOpen && !wasOpen && ui.calibration) {
+                ui.registerCalibrationTap(performance.now());
+              }
+              wasOpen = isOpen;
+              requestAnimationFrame(watch);
+            };
+            requestAnimationFrame(watch);
+          });
+          const offsetKey = `${STORAGE_PREFIX}${STORAGE_KEYS.rhythmOffsetMs}`;
+          await page.waitForFunction(
+            (key) => window.localStorage.getItem(key) !== null,
+            offsetKey,
+            { timeout: CALIBRATION_RUN_MS + WAIT_TIMEOUT_MS }
+          );
+          const saved = Number(await page.evaluate((key) => window.localStorage.getItem(key), offsetKey));
+          assert.ok(saved < 0 && saved >= -RESONANCE_CONFIG.maxOffsetMs, `early taps save a negative offset (${saved})`);
+          assert.match(await page.textContent('#calibrate-result'), new RegExp(String(Math.abs(saved))));
+          await page.click('#btn-calibrate-reset');
+          await page.waitForFunction(
+            (key) => window.localStorage.getItem(key) === '0',
+            offsetKey
+          );
+          await page.click('#btn-calibrate-done');
+          await page.waitForFunction(() => document.querySelector('#modal-calibrate').classList.contains('hidden'));
+          assert.deepEqual(errors, []);
+        } finally {
+          await context.close();
+        }
+      });
+    }
+
+    test('the beat ring is drawn in the Campaign and hidden in the Daily', async () => {
+      const { context, page, errors } = await openGame(viewport);
+      try {
+        await hookBeatRing(page);
+        await startLevelOne(page);
+        assert.equal(await page.evaluate(() => window.__fluxEngine.getBeatState().resonanceActive), true);
+        await page.waitForFunction(() => window.__ringFrames > 0);
+        await page.evaluate(() => {
+          const engine = window.__fluxEngine;
+          engine.startDailyChallenge();
+          engine.notifyUI();
+        });
+        await page.waitForFunction((playing) => window.__fluxEngine.state === playing, GAME_STATES.PLAYING);
+        assert.equal(await page.evaluate(() => window.__fluxEngine.getBeatState().resonanceActive), false);
+        const before = await page.evaluate(() => window.__ringFrames);
+        await page.waitForTimeout(RING_WAIT_MS);
+        assert.equal(await page.evaluate(() => window.__ringFrames), before, 'no ring frame is drawn in the Daily');
+        await assertLayoutFits(page, 'daily with the ring hook');
+        assert.deepEqual(errors, []);
+      } finally {
+        await context.close();
+      }
+    });
+  });
+}
