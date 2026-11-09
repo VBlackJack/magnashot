@@ -54,6 +54,10 @@ const AIM_RUN_STEPS = 600;
 const INNER_RING = gameConfig.bossRush.innerRingCount;
 const PROBE_ANGLE = -1.45;
 const NEAR_ZERO = 1e-6;
+const RANDOM_SEED = 20261109;
+const SEED_MULTIPLIER = 1664525;
+const SEED_INCREMENT = 1013904223;
+const SEED_RANGE = 2 ** 32;
 
 const createTestEngine = () => {
   const storageManager = new StorageManager();
@@ -304,19 +308,33 @@ test('Regrow finds slots in an untouched Boss Rush board by searching outer shel
   assert.equal(found, 4, `Regrow planned slots on ${found}/4 untouched waves`);
 });
 
-test('Regrow is repeatable: the same key and step give the same slots and colours', () => {
-  const grow = () => {
-    const engine = bossRushEngine(2);
-    removeMoorings(engine, INNER_RING - 3);
-    clearOuterRing(engine);
-    arm(engine, MAGNETAR_BEHAVIOURS.REGROW);
-    const slots = engine.getMagnetarView().regrowSlots;
-    // The board palette follows the (unseeded) Boss Rush layout: pin it, the draw is what is under test.
-    engine.activePalette = ballsConfig.standardColors.map((c) => c.id);
-    const before = engine.physicsWorld.balls.length;
-    endTurn(engine);
-    return { slots, colours: engine.physicsWorld.balls.slice(before).map((b) => b.colorId) };
+/** Runs `run` with Math.random replaced by a seeded generator (the Boss Rush layout rolls colours with it). */
+const withSeededRandom = (seed, run) => {
+  const original = Math.random;
+  let state = seed;
+  Math.random = () => {
+    state = (Math.imul(state, SEED_MULTIPLIER) + SEED_INCREMENT) >>> 0;
+    return state / SEED_RANGE;
   };
+  try {
+    return run();
+  } finally {
+    Math.random = original;
+  }
+};
+
+test('Regrow is repeatable: the same key and step give the same slots and colours', () => {
+  const grow = () =>
+    withSeededRandom(RANDOM_SEED, () => {
+      const engine = bossRushEngine(2);
+      removeMoorings(engine, INNER_RING - 3);
+      clearOuterRing(engine);
+      arm(engine, MAGNETAR_BEHAVIOURS.REGROW);
+      const slots = engine.getMagnetarView().regrowSlots;
+      const before = engine.physicsWorld.balls.length;
+      endTurn(engine);
+      return { slots, colours: engine.physicsWorld.balls.slice(before).map((b) => b.colorId) };
+    });
   const a = grow();
   assert.deepEqual(grow(), a);
 });
@@ -468,27 +486,47 @@ test('an avalanche of at least landslideMin spheres counts as a landslide', () =
   assert.ok(engine.storageManager.getUnlockedAchievements().magnetarLandslide);
 });
 
-test('an Overcharge strike snaps the lowest-id Mooring, and Moorings never come back', () => {
+test('an Overcharge strike snaps the lowest-id Mooring, and Regrow never adds an anchor', () => {
   const engine = bossRushEngine(1);
   const world = engine.physicsWorld;
   const first = engine.refreshMoorings(false);
   const lowest = Math.min(...first);
-  const counts = [first.length];
   engine.addOvercharge(gameConfig.scoring.overchargeMax);
   assert.equal(world.ballMap.has(lowest), false, 'the lowest id was snapped');
-  counts.push(engine.getMagnetarView().moorings);
-  assert.equal(counts[1], counts[0] - 1);
+  const afterSnap = engine.getMagnetarView().moorings;
+  assert.equal(afterSnap, first.length - 1);
 
-  // New spheres, Regrow and a Barrage never add a Mooring.
+  // Regrow adds spheres, never anchors: the anchors on the board are the same set.
+  const anchorsBefore = world.balls.filter((b) => b.isAnchor).map((b) => b.id).sort((a, b) => a - b);
   arm(engine, MAGNETAR_BEHAVIOURS.REGROW);
   endTurn(engine);
   restTurns(engine);
-  counts.push(engine.getMagnetarView().moorings);
+  const anchorsAfter = world.balls.filter((b) => b.isAnchor).map((b) => b.id).sort((a, b) => a - b);
+  assert.deepEqual(anchorsAfter, anchorsBefore);
   engine.refreshMoorings(false);
-  counts.push(engine.getMagnetarView().moorings);
-  for (let i = 1; i < counts.length; i++) {
-    assert.ok(counts[i] <= counts[i - 1], `Moorings only go down: ${counts.join(',')}`);
+  assert.ok(engine.getMagnetarView().moorings <= anchorsAfter.length);
+});
+
+test('the Mooring count equals the real holders after a sphere bridges an anchor group', () => {
+  const engine = bossRushEngine(1);
+  const world = engine.physicsWorld;
+  const magnetarBall = engine.getMagnetarBall();
+  removeMoorings(engine, 0);
+  assert.equal(engine.getMagnetarView().moorings, 0);
+  // A detached anchor, then a bridge sphere bonded to both it and the Magnetar.
+  const anchor = new Ball({ x: magnetarBall.x + RADIUS * 4, y: magnetarBall.y, radius: RADIUS, colorId: null, isAnchor: true });
+  const bridge = new Ball({ x: magnetarBall.x + RADIUS * 2, y: magnetarBall.y, radius: RADIUS, colorId: ballsConfig.standardColors[0].id });
+  world.addBall(anchor);
+  world.addBall(bridge);
+  for (const [a, b] of [[magnetarBall, bridge], [bridge, anchor]]) {
+    a.bonds.add(b.id);
+    b.bonds.add(a.id);
   }
+  assert.deepEqual(engine.refreshMoorings(false), [anchor.id]);
+  assert.equal(engine.getMagnetarView().moorings, 1, 'a bridged anchor counts again');
+  // The Overcharge strike always finds that holder.
+  assert.equal(engine.snapMagnetarMooring(), true);
+  assert.equal(world.ballMap.has(anchor.id), false);
 });
 
 test('the last Mooring left is announced', () => {

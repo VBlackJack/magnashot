@@ -180,7 +180,7 @@ export const engineMagnetarMethods = {
     const world = this.physicsWorld;
     const found = findMoorings(world.balls, world.ballMap, magnetar.ballId);
     const before = magnetar.mooringIds;
-    magnetar.mooringIds = before === null ? found : found.filter((id) => before.includes(id));
+    magnetar.mooringIds = found;
     const left = magnetar.mooringIds.length;
     const ball = this.getMagnetarBall();
     if (announce && before !== null && left < before.length && ball) {

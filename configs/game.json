@@ -1873,7 +1873,10 @@
   "ghostDuel": {
     "queryParam": "duel",
     "codecVersion": 1,
-    "contentVersion": 2,
+    "contentVersion": {
+      "daily": 1,
+      "flux": 2
+    },
     "maxUrlLength": 1500,
     "maxPayloadChars": 1200,
     "maxSamples": 20000,

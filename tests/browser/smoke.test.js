@@ -1512,7 +1512,7 @@ function rivalGhost(mode, key) {
   return {
     mode,
     key,
-    cv: DUEL_CONFIG.contentVersion,
+    cv: DUEL_CONFIG.contentVersion[mode],
     n: RIVAL_SHOT_SCORES.length,
     step: 1,
     s: [...RIVAL_SHOT_SCORES],
@@ -2330,13 +2330,13 @@ describe('Magnetar boss', () => {
           window.__fluxEngine.notifyUI();
         }, MAGNETAR_WAVE);
         const before = await hudTrackCount(page);
-        assert.equal(await isShown(page, '#magnetarTelegraph'), false, 'no warning while the Magnetar rests');
+        assert.equal(await isShown(page, '#hud-magnetar-telegraph'), false, 'no warning while the Magnetar rests');
         await armMagnetar(page);
-        await waitShown(page, '#magnetarTelegraph');
+        await waitShown(page, '#hud-magnetar-telegraph');
         const after = await hudTrackCount(page);
         assert.equal(after.tracks, before.tracks, 'the chip adds no HUD column');
         const layout = await page.evaluate(() => {
-          const chip = document.querySelector('#magnetarTelegraph');
+          const chip = document.querySelector('#hud-magnetar-telegraph');
           const rect = chip.getBoundingClientRect();
           const bar = document.querySelector('.hud-bar').getBoundingClientRect();
           const overlaps = [...document.querySelectorAll('.hud-bar > *, .hud-bar .hud-center-info > * > *')]

@@ -17,7 +17,7 @@
 import { GAME_MODES, GAME_STATES } from '../core/Constants.js';
 import { t, formatNumber, i18n } from '../core/I18n.js';
 import { SeededRandom } from '../core/SeededRandom.js';
-import { DUEL_STATUS, buildDuelUrl, stripDuelFromUrl } from '../game/GhostCodec.js';
+import { DUEL_STATUS, buildDuelUrl, contentVersionFor, stripDuelFromUrl } from '../game/GhostCodec.js';
 import { FLUX_SEED_QUERY_PARAM, getDailyChallengeNumber, stripFluxSeedFromUrl } from '../game/DailyShare.js';
 import {
   REDUCED_MOTION_CLASS,
@@ -196,7 +196,7 @@ export const uiGhostDuelMethods = {
       if (assists.tiltFree) {
         notes.push(t('duel.card.tiltFree'));
       }
-      if (ghost.cv !== this.gameConfig.ghostDuel.contentVersion) {
+      if (ghost.cv !== contentVersionFor(this.gameConfig.ghostDuel, ghost.mode)) {
         notes.push(t('duel.card.version'));
       }
     } else {

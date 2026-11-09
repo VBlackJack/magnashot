@@ -98,6 +98,17 @@ function isCount(value) {
 }
 
 /**
+ * Content version of a mode's generated boards: it moves only when that mode's generation
+ * changes, so a link of an unchanged mode stays free of the "another version" notice.
+ * @param {{contentVersion: Object<string, number>}} cfg - The `ghostDuel` config section.
+ * @param {string} mode - 'daily' or 'flux'.
+ * @returns {number} The current content version of the mode.
+ */
+export function contentVersionFor(cfg, mode) {
+  return cfg.contentVersion[mode];
+}
+
+/**
  * Cleans an alias: Unicode letters, digits and single spaces only, trimmed and cut to the
  * configured length (in code points). Never throws.
  * @param {unknown} raw - Candidate alias.

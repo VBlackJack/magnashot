@@ -53,6 +53,19 @@ const SAG_METER_CLASS_BY_PHASE = Object.freeze({
 });
 
 /** Methods installed on UIManager.prototype by UIManager.js. */
+/**
+ * Locale key of the Flux banner: a Magnetar boss stage also names its Moorings.
+ * @param {boolean} isBossStage - Whether the stage is a boss stage.
+ * @param {object|null} magnetarView - engine.getMagnetarView().
+ * @returns {string} Locale key.
+ */
+export function getFluxBannerKey(isBossStage, magnetarView) {
+  if (!isBossStage) {
+    return 'hud.stats.mode.flux';
+  }
+  return magnetarView ? 'hud.stats.mode.fluxBossMagnetar' : 'hud.stats.mode.fluxBoss';
+}
+
 export const uiHudRefreshMethods = {
   /**
    * Shows the Sag box: label, level/size value, the segmented meter and its accessible
@@ -131,15 +144,15 @@ export const uiHudRefreshMethods = {
   },
 
   /**
-   * Magnetar bosses: the Moorings take the shots slot and the telegraph chip names the next
-   * behaviour with a glyph and words (never colour alone). The chip is aria-hidden: the
+   * Magnetar bosses: in Boss Rush the Moorings take the shots slot (Flux keeps its shots and
+   * shows the Moorings in the banner), and the telegraph chip names the next behaviour with a glyph and words (never colour alone). The chip is aria-hidden: the
    * announcements are the one live channel.
    * @param {object} engine - Game engine.
    * @param {object|null} view - engine.getMagnetarView().
    */
   refreshMagnetarHud(engine, view) {
     const chip = this.elements.magnetarTelegraph;
-    if (view && !engine.getSagState?.().active) {
+    if (view && engine.mode === GAME_MODES.BOSS_RUSH && !engine.getSagState?.().active) {
       if (this.elements.shotsLabel) {
         setTextIfChanged(this.elements.shotsLabel, t('hud.stats.shots.mooringsLabel'));
       }
@@ -416,9 +429,10 @@ export const uiHudRefreshMethods = {
     } else if (engine.mode === GAME_MODES.FLUX) {
       setTextIfChanged(
         this.elements.modeBanner,
-        t(engine.fluxIsBossStage ? 'hud.stats.mode.fluxBoss' : 'hud.stats.mode.flux', {
+        t(getFluxBannerKey(engine.fluxIsBossStage, magnetarView), {
           stage: engine.fluxStage,
-          shape: this.formatFluxShapeName(engine.fluxShapeIds)
+          shape: this.formatFluxShapeName(engine.fluxShapeIds),
+          moorings: magnetarView ? formatNumber(magnetarView.moorings) : ''
         })
       );
       if (this.elements.shotsLabel) {
