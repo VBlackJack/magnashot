@@ -19,6 +19,7 @@ import { SeededRandom } from '../core/SeededRandom.js';
 import { GAME_STATES, SPECIAL_TYPES } from '../core/Constants.js';
 import {
   CHARGE_OUTCOMES,
+  OPPOSITE_STRENGTH_LOSS,
   advanceCharge,
   chargePolarityForColor,
   chargesInBlastRadius,
@@ -32,6 +33,7 @@ import {
   shotPolarity
 } from './VersusRules.js';
 import { truncateAimAtCharges } from './ImpactPreview.js';
+import { resonantStrengthLoss } from './Resonance.js';
 import { Ball } from '../entities/Ball.js';
 
 // Kept exported here so existing callers of the foundation keep working.
@@ -547,7 +549,13 @@ export const engineVersusMethods = {
       return;
     }
     const cfg = this.gameConfig.versus;
-    const result = resolveChargeHit(best.charge, { polarity: shotPolarity(projectile.colorId, projectile.isPolarityFlipped, cfg, this.physicsWorld.polarityMap) });
+    const isResonant = Boolean(projectile.isResonant);
+    const loss = resonantStrengthLoss(OPPOSITE_STRENGTH_LOSS, isResonant, this.gameConfig.resonance);
+    const result = resolveChargeHit(
+      best.charge,
+      { polarity: shotPolarity(projectile.colorId, projectile.isPolarityFlipped, cfg, this.physicsWorld.polarityMap), resonant: isResonant },
+      loss
+    );
     hitIds.add(best.charge.id);
     const info = { id: best.charge.id, polarity: best.charge.polarity, x: best.charge.x, y: best.charge.y };
     if (result.outcome === CHARGE_OUTCOMES.DEFLECTED) {

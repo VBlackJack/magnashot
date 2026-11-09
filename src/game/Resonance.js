@@ -136,3 +136,43 @@ export function ringVisual(frame, { offsetFrames = 0, framesPerBeat: fpb, window
     opacity: ring.idleOpacity
   };
 }
+
+/**
+ * Median of the signed tap deviations (a tap after the beat is positive), clamped to the
+ * allowed offset and rounded to whole milliseconds. Null when there is nothing to measure.
+ * The median ignores a stray tap that a mean would follow.
+ *
+ * @param {number[]} deviationsMs Signed deviations of the taps from the pulses, in ms.
+ * @param {number} maxOffsetMs Largest offset magnitude allowed.
+ * @returns {number|null}
+ */
+export function medianOffsetMs(deviationsMs, maxOffsetMs) {
+  const values = deviationsMs.filter(Number.isFinite).sort((a, b) => a - b);
+  if (values.length === 0) {
+    return null;
+  }
+  const middle = Math.floor(values.length / 2);
+  const median = values.length % 2 === 1 ? values[middle] : (values[middle - 1] + values[middle]) / 2;
+  return Math.round(Math.max(-maxOffsetMs, Math.min(maxOffsetMs, median)));
+}
+
+/**
+ * Signed distance in ms from a tap to the nearest pulse of a regular pulse train.
+ * @param {number} tapMs Tap time.
+ * @param {number} firstBeatMs Time of the first pulse.
+ * @param {number} beatMs Time between two pulses.
+ */
+export function tapDeviationMs(tapMs, firstBeatMs, beatMs) {
+  const sinceFirst = tapMs - firstBeatMs;
+  const nearest = Math.round(sinceFirst / beatMs);
+  return sinceFirst - nearest * beatMs;
+}
+
+/**
+ * Highest of the intensity sources, kept in [0, 1]. Each source is already a share of its
+ * own scale; the music follows whichever pressure is greatest.
+ * @param {number[]} sources
+ */
+export function combineIntensity(sources) {
+  return sources.reduce((top, value) => Math.max(top, Math.max(0, Math.min(1, Number(value) || 0))), 0);
+}

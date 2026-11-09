@@ -81,6 +81,7 @@ const PRECACHE_ASSETS = [
   './src/game/EngineControls.js',
   './src/game/EngineTurnResolution.js',
   './src/game/EngineRoundFlow.js',
+  './src/game/EnginePulse.js',
   './src/game/GameLoop.js',
   './src/game/ImpactPreview.js',
   './src/game/Renderer.js',

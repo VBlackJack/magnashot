@@ -1422,6 +1422,8 @@ const recordFrame = (RendererClass, prepare) => withDeterministicSources(() => {
   const renderer = new RendererClass(canvas, gameConfig, ballsConfig, obstaclesConfig);
   renderer.createLayerCanvas = () => createRecordingCanvas(log);
   const engine = createTestEngine();
+  // The frozen renderer predates the beat ring: Resonance (and so the ring) is off here.
+  engine.storageManager.setResonanceEnabled(false);
   engine.startClassicMode(1);
   engine.setReducedMotion(true);
   prepare?.(engine);

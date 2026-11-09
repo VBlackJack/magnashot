@@ -126,6 +126,13 @@
       "notes": [523.25, 783.99, 1046.5],
       "noteDuration": 0.07,
       "hapticMs": 0
+    },
+    "calibrationClick": {
+      "type": "sine",
+      "startFreq": 1100,
+      "endFreq": 900,
+      "duration": 0.04,
+      "hapticMs": 0
     }
   },
   "music": {

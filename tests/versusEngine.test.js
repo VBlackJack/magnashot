@@ -91,6 +91,8 @@ const createBoard = (boardIndex = 0, seedKey = SEED_KEY) => {
     onStateChange: () => {},
     role: ENGINE_ROLES.VERSUS
   });
+  // These tests pin the base duel rules: Resonance (a shot on the beat) is covered in pulseEngine.test.js.
+  engine.setVersusResonanceOption(false);
   engine.startVersusBoard({ seedKey, boardIndex });
   return engine;
 };

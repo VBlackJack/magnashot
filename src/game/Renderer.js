@@ -21,6 +21,7 @@ import { Ball } from '../entities/Ball.js';
 import { predictImpact } from './ImpactPreview.js';
 import { SAG_STEPS } from './SagMeter.js';
 import { CHARGE_OUTCOMES } from './VersusRules.js';
+import { ringVisual } from './Resonance.js';
 
 const BOND_STYLE = Object.freeze({
   STRESSED: 0,
@@ -2346,6 +2347,59 @@ export class Renderer {
     ctx.restore();
   }
 
+  /**
+   * Beat ring of Resonance around the launcher: it shrinks onto the launcher with each beat,
+   * and while the window is open it is solid and thick (outside the window it is thin and
+   * dashed, so the cue never rests on colour alone). Under reduced motion the radius stays
+   * fixed and only the opacity moves. Drawn only while Resonance is live on the board, so
+   * the competitive modes and a CPU board show nothing. A flash marks a Resonant release.
+   */
+  drawBeatRing(ctx, engineState, theme) {
+    const pulse = typeof engineState.getBeatState === 'function' ? engineState.getBeatState() : null;
+    if (!pulse?.resonanceActive) {
+      return;
+    }
+    const cfg = this.gameConfig.resonance;
+    const ring = cfg.ring;
+    const canvasCfg = this.gameConfig.canvas;
+    const baseRadius = canvasCfg.launcher.baseRadius * ring.radiusFactor;
+    const visual = ringVisual(pulse.beatFrame, {
+      offsetFrames: pulse.offsetFrames,
+      framesPerBeat: pulse.framesPerBeat,
+      windowFrames: pulse.windowFrames,
+      reducedMotion: this.isReducedMotion,
+      cfg
+    });
+    const widthFactor = this.highContrast ? ring.highContrastWidthFactor : 1;
+    const color = this.highContrast ? ring.highContrastColor : theme.launcherAccentColor;
+    const lineWidth = (visual.inWindow ? ring.windowLineWidth : ring.lineWidth) * widthFactor;
+    const radius = baseRadius * visual.radiusScale;
+    ctx.save();
+    ctx.strokeStyle = color;
+    if (visual.inWindow) {
+      ctx.globalAlpha = ring.bandAlpha;
+      ctx.lineWidth = lineWidth * ring.bandWidthFactor;
+      ctx.beginPath();
+      ctx.arc(canvasCfg.launcherX, canvasCfg.launcherY, baseRadius, 0, MATH_CONSTANTS.TWO_PI);
+      ctx.stroke();
+    }
+    ctx.globalAlpha = visual.opacity;
+    ctx.lineWidth = lineWidth;
+    ctx.setLineDash(visual.inWindow ? EMPTY_DASH : ring.dashPattern);
+    ctx.beginPath();
+    ctx.arc(canvasCfg.launcherX, canvasCfg.launcherY, radius, 0, MATH_CONSTANTS.TWO_PI);
+    ctx.stroke();
+    ctx.setLineDash(EMPTY_DASH);
+    if (engineState.resonanceFlashFrames > 0 && !this.isReducedMotion) {
+      ctx.globalAlpha = ring.flashAlpha * (engineState.resonanceFlashFrames / ring.flashFrames);
+      ctx.fillStyle = color;
+      ctx.beginPath();
+      ctx.arc(canvasCfg.launcherX, canvasCfg.launcherY, baseRadius * ring.flashRadiusFactor, 0, MATH_CONSTANTS.TWO_PI);
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+
   drawLauncher(ctx, engineState, theme, now) {
     const canvasCfg = this.gameConfig.canvas;
     const launcherGeom = canvasCfg.launcher;
@@ -2393,6 +2447,8 @@ export class Renderer {
     ctx.fill();
     ctx.stroke();
     ctx.restore();
+
+    this.drawBeatRing(ctx, engineState, theme);
 
     if (
       engineState.mode === GAME_MODES.BLITZ &&

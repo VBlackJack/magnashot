@@ -121,6 +121,11 @@ function addStats(total, extra) {
   return sum;
 }
 
+const NOT_FOUND = -1;
+const NO_CHANCE = 0;
+// Name of the seeded stream of the CPU's Resonance rolls (apart from every other stream).
+const RESONANCE_STREAM = 'resonance-bot';
+
 /** Seeded stream as a () => number in [0, 1). */
 function createRng(key) {
   const stream = new SeededRandom(key);
@@ -141,7 +146,10 @@ export function resolveCpuTier(gameConfig, tier) {
     throw new Error(`Unknown CPU tier: ${String(tier)}`);
   }
   if (typeof spec.thinkFrames === 'object') {
+    // The Resonance chance of a named tier sits at its rank in the tier list.
+    const rank = typeof tier === 'string' ? Object.keys(gameConfig.versus.cpu).indexOf(tier) : NOT_FOUND;
     return {
+      resonanceChance: gameConfig.resonance?.botChance?.[rank] ?? NO_CHANCE,
       thinkFrames: spec.thinkFrames.mean,
       thinkJitterFrames: spec.thinkFrames.jitter,
       noiseRad: spec.aimNoiseRad,
@@ -171,7 +179,7 @@ function rollThinkFrames(tier, rng) {
  * threatening charge with the tier's chance (flipping the polarity when it may), then aims
  * with the tier's noise and shoots. step() returns the angle of the shot, or null.
  */
-function createCpu({ tier, bot, rng, reach }) {
+function createCpu({ tier, bot, rng, reach, resonanceRng }) {
   const tierBot = { ...bot, aimSamples: tier.aimSamples ?? bot.aimSamples };
   const anglesPerFrame = tier.anglesPerFrame ?? ALL_ANGLES;
   const guardDecisions = new Map();
@@ -183,6 +191,13 @@ function createCpu({ tier, bot, rng, reach }) {
     if (engine.isPolarityFlipped) {
       engine.togglePolarityFlip();
     }
+  };
+
+  // The Resonance roll of a shot comes from its own stream, so it never moves the stream
+  // that drives the CPU's decisions (or the board's seeded draws).
+  const shoot = (engine) => {
+    engine.queueBotResonanceRoll(resonanceRng() < (tier.resonanceChance ?? NO_CHANCE));
+    engine.shoot();
   };
 
   const fire = (engine) => {
@@ -199,7 +214,7 @@ function createCpu({ tier, bot, rng, reach }) {
           engine.togglePolarityFlip();
         }
         engine.updateAimFromAngle(guardShot.angle);
-        engine.shoot();
+        shoot(engine);
         thinkLeft = rollThinkFrames(tier, rng);
         planner = null;
         return guardShot.angle;
@@ -221,7 +236,7 @@ function createCpu({ tier, bot, rng, reach }) {
     }
     const angle = plan.angle + (rng() * 2 - 1) * (tier.noiseRad ?? 0);
     engine.updateAimFromAngle(angle);
-    engine.shoot();
+    shoot(engine);
     return angle;
   };
 
@@ -249,14 +264,17 @@ function createCpu({ tier, bot, rng, reach }) {
 }
 
 /** Builds one versus-role engine for a board of a match. */
-function createBoardEngine({ configs, storageManager, audioManager, isMuted, boardIndex, onStateChange }) {
-  return new GameEngine({
+function createBoardEngine({ configs, storageManager, audioManager, isMuted, boardIndex, onStateChange, resonance, isCpu }) {
+  const engine = new GameEngine({
     ...configs,
     storageManager: createVersusStorageView(storageManager),
     audioManager: createAudioChannel(audioManager, { muted: isMuted, pan: BOARD_PANS[boardIndex] }),
     onStateChange: (engine, extra) => onStateChange(boardIndex, engine, extra),
     role: ENGINE_ROLES.VERSUS
   });
+  engine.setVersusResonanceOption(resonance);
+  engine.setBotResonanceDriven(isCpu);
+  return engine;
 }
 
 /**
@@ -295,6 +313,7 @@ function createBoardEngine({ configs, storageManager, audioManager, isMuted, boa
  * @param {object} options.storageManager - Real storage manager, seen only through the versus view.
  * @param {object} [options.audioManager] - Shared audio manager, seen only through channels.
  * @param {boolean[]} [options.mutedBoards] - Muted flags per board; default: only the player's board is audible.
+ * @param {boolean} [options.resonance] - Resonance match option: true or false forces it for both boards, omitted follows the player's setting.
  * @param {boolean} [options.autoAdvance] - Start the next round by itself after the round break (default: CPU vs CPU only).
  * @param {Function} [options.onBoardChange] - (boardIndex, engine, extra) for the HUD of each board.
  * @param {Function} [options.onEvent] - Announcement listener, subscribed before the first round starts (so roundStart of round 1 is received).
@@ -314,6 +333,7 @@ export function createVersusMatch(options) {
     storageManager,
     audioManager,
     mutedBoards,
+    resonance,
     onBoardChange = () => {},
     onEvent = null
   } = options;
@@ -342,7 +362,9 @@ export function createVersusMatch(options) {
     audioManager,
     isMuted: muted[b],
     boardIndex: b,
-    onStateChange: onBoardChange
+    onStateChange: onBoardChange,
+    resonance,
+    isCpu: tiers[b] !== null
   }));
 
   const listeners = new Set();
@@ -388,7 +410,13 @@ export function createVersusMatch(options) {
         engine.setVersusAimTruncation(true);
       }
       return tiers[b]
-        ? createCpu({ tier: tiers[b].spec, bot, rng: createRng(`${seedKey}:cpu:${b}`), reach })
+        ? createCpu({
+          tier: tiers[b].spec,
+          bot,
+          rng: createRng(`${seedKey}:cpu:${b}`),
+          reach,
+          resonanceRng: createRng(`${seedKey}:${RESONANCE_STREAM}:${b}`)
+        })
         : null;
     });
     roundFrame = 0;
@@ -671,11 +699,20 @@ function createHeadlessDuel({ seed, round = FIRST_ROUND, tiers, bot, configs, st
       audioManager,
       isMuted: true,
       boardIndex: b,
-      onStateChange: () => {}
+      onStateChange: () => {},
+      // No charge is exchanged here: Resonance has nothing to act on and stays off.
+      resonance: false,
+      isCpu: true
     });
     engine.startVersusBoard({ seedKey, boardIndex: b });
     engines.push(engine);
-    cpus.push(createCpu({ tier: resolveCpuTier(configs.gameConfig, tiers[b]), bot, rng: createRng(`${seedKey}:cpu:${b}`), reach }));
+    cpus.push(createCpu({
+      tier: resolveCpuTier(configs.gameConfig, tiers[b]),
+      bot,
+      rng: createRng(`${seedKey}:cpu:${b}`),
+      reach,
+      resonanceRng: createRng(`${seedKey}:${RESONANCE_STREAM}:${b}`)
+    }));
   }
 
   /** Steps both boards until one loses or the cap is reached. */

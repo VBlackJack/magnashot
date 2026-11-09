@@ -82,6 +82,8 @@ const EXPECTED_PROTOTYPE_NAMES = [
   'constructor',
   'cycleAnimationSpeed',
   'cycleMusicVolume',
+  'syncVersusResonanceOption',
+  'readVersusResonanceOption',
   'setupPulseControls',
   'toggleMusic',
   'toggleResonance',

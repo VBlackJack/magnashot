@@ -321,6 +321,7 @@ export class UIManager {
       modalVersusTiers: document.getElementById('modal-versus-tiers'),
       versusTierList: document.getElementById('versus-tier-list'),
       versusTierHint: document.getElementById('versus-tier-hint'),
+      versusResonanceOption: document.getElementById('input-versus-resonance'),
       btnVersusTiersBack: document.getElementById('btn-versus-tiers-back'),
       btnVersusLocal: document.getElementById('btn-versus-local'),
       versusLocalEntryHint: document.getElementById('versus-local-entry-hint'),

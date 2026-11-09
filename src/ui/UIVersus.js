@@ -154,9 +154,24 @@ export const uiVersusMethods = {
     }
     this.runIfModeUnlocked(GAME_MODES.VERSUS, () => {
       this.renderVersusTierPicker();
+      this.syncVersusResonanceOption();
       const firstOpen = this.elements.versusTierList?.querySelector(`.${TIER_BUTTON_CLASS}:not([aria-disabled="true"])`);
       this.openOverlayModal(this.elements.modalVersusTiers, firstOpen || this.elements.btnVersusTiersBack);
     });
+  },
+
+  /** The Resonance match option starts from the player's global setting each time the picker opens. */
+  syncVersusResonanceOption() {
+    const box = this.elements.versusResonanceOption;
+    if (box) {
+      box.checked = Boolean(this.storageManager.getResonanceEnabled?.());
+    }
+  },
+
+  /** @returns {boolean|undefined} The match option, undefined when the picker has no such control. */
+  readVersusResonanceOption() {
+    const box = this.elements.versusResonanceOption;
+    return box ? Boolean(box.checked) : undefined;
   },
 
   /** Closes the picker; focus goes back to the card that opened it. */
@@ -289,6 +304,7 @@ export const uiVersusMethods = {
         configs: this.versusConfigs,
         storageManager: this.storageManager,
         audioManager: this.audioManager,
+        resonance: this.readVersusResonanceOption(),
         onBoardChange: () => {
           v.hudDirty = true;
         },

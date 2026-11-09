@@ -165,13 +165,28 @@
     "versusStrengthLoss": 2,
     "botChance": [0, 0.35, 0.65],
     "calibrationBeats": 8,
+    "calibrationBpm": 90,
+    "calibrationLeadBeats": 2,
+    "calibrationMinTaps": 3,
+    "intensity": {
+      "dangerSpan": 260,
+      "versusThreatFull": 2
+    },
     "ring": {
       "startScale": 1.7,
+      "radiusFactor": 1.3,
       "lineWidth": 2,
       "windowLineWidth": 4,
       "idleOpacity": 0.35,
       "windowOpacity": 0.95,
-      "dashPattern": [6, 6]
+      "dashPattern": [6, 6],
+      "highContrastColor": "#ffffff",
+      "highContrastWidthFactor": 1.6,
+      "bandWidthFactor": 3,
+      "bandAlpha": 0.22,
+      "flashFrames": 12,
+      "flashAlpha": 0.35,
+      "flashRadiusFactor": 1.6
     }
   },
   "tilt": {
