@@ -132,6 +132,7 @@ export class Renderer {
   constructor(canvas, gameConfig, ballsConfig, obstaclesConfig, options = {}) {
     this.canvas = canvas;
     this.lite = Boolean(options?.lite);
+    this.maxDevicePixelRatioOption = Number.isFinite(options?.maxDevicePixelRatio) ? options.maxDevicePixelRatio : null;
     this.disposed = false;
     this.windowListeners = [];
     this.resizeObserver = null;
@@ -226,6 +227,9 @@ export class Renderer {
     // Unit-radius shatter core gradients by burst colour; scaled to the ball radius at draw time.
     this.shatterCoreGradients = new Map();
     this.shatterCoreGradientCtx = null;
+    // Unit-radius explosion gradients (puff phases, core, flash); scaled to the radius at draw time.
+    this.unitRadialGradients = new Map();
+    this.unitRadialGradientCtx = null;
     this.ballGradientCache = new Map();
     this.ballSpriteCache = new Map();
     this.highContrast = false;
@@ -308,6 +312,32 @@ export class Renderer {
   }
 
   /**
+   * Caps the device pixel ratio for this renderer (null removes the cap) and schedules a
+   * backing store resize on the next frame.
+   */
+  setMaxDevicePixelRatio(cap) {
+    const next = Number.isFinite(cap) ? cap : null;
+    if (next === this.maxDevicePixelRatioOption) {
+      return;
+    }
+    this.maxDevicePixelRatioOption = next;
+    this.resolutionDirty = true;
+  }
+
+  /** Effective device pixel ratio ceiling: config cap, coarse pointer cap, then the renderer option. */
+  getDevicePixelRatioCap() {
+    const canvasCfg = this.gameConfig.canvas;
+    let cap = canvasCfg.maxDevicePixelRatio;
+    if (typeof window !== 'undefined' && typeof window.matchMedia === 'function') {
+      const query = this.gameConfig.defaults?.coarsePointerMediaQuery;
+      if (query && window.matchMedia(query)?.matches) {
+        cap = Math.min(cap, canvasCfg.coarsePointerMaxDevicePixelRatio ?? canvasCfg.maxDevicePixelRatio);
+      }
+    }
+    return Math.min(cap, this.maxDevicePixelRatioOption ?? Infinity);
+  }
+
+  /**
    * Sizes the backing store from the canvas display size times the capped device pixel
    * ratio. The logical coordinate system is preserved through setTransform in render().
    */
@@ -319,7 +349,7 @@ export class Renderer {
     const rawDpr = typeof window !== 'undefined' && window.devicePixelRatio ? window.devicePixelRatio : 1;
     const nextDpr = this.lite
       ? this.gameConfig.renderLite.devicePixelRatio
-      : Math.max(1, Math.min(this.gameConfig.canvas.maxDevicePixelRatio, rawDpr));
+      : Math.max(1, Math.min(this.getDevicePixelRatioCap(), rawDpr));
     const rect = this.canvas.getBoundingClientRect();
     const displayW = rect.width > 0 ? rect.width : this.logicalWidth;
     const displayH = rect.height > 0 ? rect.height : this.logicalHeight;
@@ -2771,6 +2801,57 @@ export class Renderer {
     }
   }
 
+  /**
+   * Returns a cached unit-radius radial gradient for an explosion layer. The colour stops are
+   * baked once per kind, colour and phase; callers scale the context to the radius.
+   */
+  getUnitRadialGradient(ctx, kind, color, phase = 0) {
+    if (this.unitRadialGradientCtx !== ctx) {
+      this.unitRadialGradients.clear();
+      this.unitRadialGradientCtx = ctx;
+    }
+    const pCfg = this.gameConfig.juice.particles;
+    const key = `${kind}|${color}|${phase}`;
+    let grad = this.unitRadialGradients.get(key);
+    if (!grad) {
+      grad = ctx.createRadialGradient(0, 0, 0, 0, 0, 1);
+      if (kind === 'puff') {
+        if (phase === 0) {
+          grad.addColorStop(0, pCfg.flashCoreColor);
+          grad.addColorStop(pCfg.flashMidStop, pCfg.explosionHotColor);
+          grad.addColorStop(1, color);
+        } else if (phase === 1) {
+          grad.addColorStop(0, pCfg.explosionHotColor);
+          grad.addColorStop(pCfg.flashMidStop, color);
+          grad.addColorStop(1, pCfg.explosionEmberColor);
+        } else {
+          grad.addColorStop(0, color);
+          grad.addColorStop(pCfg.flashMidStop, pCfg.explosionEmberColor);
+          grad.addColorStop(1, pCfg.explosionSmokeColor);
+        }
+      } else {
+        grad.addColorStop(0, pCfg.flashCoreColor);
+        grad.addColorStop(pCfg.flashMidStop, color);
+        grad.addColorStop(1, pCfg.flashEdgeColor);
+      }
+      this.unitRadialGradients.set(key, grad);
+    }
+    return grad;
+  }
+
+  /** Fills a unit-radius gradient scaled to radius r and centred on (x, y). */
+  fillUnitCircle(ctx, grad, x, y, r, alpha) {
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.scale(r, r);
+    ctx.fillStyle = grad;
+    ctx.globalAlpha = alpha;
+    ctx.beginPath();
+    ctx.arc(0, 0, 1, 0, MATH_CONSTANTS.TWO_PI);
+    ctx.fill();
+    ctx.restore();
+  }
+
   drawParticles(ctx, particleSystem, alpha = 1.0) {
     const pCfg = this.gameConfig.juice.particles;
     const theme = this.gameConfig.theme;
@@ -2790,25 +2871,9 @@ export class Renderer {
         }
         const interpAge = this.interpolate(ex.prevAge ?? ex.age, ex.age, alpha);
         const progress = Math.min(1, Math.max(0, interpAge / Math.max(1, ex.maxAge)));
-        const grad = ctx.createRadialGradient(exX, exY, 0, exX, exY, exRadius);
-        if (progress < pCfg.explosionHotPhaseEnd) {
-          grad.addColorStop(0, pCfg.flashCoreColor);
-          grad.addColorStop(pCfg.flashMidStop, pCfg.explosionHotColor);
-          grad.addColorStop(1, ex.color);
-        } else if (progress < pCfg.explosionFirePhaseEnd) {
-          grad.addColorStop(0, pCfg.explosionHotColor);
-          grad.addColorStop(pCfg.flashMidStop, ex.color);
-          grad.addColorStop(1, pCfg.explosionEmberColor);
-        } else {
-          grad.addColorStop(0, ex.color);
-          grad.addColorStop(pCfg.flashMidStop, pCfg.explosionEmberColor);
-          grad.addColorStop(1, pCfg.explosionSmokeColor);
-        }
-        ctx.fillStyle = grad;
-        ctx.globalAlpha = exAlpha;
-        ctx.beginPath();
-        ctx.arc(exX, exY, exRadius, 0, MATH_CONSTANTS.TWO_PI);
-        ctx.fill();
+        const phase = progress < pCfg.explosionHotPhaseEnd ? 0 : (progress < pCfg.explosionFirePhaseEnd ? 1 : 2);
+        const grad = this.getUnitRadialGradient(ctx, 'puff', ex.color, phase);
+        this.fillUnitCircle(ctx, grad, exX, exY, exRadius, exAlpha);
       }
     }
 
@@ -2824,15 +2889,7 @@ export class Renderer {
         if (exRadius <= 0 || exAlpha <= 0) {
           continue;
         }
-        const grad = ctx.createRadialGradient(ex.x, ex.y, 0, ex.x, ex.y, exRadius);
-        grad.addColorStop(0, pCfg.flashCoreColor);
-        grad.addColorStop(pCfg.flashMidStop, ex.color);
-        grad.addColorStop(1, pCfg.flashEdgeColor);
-        ctx.fillStyle = grad;
-        ctx.globalAlpha = exAlpha;
-        ctx.beginPath();
-        ctx.arc(ex.x, ex.y, exRadius, 0, MATH_CONSTANTS.TWO_PI);
-        ctx.fill();
+        this.fillUnitCircle(ctx, this.getUnitRadialGradient(ctx, 'core', ex.color), ex.x, ex.y, exRadius, exAlpha);
 
         if (ex.rays) {
           ctx.strokeStyle = pCfg.flashCoreColor;
@@ -2856,15 +2913,7 @@ export class Renderer {
         if (flRadius <= 0 || flAlpha <= 0) {
           continue;
         }
-        const grad = ctx.createRadialGradient(fl.x, fl.y, 0, fl.x, fl.y, flRadius);
-        grad.addColorStop(0, pCfg.flashCoreColor);
-        grad.addColorStop(pCfg.flashMidStop, fl.color);
-        grad.addColorStop(1, pCfg.flashEdgeColor);
-        ctx.fillStyle = grad;
-        ctx.globalAlpha = flAlpha;
-        ctx.beginPath();
-        ctx.arc(fl.x, fl.y, flRadius, 0, MATH_CONSTANTS.TWO_PI);
-        ctx.fill();
+        this.fillUnitCircle(ctx, this.getUnitRadialGradient(ctx, 'flash', fl.color), fl.x, fl.y, flRadius, flAlpha);
       }
     }
 
