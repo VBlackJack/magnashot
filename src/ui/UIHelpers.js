@@ -214,6 +214,19 @@ export function resolveDailyFairPlayKey(fairPlay) {
  * @returns {string} The one-line summary.
  */
 export function buildLevelIntroText(intro, translate) {
+  if (intro.puzzleStage) {
+    const shots = intro.shots === 1
+      ? translate('hud.levelIntro.puzzleShots.one')
+      : translate('hud.levelIntro.puzzleShots.many', { shots: intro.shots });
+    const text = translate('hud.levelIntro.puzzle', {
+      stage: intro.puzzleStage,
+      total: intro.totalStages,
+      objective: translate(`hud.levelIntro.puzzleObjective.${intro.objective}`),
+      shots,
+      hint: translate(`hud.levelIntro.puzzleHints.stage${intro.puzzleStage}`)
+    });
+    return intro.isFirstPuzzle ? `${translate('gameplay.tutorial.puzzle')} ${text}` : text;
+  }
   if (intro.mutatorKey) {
     const params = {
       mutator: translate(`gameplay.mutators.${intro.mutatorKey}`),

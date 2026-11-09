@@ -313,7 +313,28 @@
       "dailyMutatorFair": "Défi du Jour : {{mutator}}. {{effect}} {{fairPlay}}",
       "dailyFairPlay": "Mêmes règles pour tous : les améliorations de l'Atelier et les munitions de la boutique sont désactivées aujourd'hui.",
       "dailyFairPlayUpgrades": "Mêmes règles pour tous : les améliorations de l'Atelier sont désactivées aujourd'hui.",
-      "dailyFairPlayAmmo": "Mêmes règles pour tous : les munitions de la boutique sont désactivées aujourd'hui."
+      "dailyFairPlayAmmo": "Mêmes règles pour tous : les munitions de la boutique sont désactivées aujourd'hui.",
+      "puzzle": "Puzzle {{stage}}/{{total}} : {{objective}} en {{shots}}. {{hint}}",
+      "puzzleObjective": {
+        "coreRescue": "libérez chaque noyau 💎",
+        "clearAll": "videz le plateau"
+      },
+      "puzzleShots": {
+        "one": "1 tir",
+        "many": "{{shots}} tirs"
+      },
+      "puzzleHints": {
+        "stage1": "Complétez le groupe au-dessus du noyau : il tombe avec lui.",
+        "stage2": "La rouille bloque le groupe : repeignez-la au Pinceau.",
+        "stage3": "Videz le plateau : la Foudre frappe toute une rangée.",
+        "stage4": "Deux tirs, une couleur : formez un groupe de trois avec le noyau sur la plateforme.",
+        "stage5": "Deux noyaux, deux outils : un groupe d'un côté, le Prisme de l'autre.",
+        "stage6": "La barrière protège le noyau : passez par le portail.",
+        "stage7": "L'ordre est fixe : brisez d'abord le Verrou Quantique, puis libérez le noyau.",
+        "stage8": "Déclenchez le Coeur de Peinture : la rouille prend sa couleur et peut former un groupe.",
+        "stage9": "Réveillez les Barils Explosifs : leurs explosions vident le plateau.",
+        "stage10": "Le noyau pend à une Sphère Enchaînée sur le rotor : formez un groupe de trois sur elle."
+      }
     },
     "ghost": {
       "ahead": "+{{gap}} vs {{name}}",
@@ -557,7 +578,7 @@
       "platform": "Les plateformes soutiennent les sphères par en dessous tout en laissant passer vos tirs !",
       "antimagnet": "Les coussins antimagnétiques repoussent l'amas suspendu sans dévier vos projectiles !",
       "rescueCore": "Libérez tous les Noyaux Captifs (💎) par un groupe ou une avalanche pour remporter aussitôt le niveau !",
-      "puzzle": "Puzzle : étudiez les rebonds et remplissez l'objectif avec votre réserve fixe de tirs !",
+      "puzzle": "Puzzle : file de tir fixe, sans échange, sans boutique ni améliorations de l'Atelier. Lisez le plateau, puis tirez.",
       "polarity": {
         "pointer": "Cliquez sur le bouton 🧲 (ou appuyez sur F) pour inverser la charge de votre tir : les sphères l'attirent alors dans l'autre sens, et il courbe de l'autre côté.",
         "touch": "Touchez le bouton 🧲 pour inverser la charge de votre tir : les sphères l'attirent alors dans l'autre sens, et il courbe de l'autre côté.",
@@ -648,8 +669,8 @@
       },
       "arcade": {
         "puzzle": "Puzzle",
-        "puzzleDesc": "10 défis à 1-2 tirs • Noyaux 💎",
-        "puzzleRecord": "Puzzle {{stage}}/{{total}} • Record : {{score}}",
+        "puzzleDesc": "10 défis d'adresse • 1 ou 2 tirs",
+        "puzzleRecord": "Puzzle {{stage}}/{{total}} • Étoiles : {{stars}}/{{maxStars}}",
         "puzzleStage": "Puzzle {{stage}}",
         "puzzleStageLocked": "Terminez le Puzzle {{previous}} pour débloquer.",
         "blitz": "Blitz 90s",
@@ -662,7 +683,8 @@
         "lockedDesc": "Terminez le niveau {{level}} pour débloquer",
         "classic": "Puriste",
         "classicDesc": "Règles pures : ni spéciaux, ni améliorations. Les ratés abaissent le plafond.",
-        "classicBest": "Record : étape {{stage}}"
+        "classicBest": "Record : étape {{stage}}",
+        "puzzleStageAria": "Puzzle {{stage}}, {{stars}} étoiles sur {{maxStars}}"
       },
       "jumpCurrent": "Niveau en cours",
       "grid": {
@@ -1107,7 +1129,8 @@
         "collectorMagnet": {
           "name": "Aimant Collecteur",
           "description": "Ajoute +{{points}} points bonus et +{{overcharge}} % de Surcharge par sphère d'avalanche dans les collecteurs du bas par rang."
-        }
+        },
+        "puzzleBaselineNote": "Les améliorations sont suspendues en Puzzle : chaque joueur affronte le même puzzle."
       },
       "feedback": {
         "upgradePurchased": "{{name}} amélioré au niveau {{level}} sur {{maxLevel}}.",

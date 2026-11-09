@@ -3571,3 +3571,122 @@ describe('play hub (desktop)', () => {
     }
   });
 });
+
+/** Puzzle stage selector: seeded records, touch-target size, stars and the locked look, on every layout. */
+const PUZZLE_TOUCH_TARGET_PX = 44;
+const PUZZLE_SEED_BEST_STAGE = 3;
+const PUZZLE_SEEDED_STARS = 2;
+const PUZZLE_SEEDED_ATTEMPTS = 2;
+const PUZZLE_SEEDED_SCORE = 900;
+const PUZZLE_CLEARED_STAGE = 1;
+const PUZZLE_LOCKED_STAGE = PUZZLE_SEED_BEST_STAGE + 1;
+const PUZZLE_SEEDED_STORAGE = Object.freeze({
+  ...EXISTING_PLAYER_STORAGE,
+  ...languageStorage('en'),
+  [`${STORAGE_PREFIX}${STORAGE_KEYS.puzzleBestStage}`]: String(PUZZLE_SEED_BEST_STAGE),
+  [`${STORAGE_PREFIX}${STORAGE_KEYS.puzzleStageStats}`]: JSON.stringify({
+    [PUZZLE_CLEARED_STAGE]: {
+      bestScore: PUZZLE_SEEDED_SCORE,
+      stars: PUZZLE_SEEDED_STARS,
+      attempts: PUZZLE_SEEDED_ATTEMPTS,
+      cleared: true
+    }
+  })
+});
+
+for (const viewport of VIEWPORTS) {
+  describe(`puzzle stage selector: ${viewport.name} (${viewport.width}x${viewport.height})`, () => {
+    test('every stage button is a full touch target, a cleared stage shows its stars and a locked one is dashed at full opacity', async () => {
+      const { context, page, errors } = await openGame(viewport, { initStorage: PUZZLE_SEEDED_STORAGE });
+      try {
+        await openPlayHub(page, viewport);
+        await page.click('#btn-puzzle-stages-toggle');
+        await waitShown(page, '#puzzle-stages-strip');
+        const looks = await page.evaluate(
+          ([clearedStage, lockedStage]) => {
+            const buttons = [...document.querySelectorAll('#puzzle-stages-strip .puzzle-stage-btn')];
+            const sizes = buttons.map((btn) => {
+              const box = btn.getBoundingClientRect();
+              return { width: box.width, height: box.height };
+            });
+            const byStage = (stage) => document.querySelector(`.puzzle-stage-btn[data-puzzle-stage="${stage}"]`);
+            const cleared = byStage(clearedStage);
+            const locked = byStage(lockedStage);
+            const lockedStyle = getComputedStyle(locked);
+            return {
+              count: buttons.length,
+              sizes,
+              clearedStars: cleared.querySelector('.puzzle-stage-stars')?.textContent ?? null,
+              clearedAria: cleared.getAttribute('aria-label'),
+              hasLockedStars: locked.querySelector('.puzzle-stage-stars') !== null,
+              lockedBorderStyle: lockedStyle.borderTopStyle,
+              lockedOpacity: lockedStyle.opacity
+            };
+          },
+          [PUZZLE_CLEARED_STAGE, PUZZLE_LOCKED_STAGE]
+        );
+        assert.equal(looks.count, GAME_CONFIG.puzzles.length);
+        for (const size of looks.sizes) {
+          assert.ok(
+            size.width >= PUZZLE_TOUCH_TARGET_PX && size.height >= PUZZLE_TOUCH_TARGET_PX,
+            `stage button ${size.width}x${size.height}`
+          );
+        }
+        const { starFilledSymbol, starEmptySymbol } = GAME_CONFIG.theme;
+        assert.equal(
+          looks.clearedStars,
+          starFilledSymbol.repeat(PUZZLE_SEEDED_STARS) +
+            starEmptySymbol.repeat(GAME_CONFIG.scoring.maxStars - PUZZLE_SEEDED_STARS)
+        );
+        assert.equal(
+          looks.clearedAria,
+          localeText('en', 'modals.levelSelect.arcade.puzzleStageAria', {
+            stage: PUZZLE_CLEARED_STAGE,
+            stars: PUZZLE_SEEDED_STARS,
+            maxStars: GAME_CONFIG.scoring.maxStars
+          })
+        );
+        assert.equal(looks.hasLockedStars, false, 'a locked stage shows no stars');
+        assert.equal(looks.lockedBorderStyle, 'dashed');
+        assert.equal(looks.lockedOpacity, '1');
+        assert.deepEqual(errors, []);
+      } finally {
+        await context.close();
+      }
+    });
+  });
+}
+
+describe('puzzle stage intro (desktop)', () => {
+  test('starting a stage from the selector shows the goal banner with its text', async () => {
+    const desktop = VIEWPORTS[0];
+    const { context, page, errors } = await openGame(desktop, { initStorage: PUZZLE_SEEDED_STORAGE });
+    try {
+      await openPlayHub(page, desktop);
+      await page.click('#btn-puzzle-stages-toggle');
+      await waitShown(page, '#puzzle-stages-strip');
+      await page.click('#puzzle-stages-strip .puzzle-stage-btn[data-puzzle-stage="1"]');
+      await page.waitForFunction(
+        ([mode, playing]) => window.__fluxEngine.mode === mode && window.__fluxEngine.state === playing,
+        [GAME_MODES.PUZZLE, GAME_STATES.PLAYING]
+      );
+      // The goal banner waits behind a discovery card: close it, then let the HUD refresh.
+      // The intro is set here in the engine's documented shape, so the test pins the banner alone.
+      await page.evaluate(([total, shots]) => {
+        const engine = window.__fluxEngine;
+        engine.dismissDiscovery();
+        engine.levelIntro = { puzzleStage: 1, totalStages: total, shots, objective: 'coreRescue', isFirstPuzzle: false };
+        engine.notifyUI();
+      }, [GAME_CONFIG.puzzles.length, GAME_CONFIG.puzzles[0].shots]);
+      await waitShown(page, '#level-intro-banner');
+      // A revealed live region is filled on the next frame.
+      await page.waitForFunction(() => document.querySelector('#level-intro-text').textContent.trim().length > 0);
+      const text = await textOf(page, '#level-intro-text');
+      assert.ok(text.includes(`Puzzle 1/${GAME_CONFIG.puzzles.length}`), text);
+      assert.ok(text.includes(localeText('en', 'hud.levelIntro.puzzleHints.stage1')), 'the stage hint is shown');
+      assert.deepEqual(errors, []);
+    } finally {
+      await context.close();
+    }
+  });
+});
