@@ -24,6 +24,8 @@ const WEEK_KEY_PATTERN = /^\d{4}-W\d{2}$/;
 
 /** Sentinel stored in place of an obstacle index when a ball has no pivot. */
 const NO_PIVOT_INDEX = -1;
+/** Lowest Flux content version a save may carry. */
+const MIN_CONTENT_VERSION = 1;
 
 /** Engine scalars copied verbatim between the engine and a snapshot. */
 const ENGINE_SCALAR_FIELDS = [
@@ -387,7 +389,7 @@ export function applyRunSnapshot(engine, snapshot) {
     // A save without a version predates the settled shapes: it resumes on the shapes it was saved on.
     const savedVersion = snapshot.fluxContentVersion;
     const currentVersion = engine.gameConfig.ghostDuel.contentVersion.flux;
-    const contentVersion = Number.isInteger(savedVersion) && savedVersion >= 1 && savedVersion <= currentVersion
+    const contentVersion = Number.isInteger(savedVersion) && savedVersion >= MIN_CONTENT_VERSION && savedVersion <= currentVersion
       ? savedVersion
       : engine.fluxConfig.shapeSettle.sinceContentVersion - 1;
     engine.restoreFluxRun(

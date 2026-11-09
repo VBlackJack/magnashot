@@ -245,7 +245,12 @@ export const uiModalMethods = {
       // The restart clears the duel with the run state: read the rival first, attach it again after.
       const ghost = this.engine.ghostDuel?.ghost ?? null;
       this.hideAllModals();
-      this.engine.startFluxRun(this.engine.fluxSeed, { isShared: this.engine.isSharedFluxRun });
+      // A duel replayed on older shapes restarts on them, so the rival still meets its own board.
+      const runOptions = { isShared: this.engine.isSharedFluxRun };
+      if (ghost) {
+        runOptions.contentVersion = this.engine.fluxContentVersion;
+      }
+      this.engine.startFluxRun(this.engine.fluxSeed, runOptions);
       if (ghost && this.engine.attachGhost(ghost)) {
         this.refresh(this.engine, this.lastExtra);
       }

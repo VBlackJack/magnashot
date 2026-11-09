@@ -270,6 +270,7 @@ test('Flux draws only settled shapes, and nothing else about a stage changes', (
         }
         assert.equal(settled.isBoss, plain.isBoss);
         assert.equal(settled.paletteCount, plain.paletteCount);
+        assert.deepEqual(settled.modifierWeights, plain.modifierWeights, 'the modifier draw is the same');
       } else {
         assert.deepEqual(settled, plain, `seed ${seed} stage ${stage}: other families are untouched`);
       }

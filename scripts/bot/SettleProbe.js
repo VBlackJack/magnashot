@@ -164,7 +164,8 @@ export function fluxShapeTuningFingerprint(configs) {
     modifiers: flux.modifiers[0],
     introFrames: flux.transition.introFrames,
     generated: flux.generated,
-    settleFrames: flux.shapeSettle.frames
+    settleFrames: flux.shapeSettle.frames,
+    settleSeedBase: flux.shapeSettle.settleSeedBase
   }));
 }
 

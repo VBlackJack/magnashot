@@ -27,6 +27,7 @@ import { ghostFromTimeline } from '../src/game/GhostCodec.js';
 import { GAME_MODES, GAME_OVER_REASONS } from '../src/core/Constants.js';
 import { applyWorldGeometry } from '../src/core/WorldGeometry.js';
 import { getUtcIsoWeekKey, getWeeklyFluxSeed } from '../src/game/WeeklyFlux.js';
+import { UIManager } from '../src/ui/UIManager.js';
 import { generateFluxStage } from '../src/game/layouts/FluxStageGenerator.js';
 
 const loadJson = (p) => JSON.parse(fs.readFileSync(p, 'utf8'));
@@ -495,6 +496,23 @@ test('a Flux duel recorded on the previous content version replays its exact sha
       assert.deepEqual(engine.fluxShapeIds, change.settled);
     });
   }
+});
+
+test('Same Seed after a legacy duel keeps the legacy shapes and is not a Weekly run', () => {
+  const change = findSeedWithSettledChange();
+  assert.ok(change, 'some seed must draw other shapes with and without the settled pool');
+  withEngine((engine) => {
+    engine.startGhostDuel({ ...makeGhost('flux', change.seed), cv: LEGACY_FLUX_VERSION });
+    const ui = Object.create(UIManager.prototype);
+    ui.engine = engine;
+    ui.hideAllModals = () => {};
+    ui.refresh = () => {};
+    ui.retrySameFluxSeed();
+    assert.equal(engine.fluxContentVersion, LEGACY_FLUX_VERSION);
+    assert.deepEqual(engine.fluxShapeIds, change.legacy);
+    assert.ok(engine.ghostDuel, 'the rival is attached again');
+    assert.equal(engine.isWeeklyFluxRun, false);
+  });
 });
 
 test('a duel on legacy shapes is not a Weekly run, so it never writes weekly records', () => {
