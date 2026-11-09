@@ -13,11 +13,11 @@
       "button": {
         "levels": "Niveaux",
         "endless": "Survie",
-        "daily": "Défi du Jour",
+        "daily": "Défi du jour",
         "dailyBonusBadge": "Défi du Jour (+{{coins}} ⬡)",
         "dailyPlayedBadge": "Défi du Jour ✓",
         "dailyPlayedStreakBadge": "Défi du Jour ✓ ({{streak}}j)",
-        "flux": "Mode Flux",
+        "flux": "Flux",
         "shop": "Atelier",
         "shopBadge": "Atelier ({{count}})",
         "restart": "Recommencer",
@@ -67,7 +67,7 @@
         "resetHintsCaption": "Indices",
         "resetHintsDone": "✓",
         "resetHintsDoneCaption": "Réinitialisés ✓",
-        "weekly": "Flux de la Semaine",
+        "weekly": "Flux de la semaine",
         "weeklyBonusBadge": "Flux de la Semaine +{{coins}} ⬡",
         "weeklyBestBadge": "Flux de la Semaine ✓ {{score}}",
         "musicOn": "🎵",
@@ -104,7 +104,9 @@
       "button": {
         "openAria": "Ouvrir le menu",
         "closeAria": "Fermer le menu",
-        "stats": "Mes statistiques"
+        "stats": "Mes statistiques",
+        "play": "Jouer",
+        "playNewAria": "Jouer : nouveaux modes débloqués"
       },
       "stats": {
         "round": "Partie en cours"
@@ -145,12 +147,12 @@
       },
       "mode": {
         "campaign": "Niveau {{level}} : {{name}}",
-        "endless": "Mode Survie • Vague {{wave}}",
-        "daily": "Défi du Jour ({{mutator}}) • Vague {{wave}}",
-        "flux": "Mode Flux • Forme {{stage}} : {{shape}}",
-        "fluxBoss": "Mode Flux • Forme {{stage}} : {{shape}} (Boss)",
-        "fluxBossMagnetar": "Mode Flux • Forme {{stage}} : {{shape}} (Boss, {{moorings}} amarres)",
-        "puzzle": "Mode Puzzle • Niveau {{stage}} / {{total}}",
+        "endless": "Survie • Vague {{wave}}",
+        "daily": "Défi du jour ({{mutator}}) • Vague {{wave}}",
+        "flux": "Flux • Forme {{stage}} : {{shape}}",
+        "fluxBoss": "Flux • Forme {{stage}} : {{shape}} (Boss)",
+        "fluxBossMagnetar": "Flux • Forme {{stage}} : {{shape}} (Boss, {{moorings}} amarres)",
+        "puzzle": "Puzzle {{stage}} / {{total}}",
         "blitz": "Blitz 90s • Vague {{wave}}",
         "bossRush": "Boss Rush • Vague {{wave}} (👑 {{shields}})",
         "bossRushMagnetar": "Boss Rush • Vague {{wave}} ({{moorings}} amarres)",
@@ -158,7 +160,7 @@
         "coreRescueProgress": "💎 {{rescued}}/{{total}}",
         "switchHint": "Cliquer pour changer de mode ou de niveau",
         "switchHintTouch": "Touchez pour changer de mode ou de niveau",
-        "classic": "Puriste - Étape {{stage}}"
+        "classic": "Puriste • Étape {{stage}}"
       },
       "shots": {
         "label": "Tirs restants",
@@ -605,9 +607,9 @@
   "modals": {
     "levelSelect": {
       "title": {
-        "main": "Modes & Sélection du Niveau"
+        "main": "Carte de campagne"
       },
-      "starsTotal": "Étoiles de Campagne : {{stars}} / {{maxStars}} ★",
+      "starsTotal": "Étoiles de campagne : {{stars}} / {{maxStars}} ★",
       "card": {
         "levelNumber": "Niveau {{id}}",
         "locked": "Verrouillé : terminez le niveau {{previous}}",
@@ -638,7 +640,10 @@
         "aria": "{{name}}, niveaux {{first}} à {{last}}, {{stars}} étoiles sur {{maxStars}}",
         "ariaLocked": "{{name}}, niveaux {{first}} à {{last}}, verrouillé",
         "starsCompleted": "{{stars}} / {{maxStars}} ★ ✓",
-        "ariaCompleted": "{{name}}, niveaux {{first}} à {{last}}, terminé avec {{stars}} étoiles sur {{maxStars}}"
+        "ariaCompleted": "{{name}}, niveaux {{first}} à {{last}}, terminé avec {{stars}} étoiles sur {{maxStars}}",
+        "prev": "Chapitre précédent",
+        "next": "Chapitre suivant",
+        "optionLocked": "{{name}} (verrouillé)"
       },
       "chapterLockedHint": "Terminez le niveau {{level}} pour débloquer ce chapitre.",
       "cardLockedHint": "Terminez le niveau {{level}} pour débloquer ce niveau.",
@@ -656,22 +661,39 @@
       },
       "arcade": {
         "sectionTitle": "Modes Arcade",
-        "puzzle": "🎯 Puzzle",
+        "puzzle": "Puzzle",
         "puzzleDesc": "10 défis à 1-2 tirs • Noyaux 💎",
-        "puzzleRecord": "Niveau {{stage}}/{{total}} • Record : {{score}}",
+        "puzzleRecord": "Puzzle {{stage}}/{{total}} • Record : {{score}}",
         "puzzleStage": "Puzzle {{stage}}",
         "puzzleStageLocked": "Terminez le Puzzle {{previous}} pour débloquer.",
-        "blitz": "⏱ Blitz 90s",
+        "blitz": "Blitz 90s",
         "blitzDesc": "Chrono 90 s • Tirs illimités",
-        "bossRush": "👑 Boss Rush",
+        "bossRush": "Boss Rush",
         "bossRushDesc": "Titan central • Surcharge -1 bouclier",
         "bossRushRecord": "Vague {{wave}} • Record : {{score}}",
-        "cascade": "⬇ Cascade",
+        "cascade": "Cascade",
         "cascadeDesc": "Puits haute gravité • Plateformes",
         "lockedDesc": "Terminez le niveau {{level}} pour débloquer",
         "classic": "Puriste",
         "classicDesc": "Règles pures : ni spéciaux, ni améliorations. Les ratés abaissent le plafond.",
         "classicBest": "Record : étape {{stage}}"
+      },
+      "jumpCurrent": "Niveau en cours",
+      "grid": {
+        "aria": "Niveaux de {{chapter}}"
+      },
+      "tile": {
+        "withBadge": "{{name}} ({{badge}})",
+        "mark": {
+          "landmark": "👑",
+          "precision": "◎",
+          "arsenal": "✦",
+          "twist": "↻"
+        }
+      },
+      "detail": {
+        "header": "Niveau {{id}} • {{chapter}}",
+        "empty": "Choisissez un niveau pour voir ses détails."
       }
     },
     "shop": {
@@ -1127,8 +1149,8 @@
         "nextLevel": "Niveau Suivant",
         "nextIncomplete": "Niveau < 3★ suivant",
         "replay": "Rejouer",
-        "levels": "Carte des Niveaux",
-        "backToLevels": "Retour aux niveaux"
+        "levels": "Carte de campagne",
+        "backToLevels": "Carte de campagne"
       },
       "unlock": {
         "single": "Nouveau mode débloqué : {{mode}}. Retrouvez-le dans le menu.",
@@ -1347,6 +1369,56 @@
         "title": "Duels",
         "record": "{{won}} gagnés - {{lost}} perdus",
         "empty": "Aucun duel pour l'instant."
+      }
+    },
+    "play": {
+      "title": "Jouer",
+      "section": {
+        "campaign": "Campagne",
+        "challenges": "Défis",
+        "arcade": "Arcade",
+        "duel": "Duel"
+      },
+      "campaign": {
+        "summary": "{{chapter}} • {{stars}} / {{maxStars}} ★",
+        "progressAria": "Étoiles du chapitre : {{stars}} sur {{maxStars}}",
+        "continue": "Continuer le niveau {{level}}",
+        "map": "Carte de campagne"
+      },
+      "reward": "+{{coins}} ⬡",
+      "rewardAria": "Bonus : {{coins}} pièces à la première partie",
+      "daily": {
+        "desc": "Le même plateau pour tous aujourd'hui, avec une variante.",
+        "done": "Fait aujourd'hui ✓",
+        "doneStreak": "Fait ✓ • série de {{streak}} j"
+      },
+      "weekly": {
+        "desc": "Une nouvelle graine Flux chaque lundi, la même pour tous."
+      },
+      "arcade": {
+        "endlessDesc": "Vagues sans fin. Chaque raté rapproche l'amas.",
+        "fluxDesc": "Formes générées, un bonus à choisir après chacune.",
+        "fluxRecord": "Forme {{stage}} • Record : {{score}}"
+      },
+      "puzzle": {
+        "stagesToggle": "Choisir un puzzle"
+      },
+      "flux": {
+        "seedToggle": "Jouer une graine"
+      },
+      "changeMode": "Changer de mode",
+      "icon": {
+        "campaign": "★",
+        "daily": "📅",
+        "weekly": "📆",
+        "endless": "∞",
+        "classic": "◇",
+        "puzzle": "🎯",
+        "blitz": "⏱",
+        "flux": "🌀",
+        "cascade": "⬇",
+        "bossRush": "👑",
+        "versus": "⚔"
       }
     }
   },

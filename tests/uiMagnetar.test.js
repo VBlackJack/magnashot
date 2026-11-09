@@ -114,7 +114,7 @@ test('in Flux the shots slot is left alone and the banner names the Moorings', (
     assert.equal(getFluxBannerKey(false, viewOf()), 'hud.stats.mode.flux');
     assert.equal(
       i18n.t('hud.stats.mode.fluxBossMagnetar', { stage: 5, shape: 'Ring', moorings: 3 }),
-      'Flux Mode • Shape 5: Ring (Boss, 3 moorings)'
+      'Flux • Shape 5: Ring (Boss, 3 moorings)'
     );
   });
 });

@@ -153,7 +153,7 @@ function makeUi({ access = {}, engine = {}, storage = {}, elements = {} } = {}) 
 }
 
 test('plainModeName drops the leading emoji and keeps the words', () => {
-  assert.equal(plainModeName('🎯 Puzzle'), 'Puzzle');
+  assert.equal(plainModeName('Puzzle'), 'Puzzle');
   assert.equal(plainModeName('⏱ Blitz 90s'), 'Blitz 90s');
   assert.equal(plainModeName('Survival'), 'Survival');
   assert.equal(plainModeName(''), '');
@@ -241,7 +241,7 @@ test('refreshModeLocks locks the menu buttons and the arcade cards with aria-dis
 
     assert.equal(elements.btnEndless.textContent, '🔒 Survival');
     assert.equal(elements.btnWeekly.textContent, '🔒 Weekly Flux', 'Weekly Flux locks together with Flux');
-    assert.equal(elements.btnFlux.textContent, '🔒 Flux Mode');
+    assert.equal(elements.btnFlux.textContent, '🔒 Flux');
     for (const key of ['btnEndless', 'btnFlux', 'btnWeekly']) {
       assert.ok(isAriaDisabled(elements[key]), `${key} is aria-disabled`);
       assert.ok(elements[key].classList.contains('is-locked'));
@@ -262,11 +262,11 @@ test('refreshModeLocks locks the menu buttons and the arcade cards with aria-dis
     ui.refreshModeLocks(open);
     assert.equal(elements.btnEndless.textContent, 'Survival');
     assert.equal(isAriaDisabled(elements.btnEndless), false);
-    assert.equal(elements.btnFlux.textContent, 'Flux Mode New');
-    assert.equal(elements.btnFlux.getAttribute('aria-label'), 'Flux Mode, newly unlocked');
+    assert.equal(elements.btnFlux.textContent, 'Flux New');
+    assert.equal(elements.btnFlux.getAttribute('aria-label'), 'Flux, newly unlocked');
     assert.equal(elements.btnWeekly.textContent, 'Weekly Flux', 'Weekly Flux never carries the New badge');
     assert.equal(elements.btnWeekly.getAttribute('aria-label'), null);
-    assert.equal(cards.puzzle.title.textContent, '🎯 Puzzle');
+    assert.equal(cards.puzzle.title.textContent, 'Puzzle');
     assert.equal(cards.puzzle.desc.textContent, gameConfigDescription('puzzleDesc'));
     assert.equal(elements.arcadeBestPuzzle.classList.contains('hidden'), false);
     assert.equal(elements.puzzleStagesStrip.classList.contains('hidden'), false);
