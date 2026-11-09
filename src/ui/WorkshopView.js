@@ -21,6 +21,12 @@ import { filterFocusTrapCandidates } from './UIHelpers.js';
 
 /** Percent scale of the HUD gauges (star progress, overcharge, tutorial offset, achievements). */
 const FULL_PERCENT = 100;
+
+/** Workshop note shown while a mode neutralises upgrades; Daily is the fallback. */
+const BASELINE_NOTE_KEYS = Object.freeze({
+  [GAME_MODES.CLASSIC]: 'modals.shop.upgrades.classicBaselineNote',
+  [GAME_MODES.PUZZLE]: 'modals.shop.upgrades.puzzleBaselineNote'
+});
 export { FULL_PERCENT };
 
 /** Achievement tiers, lowest first. */
@@ -155,11 +161,7 @@ export function renderWorkshopContents() {
     const baselineNote = document.createElement('p');
     baselineNote.className = 'levels-empty-filter';
     baselineNote.setAttribute('role', 'note');
-    baselineNote.textContent = t(
-      this.engine.mode === GAME_MODES.CLASSIC
-        ? 'modals.shop.upgrades.classicBaselineNote'
-        : 'modals.shop.upgrades.dailyBaselineNote'
-    );
+    baselineNote.textContent = t(BASELINE_NOTE_KEYS[this.engine.mode] || 'modals.shop.upgrades.dailyBaselineNote');
     grid.appendChild(baselineNote);
   }
 

@@ -284,7 +284,7 @@ export const uiHudRefreshMethods = {
         ? this.getWeeklyFluxBestScore(engine.weeklyWeekKey)
         : this.storageManager.getFluxHighScore();
     } else if (engine.mode === GAME_MODES.PUZZLE) {
-      bestScore = this.storageManager.getPuzzleHighScore();
+      bestScore = this.storageManager.getPuzzleStageStats?.()?.[engine.currentPuzzleStage]?.bestScore || 0;
     } else if (engine.mode === GAME_MODES.BLITZ) {
       bestScore = this.storageManager.getBlitzHighScore();
     } else if (engine.mode === GAME_MODES.BOSS_RUSH) {
@@ -312,7 +312,7 @@ export const uiHudRefreshMethods = {
     }
 
     if (this.elements.swapBtn) {
-      const isSwapLocked = engine.mode === GAME_MODES.PUZZLE && engine.shotsRemaining <= 1;
+      const isSwapLocked = engine.mode === GAME_MODES.PUZZLE;
       this.elements.swapBtn.disabled = isSwapLocked;
     }
 
@@ -595,8 +595,10 @@ export const uiHudRefreshMethods = {
     // Classic has no specials at all: no empty-panel message and no overcharge bar either.
     const isPurist = engine.mode === GAME_MODES.CLASSIC;
     this.elements.powerupsEmpty?.classList.toggle('hidden', offersSpecialBalls || isPurist);
-    this.elements.overchargeFill?.closest?.('.overcharge-widget')?.classList.toggle('hidden', isPurist);
-    this.elements.overchargePct?.classList.toggle('hidden', isPurist);
+    // Puzzle runs carry no Overcharge either: the bar would never move.
+    const hidesOvercharge = isPurist || engine.mode === GAME_MODES.PUZZLE;
+    this.elements.overchargeFill?.closest?.('.overcharge-widget')?.classList.toggle('hidden', hidesOvercharge);
+    this.elements.overchargePct?.classList.toggle('hidden', hidesOvercharge);
 
     this.syncShopAmmoAvailability();
     this.updateTiltButton();

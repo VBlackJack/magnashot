@@ -681,9 +681,25 @@ test('Puzzle mode loads deterministic stages, fixed launcher queues, and blocks 
   engine.physicsWorld.clear();
   engine.evaluateRoundEnd();
   assert.equal(engine.state, 'victory');
-  assert.ok(engine.victorySummary.nextStarTarget > engine.score, '1-star Puzzle clear reports nextStarTarget');
-  assert.equal(engine.victorySummary.nextStarNumber, 2);
+  assert.equal(engine.victorySummary.nextStarTarget, null, 'Stage 1 has no score threshold, so no next-star hint');
+  assert.equal(engine.victorySummary.nextStarNumber, null);
   assert.equal(storage.getPuzzleBestStage(), 2, 'Clearing Puzzle stage 1 unlocks stage 2');
+});
+
+test('Puzzle clear on a score-gated stage hints the missing third star while the attempt cap allows it', () => {
+  for (const stage of [3, 7, 9]) {
+    const storage = createTestStorage();
+    const engine = createTestEngine(storage);
+    engine.startPuzzleMode(stage);
+    const target = gameConfig.puzzles[stage - 1].starThresholds.at(-1);
+    engine.shotsRemaining = 0;
+    engine.score = 0;
+    engine.physicsWorld.clear();
+    engine.evaluateRoundEnd();
+    assert.equal(engine.state, 'victory');
+    assert.equal(engine.victorySummary.nextStarTarget, target, `stage ${stage} hints its score threshold`);
+    assert.equal(engine.victorySummary.nextStarNumber, gameConfig.scoring.maxStars);
+  }
 });
 
 test('Blitz 90s mode counts down timer, auto-fires on hesitation, and triggers timeUp game over at zero', () => {

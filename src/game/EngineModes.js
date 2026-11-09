@@ -366,7 +366,28 @@ export const engineModeMethods = {
     const canvasCfg = this.gameConfig.canvas;
     this.updateAim(canvasCfg.launcherX, canvasCfg.launcherY + canvasCfg.initialAimOffsetY);
     this.refreshDiscovery();
+    // The attempt is counted on the first shot (see fire), not here; the intro stays built behind
+    // a discovery card (the UI defers it).
+    this.levelIntro = this.isRestoringRun ? null : this.buildPuzzleIntro(boundedStage, puzzleDef);
     this.notifyUI();
+  },
+
+  /**
+   * Builds the per-stage Puzzle banner data, shown on every start and retry.
+   * @param {number} stage - 1-based stage index.
+   * @param {Object} puzzleDef - Stage definition from game.json.
+   * @returns {{puzzleStage: number, totalStages: number, shots: number, objective: string, isFirstPuzzle: boolean}}
+   */
+  buildPuzzleIntro(stage, puzzleDef) {
+    const stats = this.storageManager.getPuzzleStageStats?.() || {};
+    const isFirstPuzzle = !Object.values(stats).some((entry) => entry.cleared);
+    return {
+      puzzleStage: stage,
+      totalStages: (this.gameConfig.puzzles || []).length,
+      shots: puzzleDef.shots,
+      objective: puzzleDef.objective || OBJECTIVE_TYPES.CLEAR_ALL,
+      isFirstPuzzle
+    };
   },
 
   /**

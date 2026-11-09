@@ -667,10 +667,25 @@ export class UIManager {
     }
     const intro = engine.levelIntro;
     if (!intro || engine.state !== GAME_STATES.PLAYING) {
+      // A Puzzle intro that never got its turn behind a discovery card: the first shot came first,
+      // so the goal is still announced to screen readers before the intro is forgotten.
+      if (!intro && this.deferredPuzzleIntro && engine.state === GAME_STATES.PLAYING && engine.hasFiredInRound) {
+        this.announce(buildLevelIntroText({ ...this.deferredPuzzleIntro, fairPlay: null }, t));
+      }
+      if (!intro) {
+        this.deferredPuzzleIntro = null;
+      }
       banner.classList.add('hidden');
       this.levelIntroShotsAtShow = null;
       return;
     }
+    // A discovery card owns the slot: the Puzzle objective waits for it (deferred, never dropped).
+    if (intro.puzzleStage && engine.activeDiscoveryId) {
+      this.deferredPuzzleIntro = intro;
+      banner.classList.add('hidden');
+      return;
+    }
+    this.deferredPuzzleIntro = null;
     const usesShots = engine.usesShotBudget ? engine.usesShotBudget() : true;
     if (usesShots) {
       if (this.levelIntroShotsAtShow === null || this.levelIntroShotsAtShow === undefined) {
@@ -692,7 +707,9 @@ export class UIManager {
       text,
       schedule: scheduleNextFrame
     });
-    const introKey = intro.levelId ?? `daily:${intro.dailySeed || intro.mutatorKey}`;
+    const introKey =
+      intro.levelId ??
+      (intro.puzzleStage ? `puzzle:${intro.puzzleStage}` : `daily:${intro.dailySeed || intro.mutatorKey}`);
     if (this.announcedLevelIntroId !== introKey) {
       this.announcedLevelIntroId = introKey;
       this.announce(text);
@@ -1171,6 +1188,8 @@ export class UIManager {
       totalPuzzles,
       Math.max(1, this.storageManager?.getPuzzleBestStage?.() || 1)
     );
+    const stageStats = this.storageManager?.getPuzzleStageStats?.() || {};
+    const maxStars = this.gameConfig?.scoring?.maxStars || 0;
     strip.replaceChildren();
     for (let stageNum = 1; stageNum <= totalPuzzles; stageNum++) {
       const isUnlocked = stageNum <= unlockedStage;
@@ -1181,11 +1200,26 @@ export class UIManager {
       btn.className = `puzzle-stage-btn${isCurrent ? ' active' : ''}${isUnlocked ? '' : ' locked'}`;
       btn.dataset.puzzleStage = String(stageNum);
       const label = t('modals.levelSelect.arcade.puzzleStage', { stage: formatNumber(stageNum) });
-      btn.textContent = label;
       if (isCurrent) {
         btn.setAttribute('aria-current', 'true');
       }
       if (isUnlocked) {
+        const stars = stageStats[stageNum]?.stars || 0;
+        const labelEl = document.createElement('span');
+        labelEl.textContent = label;
+        const starsEl = document.createElement('span');
+        starsEl.className = 'puzzle-stage-stars';
+        starsEl.setAttribute('aria-hidden', 'true');
+        starsEl.textContent = this.formatStars(stars, maxStars);
+        btn.append(labelEl, starsEl);
+        btn.setAttribute(
+          'aria-label',
+          t('modals.levelSelect.arcade.puzzleStageAria', {
+            stage: formatNumber(stageNum),
+            stars: formatNumber(stars),
+            maxStars: formatNumber(maxStars)
+          })
+        );
         btn.addEventListener('click', () => {
           this.requestDestructiveAction(
             () => {
@@ -1196,6 +1230,7 @@ export class UIManager {
           );
         });
       } else {
+        btn.textContent = label;
         const requiredStage = Math.max(1, stageNum - 1);
         const lockText = t('modals.levelSelect.arcade.puzzleStageLocked', {
           previous: formatNumber(requiredStage)

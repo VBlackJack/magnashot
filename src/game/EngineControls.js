@@ -51,9 +51,15 @@ export const engineControlsMethods = {
 
   /**
    * True while the Workshop upgrades count for nothing in the current run: Classic always,
-   * the Daily Challenge while it holds a zero baseline.
+   * the Daily Challenge and Puzzle while they hold a zero baseline.
    */
   areUpgradesNeutralised() {
+    if (this.mode === GAME_MODES.PUZZLE) {
+      // Mirrors the Daily check: neutralised while every baseline level is 0 (missing config counts as 0).
+      return Object.keys(this.gameConfig.upgrades || {}).every(
+        (key) => (this.gameConfig.seededFairness?.puzzleUpgradeLevels?.[key] ?? 0) === 0
+      );
+    }
     return this.mode === GAME_MODES.CLASSIC || this.areDailyUpgradesNeutralised();
   },
 
@@ -160,7 +166,7 @@ export const engineControlsMethods = {
       this.physicsWorld.projectile ||
       !this.currentBall ||
       !this.nextBall ||
-      (this.mode === GAME_MODES.PUZZLE && this.shotsRemaining <= 1)
+      this.mode === GAME_MODES.PUZZLE
     ) {
       return;
     }
@@ -280,11 +286,12 @@ export const engineControlsMethods = {
     }
   },
 
-  /** True when the device tilt is ignored: Daily and shared-seed Flux runs share one physics. */
+  /** True when the device tilt is ignored: Daily, Classic, Puzzle and shared-seed Flux share one physics. */
   isTiltLocked() {
     return (
       this.mode === GAME_MODES.DAILY
       || this.mode === GAME_MODES.CLASSIC
+      || this.mode === GAME_MODES.PUZZLE
       || (this.mode === GAME_MODES.FLUX && this.isSharedFluxRun)
     );
   },

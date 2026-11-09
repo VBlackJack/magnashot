@@ -91,8 +91,8 @@ const COMPETITIVE_FLAGS = [
 
 test('isResonanceAllowed matrix: every mode with the setting on and no flag', () => {
   for (const mode of ALL_MODES) {
-    // Daily is competitive and Classic keeps its own ruleset.
-    const expected = mode !== GAME_MODES.DAILY && mode !== GAME_MODES.CLASSIC;
+    // Daily is competitive; Classic and Puzzle keep their own ruleset.
+    const expected = mode !== GAME_MODES.DAILY && mode !== GAME_MODES.CLASSIC && mode !== GAME_MODES.PUZZLE;
     assert.equal(isResonanceAllowed({ mode, setting: true }), expected, mode);
   }
 });

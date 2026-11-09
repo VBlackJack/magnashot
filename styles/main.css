@@ -1520,6 +1520,13 @@ body {
 }
 
 .puzzle-stage-btn {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  min-height: var(--touch-target);
+  min-width: var(--touch-target);
   padding: 4px 10px;
   background: var(--surface-raised);
   color: var(--text-main);
@@ -1530,6 +1537,13 @@ body {
   font-weight: 700;
   cursor: pointer;
   transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.puzzle-stage-stars {
+  color: var(--accent-amber);
+  font-size: 0.6rem;
+  line-height: 1;
+  letter-spacing: 0;
 }
 
 .puzzle-stage-btn:hover:not(:disabled):not(.locked) {
@@ -1544,7 +1558,9 @@ body {
 
 .puzzle-stage-btn:disabled,
 .puzzle-stage-btn.locked {
-  opacity: 0.5;
+  background: var(--surface-sunken);
+  color: var(--text-secondary);
+  border: 1px dashed var(--border-strong);
   cursor: not-allowed;
 }
 
@@ -3491,6 +3507,7 @@ body {
     border: 1px dashed GrayText;
   }
   .nav-btn.is-locked,
+  .puzzle-stage-btn.locked,
   .arcade-mode-card.is-locked,
   .arcade-mode-card.is-locked .arcade-card-desc,
   .level-tile.locked,

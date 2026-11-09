@@ -303,6 +303,7 @@ export const uiPlayHubMethods = {
     const storage = this.storageManager;
     const totalPuzzles = Math.max(1, this.gameConfig?.puzzles?.length || 1);
     const bestPuzzleStage = Math.min(totalPuzzles, Math.max(DEFAULT_STAGE, storage.getPuzzleBestStage?.() || 1));
+    const maxPuzzleStars = this.gameConfig?.scoring?.maxStars || 0;
     setTextIfChanged(
       els.arcadeBestEndless,
       t('modals.levelSelect.card.bestScore', { score: formatNumber(storage.getEndlessHighScore?.() || 0) })
@@ -318,7 +319,8 @@ export const uiPlayHubMethods = {
       t('modals.levelSelect.arcade.puzzleRecord', {
         stage: formatNumber(bestPuzzleStage),
         total: formatNumber(totalPuzzles),
-        score: formatNumber(storage.getPuzzleHighScore?.() || 0)
+        stars: formatNumber(storage.getPuzzleTotalStars?.() || 0),
+        maxStars: formatNumber(totalPuzzles * maxPuzzleStars)
       })
     );
     setTextIfChanged(

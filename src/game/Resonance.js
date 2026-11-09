@@ -115,7 +115,7 @@ export function getResonanceBlock({
   if (mode === GAME_MODES.DAILY || isDailyRematch || isWeeklyFluxRun || isSharedFluxRun || ghostDuel) {
     return RESONANCE_BLOCKS.COMPETITIVE;
   }
-  if (mode === GAME_MODES.CLASSIC || !Object.values(GAME_MODES).includes(mode)) {
+  if (mode === GAME_MODES.CLASSIC || mode === GAME_MODES.PUZZLE || !Object.values(GAME_MODES).includes(mode)) {
     return RESONANCE_BLOCKS.RULESET;
   }
   if (!isVersus && !isUnlocked) {

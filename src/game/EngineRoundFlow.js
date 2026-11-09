@@ -27,6 +27,50 @@ import { t } from '../core/I18n.js';
 import { SeededRandom } from '../core/SeededRandom.js';
 import { getSagSpec, getSagPhase, SAG_PHASES } from './SagMeter.js';
 
+/**
+ * Stars a Puzzle attempt count allows: the fewer attempts before the first clear, the higher
+ * the cap. Thresholds come from game.json puzzleStars.
+ * @param {number} attempts - Attempts started on the stage up to its first clear.
+ * @param {{threeStarMaxAttempts: number, twoStarMaxAttempts: number}} puzzleStars
+ * @param {{minVictoryStars: number, maxStars: number}} scoring
+ * @returns {number}
+ */
+export function attemptStars(attempts, puzzleStars, scoring) {
+  if (attempts <= puzzleStars.threeStarMaxAttempts) {
+    return scoring.maxStars;
+  }
+  if (attempts <= puzzleStars.twoStarMaxAttempts) {
+    return scoring.maxStars - 1;
+  }
+  return scoring.minVictoryStars;
+}
+
+/**
+ * Stars of a Puzzle win: the lower of the attempt cap and the score stars.
+ * @param {{attempts: number, scoreStars: number, puzzleStars: Object, scoring: Object}} input
+ * @returns {number}
+ */
+export function computePuzzleStars({ attempts, scoreStars, puzzleStars, scoring }) {
+  return Math.min(attemptStars(attempts, puzzleStars, scoring), scoreStars);
+}
+
+/**
+ * Next-star hint of a Puzzle win. Only a win whose attempts still allow the top star but whose
+ * score misses the top threshold gets one; it targets that threshold.
+ * @returns {{nextStarTarget: ?number, nextStarNumber: ?number}}
+ */
+export function getPuzzleNextStarHint({ attempts, score, thresholds, puzzleStars, scoring }) {
+  const topThreshold = thresholds[thresholds.length - 1] ?? 0;
+  const capIsTop = attemptStars(attempts, puzzleStars, scoring) >= scoring.maxStars;
+  if (!capIsTop || !(topThreshold > score)) {
+    return { nextStarTarget: null, nextStarNumber: null };
+  }
+  return {
+    nextStarTarget: topThreshold,
+    nextStarNumber: thresholds.filter((th) => th <= topThreshold).length
+  };
+}
+
 /** Methods of GameEngine that belong to this domain, installed on its prototype. */
 export const engineRoundFlowMethods = {
   findClosestBall(sourceBall, candidates) {
@@ -317,14 +361,28 @@ export const engineRoundFlowMethods = {
         this.releaseRemainingBoardAsAvalanche();
         const bonus = this.shotsRemaining * this.gameConfig.scoring.remainingShotBonus;
         this.addScore(bonus);
-        const stars = this.computeStars(this.score);
-        const previousBest = this.storageManager.getPuzzleHighScore?.() || 0;
-        const isNewRecord = previousBest > 0 && this.score > previousBest;
-        const thresholds = this.getStarThresholds();
-        const nextStarTarget = thresholds.find((th) => th > this.score) ?? null;
-        const nextStarNumber = nextStarTarget !== null ? stars + 1 : null;
+        const stage = this.currentPuzzleStage;
+        const previous = this.storageManager.getPuzzleStageStats()[stage] || { bestScore: 0, stars: 0, attempts: 0 };
+        const scoring = this.gameConfig.scoring;
+        // A snapshot saved before attempts were counted on the first shot holds 0: never better than a first try.
+        const attemptsForStars = Math.max(1, previous.attempts);
+        const stars = computePuzzleStars({
+          attempts: attemptsForStars,
+          scoreStars: this.computeStars(this.score),
+          puzzleStars: this.gameConfig.puzzleStars,
+          scoring
+        });
+        const isNewRecord = previous.bestScore > 0 && this.score > previous.bestScore;
+        const { nextStarTarget, nextStarNumber } = getPuzzleNextStarHint({
+          attempts: attemptsForStars,
+          score: this.score,
+          thresholds: this.getStarThresholds(),
+          puzzleStars: this.gameConfig.puzzleStars,
+          scoring
+        });
         const pointsToNextStar = nextStarTarget !== null ? Math.max(1, nextStarTarget - this.score) : 0;
-        const earnedCoins = stars * this.gameConfig.scoring.coinsPerVictoryStar;
+        const { newlyEarnedStars } = this.storageManager.savePuzzleStageResult(stage, this.score, stars);
+        const earnedCoins = newlyEarnedStars * (scoring.coinsPerVictoryStar + scoring.firstTimeStarCoinBonus);
         this.storageManager.addCoins(earnedCoins);
         this.flushPendingRunCoins();
         this.state = GAME_STATES.VICTORY;
@@ -479,7 +537,7 @@ export const engineRoundFlowMethods = {
       previousBestScore = this.storageManager.getClassicHighScore?.() || 0;
     }
     // A Daily rematch persists nothing, so it never sets a record.
-    const isNewRecord = this.mode !== GAME_MODES.CAMPAIGN && !this.isDailyRematch && previousBestScore > 0 && this.score > previousBestScore;
+    const isNewRecord = this.mode !== GAME_MODES.CAMPAIGN && this.mode !== GAME_MODES.PUZZLE && !this.isDailyRematch && previousBestScore > 0 && this.score > previousBestScore;
     const remainingSpheres = this.physicsWorld.balls.length;
     this.gameOverSummary = {
       reasonKey,

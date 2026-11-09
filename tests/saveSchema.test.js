@@ -432,13 +432,13 @@ const migrateVolume = (storedVolume, extra = {}) => {
   return storage;
 };
 
-test('v6: the schema reaches 6 on a fresh profile and the stored version is written', () => {
-  assert.equal(CURRENT_SAVE_SCHEMA_VERSION, 6);
+test('v7: a fresh profile starts at the current schema version and the stored version is written', () => {
+  assert.equal(CURRENT_SAVE_SCHEMA_VERSION, 7);
   const storage = createFakeStorage();
   withStorage(storage, () => {
     initManager();
   });
-  assert.equal(storage.getItem(VERSION_KEY), '6');
+  assert.equal(storage.getItem(VERSION_KEY), '7');
   assert.equal(storage.getItem(VOLUME_KEY), null, 'a fresh profile gets no volume key written');
 });
 
@@ -447,7 +447,7 @@ test('v6: an off-step music volume snaps to the nearest step, ties going up', ()
   for (const [stored, expected] of cases) {
     const storage = migrateVolume(stored);
     assert.equal(storage.getItem(VOLUME_KEY), expected, `${stored} snaps to ${expected}`);
-    assert.equal(storage.getItem(VERSION_KEY), '6');
+    assert.equal(storage.getItem(VERSION_KEY), '7');
   }
 });
 
@@ -488,4 +488,119 @@ test('v6: a failing write leaves the version at 5 so the next launch retries', (
   });
   assert.equal(storage.getItem(VERSION_KEY), '5');
   assert.equal(storage.getItem(VOLUME_KEY), '0.25');
+});
+
+const BEST_STAGE_KEY = `${prefix}${keys.puzzleBestStage}`;
+const STAGE_STATS_KEY = `${prefix}${keys.puzzleStageStats}`;
+const MIN_VICTORY_STARS = gameConfig.scoring.minVictoryStars;
+const SEEDED_ATTEMPTS = gameConfig.puzzleStars.twoStarMaxAttempts + 1;
+const SEEDED_ENTRY = { bestScore: 0, stars: MIN_VICTORY_STARS, attempts: SEEDED_ATTEMPTS, cleared: true };
+
+const migratePuzzle = (bestStage, existingStats = null, fromVersion = '6') => {
+  const storage = createFakeStorage();
+  storage.setItem(VERSION_KEY, fromVersion);
+  if (bestStage !== null) {
+    storage.setItem(BEST_STAGE_KEY, String(bestStage));
+  }
+  if (existingStats !== null) {
+    storage.setItem(STAGE_STATS_KEY, JSON.stringify(existingStats));
+  }
+  withStorage(storage, () => {
+    initManager();
+  });
+  return storage;
+};
+
+const readStageStats = (storage) => JSON.parse(storage.getItem(STAGE_STATS_KEY));
+
+test('v7: the schema is 7 and every stage below the best stage is seeded as cleared', () => {
+  assert.equal(CURRENT_SAVE_SCHEMA_VERSION, 7);
+  const storage = migratePuzzle(4);
+  assert.equal(storage.getItem(VERSION_KEY), '7');
+  assert.deepEqual(readStageStats(storage), { 1: SEEDED_ENTRY, 2: SEEDED_ENTRY, 3: SEEDED_ENTRY });
+  assert.equal(storage.getItem(BEST_STAGE_KEY), '4', 'the best stage is never touched');
+});
+
+test('v7: a fresh profile and a best stage of 1 seed nothing', () => {
+  const fresh = migratePuzzle(null);
+  assert.equal(fresh.getItem(STAGE_STATS_KEY), null);
+  assert.equal(fresh.getItem(VERSION_KEY), '7');
+  const first = migratePuzzle(1);
+  assert.equal(first.getItem(STAGE_STATS_KEY), null);
+});
+
+test('v7: an unreadable best stage seeds nothing', () => {
+  const storage = migratePuzzle('high');
+  assert.equal(storage.getItem(STAGE_STATS_KEY), null);
+  assert.equal(storage.getItem(VERSION_KEY), '7');
+});
+
+test('v7: existing entries are never overwritten and missing ones are filled', () => {
+  const existing = { 2: { bestScore: 900, stars: 3, attempts: 1, cleared: true } };
+  const storage = migratePuzzle(4, existing);
+  const stats = readStageStats(storage);
+  assert.deepEqual(stats[2], existing[2]);
+  assert.deepEqual(stats[1], SEEDED_ENTRY);
+  assert.deepEqual(stats[3], SEEDED_ENTRY);
+  assert.equal(stats[4], undefined, 'the best stage itself is not cleared yet');
+});
+
+test('v7: the migration is idempotent and a complete table is not written again', () => {
+  const storage = migratePuzzle(5);
+  const first = [...storage.data.entries()].sort().join('|');
+  withStorage(storage, () => {
+    assert.equal(initManager().seedPuzzleStageStats(), true);
+  });
+  assert.equal([...storage.data.entries()].sort().join('|'), first);
+  const writesBefore = storage.writes.length;
+  withStorage(storage, () => {
+    assert.equal(initManager().seedPuzzleStageStats(), true);
+  });
+  assert.equal(storage.writes.length, writesBefore, 'a complete table is not written again');
+});
+
+test('v7: a seeded stage reads as one star and a closed attempt count', () => {
+  const storage = migratePuzzle(3);
+  withStorage(storage, () => {
+    const manager = initManager();
+    assert.equal(manager.getPuzzleTotalStars(), 2 * MIN_VICTORY_STARS);
+    assert.equal(manager.recordPuzzleAttempt(1).attempts, SEEDED_ATTEMPTS, 'cleared stages stay frozen');
+  });
+});
+
+test('v7: a missing attempts threshold seeds a closed count (fail closed)', () => {
+  const storage = createFakeStorage();
+  storage.data.set(VERSION_KEY, '6');
+  storage.data.set(BEST_STAGE_KEY, '3');
+  withStorage(storage, () => {
+    const manager = initManager();
+    manager.puzzleStarsConfig = {};
+    storage.data.delete(STAGE_STATS_KEY);
+    assert.equal(manager.seedPuzzleStageStats(), true);
+  });
+  const stats = readStageStats(storage);
+  assert.equal(stats[1].attempts, Number.MAX_SAFE_INTEGER);
+  assert.equal(stats[2].attempts, Number.MAX_SAFE_INTEGER);
+});
+
+test('v7: a failing write leaves the version at 6 so the next launch retries', () => {
+  const storage = createFakeStorage({ failWrite: (key) => key === STAGE_STATS_KEY });
+  storage.data.set(VERSION_KEY, '6');
+  storage.data.set(BEST_STAGE_KEY, '4');
+  withStorage(storage, () => {
+    initManager();
+  });
+  assert.equal(storage.getItem(VERSION_KEY), '6');
+  assert.equal(storage.getItem(STAGE_STATS_KEY), null);
+});
+
+test('v7: an unavailable storage reports failure without throwing', () => {
+  const storage = createFakeStorage({ throwing: true });
+  withStorage(storage, () => {
+    const manager = new StorageManager();
+    manager.storageConfig = gameConfig.storage;
+    manager.scoringConfig = gameConfig.scoring;
+    manager.puzzleStarsConfig = gameConfig.puzzleStars;
+    assert.equal(manager.seedPuzzleStageStats(), false);
+  });
 });

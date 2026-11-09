@@ -1278,8 +1278,8 @@ test('Graphical audit guards: collector labels, floating-text clamping, Antimagn
   assert.match(rendererCode, /if \(cfg\.outerColor\)/, 'drawObstacles renders outerColor and ringColor on Antimagnet');
   assert.match(
     uiManagerCode,
-    /const isSwapLocked = engine\.mode === GAME_MODES\.PUZZLE && engine\.shotsRemaining <= 1;\s*this\.elements\.swapBtn\.disabled = isSwapLocked;/,
-    'UIManager disables #btn-swap-ball when only 1 shot remains in Puzzle mode'
+    /const isSwapLocked = engine\.mode === GAME_MODES\.PUZZLE;\s*this\.elements\.swapBtn\.disabled = isSwapLocked;/,
+    'UIManager disables #btn-swap-ball for the whole Puzzle run'
   );
   assert.match(
     uiManagerCode,
