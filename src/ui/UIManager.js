@@ -170,6 +170,9 @@ export class UIManager {
       btnTilt: document.getElementById('btn-tilt'),
       btnMotion: document.getElementById('btn-motion'),
       btnAnimSpeed: document.getElementById('btn-anim-speed'),
+      btnMusic: document.getElementById('btn-music'),
+      btnMusicVolume: document.getElementById('btn-music-volume'),
+      btnResonance: document.getElementById('btn-resonance'),
       btnFullscreen: document.getElementById('btn-fullscreen'),
       btnFullscreenHud: document.getElementById('btn-fullscreen-hud'),
       btnResetHints: document.getElementById('btn-reset-hints'),
@@ -504,6 +507,7 @@ export class UIManager {
     this.setupTiltControl();
     this.updateMotionButton();
     this.updateAnimSpeedButton();
+    this.setupPulseControls();
     this.setupGamepadControls();
     this.setupFullscreenControl();
     this.updateLanguageButton();
@@ -519,6 +523,9 @@ export class UIManager {
       this.updateTiltButton();
       this.updateMotionButton();
       this.updateAnimSpeedButton();
+      this.updateMusicButton();
+      this.updateMusicVolumeButton();
+      this.updateResonanceButton();
       this.updateGamepadControls();
       this.updateFullscreenButton();
       this.updateLanguageButton();

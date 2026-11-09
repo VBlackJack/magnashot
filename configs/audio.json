@@ -135,6 +135,7 @@
     "defaultVolume": 0.6,
     "volumeSteps": [0, 0.25, 0.5, 0.75, 1],
     "gain": 0.5,
+    "endFadeSec": 0.4,
     "stepsPerBar": 16,
     "stepsPerBeat": 4,
     "progressionBars": 4,

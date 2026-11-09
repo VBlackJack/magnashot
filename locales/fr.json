@@ -69,7 +69,20 @@
         "resetHintsDoneCaption": "Réinitialisés ✓",
         "weekly": "Flux de la Semaine",
         "weeklyBonusBadge": "Flux de la Semaine +{{coins}} ⬡",
-        "weeklyBestBadge": "Flux de la Semaine ✓ {{score}}"
+        "weeklyBestBadge": "Flux de la Semaine ✓ {{score}}",
+        "musicOn": "🎵",
+        "musicOff": "🔕",
+        "musicOnAria": "Musique : activée",
+        "musicOffAria": "Musique : désactivée",
+        "musicAria": "Musique",
+        "musicVolume": "{{volume}} %",
+        "musicVolumeAria": "Volume de la musique : {{volume}} %",
+        "musicVolumeCaption": "Musique : {{volume}} %",
+        "resonanceOn": "◎",
+        "resonanceOff": "○",
+        "resonanceOnAria": "Résonance : activée",
+        "resonanceOffAria": "Résonance : désactivée",
+        "resonanceAria": "Résonance (tirer sur le rythme)"
       },
       "groups": {
         "modes": "Modes de jeu",
@@ -94,6 +107,16 @@
       },
       "stats": {
         "round": "Partie en cours"
+      }
+    },
+    "settings": {
+      "calibrate": {
+        "title": "Calibrer le rythme",
+        "intro": "Tapez en rythme avec l'anneau de pulsation {{count}} fois. Le décalage ne change que la façon dont votre timing est jugé.",
+        "tap": "Taper sur le temps",
+        "result": "Décalage : {{offset}} ms",
+        "reset": "Réinitialiser",
+        "done": "Terminé"
       }
     }
   },
@@ -421,7 +444,8 @@
         "immune": "INDESTRUCTIBLE : COUPEZ SES AMARRES",
         "moorings": "AMARRE COUPÉE ! RESTE : {{left}}",
         "down": "MAGNETAR TERRASSÉ ! +{{points}}"
-      }
+      },
+      "resonance": "Résonance !"
     },
     "mutators": {
       "hyperGravity": "Hyper-Gravité",
@@ -567,6 +591,9 @@
         "regrow": "Remplissez les emplacements marqués pour le bloquer.",
         "barrage": "Tirez les charges avec la polarité opposée."
       }
+    },
+    "resonance": {
+      "disabledCompetitive": "La résonance est désactivée dans les modes compétitifs"
     }
   },
   "modals": {
@@ -1683,6 +1710,9 @@
     "share": {
       "won": "MagnaShot Duel de polarité : victoire contre l'ordinateur {{tier}} {{score}}, {{neutralised}} charges neutralisées, {{pulses}} impulsions",
       "lost": "MagnaShot Duel de polarité : défaite contre l'ordinateur {{tier}} {{score}}, {{neutralised}} charges neutralisées, {{pulses}} impulsions"
+    },
+    "setup": {
+      "resonance": "Résonance"
     }
   },
   "toast": {
