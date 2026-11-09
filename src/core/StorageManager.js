@@ -1477,7 +1477,10 @@ export class StorageManager {
       const statsKey = this.buildKey(keys.puzzleStageStats);
       const stats = StorageManager.parsePuzzleStageStats(localStorage.getItem(statsKey));
       const seededStars = this.scoringConfig.minVictoryStars ?? 1;
-      const seededAttempts = (this.puzzleStarsConfig.twoStarMaxAttempts ?? 0) + 1;
+      // Fail closed: without the threshold, a seeded stage never reads as a fast clear.
+      const seededAttempts = Number.isFinite(this.puzzleStarsConfig.twoStarMaxAttempts)
+        ? this.puzzleStarsConfig.twoStarMaxAttempts + 1
+        : Number.MAX_SAFE_INTEGER;
       let isChanged = false;
       for (let stage = 1; stage < bestStage; stage += 1) {
         if (!stats[String(stage)]) {

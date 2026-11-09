@@ -432,7 +432,7 @@ const migrateVolume = (storedVolume, extra = {}) => {
   return storage;
 };
 
-test('v6: the schema reaches 7 on a fresh profile and the stored version is written', () => {
+test('v7: a fresh profile starts at the current schema version and the stored version is written', () => {
   assert.equal(CURRENT_SAVE_SCHEMA_VERSION, 7);
   const storage = createFakeStorage();
   withStorage(storage, () => {
@@ -566,6 +566,21 @@ test('v7: a seeded stage reads as one star and a closed attempt count', () => {
     assert.equal(manager.getPuzzleTotalStars(), 2 * MIN_VICTORY_STARS);
     assert.equal(manager.recordPuzzleAttempt(1).attempts, SEEDED_ATTEMPTS, 'cleared stages stay frozen');
   });
+});
+
+test('v7: a missing attempts threshold seeds a closed count (fail closed)', () => {
+  const storage = createFakeStorage();
+  storage.data.set(VERSION_KEY, '6');
+  storage.data.set(BEST_STAGE_KEY, '3');
+  withStorage(storage, () => {
+    const manager = initManager();
+    manager.puzzleStarsConfig = {};
+    storage.data.delete(STAGE_STATS_KEY);
+    assert.equal(manager.seedPuzzleStageStats(), true);
+  });
+  const stats = readStageStats(storage);
+  assert.equal(stats[1].attempts, Number.MAX_SAFE_INTEGER);
+  assert.equal(stats[2].attempts, Number.MAX_SAFE_INTEGER);
 });
 
 test('v7: a failing write leaves the version at 6 so the next launch retries', () => {

@@ -364,15 +364,17 @@ export const engineRoundFlowMethods = {
         const stage = this.currentPuzzleStage;
         const previous = this.storageManager.getPuzzleStageStats()[stage] || { bestScore: 0, stars: 0, attempts: 0 };
         const scoring = this.gameConfig.scoring;
+        // A snapshot saved before attempts were counted on the first shot holds 0: never better than a first try.
+        const attemptsForStars = Math.max(1, previous.attempts);
         const stars = computePuzzleStars({
-          attempts: previous.attempts,
+          attempts: attemptsForStars,
           scoreStars: this.computeStars(this.score),
           puzzleStars: this.gameConfig.puzzleStars,
           scoring
         });
         const isNewRecord = previous.bestScore > 0 && this.score > previous.bestScore;
         const { nextStarTarget, nextStarNumber } = getPuzzleNextStarHint({
-          attempts: previous.attempts,
+          attempts: attemptsForStars,
           score: this.score,
           thresholds: this.getStarThresholds(),
           puzzleStars: this.gameConfig.puzzleStars,
