@@ -123,6 +123,7 @@
         "daily": "Daily Challenge ({{mutator}}) • Wave {{wave}}",
         "flux": "Flux Mode • Shape {{stage}}: {{shape}}",
         "fluxBoss": "Flux Mode • Shape {{stage}}: {{shape}} (Boss)",
+        "fluxBossMagnetar": "Flux Mode • Shape {{stage}}: {{shape}} (Boss, {{moorings}} moorings)",
         "puzzle": "Puzzle Mode • Stage {{stage}} / {{total}}",
         "blitz": "Blitz 90s • Wave {{wave}}",
         "bossRush": "Boss Rush • Wave {{wave}} (👑 {{shields}})",

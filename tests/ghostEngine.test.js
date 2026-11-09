@@ -132,7 +132,7 @@ const makeGhost = (mode, key, alias = 'Sam', scores = [0, GHOST_FINAL]) => {
     seed: fluxConfig.seed,
     maxPoints: gameConfig.shotTimeline.maxPoints
   };
-  const ghost = ghostFromTimeline(tl, { key, cv: DUEL_CFG.contentVersion, alias }, DUEL_CFG, ctx);
+  const ghost = ghostFromTimeline(tl, { key, cv: DUEL_CFG.contentVersion[mode], alias }, DUEL_CFG, ctx);
   assert.ok(ghost, 'the test ghost must be encodable');
   return ghost;
 };

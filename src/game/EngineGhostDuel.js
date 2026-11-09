@@ -17,7 +17,7 @@
 import { GAME_MODES } from '../core/Constants.js';
 import { t } from '../core/I18n.js';
 import { SeededRandom } from '../core/SeededRandom.js';
-import { decodeGhost, encodeGhost, ghostFromTimeline, DUEL_STATUS } from './GhostCodec.js';
+import { contentVersionFor, decodeGhost, encodeGhost, ghostFromTimeline, DUEL_STATUS } from './GhostCodec.js';
 import {
   compareToGhost,
   createDuelAnnouncementState,
@@ -246,7 +246,7 @@ export const engineGhostDuelMethods = {
       this.shotTimeline,
       {
         key: isDaily ? this.dailySeedKey : this.fluxSeed,
-        cv: cfg.contentVersion,
+        cv: contentVersionFor(cfg, isDaily ? GHOST_MODE_DAILY : GHOST_MODE_FLUX),
         alias: this.storageManager.getGhostAlias?.() || '',
         assists: {
           workshop: this.getRunWorkshopLevels(),

@@ -38,7 +38,7 @@ const fluxConfig = JSON.parse(readFileSync(new URL('../configs/flux.json', impor
 const cfg = {
   queryParam: 'duel',
   codecVersion: 1,
-  contentVersion: 1,
+  contentVersion: { daily: 1, flux: 2 },
   maxUrlLength: 1500,
   maxPayloadChars: 1200,
   maxSamples: 20000,

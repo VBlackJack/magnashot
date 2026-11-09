@@ -23,12 +23,13 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
-import { CLUSTER_MODIFIERS } from '../src/core/Constants.js';
+import { CLUSTER_MODIFIERS, GAME_MODES } from '../src/core/Constants.js';
 import { i18n } from '../src/core/I18n.js';
 import { isProjectileNearMechanic, listBoardMechanics, resolveHintText } from '../src/game/Discovery.js';
 import { MAGNETAR_BEHAVIOURS, MAGNETAR_PHASES } from '../src/game/MagnetarRules.js';
 import { buildCodexPane } from '../src/ui/CodexView.js';
 import { UIManager } from '../src/ui/UIManager.js';
+import { getFluxBannerKey } from '../src/ui/UIHudRefresh.js';
 
 const readText = (path) => readFileSync(new URL(path, import.meta.url), 'utf8');
 const gameConfig = JSON.parse(readText('../configs/game.json'));
@@ -80,6 +81,7 @@ function withLocale(locale, dictionary, run) {
 
 const withEnglish = (run) => withLocale('en', en, run);
 const calmEngine = { getSagState: () => ({ active: false }) };
+const bossRushEngine = { mode: GAME_MODES.BOSS_RUSH, getSagState: () => ({ active: false }) };
 const viewOf = (overrides = {}) => ({
   moorings: 4,
   phase: MAGNETAR_PHASES.REST,
@@ -87,15 +89,33 @@ const viewOf = (overrides = {}) => ({
   ...overrides
 });
 
-test('the shots slot shows the Moorings, and the last one warns', () => {
+test('in Boss Rush the shots slot shows the Moorings, and the last one warns', () => {
   withEnglish(() => {
     const ui = makeUi();
-    ui.refreshMagnetarHud(calmEngine, viewOf({ moorings: 4 }));
+    ui.refreshMagnetarHud(bossRushEngine, viewOf({ moorings: 4 }));
     assert.equal(ui.elements.shotsLabel.textContent, 'Moorings');
     assert.equal(ui.elements.shotsValue.textContent, '4');
     assert.equal(ui.elements.shotsValue.classList.contains('warning'), false);
-    ui.refreshMagnetarHud(calmEngine, viewOf({ moorings: 1 }));
+    ui.refreshMagnetarHud(bossRushEngine, viewOf({ moorings: 1 }));
     assert.equal(ui.elements.shotsValue.classList.contains('warning'), true);
+  });
+});
+
+test('in Flux the shots slot is left alone and the banner names the Moorings', () => {
+  withEnglish(() => {
+    const ui = makeUi();
+    ui.elements.shotsLabel.textContent = 'Shots';
+    ui.elements.shotsValue.textContent = '12';
+    ui.refreshMagnetarHud({ mode: GAME_MODES.FLUX, getSagState: () => ({ active: false }) }, viewOf({ moorings: 3 }));
+    assert.equal(ui.elements.shotsLabel.textContent, 'Shots');
+    assert.equal(ui.elements.shotsValue.textContent, '12');
+    assert.equal(getFluxBannerKey(true, viewOf()), 'hud.stats.mode.fluxBossMagnetar');
+    assert.equal(getFluxBannerKey(true, null), 'hud.stats.mode.fluxBoss');
+    assert.equal(getFluxBannerKey(false, viewOf()), 'hud.stats.mode.flux');
+    assert.equal(
+      i18n.t('hud.stats.mode.fluxBossMagnetar', { stage: 5, shape: 'Ring', moorings: 3 }),
+      'Flux Mode • Shape 5: Ring (Boss, 3 moorings)'
+    );
   });
 });
 
@@ -154,11 +174,11 @@ test('the announcement is read from one refresh only', () => {
 });
 
 test('the chip is hidden, aria-hidden and sits in the badges row, so no column is added', () => {
-  const chip = html.match(/<span id="magnetarTelegraph"[^>]*>/)?.[0] ?? '';
+  const chip = html.match(/<span id="hud-magnetar-telegraph"[^>]*>/)?.[0] ?? '';
   assert.match(chip, /class="[^"]*\bhidden\b/);
   assert.match(chip, /aria-hidden="true"/);
   const row = html.match(/<div class="hud-badges-row">[\s\S]*?<\/div>/)?.[0] ?? '';
-  assert.ok(row.includes('id="magnetarTelegraph"'));
+  assert.ok(row.includes('id="hud-magnetar-telegraph"'));
 });
 
 test('the chip style does not rely on colour: dashed border, forced colours border, no animation', () => {
@@ -171,6 +191,7 @@ test('the chip style does not rely on colour: dashed border, forced colours bord
 test('the Boss Rush banner and the shots label exist in both languages', () => {
   for (const dictionary of [en, fr]) {
     assert.match(dictionary.hud.stats.mode.bossRushMagnetar, /\{\{wave\}\}.*\{\{moorings\}\}/);
+    assert.match(dictionary.hud.stats.mode.fluxBossMagnetar, /\{\{shape\}\}.*\{\{moorings\}\}/);
     assert.ok(dictionary.hud.stats.shots.mooringsLabel);
     assert.match(dictionary.hud.magnetar.next, /\{\{behaviour\}\}/);
     for (const kind of ['armed', 'lastMooring', 'down']) {

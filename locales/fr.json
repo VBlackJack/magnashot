@@ -123,6 +123,7 @@
         "daily": "Défi du Jour ({{mutator}}) • Vague {{wave}}",
         "flux": "Mode Flux • Forme {{stage}} : {{shape}}",
         "fluxBoss": "Mode Flux • Forme {{stage}} : {{shape}} (Boss)",
+        "fluxBossMagnetar": "Mode Flux • Forme {{stage}} : {{shape}} (Boss, {{moorings}} amarres)",
         "puzzle": "Mode Puzzle • Niveau {{stage}} / {{total}}",
         "blitz": "Blitz 90s • Vague {{wave}}",
         "bossRush": "Boss Rush • Vague {{wave}} (👑 {{shields}})",

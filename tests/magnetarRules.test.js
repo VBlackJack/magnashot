@@ -184,6 +184,27 @@ test('Moorings never increase when bonds are removed', () => {
   assert.equal(previous, 0);
 });
 
+test('an anchor behind another anchor is not a Mooring, one behind a plain sphere is', () => {
+  const m = ball(1, 0, 0);
+  const front = ball(2, 1, 0, true);
+  const behindAnchor = ball(3, 2, 0, true);
+  const plain = ball(4, 0, 1);
+  const behindPlain = ball(5, 0, 2, true);
+  bond(m, front);
+  bond(front, behindAnchor);
+  bond(m, plain);
+  bond(plain, behindPlain);
+  const { balls, ballMap } = world([m, front, behindAnchor, plain, behindPlain]);
+  assert.deepEqual(findMoorings(balls, ballMap, 1), [2, 5]);
+  // Once the front anchor snaps, the one behind it becomes reachable and counts.
+  const after = world([m, behindAnchor, plain, behindPlain]);
+  front.bonds.clear();
+  m.bonds.delete(2);
+  behindAnchor.bonds.delete(2);
+  bond(m, behindAnchor);
+  assert.deepEqual(findMoorings(after.balls, after.ballMap, 1), [3, 5]);
+});
+
 test('a ball removed from the live list no longer counts as a Mooring', () => {
   const m = ball(1, 0, 0);
   const a = ball(2, 1, 0, true);

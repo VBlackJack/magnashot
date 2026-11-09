@@ -172,7 +172,8 @@ export function advanceSchedule(state, cfg, key) {
 }
 
 /**
- * Anchors still holding the Magnetar up: every anchor in its bond component, lowest id first.
+ * Anchors still holding the Magnetar up: every anchor reachable through bonds without passing
+ * through another anchor, lowest id first.
  * @param {Array<object>} balls - Live balls.
  * @param {Map<number, object>} ballMap - Ball id -> ball.
  * @param {number} magnetarId - Id of the Magnetar ball.
@@ -196,10 +197,12 @@ export function findMoorings(balls, ballMap, magnetarId) {
         continue;
       }
       seen.add(neighbourId);
-      queue.push(neighbourId);
       if (ballMap.get(neighbourId)?.isAnchor) {
+        // An anchor is a Mooring only when reached without crossing another anchor.
         anchors.push(neighbourId);
+        continue;
       }
+      queue.push(neighbourId);
     }
   }
   return anchors.sort((a, b) => a - b);
