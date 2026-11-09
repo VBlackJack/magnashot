@@ -415,6 +415,131 @@ test('a dialog without tabs ignores the bumpers', () => {
   });
 });
 
+/** A campaign map root: a roving tile grid, a chapter select and the previous and next buttons. */
+function makeMapRoot({ log, nextDisabled = false } = {}) {
+  const tiles = [makeItem('tile1', 0, 0, { log }), makeItem('tile2', 50, 0, { log })];
+  tiles[0].attrs.tabindex = '0';
+  const grid = {
+    contains: (el) => tiles.includes(el),
+    querySelector: (selector) => (selector.includes('tabindex') ? tiles[0] : tiles[0])
+  };
+  const prev = makeItem('prev', 0, 100, { log });
+  const next = makeItem('next', 100, 100, { log });
+  if (nextDisabled) {
+    next.attrs['aria-disabled'] = 'true';
+  }
+  const select = makeItem('select', 50, 100, { log });
+  const detailPlay = makeItem('play', 0, 200, { log });
+  const items = [tiles[0], prev, select, next, detailPlay];
+  const root = makeRoot(items);
+  root.querySelector = (selector) => {
+    if (selector === '[data-pad-tab-prev]') {
+      return prev;
+    }
+    return selector === '[data-pad-tab-next]' ? next : null;
+  };
+  return { root, grid, tiles, prev, next, select, detailPlay };
+}
+
+test('while a tile has the focus, a direction moves the tile selection and the focus follows', () => {
+  withDocument((doc) => {
+    const { ui, log } = makeUi();
+    const map = makeMapRoot({ log });
+    ui.elements.levelsGrid = map.grid;
+    ui.topModal = map.root;
+    const calls = [];
+    ui.moveLevelTileFocus = (dx, dy, options) => {
+      calls.push([dx, dy, options]);
+      return map.tiles[1];
+    };
+    doc.activeElement = map.tiles[0];
+    ui.padLastMove = { from: map.prev, to: map.tiles[0], action: A.NAV_UP };
+    ui.routeGamepadMenuActions([A.NAV_RIGHT]);
+    assert.deepEqual(calls, [[1, 0, { wrapRows: false }]]);
+    assert.equal(doc.activeElement, map.tiles[1], 'the new tile has the focus though it is not a focus candidate');
+    assert.equal(map.tiles[1].classList.contains(PAD_FOCUS_CLASS), true);
+    assert.equal(ui.padLastMove, null, 'the undo memory is reset after a tile move');
+  });
+});
+
+test('at the edge of the tile grid the press falls back to spatial navigation', () => {
+  withDocument((doc) => {
+    const { ui, log } = makeUi();
+    const map = makeMapRoot({ log });
+    ui.elements.levelsGrid = map.grid;
+    ui.topModal = map.root;
+    ui.moveLevelTileFocus = () => null;
+    doc.activeElement = map.tiles[0];
+    ui.routeGamepadMenuActions([A.NAV_DOWN]);
+    assert.notEqual(doc.activeElement, map.tiles[0], 'the focus left the grid');
+    assert.ok(map.root.contains(doc.activeElement), 'and went to another control of the dialog');
+  });
+});
+
+test('outside the tile grid the tile hook is not consulted', () => {
+  withDocument((doc) => {
+    const { ui, log } = makeUi();
+    const map = makeMapRoot({ log });
+    ui.elements.levelsGrid = map.grid;
+    ui.topModal = map.root;
+    ui.moveLevelTileFocus = () => {
+      throw new Error('must not be called');
+    };
+    doc.activeElement = map.prev;
+    ui.routeGamepadMenuActions([A.NAV_RIGHT]);
+    assert.notEqual(doc.activeElement, map.prev);
+  });
+});
+
+test('without a tab list, the bumpers click the data-pad-tab buttons and focus follows the trigger', () => {
+  withDocument((doc) => {
+    const { ui, log } = makeUi();
+    const map = makeMapRoot({ log });
+    ui.elements.levelsGrid = map.grid;
+    ui.topModal = map.root;
+    doc.activeElement = map.tiles[0];
+    ui.routeGamepadMenuActions([A.TAB_NEXT]);
+    assert.deepEqual(log.filter((e) => e.startsWith('click')), ['click:next']);
+    assert.equal(doc.activeElement, map.tiles[0], 'from a tile, focus lands on the selected tile of the new chapter');
+    log.length = 0;
+    doc.activeElement = map.select;
+    ui.routeGamepadMenuActions([A.TAB_PREV]);
+    assert.deepEqual(log.filter((e) => e.startsWith('click')), ['click:prev']);
+    assert.equal(doc.activeElement, map.select, 'from the chapter controls, focus stays where it was');
+  });
+});
+
+test('the bumper fallback skips a disabled button', () => {
+  withDocument((doc) => {
+    const { ui, log } = makeUi();
+    const map = makeMapRoot({ log, nextDisabled: true });
+    ui.elements.levelsGrid = map.grid;
+    ui.topModal = map.root;
+    doc.activeElement = map.tiles[0];
+    ui.routeGamepadMenuActions([A.TAB_NEXT]);
+    assert.deepEqual(log, [], 'an aria-disabled next button is not clicked');
+  });
+});
+
+test('a select steps over disabled options in both directions and stops when none is left', () => {
+  const { ui } = makeUi();
+  const events = [];
+  const select = {
+    options: [{}, { disabled: true }, { disabled: true }, {}, { disabled: true }],
+    selectedIndex: 0,
+    dispatchEvent: (e) => events.push(e.type)
+  };
+  ui.stepSelect(select, 1);
+  assert.equal(select.selectedIndex, 3, 'locked options are jumped over');
+  ui.stepSelect(select, 1);
+  assert.equal(select.selectedIndex, 3, 'only disabled options ahead: nothing changes');
+  ui.stepSelect(select, -1);
+  assert.equal(select.selectedIndex, 0);
+  ui.stepSelect(select, -1);
+  assert.equal(select.selectedIndex, 0);
+  assert.deepEqual(events, ['change', 'change']);
+});
+
 test('Start resumes from the Pause dialog, is ignored over other dialogs, and Select closes the menu', () => {
   const pauseUi = makeUi({ engine: makeEngine({ state: GAME_STATES.PAUSED }) });
   pauseUi.ui.topModal = pauseUi.ui.elements.modalPause;

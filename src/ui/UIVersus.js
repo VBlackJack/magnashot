@@ -123,6 +123,8 @@ export const uiVersusMethods = {
   bindVersusEvents() {
     const els = this.elements;
     els.btnModeVersus?.addEventListener('click', () => {
+      // The Duel card is the opener: a stale hub two-player opener must not redirect the return.
+      this.versusTierOpener = null;
       this.openVersusTierPicker();
     });
     els.btnVersusTiersBack?.addEventListener('click', () => {
@@ -194,10 +196,15 @@ export const uiVersusMethods = {
     return box ? Boolean(box.checked) : undefined;
   },
 
-  /** Closes the picker; focus goes back to the card that opened it. */
+  /**
+   * Closes the picker; focus goes back to what opened it: the hub's two-player button when it
+   * was opened from there (versusTierOpener), else the Duel card.
+   */
   closeVersusTierPicker() {
     this.elements.versusTierHint?.classList.add(HIDDEN_CLASS);
-    this.stackedModalOpener = this.elements.btnModeVersus;
+    const opener = this.versusTierOpener;
+    this.versusTierOpener = null;
+    this.stackedModalOpener = opener?.isConnected ? opener : this.elements.btnModeVersus;
     this.closeOverlayModal(this.elements.modalVersusTiers);
   },
 
