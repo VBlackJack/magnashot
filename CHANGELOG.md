@@ -4,6 +4,19 @@ All notable changes to **MagnaShot** are documented in this file.
 
 ## [Unreleased]
 
+### Added
+- **Puzzle Records per Stage (`StorageManager`, `StorageView`, `EngineRoundFlow`, `UIManager`, `UIHudRefresh`, `PlayHubView`, `game.json`)**: Each Puzzle stage keeps its own best score, stars, attempts and cleared flag (`puzzle_stage_stats`). The stage selector shows the stars of every cleared stage, the HUD best is the best of the current stage, and a new record is judged per stage. Save schema 7 gives every stage below the saved best stage one star and an attempts count that caps it there (its real history is unknown); nothing is deleted and the migration runs once.
+- **Puzzle Stage Intro (`EngineModes`, `UIHelpers`, `UIManager`, `locales`)**: Every start and retry of a Puzzle stage shows a goal banner: stage number, objective, number of shots and a one-line hint that names no color. The first Puzzle ever adds a short rules reminder. It never pauses the run, the first shot closes it, it is announced once per stage (a retry is not announced again), and it waits behind a discovery card instead of being dropped.
+- **Puzzle Solvability Test (`PuzzleProbe`, `tests/slow`, `puzzleSolutions.json`)**: A slow test replays every stage on the real engine with the shot angles pinned in a fixture: each stage keeps a winning window of at least 1 degree, the 2-shot stages have no one-shot win at any angle, polarity, special or (stage 10) rotor timing, the third star on stages 3, 7 and 9 stays reachable, and an idle board stays above the danger line for 3600 frames.
+
+### Changed
+- **Puzzle Stages 4, 5, 8 and 10 (`game.json`)**: These stages are redrawn so that no single shot wins them: 0 one-shot wins out of 6,464 sweeps on stages 4, 7, 8 and 10 and out of 12,928 on stage 5 (stage 10 at every rotor timing). Stage 5 has no Rocket and stage 10 no special at all. Their widest windows are 4.5 degrees or more per shot.
+- **Puzzle Rules (`EngineControls`, `GameEngine`, `Resonance`, `WorkshopView`, `UIHudRefresh`, `game.json`)**: Puzzle is the same puzzle for everyone: the launcher cannot be swapped (the stage 7 one-shot win is gone), Workshop upgrades are paused (`seededFairness.puzzleUpgradeLevels`, a note in the Workshop says so), tilt is locked, Overcharge is off (the widget is hidden) and Resonance never applies.
+- **Puzzle Stars and Coins (`EngineRoundFlow`, `game.json`, `puzzleStars`)**: Stars follow attempts: 3 stars for a win on the first attempt, 2 within 3 attempts, 1 otherwise; stages 3, 7 and 9 also need their score (820, 1960, 760) for the third star, and the HUD hints the missing score only there. Stages cleared before the update keep 1 star and can earn more by replaying. A first clear pays 40 coins per newly earned star (1200 at most); a replay pays nothing, and Puzzle no longer pays run coins.
+
+### Fixed
+- **Puzzle Stage Buttons (`styles/main.css`)**: The stage buttons are at least 44 px square at every layout, and a locked stage is shown by a dashed border instead of a reduced opacity (forced colors keep it as dashed gray text).
+
 ## [1.22.0] - 2026-11-09
 
 ### Added
