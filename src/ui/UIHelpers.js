@@ -581,6 +581,8 @@ export const MODE_NEW_CLASS = 'is-new';
 /** Class of the "New" badge shown beside a newly unlocked mode. */
 export const MODE_NEW_BADGE_CLASS = 'mode-new-badge';
 
+export const WEEKLY_ACCESS_KEY = 'weekly';
+
 /** i18n key of each gated mode's name; the lock texts, hints and announcements reuse them. */
 export const MODE_NAME_KEYS = Object.freeze({
   [GAME_MODES.ENDLESS]: 'app.nav.button.endless',
