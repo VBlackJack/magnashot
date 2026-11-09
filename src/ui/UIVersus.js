@@ -527,7 +527,8 @@ export const uiVersusMethods = {
       this.updateNextLevelButton?.(engine);
       this.elements.modalVictory?.classList.remove(HIDDEN_CLASS);
       this.syncModalInertState();
-      this.focusInTopModal?.(this.elements.btnNextLevel);
+      const nextButton = this.elements.btnNextLevel;
+      this.focusInTopModal?.(nextButton?.classList.contains(HIDDEN_CLASS) ? this.elements.btnLevelsVictory : nextButton);
     } else if (engine.state === GAME_STATES.GAME_OVER) {
       this.elements.modalGameOver?.classList.remove(HIDDEN_CLASS);
       this.syncModalInertState();

@@ -749,7 +749,9 @@ export const uiHudRefreshMethods = {
       }
       this.elements.modalVictory.classList.remove('hidden');
       if (isVictoryJustRevealed) {
-        this.focusInTopModal(this.elements.btnNextLevel);
+        const nextButton = this.elements.btnNextLevel;
+        // Hidden after the last Puzzle stage: the other-modes button takes the focus.
+        this.focusInTopModal(nextButton?.classList.contains('hidden') ? this.elements.btnLevelsVictory : nextButton);
       }
     }
 

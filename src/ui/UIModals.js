@@ -154,12 +154,16 @@ export const uiModalMethods = {
     if (engine.mode === GAME_MODES.PUZZLE) {
       const totalPuzzles = this.gameConfig.puzzles?.length || 0;
       // After the last puzzle there is no next one: the button offers the other modes.
-      const labelKey = engine.currentPuzzleStage < totalPuzzles
+      const hasNextStage = engine.currentPuzzleStage < totalPuzzles;
+      const labelKey = hasNextStage
         ? VICTORY_NEXT_LABEL_KEYS[VICTORY_NEXT_ACTIONS.NEXT_LEVEL]
         : 'modals.play.changeMode';
       setButtonLabelKey(button, labelKey);
+      // The third button already offers the other modes: do not show the same action twice.
+      button.classList.toggle('hidden', !hasNextStage);
       return;
     }
+    button.classList.remove('hidden');
     const { action } = resolveNextCampaignTarget(
       engine.currentLevelId,
       engine.levelCatalog,
@@ -568,6 +572,8 @@ export const uiModalMethods = {
 
   hideAllModals() {
     this.autoPausedByOverlay = false;
+    // A closed hub two-player flow must not redirect the next picker return.
+    this.versusTierOpener = null;
     this.confirmPausedRun = false;
     this.pendingConfirmCallback = null;
     this.pendingConfirmLabelResolver = null;

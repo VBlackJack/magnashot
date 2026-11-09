@@ -356,3 +356,18 @@ test('isPlayHubOpen reads the dialog visibility', () => {
   assert.equal(uiPlayHubMethods.isPlayHubOpen.call(ctx), true);
   assert.equal(uiPlayHubMethods.isPlayHubOpen.call({ elements: {} }), false);
 });
+
+test('P3-4: only a plain Flux run makes the Flux card the running one', () => {
+  const plain = engineOf(GAME_MODES.FLUX, GAME_STATES.PLAYING);
+  assert.equal(isModeRunning(plain, GAME_MODES.FLUX, WEEK), true);
+  const variants = {
+    shared: { isSharedFluxRun: true },
+    pastWeekly: { isWeeklyFluxRun: true, isSharedFluxRun: true, weeklyWeekKey: OLD_WEEK },
+    ghostDuel: { ghostDuel: { ghost: {} } }
+  };
+  for (const [name, extra] of Object.entries(variants)) {
+    const engine = engineOf(GAME_MODES.FLUX, GAME_STATES.PAUSED, extra);
+    assert.equal(isModeRunning(engine, GAME_MODES.FLUX, WEEK), false, `${name}: no Flux card is running`);
+    assert.equal(isModeRunning(engine, WEEKLY_ACCESS_KEY, WEEK), false, `${name}: Weekly is not running either`);
+  }
+});

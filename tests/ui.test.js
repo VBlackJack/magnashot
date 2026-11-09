@@ -709,6 +709,58 @@ test('playSelectedLevel closes the campaign map over the running level and asks 
   assert.equal(calls.closed.length, 1);
 });
 
+/** Stacks the campaign map over the Play hub on a real closeOverlayModal, to check where the run ends up. */
+function stackedMapOverHubHarness({ autoPaused, state = 'paused' }) {
+  const makeModal = (hidden) => {
+    const classes = new Set(hidden ? ['hidden'] : []);
+    return {
+      classList: {
+        add: (name) => classes.add(name),
+        remove: (name) => classes.delete(name),
+        contains: (name) => classes.has(name)
+      }
+    };
+  };
+  const { ui } = playSelectedLevelHarness({
+    engine: {
+      state,
+      togglePause() {
+        this.state = this.state === 'paused' ? 'playing' : 'paused';
+      }
+    }
+  });
+  const modals = {
+    modalLevels: makeModal(false),
+    modalPlay: makeModal(false),
+    modalPause: makeModal(true),
+    modalConfirm: makeModal(true)
+  };
+  ui.elements = modals;
+  ui.autoPausedByOverlay = autoPaused;
+  ui.isDrawerOpen = false;
+  ui.isRunHeldByUi = () => false;
+  ui.isAnyOverlayModalOpen = () => ['modalLevels', 'modalPlay'].some((key) => !modals[key].classList.contains('hidden'));
+  ui.syncModalInertState = () => {};
+  ui.closeOverlayModal = UIManager.prototype.closeOverlayModal;
+  return { ui, modals };
+}
+
+test('playSelectedLevel resumes the run and leaves no dialog open when the map is stacked over the hub', () => {
+  const cases = [
+    { name: 'hub opened during play', autoPaused: true },
+    { name: 'hub opened from Pause', autoPaused: false }
+  ];
+  for (const { name, autoPaused } of cases) {
+    const { ui, modals } = stackedMapOverHubHarness({ autoPaused });
+    ui.playSelectedLevel();
+    assert.equal(ui.engine.state, 'playing', `${name}: the run resumes`);
+    for (const [key, modal] of Object.entries(modals)) {
+      assert.equal(modal.classList.contains('hidden'), true, `${name}: ${key} is closed`);
+    }
+    assert.equal(ui.autoPausedByOverlay, false, `${name}: the overlay hold is released`);
+  }
+});
+
 test('playSelectedLevel opened from Pause unpauses before closing the campaign map so Pause stays hidden and focus returns to the board', () => {
   const { ui, calls } = playSelectedLevelHarness({
     engine: {

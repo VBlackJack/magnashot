@@ -28,7 +28,7 @@ All notable changes to **MagnaShot** are documented in this file.
 ### Fixed
 - **Calibration Smoke Test**: The scripted taps of the calibration run test carry their own timestamps, a fixed 40 ms before each pulse, instead of following the ring in frame callbacks whose lag exceeded the narrower window; the test checks the saved offset exactly.
 - **Upgrade Sound (`audio.json`)**: The upgrade effect is defined in the audio config, so the sound plays.
-- **Campaign Levels That Sagged (`campaignTuning.json`, `calibrate-campaign`, `SettleProbe`)**: 84 generated campaign levels are rerolled to a variant whose cluster settles at least 72 px above the danger line with no shot; 27 of them were lost before the first shot (level 179, for one). Calibration now rejects variants that sag, and a new slow test settles all 824 levels.
+- **Campaign Levels That Sagged (`campaignTuning.json`, `calibrate-campaign`, `SettleProbe`)**: 84 generated campaign levels are rerolled to a variant whose cluster settles at least 72 px above the danger line with no shot; 26 of them were lost before the first shot (level 179, for one). Calibration now rejects variants that sag, and a new slow test settles all 824 levels.
 
 ## [1.21.0] - 2026-11-09
 

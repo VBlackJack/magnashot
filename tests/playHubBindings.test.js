@@ -537,3 +537,14 @@ test('the input bindings no longer know the Levels drawer button or the drawer l
   assert.doesNotMatch(source, /elements\.btnLevels\b/);
   assert.doesNotMatch(source, /isDrawerButtonLocked|MODE_LOCK_BUTTON_KEYS/);
 });
+
+test('hideAllModals spends a stale hub two-player opener', () => {
+  const ui = Object.create(UIManager.prototype);
+  ui.elements = {};
+  ui.getModalsByPriority = () => [];
+  ui.stopDailyCountdown = () => {};
+  ui.syncModalInertState = () => {};
+  ui.versusTierOpener = { name: 'hub', isConnected: true };
+  ui.hideAllModals();
+  assert.equal(ui.versusTierOpener, null);
+});

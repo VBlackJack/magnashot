@@ -762,7 +762,7 @@
           "resonance": {
             "icon": "🎵",
             "name": "Résonance",
-            "description": "Débloquée pendant la campagne. L'anneau autour du lanceur se resserre à chaque temps ; un tir lâché quand il est plein est en résonance et rapporte plus de Surcharge, ou frappe plus fort les charges en Duel de Polarité. Désactivée en Classique et dans les parties compétitives."
+            "description": "Débloquée pendant la campagne. L'anneau autour du lanceur se resserre à chaque temps ; un tir lâché quand il est plein est en résonance et rapporte plus de Surcharge, ou frappe plus fort les charges en Duel de Polarité. Désactivée en Puriste et dans les parties compétitives."
           },
           "sag": {
             "icon": "⏬",

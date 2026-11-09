@@ -68,7 +68,8 @@ function isEngineRunActive(engine) {
 
 /**
  * The hub mode key of the running mode: a game mode id, or the Weekly pseudo key for the
- * Weekly Flux run of the current week. Null without a run.
+ * Weekly Flux run of the current week. Null without a run, or for a Flux run no card stands for
+ * (shared seed, past Weekly, ghost duel).
  * @param {object|null|undefined} engine - Game engine.
  * @param {string} weekKey - ISO week key of now.
  * @returns {string|null}
@@ -77,7 +78,14 @@ export function resolveRunningModeKey(engine, weekKey) {
   if (!isEngineRunActive(engine) || !engine.mode) {
     return null;
   }
-  return isCurrentWeeklyRun(engine, weekKey) ? WEEKLY_ACCESS_KEY : engine.mode;
+  if (isCurrentWeeklyRun(engine, weekKey)) {
+    return WEEKLY_ACCESS_KEY;
+  }
+  // A shared seed (a past Weekly is one too) or a ghost duel is a Flux run that no hub card resumes.
+  if (engine.mode === GAME_MODES.FLUX && (engine.isSharedFluxRun || engine.ghostDuel)) {
+    return null;
+  }
+  return engine.mode;
 }
 
 /**

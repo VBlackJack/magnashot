@@ -587,6 +587,34 @@ for (const viewport of VIEWPORTS) {
       }
     });
 
+    for (const fromPause of [false, true]) {
+      test(`Enter on the running level of the campaign map resumes the run and leaves no dialog open (${fromPause ? 'hub opened from Pause' : 'hub opened during play'})`, async () => {
+        const { context, page, errors } = await openGame(viewport);
+        try {
+          await startLevelOne(page);
+          if (fromPause) {
+            await clickMenuButton(page, viewport, '#btn-pause');
+            await waitShown(page, '#modal-pause');
+            await page.click('#btn-levels-pause');
+            await waitShown(page, '#modal-play');
+          } else {
+            await openPlayHub(page, viewport);
+          }
+          await page.click('#btn-campaign-map');
+          await waitShown(page, '#modal-levels');
+          await page.focus('#levels-grid .level-tile.current');
+          await page.keyboard.press('Enter');
+          await page.waitForFunction((playing) => window.__fluxEngine.state === playing, GAME_STATES.PLAYING);
+          for (const dialog of ['#modal-levels', '#modal-play', '#modal-pause']) {
+            assert.equal(await isShown(page, dialog), false, `${dialog} is closed`);
+          }
+          assert.deepEqual(errors, []);
+        } finally {
+          await context.close();
+        }
+      });
+    }
+
     test('a fresh profile finds the gated modes locked in the Play hub; tapping one explains why and changes nothing', async () => {
       const { context, page, errors } = await openGame(viewport);
       try {

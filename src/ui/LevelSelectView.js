@@ -742,6 +742,13 @@ export const uiLevelSelectMethods = {
       return;
     }
     if (this.isCampaignRunActive() && levelId === this.engine.currentLevelId) {
+      if (this.isPlayHubOpen()) {
+        // The map is stacked over the Play hub: close it without touching the pause state, then let
+        // the hub resume path unpause (or release the overlay hold) and close the hub itself.
+        this.closeOverlayModal(this.elements.modalLevels);
+        this.resumePlayHubRun();
+        return;
+      }
       if (!this.autoPausedByOverlay && this.engine.state === GAME_STATES.PAUSED) {
         this.engine.togglePause();
       }
