@@ -3750,8 +3750,8 @@ body {
   pointer-events: none;
 }
 
-/* Split and the wide mini-view put every HUD and canvas on one grid: the boards line up exactly. */
-.versus-screen:is([data-layout='split'], [data-layout='mini'][data-orient='landscape']) .versus-board {
+/* Split and the mini-view put every HUD and canvas on one grid: the boards line up exactly. */
+.versus-screen:is([data-layout='split'], [data-layout='mini']) .versus-board {
   display: contents;
 }
 
@@ -3779,17 +3779,8 @@ body {
   grid-area: ch;
 }
 
-/* Mini-view: the player board fills the screen, the CPU board is a small one on top of it. */
+/* Mini-view: the player board fills the screen, the CPU board is a small one beside the top bar (no overlay). */
 .versus-screen[data-layout='mini'] .versus-board[data-board='1'] {
-  position: absolute;
-  top: 0;
-  right: 0;
-  z-index: 2;
-  width: max-content;
-  padding: 4px;
-  background: var(--bg-dark-alpha-78);
-  border: 1px solid var(--border-strong);
-  border-radius: 8px;
   pointer-events: none;
 }
 
@@ -3818,9 +3809,32 @@ body {
   min-width: 24px;
 }
 
-/* Narrow mini-view: controls sit under the board, in reach of the thumbs. */
-.versus-screen[data-layout='mini'][data-orient='portrait'] .versus-board .versus-hud {
-  order: 1;
+/* Narrow mini-view: the top bar and the small CPU board share a strip above the player board, whose controls sit under it in reach of the thumbs. */
+.versus-screen[data-layout='mini'][data-orient='portrait'] .versus-boards {
+  grid-template-columns: minmax(0, 1fr) var(--versus-mini-width);
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
+  grid-template-areas:
+    'bar cc'
+    'ch cc'
+    'pc pc'
+    'ph ph';
+}
+
+.versus-screen[data-layout='mini'][data-orient='portrait'] .versus-boards > .versus-bar {
+  grid-area: bar;
+  flex-wrap: wrap;
+  align-self: start;
+  min-width: 0;
+}
+
+.versus-screen[data-layout='mini'][data-orient='portrait'] .versus-board[data-board='1'] .versus-canvas-wrap {
+  justify-self: end;
+}
+
+.versus-screen[data-layout='mini'][data-orient='portrait'] .versus-board[data-board='1'] .versus-hud {
+  justify-self: stretch;
+  align-self: start;
+  width: auto;
 }
 
 /* Mini-view on a wide, short screen: the controls on the left, the CPU board on the right, the player board between. */
@@ -3847,14 +3861,6 @@ body {
   align-self: end;
   gap: 6px;
   min-height: 0;
-}
-
-.versus-screen[data-layout='mini'][data-orient='landscape'] .versus-board[data-board='1'] {
-  position: static;
-  width: auto;
-  padding: 0;
-  background: none;
-  border: 0;
 }
 
 .versus-screen[data-layout='mini'][data-orient='landscape'] .versus-board[data-board='0'] .versus-canvas-wrap {

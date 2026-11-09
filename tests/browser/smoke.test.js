@@ -289,6 +289,46 @@ async function winVersusMatch(page) {
   await waitShown(page, '#modal-duel-result');
 }
 
+/** Share of the viewport width (less the screen padding) the player board keeps in the portrait mini-view. */
+const VERSUS_PLAYER_MIN_WIDTH_SHARE = 0.8;
+/** Screen padding on each side, in pixels, that the player board width is measured against (--versus-pad twice). */
+const VERSUS_SCREEN_PADDING_TOTAL_PX = 16;
+/** Sub-pixel tolerance for the board intersection checks. */
+const VERSUS_RECT_TOLERANCE_PX = 0.5;
+
+/** Measures the player canvas and the rectangles of the CPU board parts that must stay clear of it. */
+async function measureVersusMini(page) {
+  return page.evaluate(() => {
+    const rectOf = (selector) => {
+      const rect = document.querySelector(selector).getBoundingClientRect();
+      return { left: rect.left, top: rect.top, right: rect.right, bottom: rect.bottom, width: rect.width };
+    };
+    return {
+      viewportWidth: window.innerWidth,
+      player: rectOf('#versus-canvas-0'),
+      cpu: ['#versus-canvas-1', '#versus-hud-1'].map((selector) => ({ selector, rect: rectOf(selector) }))
+    };
+  });
+}
+
+/** Fails when a CPU board part overlaps the player canvas, or (portrait) the player canvas is too narrow. */
+async function assertVersusMiniClear(page, label, { isPortrait }) {
+  const measured = await measureVersusMini(page);
+  for (const { selector, rect } of measured.cpu) {
+    const overlaps =
+      rect.left < measured.player.right - VERSUS_RECT_TOLERANCE_PX &&
+      rect.right > measured.player.left + VERSUS_RECT_TOLERANCE_PX &&
+      rect.top < measured.player.bottom - VERSUS_RECT_TOLERANCE_PX &&
+      rect.bottom > measured.player.top + VERSUS_RECT_TOLERANCE_PX;
+    assert.equal(overlaps, false, `${label}: ${selector} overlaps the player canvas`);
+  }
+  if (isPortrait) {
+    const minWidth = VERSUS_PLAYER_MIN_WIDTH_SHARE * (measured.viewportWidth - VERSUS_SCREEN_PADDING_TOTAL_PX);
+    assert.ok(measured.player.width >= minWidth, `${label}: the player canvas is ${measured.player.width}px wide, under ${minWidth}px`);
+  }
+  return measured;
+}
+
 /** Fails when the versus screen scrolls or a board or control leaves the viewport. */
 async function assertVersusFits(page, label) {
   const fit = await page.evaluate(() => {
@@ -793,6 +833,9 @@ for (const viewport of VIEWPORTS) {
         const expectedLayout = VERSUS_LAYOUT_BY_VIEWPORT[viewport.name];
         assert.equal(await page.evaluate(() => document.querySelector('#versus-screen').dataset.layout), expectedLayout);
         await assertVersusFits(page, `${viewport.name} ${expectedLayout}`);
+        if (expectedLayout === 'mini') {
+          await assertVersusMiniClear(page, `${viewport.name} mini`, { isPortrait: viewport.height > viewport.width });
+        }
         assert.equal(await page.evaluate(() => document.querySelector('.app-shell').inert), true, 'the shell is out of reach');
         for (const selector of ['#versus-canvas-0', '#versus-canvas-1', '#versus-hud-0 .versus-incoming', '#versus-hud-1 .versus-incoming', '#versus-hud-1 .versus-pulse']) {
           assert.equal(await isShown(page, selector), true, `${selector} is shown in the ${expectedLayout} layout`);

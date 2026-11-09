@@ -51,6 +51,7 @@ import {
   createAnnouncementQueue,
   createVersusTutorial,
   fitBoard,
+  getVersusDevicePixelRatioCap,
   renderAnnouncement
 } from './VersusHud.js';
 
@@ -594,13 +595,17 @@ export const uiVersusMethods = {
         this.sizeVersusCanvas(els.versusCanvas1, size);
       }
     } else {
-      // On a wide, short screen the top bar moves into the side column: the player board gets its height.
-      this.placeVersusBar(isLandscape);
+      // The top bar joins the boards grid: beside the CPU board on a phone portrait, in the side column on a wide, short screen.
+      this.placeVersusBar(true);
       this.layoutVersusMini(isLandscape, style);
     }
 
     const previous = v.layout;
     v.layout = layout;
+    const pixelRatioCap = getVersusDevicePixelRatioCap(layoutCfg, layout);
+    for (const renderer of v.renderers) {
+      renderer?.setMaxDevicePixelRatio(pixelRatioCap);
+    }
     const needsCpuRenderer = !v.renderers[CPU_BOARD] || previous !== layout;
     if (!v.renderers[PLAYER_BOARD] || needsCpuRenderer) {
       this.buildVersusRenderers(isMini);
@@ -683,7 +688,9 @@ export const uiVersusMethods = {
     const screen = els.versusScreen;
     const layoutCfg = this.gameConfig.versus.layout;
     const canvasCfg = this.gameConfig.canvas;
-    const nominal = computeMiniSize(canvasCfg, layoutCfg);
+    // A phone portrait strip keeps the CPU board short so the player board gets the width and the height.
+    const maxHeight = isLandscape ? Infinity : layoutCfg.portraitMiniMaxHeightPx;
+    const nominal = computeMiniSize(canvasCfg, layoutCfg, maxHeight);
     screen.style.setProperty('--versus-mini-width', `${nominal.width}px`);
     screen.style.setProperty('--versus-mini-height', `${nominal.height}px`);
     const boardsBox = els.versusBoards;
@@ -692,7 +699,7 @@ export const uiVersusMethods = {
     // The HUD heights are read once the arrangement is in place: they differ from the split.
     const columnRoom = isLandscape
       ? boardsBox.clientHeight - els.versusHud1.offsetHeight - (els.versusBar?.offsetHeight ?? 0) - 2 * rowGap
-      : Infinity;
+      : maxHeight;
     const mini = computeMiniSize(canvasCfg, layoutCfg, columnRoom);
     screen.style.setProperty('--versus-mini-width', `${mini.width}px`);
     screen.style.setProperty('--versus-mini-height', `${mini.height}px`);
@@ -718,7 +725,10 @@ export const uiVersusMethods = {
     const v = this.versus;
     const { gameConfig, ballsConfig, versusConfigs } = this;
     const make = (canvas, lite) => {
-      const renderer = new Renderer(canvas, gameConfig, ballsConfig, versusConfigs.obstaclesConfig, { lite });
+      const renderer = new Renderer(canvas, gameConfig, ballsConfig, versusConfigs.obstaclesConfig, {
+        lite,
+        maxDevicePixelRatio: getVersusDevicePixelRatioCap(gameConfig.versus.layout, v.layout) ?? undefined
+      });
       renderer.setHighContrast(this.storageManager.getHighContrast());
       renderer.setColorPatterns(this.storageManager.getColorPatterns());
       renderer.setBallStyle(this.storageManager.getActiveBallStyle());

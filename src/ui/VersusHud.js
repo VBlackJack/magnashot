@@ -81,6 +81,17 @@ export function chooseVersusLayout(input, layoutCfg, canvasCfg) {
 }
 
 /**
+ * Device pixel ratio ceiling for the renderers of a layout: two full boards (split) are capped, the
+ * mini-view keeps the renderer defaults.
+ * @param {{splitMaxDevicePixelRatio: number}} layoutCfg - versus.layout.
+ * @param {string} layout - A VERSUS_LAYOUTS value.
+ * @returns {number|null} The cap, or null for no extra cap.
+ */
+export function getVersusDevicePixelRatioCap(layoutCfg, layout) {
+  return layout === VERSUS_LAYOUTS.SPLIT ? layoutCfg.splitMaxDevicePixelRatio : null;
+}
+
+/**
  * Size of the CPU board in the mini-view: `miniScale` of the logical size, shrunk to fit a
  * maximum height when the column it sits in is short.
  * @param {{logicalWidth: number, logicalHeight: number}} canvasCfg - The `canvas` section of the game config.
