@@ -616,6 +616,10 @@
       "brush": 1
     }
   },
+  "puzzleStars": {
+    "threeStarMaxAttempts": 1,
+    "twoStarMaxAttempts": 3
+  },
   "puzzles": [
     {
       "id": 1,
@@ -638,8 +642,8 @@
       },
       "starThresholds": [
         0,
-        1470,
-        1470
+        0,
+        0
       ],
       "obstacles": [],
       "balls": [
@@ -698,8 +702,8 @@
       },
       "starThresholds": [
         0,
-        970,
-        970
+        0,
+        0
       ],
       "obstacles": [],
       "balls": [
@@ -755,7 +759,7 @@
       },
       "starThresholds": [
         0,
-        700,
+        0,
         820
       ],
       "obstacles": [],
@@ -814,8 +818,8 @@
       },
       "starThresholds": [
         0,
-        1110,
-        1110
+        0,
+        0
       ],
       "obstacles": [
         {
@@ -872,8 +876,8 @@
       },
       "starThresholds": [
         0,
-        1720,
-        1720
+        0,
+        0
       ],
       "obstacles": [],
       "balls": [
@@ -929,8 +933,8 @@
       },
       "starThresholds": [
         0,
-        930,
-        930
+        0,
+        0
       ],
       "obstacles": [
         {
@@ -1001,7 +1005,7 @@
       },
       "starThresholds": [
         0,
-        1480,
+        0,
         1960
       ],
       "obstacles": [
@@ -1073,8 +1077,8 @@
       },
       "starThresholds": [
         0,
-        1740,
-        1740
+        0,
+        0
       ],
       "obstacles": [],
       "balls": [
@@ -1138,7 +1142,7 @@
       },
       "starThresholds": [
         0,
-        740,
+        0,
         760
       ],
       "obstacles": [],
@@ -1206,8 +1210,8 @@
       },
       "starThresholds": [
         0,
-        1290,
-        1290
+        0,
+        0
       ],
       "obstacles": [
         {

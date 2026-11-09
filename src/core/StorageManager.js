@@ -42,7 +42,8 @@ export const SAVE_MIGRATIONS = Object.freeze([
   { toVersion: 3, run: (manager) => manager.seedDailyHistory() },
   { toVersion: 4, run: (manager) => manager.announceIntroducedModes() },
   { toVersion: 5, run: (manager) => manager.announceIntroducedModes() },
-  { toVersion: 6, run: (manager) => manager.migrateMusicVolumeSteps() }
+  { toVersion: 6, run: (manager) => manager.migrateMusicVolumeSteps() },
+  { toVersion: 7, run: (manager) => manager.seedPuzzleStageStats() }
 ]);
 export const CURRENT_SAVE_SCHEMA_VERSION = SAVE_MIGRATIONS.at(-1).toVersion;
 
@@ -66,6 +67,8 @@ export class StorageManager {
   constructor() {
     this.storageConfig = null;
     this.defaultsConfig = null;
+    this.scoringConfig = null;
+    this.puzzleStarsConfig = null;
     this.gamepadConfig = null;
     this.upgradesConfig = null;
     this.achievementsConfig = null;
@@ -89,6 +92,8 @@ export class StorageManager {
     const campaignConfig = configRegistry.get('campaign');
     this.storageConfig = gameConfig.storage;
     this.defaultsConfig = gameConfig.defaults;
+    this.scoringConfig = gameConfig.scoring || {};
+    this.puzzleStarsConfig = gameConfig.puzzleStars || {};
     this.gamepadConfig = gameConfig.gamepad || {};
     this.upgradesConfig = gameConfig.upgrades;
     this.achievementsConfig = gameConfig.achievements || {};
@@ -961,6 +966,93 @@ export class StorageManager {
     }
   }
 
+  /**
+   * Parses a raw Puzzle stage-stats string into sanitized entries (empty when invalid).
+   * Missing fields take their defaults; a stored star implies the stage was cleared.
+   */
+  static parsePuzzleStageStats(raw) {
+    let parsed;
+    try {
+      parsed = JSON.parse(raw);
+    } catch {
+      return {};
+    }
+    const stats = {};
+    if (!StorageManager.isPlainObject(parsed)) {
+      return stats;
+    }
+    for (const [stage, entry] of Object.entries(parsed)) {
+      if (StorageManager.isPlainObject(entry)) {
+        const stars = StorageManager.toNonNegativeNumber(entry.stars);
+        stats[stage] = {
+          bestScore: StorageManager.toNonNegativeNumber(entry.bestScore),
+          stars,
+          attempts: Math.floor(StorageManager.toNonNegativeNumber(entry.attempts)),
+          cleared: entry.cleared === true || stars > 0
+        };
+      }
+    }
+    return stats;
+  }
+
+  /** @returns {Object<string, {bestScore: number, stars: number, attempts: number, cleared: boolean}>} */
+  getPuzzleStageStats() {
+    const key = this.storageConfig?.keys?.puzzleStageStats;
+    return key ? StorageManager.parsePuzzleStageStats(this.safeGetItem(key)) : {};
+  }
+
+  /**
+   * Counts one attempt started on a Puzzle stage. The count only grows until the stage is
+   * cleared, then stays frozen so a replay never changes the stars of the first clear.
+   * @returns {{bestScore: number, stars: number, attempts: number, cleared: boolean}} The entry.
+   */
+  recordPuzzleAttempt(stage) {
+    const key = this.storageConfig?.keys?.puzzleStageStats;
+    const stageKey = String(Math.max(0, Math.floor(Number(stage) || 0)));
+    const stats = this.getPuzzleStageStats();
+    const existing = stats[stageKey] || { bestScore: 0, stars: 0, attempts: 0, cleared: false };
+    if (!key || existing.cleared) {
+      return existing;
+    }
+    const entry = { ...existing, attempts: existing.attempts + 1 };
+    stats[stageKey] = entry;
+    this.safeSetItem(key, JSON.stringify(stats));
+    return entry;
+  }
+
+  /**
+   * Stores the result of a won Puzzle stage: marks it cleared and keeps the best score and
+   * the most stars ever earned.
+   * @returns {{newlyEarnedStars: number}}
+   */
+  savePuzzleStageResult(stage, score, stars) {
+    const key = this.storageConfig?.keys?.puzzleStageStats;
+    const stageKey = String(Math.max(0, Math.floor(Number(stage) || 0)));
+    const cleanScore = Math.max(0, Math.floor(Number(score) || 0));
+    const cleanStars = Math.max(0, Math.floor(Number(stars) || 0));
+    const stats = this.getPuzzleStageStats();
+    const existing = stats[stageKey] || { bestScore: 0, stars: 0, attempts: 0, cleared: false };
+    const newlyEarnedStars = Math.max(0, cleanStars - existing.stars);
+    stats[stageKey] = {
+      bestScore: Math.max(existing.bestScore, cleanScore),
+      stars: Math.max(existing.stars, cleanStars),
+      attempts: existing.attempts,
+      cleared: true
+    };
+    if (key) {
+      this.safeSetItem(key, JSON.stringify(stats));
+    }
+    return { newlyEarnedStars };
+  }
+
+  getPuzzleTotalStars() {
+    let total = 0;
+    for (const entry of Object.values(this.getPuzzleStageStats())) {
+      total += entry.stars;
+    }
+    return total;
+  }
+
   getClassicHighScore() {
     const key = this.storageConfig?.keys?.classicHighScore;
     return key ? this.readNonNegativeInt(key) : 0;
@@ -1357,6 +1449,46 @@ export class StorageManager {
       }
       localStorage.setItem(volumeKey, String(migrated));
       this.memoryFallback.delete(volumeKey);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Migration v7. Puzzle stage records are new: every stage below the stored best stage was
+   * cleared before the update, with a history nobody kept. Each such stage without an entry
+   * gets one star (the minimum win), a score of 0 (unknown) and an attempt count past the
+   * two-star limit so the unknown history can never read as a clean first try.
+   * Idempotent, never overwrites an entry, nothing is deleted.
+   * @returns {boolean} False when storage could not be read or written.
+   */
+  seedPuzzleStageStats() {
+    const keys = this.storageConfig.keys;
+    if (typeof keys.puzzleStageStats !== 'string' || typeof keys.puzzleBestStage !== 'string') {
+      return true;
+    }
+    try {
+      const rawBest = localStorage.getItem(this.buildKey(keys.puzzleBestStage));
+      const bestStage = rawBest === null ? 0 : Number.parseInt(rawBest, 10);
+      if (!Number.isInteger(bestStage) || bestStage < 2) {
+        return true;
+      }
+      const statsKey = this.buildKey(keys.puzzleStageStats);
+      const stats = StorageManager.parsePuzzleStageStats(localStorage.getItem(statsKey));
+      const seededStars = this.scoringConfig.minVictoryStars ?? 1;
+      const seededAttempts = (this.puzzleStarsConfig.twoStarMaxAttempts ?? 0) + 1;
+      let isChanged = false;
+      for (let stage = 1; stage < bestStage; stage += 1) {
+        if (!stats[String(stage)]) {
+          stats[String(stage)] = { bestScore: 0, stars: seededStars, attempts: seededAttempts, cleared: true };
+          isChanged = true;
+        }
+      }
+      if (isChanged) {
+        localStorage.setItem(statsKey, JSON.stringify(stats));
+        this.memoryFallback.delete(statsKey);
+      }
       return true;
     } catch {
       return false;
