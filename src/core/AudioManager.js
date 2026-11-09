@@ -30,6 +30,8 @@ export class AudioManager {
     this.output = null;
     this.muted = false;
     this.reducedMotion = false;
+    // Phone and controller vibration preference; off silences triggerHaptic only.
+    this.vibrationEnabled = true;
     this.config = null;
     // Each playing oscillator mapped to the gain node it plays through, so stopAll can
     // fade the voice out instead of cutting it mid-wave.
@@ -56,11 +58,12 @@ export class AudioManager {
     this.music = null;
   }
 
-  init(initialMuted = false, initialReducedMotion = false, { musicEnabled = true, musicVolume } = {}) {
+  init(initialMuted = false, initialReducedMotion = false, { musicEnabled = true, musicVolume, vibrationEnabled = true } = {}) {
     this.config = configRegistry.get('audio');
     this.muted = initialMuted;
     this.reducedMotion = Boolean(initialReducedMotion);
     this.musicEnabled = Boolean(musicEnabled);
+    this.vibrationEnabled = Boolean(vibrationEnabled);
     this.musicVolume = Number.isFinite(musicVolume) ? musicVolume : this.config.music.defaultVolume;
     this.bindVisibility();
   }
@@ -185,8 +188,12 @@ export class AudioManager {
     this.reducedMotion = Boolean(reduced);
   }
 
+  setVibrationEnabled(enabled) {
+    this.vibrationEnabled = Boolean(enabled);
+  }
+
   triggerHaptic(durationMs) {
-    if (this.muted || this.reducedMotion || !durationMs) {
+    if (!this.vibrationEnabled || this.muted || this.reducedMotion || !durationMs) {
       return;
     }
     const nowMs = this.clock();

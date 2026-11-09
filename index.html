@@ -404,89 +404,105 @@
   <div id="modal-settings" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="modal-settings-title">
     <div class="modal-card">
       <h2 id="modal-settings-title" class="modal-title" data-i18n="modals.settings.title.main"></h2>
-      <div class="pause-settings-row">
-        <div class="pause-setting">
-          <button id="btn-sound" type="button" class="nav-btn icon-btn"></button>
-          <span class="pause-setting-caption" data-caption-for="btn-sound" aria-hidden="true"></span>
+      <section class="settings-controller settings-group" aria-labelledby="settings-group-audio-title">
+        <h3 id="settings-group-audio-title" class="stats-section-title" data-i18n="modals.settings.groups.audio"></h3>
+        <div class="pause-settings-row">
+          <div class="pause-setting">
+            <button id="btn-sound" type="button" class="nav-btn icon-btn"></button>
+            <span class="pause-setting-caption" data-caption-for="btn-sound" aria-hidden="true"></span>
+          </div>
+          <div class="pause-setting">
+            <button id="btn-music" type="button" class="nav-btn icon-btn"></button>
+            <span class="pause-setting-caption" data-caption-for="btn-music" aria-hidden="true"></span>
+          </div>
+          <div class="pause-setting">
+            <button id="btn-music-volume" type="button" class="nav-btn badge-btn"></button>
+            <span class="pause-setting-caption" data-caption-for="btn-music-volume" aria-hidden="true"></span>
+          </div>
         </div>
-        <div class="pause-setting">
-          <button id="btn-contrast" type="button" class="nav-btn icon-btn"></button>
-          <span class="pause-setting-caption" data-caption-for="btn-contrast" aria-hidden="true"></span>
+      </section>
+      <section class="settings-controller settings-group" aria-labelledby="settings-group-gameplay-title">
+        <h3 id="settings-group-gameplay-title" class="stats-section-title" data-i18n="modals.settings.groups.gameplay"></h3>
+        <div class="pause-settings-row">
+          <div class="pause-setting">
+            <button id="btn-resonance" type="button" class="nav-btn icon-btn"></button>
+            <span class="pause-setting-caption" data-caption-for="btn-resonance" aria-hidden="true"></span>
+          </div>
+          <div class="pause-setting">
+            <button id="btn-calibrate" type="button" class="nav-btn icon-btn" aria-haspopup="dialog" data-i18n="app.nav.button.calibrateIcon" data-i18n-aria-label="app.settings.calibrate.title" data-i18n-title="app.settings.calibrate.title"></button>
+            <span class="pause-setting-caption" data-i18n="app.settings.calibrate.title" aria-hidden="true"></span>
+          </div>
+          <div class="pause-setting">
+            <button id="btn-tilt" type="button" class="nav-btn icon-btn"></button>
+            <span class="pause-setting-caption" data-caption-for="btn-tilt" aria-hidden="true"></span>
+          </div>
+          <div class="pause-setting">
+            <button id="btn-reset-hints" type="button" class="nav-btn icon-btn" data-i18n="app.nav.button.resetHints" data-i18n-aria-label="app.nav.button.resetHintsAria" data-i18n-title="app.nav.button.resetHintsAria"></button>
+            <span class="pause-setting-caption" data-i18n="app.nav.button.resetHintsCaption" data-caption-for="btn-reset-hints" aria-hidden="true"></span>
+          </div>
+          <div class="pause-setting">
+            <button id="btn-fullscreen" type="button" class="nav-btn icon-btn"></button>
+            <span class="pause-setting-caption" data-caption-for="btn-fullscreen" aria-hidden="true"></span>
+          </div>
+          <div class="pause-setting">
+            <button id="btn-lang" type="button" class="nav-btn badge-btn"></button>
+            <span class="pause-setting-caption" data-i18n="app.nav.button.languageCaption" aria-hidden="true"></span>
+          </div>
         </div>
-        <div class="pause-setting">
-          <button id="btn-patterns" type="button" class="nav-btn icon-btn"></button>
-          <span class="pause-setting-caption" data-caption-for="btn-patterns" aria-hidden="true"></span>
+        <div class="settings-duel-name">
+          <label id="duel-name-label" class="settings-duel-name-label" for="input-duel-name" data-i18n="modals.settings.duelName.label"></label>
+          <input id="input-duel-name" type="text" class="flux-seed-input settings-duel-name-input" autocomplete="off" autocapitalize="off" spellcheck="false" aria-describedby="duel-name-hint">
+          <p id="duel-name-hint" class="install-hint" data-i18n="modals.settings.duelName.hint"></p>
         </div>
-        <div class="pause-setting">
-          <button id="btn-tilt" type="button" class="nav-btn icon-btn"></button>
-          <span class="pause-setting-caption" data-caption-for="btn-tilt" aria-hidden="true"></span>
+      </section>
+      <section class="settings-controller settings-group" aria-labelledby="settings-group-accessibility-title">
+        <h3 id="settings-group-accessibility-title" class="stats-section-title" data-i18n="modals.settings.groups.accessibility"></h3>
+        <div class="pause-settings-row">
+          <div class="pause-setting">
+            <button id="btn-contrast" type="button" class="nav-btn icon-btn"></button>
+            <span class="pause-setting-caption" data-caption-for="btn-contrast" aria-hidden="true"></span>
+          </div>
+          <div class="pause-setting">
+            <button id="btn-patterns" type="button" class="nav-btn icon-btn"></button>
+            <span class="pause-setting-caption" data-caption-for="btn-patterns" aria-hidden="true"></span>
+          </div>
+          <div class="pause-setting">
+            <button id="btn-motion" type="button" class="nav-btn icon-btn"></button>
+            <span class="pause-setting-caption" data-caption-for="btn-motion" aria-hidden="true"></span>
+          </div>
+          <div class="pause-setting">
+            <button id="btn-anim-speed" type="button" class="nav-btn badge-btn"></button>
+            <span class="pause-setting-caption" data-caption-for="btn-anim-speed" aria-hidden="true"></span>
+          </div>
         </div>
-        <div class="pause-setting">
-          <button id="btn-motion" type="button" class="nav-btn icon-btn"></button>
-          <span class="pause-setting-caption" data-caption-for="btn-motion" aria-hidden="true"></span>
-        </div>
-        <div class="pause-setting">
-          <button id="btn-anim-speed" type="button" class="nav-btn badge-btn"></button>
-          <span class="pause-setting-caption" data-caption-for="btn-anim-speed" aria-hidden="true"></span>
-        </div>
-        <div class="pause-setting">
-          <button id="btn-music" type="button" class="nav-btn icon-btn"></button>
-          <span class="pause-setting-caption" data-caption-for="btn-music" aria-hidden="true"></span>
-        </div>
-        <div class="pause-setting">
-          <button id="btn-music-volume" type="button" class="nav-btn badge-btn"></button>
-          <span class="pause-setting-caption" data-caption-for="btn-music-volume" aria-hidden="true"></span>
-        </div>
-        <div class="pause-setting">
-          <button id="btn-resonance" type="button" class="nav-btn icon-btn"></button>
-          <span class="pause-setting-caption" data-caption-for="btn-resonance" aria-hidden="true"></span>
-        </div>
-        <div class="pause-setting">
-          <button id="btn-calibrate" type="button" class="nav-btn icon-btn" aria-haspopup="dialog" data-i18n="app.nav.button.calibrateIcon" data-i18n-aria-label="app.settings.calibrate.title" data-i18n-title="app.settings.calibrate.title"></button>
-          <span class="pause-setting-caption" data-i18n="app.settings.calibrate.title" aria-hidden="true"></span>
-        </div>
-        <div class="pause-setting">
-          <button id="btn-fullscreen" type="button" class="nav-btn icon-btn"></button>
-          <span class="pause-setting-caption" data-caption-for="btn-fullscreen" aria-hidden="true"></span>
-        </div>
-        <div class="pause-setting">
-          <button id="btn-reset-hints" type="button" class="nav-btn icon-btn" data-i18n="app.nav.button.resetHints" data-i18n-aria-label="app.nav.button.resetHintsAria" data-i18n-title="app.nav.button.resetHintsAria"></button>
-          <span class="pause-setting-caption" data-i18n="app.nav.button.resetHintsCaption" data-caption-for="btn-reset-hints" aria-hidden="true"></span>
-        </div>
-        <div class="pause-setting">
-          <button id="btn-lang" type="button" class="nav-btn badge-btn"></button>
-          <span class="pause-setting-caption" data-i18n="app.nav.button.languageCaption" aria-hidden="true"></span>
-        </div>
-      </div>
-      <div class="settings-duel-name">
-        <label id="duel-name-label" class="settings-duel-name-label" for="input-duel-name" data-i18n="modals.settings.duelName.label"></label>
-        <input id="input-duel-name" type="text" class="flux-seed-input settings-duel-name-input" autocomplete="off" autocapitalize="off" spellcheck="false" aria-describedby="duel-name-hint">
-        <p id="duel-name-hint" class="install-hint" data-i18n="modals.settings.duelName.hint"></p>
-      </div>
-      <section class="settings-controller" aria-labelledby="settings-controller-title">
-        <h3 id="settings-controller-title" class="stats-section-title" data-i18n="modals.settings.controller.title"></h3>
-        <p id="settings-controller-hint" class="install-hint" data-i18n="modals.settings.controller.hint"></p>
-        <span class="pad-glyphs"><span class="pad-glyph pad-face" data-pos="bottom" aria-hidden="true"></span><span class="pad-glyph pad-bumper" data-i18n="hud.pad.glyph.leftBumper" aria-hidden="true"></span><span class="pad-glyph pad-bumper" data-i18n="hud.pad.glyph.rightBumper" aria-hidden="true"></span><span class="pad-glyph pad-pill" data-i18n="hud.pad.glyph.start" aria-hidden="true"></span><span class="pad-glyph pad-pill" data-i18n="hud.pad.glyph.select" aria-hidden="true"></span></span>
-        <label class="settings-controller-field">
-          <input id="input-gamepad-enabled" type="checkbox">
-          <span data-i18n="modals.settings.controller.enabled"></span>
-        </label>
-        <label class="settings-controller-field" for="select-gamepad-deadzone">
-          <span data-i18n="modals.settings.controller.deadzone"></span>
-          <select id="select-gamepad-deadzone" class="flux-seed-input settings-controller-select"></select>
-        </label>
-        <label class="settings-controller-field" for="select-gamepad-aim-speed">
-          <span data-i18n="modals.settings.controller.aimSpeed"></span>
-          <select id="select-gamepad-aim-speed" class="flux-seed-input settings-controller-select"></select>
-        </label>
-        <label class="settings-controller-field">
-          <input id="input-gamepad-invert-x" type="checkbox">
-          <span data-i18n="modals.settings.controller.invertX"></span>
-        </label>
         <label class="settings-controller-field">
           <input id="input-gamepad-rumble" type="checkbox">
-          <span data-i18n="modals.settings.controller.rumble"></span>
+          <span data-i18n="modals.settings.vibration"></span>
         </label>
+      </section>
+      <section class="settings-controller settings-group" aria-labelledby="settings-controller-title">
+        <h3 id="settings-controller-title" class="stats-section-title" data-i18n="modals.settings.controller.title"></h3>
+        <p id="settings-controller-nopad" class="install-hint" data-i18n="modals.settings.controller.noPad"></p>
+        <div id="settings-controller-fields" class="hidden">
+          <p id="settings-controller-hint" class="install-hint" data-i18n="modals.settings.controller.hint"></p>
+          <span class="pad-glyphs"><span class="pad-glyph pad-face" data-pos="bottom" aria-hidden="true"></span><span class="pad-glyph pad-bumper" data-i18n="hud.pad.glyph.leftBumper" aria-hidden="true"></span><span class="pad-glyph pad-bumper" data-i18n="hud.pad.glyph.rightBumper" aria-hidden="true"></span><span class="pad-glyph pad-pill" data-i18n="hud.pad.glyph.start" aria-hidden="true"></span><span class="pad-glyph pad-pill" data-i18n="hud.pad.glyph.select" aria-hidden="true"></span></span>
+          <label class="settings-controller-field">
+            <input id="input-gamepad-enabled" type="checkbox">
+            <span data-i18n="modals.settings.controller.enabled"></span>
+          </label>
+          <label class="settings-controller-field" for="select-gamepad-deadzone">
+            <span data-i18n="modals.settings.controller.deadzone"></span>
+            <select id="select-gamepad-deadzone" class="flux-seed-input settings-controller-select"></select>
+          </label>
+          <label class="settings-controller-field" for="select-gamepad-aim-speed">
+            <span data-i18n="modals.settings.controller.aimSpeed"></span>
+            <select id="select-gamepad-aim-speed" class="flux-seed-input settings-controller-select"></select>
+          </label>
+          <label class="settings-controller-field">
+            <input id="input-gamepad-invert-x" type="checkbox">
+            <span data-i18n="modals.settings.controller.invertX"></span>
+          </label>
+        </div>
       </section>
       <div class="settings-install-row">
         <button id="btn-install" type="button" class="modal-btn hidden" data-i18n="modals.settings.install.button"></button>
