@@ -41,9 +41,13 @@ export const SAVE_MIGRATIONS = Object.freeze([
   { toVersion: 2, run: (manager) => manager.grandfatherModeUnlocks() },
   { toVersion: 3, run: (manager) => manager.seedDailyHistory() },
   { toVersion: 4, run: (manager) => manager.announceIntroducedModes() },
-  { toVersion: 5, run: (manager) => manager.announceIntroducedModes() }
+  { toVersion: 5, run: (manager) => manager.announceIntroducedModes() },
+  { toVersion: 6, run: (manager) => manager.migrateMusicVolumeSteps() }
 ]);
 export const CURRENT_SAVE_SCHEMA_VERSION = SAVE_MIGRATIONS.at(-1).toVersion;
+
+// Absorbs float rounding when two music volume steps are equally close to a stored value.
+const VOLUME_TIE_EPSILON = 1e-9;
 
 /** Clamps a latency offset to +-maxMs and rounds it to whole milliseconds; garbage becomes 0. */
 function clampRhythmOffsetMs(maxMs = 0, value) {
@@ -1311,6 +1315,48 @@ export class StorageManager {
         localStorage.setItem(fullKey, JSON.stringify(merged));
         this.memoryFallback.delete(fullKey);
       }
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Migration v6. The music volume steps changed from [0, .25, .5, .75, 1] to [.2, .4, .6, .8, 1]
+   * (a volume of 0 is now the music switch). A stored volume that is not a step snaps to the
+   * nearest one (ties go up); a stored 0 turns the music off and restores the default volume.
+   * Idempotent, and nothing is deleted. Unreadable values are left for the getter's fallback.
+   * @returns {boolean} False when storage could not be read or written.
+   */
+  migrateMusicVolumeSteps() {
+    const steps = this.defaultsConfig.musicVolumeSteps;
+    if (!Array.isArray(steps) || steps.length === 0) {
+      return true;
+    }
+    try {
+      const volumeKey = this.buildKey(this.storageConfig.keys.musicVolume);
+      const raw = localStorage.getItem(volumeKey);
+      const stored = raw === null ? Number.NaN : Number.parseFloat(raw);
+      if (!Number.isFinite(stored) || steps.includes(stored)) {
+        return true;
+      }
+      let migrated;
+      if (stored <= 0) {
+        const enabledKey = this.buildKey(this.storageConfig.keys.musicEnabled);
+        localStorage.setItem(enabledKey, 'false');
+        this.memoryFallback.delete(enabledKey);
+        migrated = this.defaultsConfig.musicVolume;
+      } else {
+        migrated = steps.reduce((best, step) => {
+          const gap = Math.abs(step - stored);
+          const bestGap = Math.abs(best - stored);
+          const isCloser = gap < bestGap - VOLUME_TIE_EPSILON;
+          const isTieUp = Math.abs(gap - bestGap) <= VOLUME_TIE_EPSILON && step > best;
+          return isCloser || isTieUp ? step : best;
+        }, steps[0]);
+      }
+      localStorage.setItem(volumeKey, String(migrated));
+      this.memoryFallback.delete(volumeKey);
       return true;
     } catch {
       return false;

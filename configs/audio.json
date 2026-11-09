@@ -127,6 +127,16 @@
       "noteDuration": 0.07,
       "hapticMs": 0
     },
+    "upgrade": {
+      "notes": [392, 523.25, 659.25, 783.99],
+      "noteDuration": 0.08,
+      "hapticMs": 20
+    },
+    "magnetarFall": {
+      "notes": [196, 155.56, 130.81, 98],
+      "noteDuration": 0.14,
+      "hapticMs": 60
+    },
     "calibrationClick": {
       "type": "sine",
       "startFreq": 1100,
@@ -140,7 +150,6 @@
     "timerMs": 25,
     "maxVoices": 8,
     "defaultVolume": 0.6,
-    "volumeSteps": [0, 0.25, 0.5, 0.75, 1],
     "gain": 0.5,
     "endFadeSec": 0.4,
     "driver": { "intensityIntervalMs": 100, "syncIntervalMs": 250 },

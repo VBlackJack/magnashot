@@ -22,7 +22,7 @@ import { MAGNETAR_BEHAVIOURS } from '../game/MagnetarRules.js';
 export const SPECIAL_ICON_HIGHLIGHT_POSITION = '30% 30%';
 
 /** Core board and launcher mechanics documented in the Workshop Codex. */
-export const CODEX_MECHANICS_ORDER = Object.freeze(['polarity', 'collectors', 'overcharge']);
+export const CODEX_MECHANICS_ORDER = Object.freeze(['polarity', 'collectors', 'overcharge', 'resonance', 'sag']);
 
 /**
  * Background of a special ball icon: lit from the top left, like the ball on the board.

@@ -2486,6 +2486,10 @@ const RESONANCE_CONFIG = GAME_CONFIG.resonance;
 const CALIBRATION_BEAT_MS = 60000 / RESONANCE_CONFIG.calibrationBpm;
 const CALIBRATION_RUN_MS = (RESONANCE_CONFIG.calibrationLeadBeats + RESONANCE_CONFIG.calibrationBeats + 3) * CALIBRATION_BEAT_MS;
 const RING_WAIT_MS = 500;
+/** A profile that cleared the campaign up to the Resonance unlock (resonance.unlockAfterCampaignLevel). */
+const RESONANCE_UNLOCKED_STORAGE = Object.freeze({
+  [`${STORAGE_PREFIX}${STORAGE_KEYS.unlockedLevel}`]: String(RESONANCE_CONFIG.unlockAfterCampaignLevel + 1)
+});
 
 /** Fails when a dialog is wider than the window or its card scrolls sideways. */
 async function assertDialogFits(page, selector, label) {
@@ -2557,7 +2561,7 @@ for (const viewport of VIEWPORTS) {
     });
 
     test('the Music button and the volume button change and keep their settings', async () => {
-      const { context, page, errors } = await openGame(viewport);
+      const { context, page, errors } = await openGame(viewport, { initStorage: RESONANCE_UNLOCKED_STORAGE });
       try {
         await startLevelOne(page);
         await clickMenuButton(page, viewport, '#btn-settings');
@@ -2668,8 +2672,23 @@ for (const viewport of VIEWPORTS) {
       });
     }
 
-    test('the beat ring is drawn in the Campaign and hidden in the Daily', async () => {
+    test('a fresh profile has no beat ring on level 1', async () => {
       const { context, page, errors } = await openGame(viewport);
+      try {
+        await hookBeatRing(page);
+        await startLevelOne(page);
+        assert.equal(await page.evaluate(() => window.__fluxEngine.getBeatState().resonanceActive), false);
+        assert.equal(await page.evaluate(() => window.__fluxEngine.getResonanceBlockReason()), 'locked');
+        await page.waitForTimeout(RING_WAIT_MS);
+        assert.equal(await page.evaluate(() => window.__ringFrames), 0, 'no ring frame is drawn before the unlock');
+        assert.deepEqual(errors, []);
+      } finally {
+        await context.close();
+      }
+    });
+
+    test('the beat ring is drawn in the Campaign and hidden in the Daily', async () => {
+      const { context, page, errors } = await openGame(viewport, { initStorage: RESONANCE_UNLOCKED_STORAGE });
       try {
         await hookBeatRing(page);
         await startLevelOne(page);

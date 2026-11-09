@@ -30,6 +30,12 @@ const CODEX_HINT_KEY = 'gameplay.discovery.hint';
 /** Mechanic id of the polarity flip, taught by the level that declares it. */
 export const POLARITY_MECHANIC_ID = 'polarity';
 
+/** Mechanic id of the beat bonus, present on a board where Resonance is live. */
+export const RESONANCE_MECHANIC_ID = 'resonance';
+
+/** Mechanic id of the Sag meter, present on a board where Sag is active. */
+export const SAG_MECHANIC_ID = 'sag';
+
 /** Prefix of the mechanic id of a special ball type: `special:<type>`. */
 export const SPECIAL_MECHANIC_PREFIX = 'special:';
 

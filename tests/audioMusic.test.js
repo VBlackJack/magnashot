@@ -36,7 +36,8 @@ configRegistry.configs.set('campaign', loadJson('./configs/campaign.json'));
 const MUSIC = audioConfig.music;
 const TICK_SEC = MUSIC.timerMs / 1000;
 const MODE = GAME_MODES.CAMPAIGN;
-const FRESH_VOLUME = 0.25;
+const FRESH_VOLUME = 0.2;
+const EXPECTED_VOLUME_STEPS = [0.2, 0.4, 0.6, 0.8, 1];
 
 class FakeParam {
   constructor(value = 0) {
@@ -275,7 +276,9 @@ test('storage: music and Resonance settings default, round trip, clamp and rejec
   assert.equal(keys.resonanceEnabled, 'resonance_enabled');
   assert.equal(keys.rhythmOffsetMs, 'rhythm_offset_ms');
   assert.equal(gameConfig.defaults.musicVolume, MUSIC.defaultVolume, 'storage default matches the audio config');
-  assert.deepEqual(gameConfig.defaults.musicVolumeSteps, MUSIC.volumeSteps);
+  assert.deepEqual(gameConfig.defaults.musicVolumeSteps, EXPECTED_VOLUME_STEPS);
+  assert.ok(EXPECTED_VOLUME_STEPS.includes(MUSIC.defaultVolume), 'the default volume is one of the steps');
+  assert.equal(MUSIC.volumeSteps, undefined, 'the steps live in game.json defaults only');
 
   assert.equal(storage.getMusicEnabled(), true);
   assert.equal(storage.getMusicVolume(), MUSIC.defaultVolume);
@@ -365,6 +368,17 @@ test('the Music volume button cycles the configured steps and wraps', () => {
   ui.cycleMusicVolume();
   assert.equal(state.volume, steps[1]);
   assert.deepEqual(audioCalls, [['volume', steps[0]], ['volume', steps[1]]]);
+});
+
+test('the Music volume button steps 0.6 to 0.8 and wraps from 1 to 0.2', () => {
+  const { ui, state } = createPulseUi({ volume: 0.6 });
+  ui.updateMusicVolumeButton = () => {};
+  ui.cycleMusicVolume();
+  assert.equal(state.volume, 0.8);
+  ui.cycleMusicVolume();
+  assert.equal(state.volume, 1);
+  ui.cycleMusicVolume();
+  assert.equal(state.volume, 0.2, 'the top step wraps to the lowest, never to a silent volume');
 });
 
 test('the Resonance toggle flips the stored setting', () => {

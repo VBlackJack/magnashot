@@ -429,7 +429,7 @@ test('music config covers every mode with distinct tempi and valid structure', (
   }
   assert.equal(bpms.size, modes.length, 'tempi are distinct');
   assert.equal(Object.keys(MUSIC.modes).length, modes.length, 'no extra modes');
-  assert.deepEqual(MUSIC.volumeSteps, [0, 0.25, 0.5, 0.75, 1]);
+  assert.equal(MUSIC.volumeSteps, undefined, 'the volume steps live in game.json defaults only');
   assert.equal(MUSIC.maxVoices, 8);
   assert.ok(AUDIO.effects.resonance.notes.length >= 3);
 });

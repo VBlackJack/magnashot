@@ -15,7 +15,7 @@
  */
 import { configRegistry } from '../core/ConfigRegistry.js';
 import { t, formatNumber } from '../core/I18n.js';
-import { ringVisual } from '../game/Resonance.js';
+import { framesPerBeat, ringVisual } from '../game/Resonance.js';
 import { createCalibration } from './RhythmCalibration.js';
 import { createPulseDriver } from './PulseDriver.js';
 import { setTextIfChanged } from './UIHelpers.js';
@@ -252,9 +252,12 @@ export const uiCalibrationMethods = {
     }
     const cfg = this.gameConfig.resonance;
     const stepMs = this.engine.physicsConfig.simulation.fixedStepMs;
+    const beatFrames = framesPerBeat(cfg.calibrationBpm, stepMs);
+    // Same cap as the game board's window, so the calibration ring shows the window the shots get.
+    const windowFrames = Math.min(cfg.windowFrames, Math.floor(beatFrames * cfg.maxWindowBeatFraction));
     const visual = ringVisual(calibration.getFrame(now, stepMs), {
       framesPerBeat: calibration.beatMs / stepMs,
-      windowFrames: cfg.windowFrames,
+      windowFrames,
       reducedMotion: Boolean(this.engine.isReducedMotion),
       cfg
     });
