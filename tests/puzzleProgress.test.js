@@ -143,27 +143,60 @@ test('next-star hint only appears while the attempt cap is 3 stars and the score
   );
 });
 
-test('attempts count on start and retry, not on restore, and freeze after the first clear', () => {
+const fireFirstShot = (engine) => {
+  engine.state = 'playing';
+  engine.shoot();
+};
+
+test('attempts count on the first shot of a round, not on start, retry or restore', () => {
   const storage = createTestStorage();
   const engine = createTestEngine(storage);
   engine.startPuzzleMode(PLAIN_STAGE);
-  assert.equal(attemptsOf(storage, PLAIN_STAGE), 1);
+  assert.equal(attemptsOf(storage, PLAIN_STAGE), 0, 'start alone does not count');
   engine.restartCurrent();
-  assert.equal(attemptsOf(storage, PLAIN_STAGE), 2);
+  assert.equal(attemptsOf(storage, PLAIN_STAGE), 0, 'a retry alone does not count');
 
-  engine.hasFiredInRound = true;
+  fireFirstShot(engine);
+  assert.equal(engine.hasFiredInRound, true);
+  assert.equal(attemptsOf(storage, PLAIN_STAGE), 1, 'the first shot counts once');
+  engine.currentBall = engine.nextBall;
+  engine.physicsWorld.projectile = null;
+  engine.shotsRemaining = Math.max(engine.shotsRemaining, 2);
+  engine.shoot();
+  assert.equal(attemptsOf(storage, PLAIN_STAGE), 1, 'a second shot of the round does not count');
+
+  engine.restartCurrent();
+  fireFirstShot(engine);
+  assert.equal(attemptsOf(storage, PLAIN_STAGE), 2, 'a retry then a shot counts');
+
+  engine.physicsWorld.projectile = null;
   engine.saveRunSnapshot({ force: true });
   const resumed = createTestEngine(storage);
   assert.equal(resumed.restoreSavedRun(), true);
   assert.equal(resumed.mode, 'puzzle');
-  assert.equal(attemptsOf(storage, PLAIN_STAGE), 2, 'a restore is not an attempt');
-
+  assert.equal(resumed.hasFiredInRound, true);
   resumed.state = 'playing';
+  resumed.physicsWorld.projectile = null;
+  resumed.shotsRemaining = Math.max(resumed.shotsRemaining, 2);
+  resumed.shoot();
+  assert.equal(attemptsOf(storage, PLAIN_STAGE), 2, 'a restored round keeps its flag: no new attempt');
+
   winStage(resumed, 0);
   assert.equal(resumed.state, 'victory');
   resumed.restartCurrent();
+  fireFirstShot(resumed);
   resumed.restartCurrent();
+  fireFirstShot(resumed);
   assert.equal(attemptsOf(storage, PLAIN_STAGE), 2, 'attempts stay frozen once cleared');
+});
+
+test('a pre-update victory with 0 stored attempts is never rated better than a first try', () => {
+  const storage = createTestStorage();
+  const engine = createTestEngine(storage);
+  engine.startPuzzleMode(GATED_STAGE);
+  assert.equal(attemptsOf(storage, GATED_STAGE), 0);
+  winStage(engine, topThreshold(GATED_STAGE));
+  assert.equal(engine.victorySummary.stars, scoring.maxStars, 'a first try may still earn every star');
 });
 
 test('stars come from the frozen attempts: first try 3, third try 2, later 1', () => {
@@ -177,8 +210,10 @@ test('stars come from the frozen attempts: first try 3, third try 2, later 1', (
     const engine = createTestEngine(storage);
     engine.startPuzzleMode(PLAIN_STAGE);
     for (let i = 0; i < retries; i++) {
+      fireFirstShot(engine);
       engine.restartCurrent();
     }
+    fireFirstShot(engine);
     winStage(engine, 0);
     assert.equal(engine.victorySummary.stars, expectedStars, `${retries} retries`);
     assert.equal(storage.getPuzzleStageStats()[PLAIN_STAGE].stars, expectedStars);
@@ -213,15 +248,22 @@ test('isNewRecord is per stage: a record on one stage does not flag another', ()
   assert.equal(engine.victorySummary.isNewRecord, true, 'beating the stage best is a record');
 });
 
-test('first clear pays 40 per new star, a replay pays 0, and Puzzle pays no run coins', () => {
+test('first clear pays 40 per new star, a replay pays 0 for no new star, and Puzzle pays no run coins', () => {
   const storage = createTestStorage();
   const engine = createTestEngine(storage);
   engine.startPuzzleMode(PLAIN_STAGE);
   const before = storage.getCoins();
+  const runCoinAwards = [];
+  const realAward = engine.awardRunCoins.bind(engine);
+  engine.awardRunCoins = (amount) => {
+    runCoinAwards.push(amount);
+    realAward(amount);
+  };
   winStage(engine, FIRST_SCORE);
   const { stars } = engine.victorySummary;
   assert.equal(engine.victorySummary.earnedCoins, stars * COIN_PER_NEW_STAR);
-  assert.equal(storage.getCoins(), before + stars * COIN_PER_NEW_STAR, 'no run coins on top');
+  assert.deepEqual(runCoinAwards, [], 'no run coins are awarded on a Puzzle win');
+  assert.equal(storage.getCoins(), before + stars * COIN_PER_NEW_STAR);
 
   engine.restartCurrent();
   const afterFirst = storage.getCoins();

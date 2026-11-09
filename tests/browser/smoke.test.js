@@ -3670,20 +3670,21 @@ describe('puzzle stage intro (desktop)', () => {
         ([mode, playing]) => window.__fluxEngine.mode === mode && window.__fluxEngine.state === playing,
         [GAME_MODES.PUZZLE, GAME_STATES.PLAYING]
       );
-      // The goal banner waits behind a discovery card: close it, then let the HUD refresh.
-      // The intro is set here in the engine's documented shape, so the test pins the banner alone.
-      await page.evaluate(([total, shots]) => {
+      // The goal banner waits behind a discovery card: close it only if one is showing.
+      await page.evaluate(() => {
         const engine = window.__fluxEngine;
-        engine.dismissDiscovery();
-        engine.levelIntro = { puzzleStage: 1, totalStages: total, shots, objective: 'coreRescue', isFirstPuzzle: false };
-        engine.notifyUI();
-      }, [GAME_CONFIG.puzzles.length, GAME_CONFIG.puzzles[0].shots]);
+        if (engine.activeDiscoveryId) {
+          engine.dismissDiscovery();
+        }
+      });
       await waitShown(page, '#level-intro-banner');
       // A revealed live region is filled on the next frame.
       await page.waitForFunction(() => document.querySelector('#level-intro-text').textContent.trim().length > 0);
       const text = await textOf(page, '#level-intro-text');
       assert.ok(text.includes(`Puzzle 1/${GAME_CONFIG.puzzles.length}`), text);
       assert.ok(text.includes(localeText('en', 'hud.levelIntro.puzzleHints.stage1')), 'the stage hint is shown');
+      await page.evaluate(() => window.__fluxEngine.shoot());
+      await page.waitForFunction(() => document.querySelector('#level-intro-banner').classList.contains('hidden'));
       assert.deepEqual(errors, []);
     } finally {
       await context.close();

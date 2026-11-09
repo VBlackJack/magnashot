@@ -667,15 +667,25 @@ export class UIManager {
     }
     const intro = engine.levelIntro;
     if (!intro || engine.state !== GAME_STATES.PLAYING) {
+      // A Puzzle intro that never got its turn behind a discovery card: the first shot came first,
+      // so the goal is still announced to screen readers before the intro is forgotten.
+      if (!intro && this.deferredPuzzleIntro && engine.state === GAME_STATES.PLAYING && engine.hasFiredInRound) {
+        this.announce(buildLevelIntroText({ ...this.deferredPuzzleIntro, fairPlay: null }, t));
+      }
+      if (!intro) {
+        this.deferredPuzzleIntro = null;
+      }
       banner.classList.add('hidden');
       this.levelIntroShotsAtShow = null;
       return;
     }
-    // A discovery card owns the slot: the objective waits for it (deferred, never dropped).
-    if (engine.activeDiscoveryId) {
+    // A discovery card owns the slot: the Puzzle objective waits for it (deferred, never dropped).
+    if (intro.puzzleStage && engine.activeDiscoveryId) {
+      this.deferredPuzzleIntro = intro;
       banner.classList.add('hidden');
       return;
     }
+    this.deferredPuzzleIntro = null;
     const usesShots = engine.usesShotBudget ? engine.usesShotBudget() : true;
     if (usesShots) {
       if (this.levelIntroShotsAtShow === null || this.levelIntroShotsAtShow === undefined) {

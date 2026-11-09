@@ -1280,6 +1280,10 @@ export class GameEngine {
     }
 
     this.blitzIdleFrames = 0;
+    if (this.mode === GAME_MODES.PUZZLE && !this.hasFiredInRound) {
+      // An attempt is the first shot of a round; a restored round already carries the flag.
+      this.storageManager.recordPuzzleAttempt?.(this.currentPuzzleStage);
+    }
     this.hasFiredInRound = true;
     this.physicsWorld.allowTensionBreak = true;
     this.audioManager.playEffect('shoot');

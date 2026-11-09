@@ -366,10 +366,8 @@ export const engineModeMethods = {
     const canvasCfg = this.gameConfig.canvas;
     this.updateAim(canvasCfg.launcherX, canvasCfg.launcherY + canvasCfg.initialAimOffsetY);
     this.refreshDiscovery();
-    // A restore is not a new attempt; the intro stays built behind a discovery card (the UI defers it).
-    if (!this.isRestoringRun) {
-      this.storageManager.recordPuzzleAttempt?.(boundedStage);
-    }
+    // The attempt is counted on the first shot (see fire), not here; the intro stays built behind
+    // a discovery card (the UI defers it).
     this.levelIntro = this.isRestoringRun ? null : this.buildPuzzleIntro(boundedStage, puzzleDef);
     this.notifyUI();
   },

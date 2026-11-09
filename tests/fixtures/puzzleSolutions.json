@@ -45,10 +45,6 @@
         "firstTo": 122.667,
         "first": { "special": null, "flip": true },
         "second": { "special": null, "flip": false, "from": 113.167, "to": 117.667 }
-      },
-      "5": {
-        "first": { "special": null, "flip": false },
-        "second": { "special": "rainbow", "flip": false, "from": 126.667, "to": 136.167 }
       }
     }
   }

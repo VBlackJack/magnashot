@@ -231,3 +231,37 @@ test('Puzzle intro waits behind a discovery card, then shows and is announced on
   ui.updateLevelIntro(engine);
   assert.equal(announced.length, 2, 'a new stage is announced');
 });
+
+test('a non-Puzzle intro is never deferred behind a discovery card', () => {
+  const dailyIntro = { mutatorKey: 'anyMutator', dailySeed: 'seed' };
+  const { ui, engine, banner } = makeIntroUi({ activeDiscoveryId: 'portal', intro: dailyIntro });
+  engine.areUpgradesNeutralised = () => false;
+  engine.isDailyAmmoLocked = () => false;
+  ui.updateLevelIntro(engine);
+  assert.ok(!banner.classList.contains('hidden'), 'Campaign and Daily keep showing the banner');
+  assert.equal(ui.deferredPuzzleIntro ?? null, null);
+});
+
+test('a Puzzle intro still deferred at the first shot is announced once, then forgotten', () => {
+  const { ui, engine, banner, announced } = makeIntroUi({ activeDiscoveryId: 'portal' });
+  ui.updateLevelIntro(engine);
+  assert.equal(announced.length, 0);
+
+  engine.levelIntro = null;
+  engine.hasFiredInRound = true;
+  ui.updateLevelIntro(engine);
+  assert.equal(announced.length, 1, 'the goal reaches screen readers');
+  assert.ok(announced[0].includes(`${STAGE_COUNT}`), 'the announcement is the intro text');
+  assert.ok(banner.classList.contains('hidden'));
+  ui.updateLevelIntro(engine);
+  assert.equal(announced.length, 1, 'announced only once');
+});
+
+test('a Puzzle intro dropped without a shot (quit or restart) is not announced', () => {
+  const { ui, engine, announced } = makeIntroUi({ activeDiscoveryId: 'portal' });
+  ui.updateLevelIntro(engine);
+  engine.levelIntro = null;
+  engine.hasFiredInRound = false;
+  ui.updateLevelIntro(engine);
+  assert.equal(announced.length, 0);
+});
