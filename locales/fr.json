@@ -11,12 +11,8 @@
     },
     "nav": {
       "button": {
-        "levels": "Niveaux",
         "endless": "Survie",
         "daily": "Défi du jour",
-        "dailyBonusBadge": "Défi du Jour (+{{coins}} ⬡)",
-        "dailyPlayedBadge": "Défi du Jour ✓",
-        "dailyPlayedStreakBadge": "Défi du Jour ✓ ({{streak}}j)",
         "flux": "Flux",
         "shop": "Atelier",
         "shopBadge": "Atelier ({{count}})",
@@ -68,8 +64,6 @@
         "resetHintsDone": "✓",
         "resetHintsDoneCaption": "Réinitialisés ✓",
         "weekly": "Flux de la semaine",
-        "weeklyBonusBadge": "Flux de la Semaine +{{coins}} ⬡",
-        "weeklyBestBadge": "Flux de la Semaine ✓ {{score}}",
         "musicOn": "🎵",
         "musicOff": "🔕",
         "musicOnAria": "Musique : activée",
@@ -86,7 +80,6 @@
         "calibrateIcon": "⏱"
       },
       "groups": {
-        "modes": "Modes de jeu",
         "round": "Partie en cours"
       },
       "locked": {
@@ -611,14 +604,12 @@
       },
       "starsTotal": "Étoiles de campagne : {{stars}} / {{maxStars}} ★",
       "card": {
-        "levelNumber": "Niveau {{id}}",
         "locked": "Verrouillé : terminez le niveau {{previous}}",
         "ariaLocked": "Niveau {{id}} : {{name}}, verrouillé, terminez le niveau {{previous}}",
         "aria": "Niveau {{id}} : {{name}}, {{stars}} étoiles sur {{maxStars}}, {{best}}",
         "ariaCurrent": "Niveau {{id}} (En cours) : {{name}}, {{stars}} étoiles sur {{maxStars}}, {{best}}",
         "bestScore": "Record : {{score}}",
         "starsAria": "Étoiles : {{stars}} sur {{maxStars}}",
-        "current": "En cours",
         "formatBadge": {
           "landmark": "Boss",
           "precision": "Précision",
@@ -636,11 +627,7 @@
         "tutorial": "Apprentissage",
         "numbered": "Ch. {{chapter}} : {{theme}}",
         "stars": "{{stars}} / {{maxStars}} ★",
-        "locked": "🔒 Verrouillé",
-        "aria": "{{name}}, niveaux {{first}} à {{last}}, {{stars}} étoiles sur {{maxStars}}",
-        "ariaLocked": "{{name}}, niveaux {{first}} à {{last}}, verrouillé",
         "starsCompleted": "{{stars}} / {{maxStars}} ★ ✓",
-        "ariaCompleted": "{{name}}, niveaux {{first}} à {{last}}, terminé avec {{stars}} étoiles sur {{maxStars}}",
         "prev": "Chapitre précédent",
         "next": "Chapitre suivant",
         "optionLocked": "{{name}} (verrouillé)"
@@ -660,7 +647,6 @@
         "invalidHint": "Entrez une graine Flux valide de {{length}} caractères (lettres a-z et chiffres 0-9)."
       },
       "arcade": {
-        "sectionTitle": "Modes Arcade",
         "puzzle": "Puzzle",
         "puzzleDesc": "10 défis à 1-2 tirs • Noyaux 💎",
         "puzzleRecord": "Puzzle {{stage}}/{{total}} • Record : {{score}}",
@@ -1181,7 +1167,6 @@
         "continueShots": "+{{shots}} tirs ({{cost}} ⬡)",
         "retry": "Réessayer",
         "sameSeed": "Même Graine (#{{seed}})",
-        "levels": "Choisir un Niveau",
         "share": "Partager",
         "shareCopied": "Copié ✓",
         "dailyHistory": "Historique",
@@ -1246,8 +1231,7 @@
       },
       "button": {
         "resume": "Reprendre",
-        "restart": "Recommencer",
-        "levels": "Choisir un Niveau"
+        "restart": "Recommencer"
       }
     },
     "confirm": {

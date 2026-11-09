@@ -96,7 +96,7 @@ export function handleLevelGridKeydown(ui, event) {
   const arrow = GRID_ARROW_STEPS[event.key];
   if (arrow) {
     event.preventDefault();
-    ui.moveLevelTileFocus(arrow.dx, arrow.dy, { wrapRows: false })?.focus();
+    ui.moveLevelTileFocus(arrow.dx, arrow.dy, { wrapRows: true })?.focus();
     return;
   }
   switch (event.key) {

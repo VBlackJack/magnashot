@@ -1598,18 +1598,6 @@ body {
   padding: 5px;
 }
 
-/* One tab per chapter; the strip scrolls sideways on its own, never the page. */
-.level-chapters {
-  display: flex;
-  flex: 0 0 auto;
-  gap: 8px;
-  overflow-x: auto;
-  overscroll-behavior-x: contain;
-  /* Top and sides hold the focus outline plus its offset (3px + 2px); the bottom also clears the scrollbar. */
-  padding: 5px 5px 8px;
-  scrollbar-width: thin;
-}
-
 #levels-grid {
   flex: 1 1 auto;
   max-height: none;

@@ -369,7 +369,7 @@ test('grid keys: arrows move and focus, Home and End jump, Page keys change chap
 
   assert.equal(press('ArrowRight').prevented, true);
   press('ArrowUp');
-  assert.deepEqual(calls.splice(0), [['move', 1, 0, { wrapRows: false }], ['move', 0, -1, { wrapRows: false }]]);
+  assert.deepEqual(calls.splice(0), [['move', 1, 0, { wrapRows: true }], ['move', 0, -1, { wrapRows: true }]]);
   assert.deepEqual(focused, ['tile'], 'the focus follows the tile that was returned, and an edge focuses nothing');
 
   press('Home');

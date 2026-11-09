@@ -20,10 +20,15 @@ All notable changes to **MagnaShot** are documented in this file.
 - **Rendering Cost (`Renderer`)**: Explosion gradients are cached, the pixel ratio is capped at 2 on touch screens and on the split duel boards, and at most 64 explosions are drawn at once.
 - **Names and Texts (`locales`)**: The Chain Reaction achievements are named "Chain Reaction" (I to III) instead of "Chain Resonance"; the French calibration texts read "appuis" and the too-few-taps message tells how to start again.
 - **Settings Layout (`styles/main.css`)**: A rule and an even gap separate the Settings groups, with the headings centred; forced colors keep the rule visible.
+- **Play Hub (`PlayHubView`, `UIManager`, `UIModals`, `UIHudRefresh`, `UIInputBindings`, `UIGamepad`, `UIHelpers`, `index.html`, `styles/main.css`)**: The menu drawer is reduced to Play, My stats and Settings, plus the current-round actions. Play opens one hub with every mode in four sections (Campaign, Challenges, Arcade in unlock order, Duel); locked cards name the level that opens them, a newly unlocked mode is marked New on its card and on the Play button, and the Puzzle stage strip and the Flux seed field open under their cards. The Pause and Game over dialogs and the HUD mode pill offer "Change mode", which opens the hub.
+- **Campaign Map (`LevelSelectView`, `UIInputBindings`, `UIGamepad`, `styles/main.css`)**: The level select is campaign only: a chapter switcher, compact level tiles navigable with the arrow keys, Home, End, PageUp, PageDown or the controller, and a detail panel. The map is one tap further for campaign players (Play, then Campaign map), and a level that is not the current one is selected first, then played with a second tap or Enter.
+- **Consistent Mode Names (`locales`)**: Mode names carry no emoji, HUD banners read "Mode - detail" with a bullet, rewards read "+N" with the coin sign, and "Puzzle N" names puzzle stages, leaving "Level" to the campaign.
+- **Weekly Flux Unlock (`UIModals`, `weeklyFlux.unlockAfterCampaignLevel`)**: The Weekly Flux opens after campaign level 5, before Flux itself, and playing it opens Flux. It never wears a New badge.
 
 ### Fixed
 - **Calibration Smoke Test**: The scripted taps of the calibration run test carry their own timestamps, a fixed 40 ms before each pulse, instead of following the ring in frame callbacks whose lag exceeded the narrower window; the test checks the saved offset exactly.
 - **Upgrade Sound (`audio.json`)**: The upgrade effect is defined in the audio config, so the sound plays.
+- **Campaign Levels That Sagged (`campaignTuning.json`, `calibrate-campaign`, `SettleProbe`)**: 84 generated campaign levels are rerolled to a variant whose cluster settles at least 72 px above the danger line with no shot; 27 of them were lost before the first shot (level 179, for one). Calibration now rejects variants that sag, and a new slow test settles all 824 levels.
 
 ## [1.21.0] - 2026-11-09
 

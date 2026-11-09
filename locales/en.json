@@ -11,12 +11,8 @@
     },
     "nav": {
       "button": {
-        "levels": "Levels",
         "endless": "Survival",
         "daily": "Daily Challenge",
-        "dailyBonusBadge": "Daily (+{{coins}} ⬡)",
-        "dailyPlayedBadge": "Daily ✓",
-        "dailyPlayedStreakBadge": "Daily ✓ ({{streak}}d)",
         "flux": "Flux",
         "shop": "Workshop",
         "shopBadge": "Workshop ({{count}})",
@@ -68,8 +64,6 @@
         "resetHintsDone": "✓",
         "resetHintsDoneCaption": "Reset ✓",
         "weekly": "Weekly Flux",
-        "weeklyBonusBadge": "Weekly Flux +{{coins}} ⬡",
-        "weeklyBestBadge": "Weekly Flux ✓ {{score}}",
         "musicOn": "🎵",
         "musicOff": "🔕",
         "musicOnAria": "Music: ON",
@@ -86,7 +80,6 @@
         "calibrateIcon": "⏱"
       },
       "groups": {
-        "modes": "Game modes",
         "round": "Current round"
       },
       "locked": {
@@ -611,14 +604,12 @@
       },
       "starsTotal": "Campaign stars: {{stars}} / {{maxStars}} ★",
       "card": {
-        "levelNumber": "Level {{id}}",
         "locked": "Locked: clear level {{previous}}",
         "ariaLocked": "Level {{id}}: {{name}}, locked, clear level {{previous}}",
         "aria": "Level {{id}}: {{name}}, {{stars}} of {{maxStars}} stars, {{best}}",
         "ariaCurrent": "Level {{id}} (Current): {{name}}, {{stars}} of {{maxStars}} stars, {{best}}",
         "bestScore": "Best: {{score}}",
         "starsAria": "Stars: {{stars}} of {{maxStars}}",
-        "current": "Current",
         "formatBadge": {
           "landmark": "Boss",
           "precision": "Precision",
@@ -636,11 +627,7 @@
         "tutorial": "Basics",
         "numbered": "Ch. {{chapter}}: {{theme}}",
         "stars": "{{stars}} / {{maxStars}} ★",
-        "locked": "🔒 Locked",
-        "aria": "{{name}}, levels {{first}} to {{last}}, {{stars}} of {{maxStars}} stars",
-        "ariaLocked": "{{name}}, levels {{first}} to {{last}}, locked",
         "starsCompleted": "{{stars}} / {{maxStars}} ★ ✓",
-        "ariaCompleted": "{{name}}, levels {{first}} to {{last}}, completed with {{stars}} of {{maxStars}} stars",
         "prev": "Previous chapter",
         "next": "Next chapter",
         "optionLocked": "{{name}} (locked)"
@@ -660,7 +647,6 @@
         "invalidHint": "Enter a valid {{length}}-character Flux seed (letters a-z and digits 0-9)."
       },
       "arcade": {
-        "sectionTitle": "Arcade Modes",
         "puzzle": "Puzzle",
         "puzzleDesc": "10 trick-shot stages • Rescue Cores 💎",
         "puzzleRecord": "Puzzle {{stage}}/{{total}} • Best: {{score}}",
@@ -1181,7 +1167,6 @@
         "continueShots": "+{{shots}} Shots ({{cost}} ⬡)",
         "retry": "Try Again",
         "sameSeed": "Same Seed (#{{seed}})",
-        "levels": "Select Level",
         "share": "Share",
         "shareCopied": "Copied ✓",
         "dailyHistory": "History",
@@ -1246,8 +1231,7 @@
       },
       "button": {
         "resume": "Resume",
-        "restart": "Restart",
-        "levels": "Select Level"
+        "restart": "Restart"
       }
     },
     "confirm": {

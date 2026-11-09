@@ -308,7 +308,7 @@ const textOf = (page, selector) =>
 
 /** True when a mode card carries the "New" badge. */
 const hasNewBadge = (page, selector) =>
-  page.evaluate((sel) => Boolean(document.querySelector(sel)?.querySelector('.mode-new-badge')), selector);
+  page.evaluate((sel) => Boolean(document.querySelector(sel)?.querySelector('.mode-new-badge:not(.hidden)')), selector);
 
 /** Starts a match against a tier and waits for the board of the player to be in play. */
 async function startVersusMatch(page, viewport, tier) {
@@ -3101,9 +3101,12 @@ for (const viewport of VIEWPORTS) {
             'the running level is offered for resuming'
           );
           const headings = await page.evaluate(() =>
-            [...document.querySelectorAll('#modal-play section[aria-labelledby]')].map(
-              (section) => document.getElementById(section.getAttribute('aria-labelledby'))?.textContent.trim() ?? ''
-            )
+            [...document.querySelectorAll('#modal-play section[aria-labelledby]')].map((section) => {
+              // The accessible name leaves out decorative (aria-hidden) icons.
+              const heading = document.getElementById(section.getAttribute('aria-labelledby'))?.cloneNode(true);
+              heading?.querySelectorAll('[aria-hidden="true"]').forEach((icon) => icon.remove());
+              return heading?.textContent.trim() ?? '';
+            })
           );
           assert.deepEqual(headings, HUB_SECTION_KEYS.map((key) => localeText(language, key)), 'four sections, in order');
           await assertHubFits(page, `Play hub (${language})`);
@@ -3393,7 +3396,11 @@ describe('play hub (desktop)', () => {
       await waitShown(page, '#modal-levels');
       const opened = await readMapState(page);
       const index = opened.ids.indexOf(opened.selectedId);
-      const button = index < opened.ids.length - 1 ? HUB_PAD_BUTTONS.dpadRight : HUB_PAD_BUTTONS.dpadLeft;
+      // The pad stops at a row edge (spatial navigation takes over there), so pick the side that stays in the row.
+      const columns = await page.evaluate(
+        () => getComputedStyle(document.querySelector('#levels-grid')).gridTemplateColumns.split(' ').filter(Boolean).length
+      );
+      const button = index < opened.ids.length - 1 && (index + 1) % columns !== 0 ? HUB_PAD_BUTTONS.dpadRight : HUB_PAD_BUTTONS.dpadLeft;
       await tapPad(page, button);
       const moved = await readMapState(page);
       assert.equal(moved.selectedId, opened.ids[index + (button === HUB_PAD_BUTTONS.dpadRight ? 1 : -1)], 'the d-pad selects the neighbour tile');

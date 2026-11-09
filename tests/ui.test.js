@@ -2555,10 +2555,6 @@ test('Daily mutator intro banner, completed chapter summary, and collectorMagnet
         ['overcharge', 'points']
       );
       assert.deepEqual(
-        placeholdersOf(locale.modals.levelSelect.chapters.ariaCompleted),
-        ['first', 'last', 'maxStars', 'name', 'stars']
-      );
-      assert.deepEqual(
         placeholdersOf(locale.modals.levelSelect.chapters.starsCompleted),
         ['maxStars', 'stars']
       );
