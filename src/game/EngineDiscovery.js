@@ -23,6 +23,8 @@ import {
 import {
   DISCOVERY_INTERACTIONS,
   POLARITY_MECHANIC_ID,
+  RESONANCE_MECHANIC_ID,
+  SAG_MECHANIC_ID,
   isProjectileNearMechanic,
   listBoardMechanics,
   listLevelMechanics,
@@ -174,8 +176,9 @@ export const engineDiscoveryMethods = {
   },
 
   /**
-   * Mechanics on the board, plus the ones the campaign level declares: the polarity flip
-   * has no object on the board.
+   * Mechanics on the board, plus the ones the campaign level declares (the polarity flip has
+   * no object on the board) and the ones the run itself switches on: Resonance when it is
+   * live and Sag when the mode has the meter.
    * @returns {Set<string>} Mechanic ids.
    */
   listPresentMechanics() {
@@ -185,6 +188,12 @@ export const engineDiscoveryMethods = {
       for (const mechanicId of levelDef?.teachesMechanics || []) {
         present.add(mechanicId);
       }
+    }
+    if (this.isResonanceEnabled()) {
+      present.add(RESONANCE_MECHANIC_ID);
+    }
+    if (this.getSagState().active) {
+      present.add(SAG_MECHANIC_ID);
     }
     return present;
   },

@@ -32,6 +32,7 @@
     "survivalWaveWarningThreshold": 2,
     "dangerWarningMarginY": 72,
     "maxDevicePixelRatio": 3,
+    "coarsePointerMaxDevicePixelRatio": 2,
     "aimPreviewCacheCellPx": 1,
     "idleRenderIntervalMs": 250,
     "launcher": {
@@ -159,8 +160,9 @@
   },
   "resonance": {
     "enabledByDefault": true,
-    "windowFrames": 7,
-    "maxWindowBeatFraction": 0.15,
+    "windowFrames": 5,
+    "maxWindowBeatFraction": 0.12,
+    "unlockAfterCampaignLevel": 5,
     "maxOffsetMs": 200,
     "overchargeMultiplier": 1.5,
     "versusStrengthLoss": 2,
@@ -242,7 +244,7 @@
     "particles": {
       "maxParticles": 480,
       "maxShatteringBalls": 24,
-      "maxExplosions": 128,
+      "maxExplosions": 64,
       "shakeStopThreshold": 0.1,
       "screenFlashInitialAlpha": 0.32,
       "screenFlashDecay": 0.04,
@@ -555,7 +557,8 @@
       "fallExplosionBurst": 36,
       "fallShockwaveRadius": 180,
       "fallSlowMoFrames": 36,
-      "fallSlowMoTimeScale": 0.24
+      "fallSlowMoTimeScale": 0.24,
+      "fallShake": 9
     }
   },
   "cascade": {
@@ -1467,6 +1470,8 @@
     "order": [
       "basics",
       "polarity",
+      "resonance",
+      "sag",
       "pivot",
       "coinCore",
       "dormantBomb",
@@ -1506,6 +1511,14 @@
       "basics": {
         "hintKey": "gameplay.tutorial.pendulum",
         "interaction": "match"
+      },
+      "resonance": {
+        "hintKey": "gameplay.tutorial.resonance",
+        "interaction": "shot"
+      },
+      "sag": {
+        "hintKey": "gameplay.tutorial.sag",
+        "interaction": "shot"
       },
       "pivot": {
         "hintKey": "gameplay.tutorial.rotor",
@@ -1792,6 +1805,8 @@
       "splitMinBoardWidthPx": 300,
       "splitMinViewportHeightPx": 520,
       "miniScale": 0.28,
+      "portraitMiniMaxHeightPx": 140,
+      "splitMaxDevicePixelRatio": 2,
       "liteFrameInterval": 2
     },
     "ui": {
@@ -1858,6 +1873,7 @@
     "timelineEntries": 14
   },
   "weeklyFlux": {
+    "unlockAfterCampaignLevel": 5,
     "firstPlayBonusCoins": 40,
     "seedSalt": "magnashot-weekly"
   },
@@ -2013,7 +2029,7 @@
     "ballStyle": "classic",
     "musicEnabled": true,
     "musicVolume": 0.6,
-    "musicVolumeSteps": [0, 0.25, 0.5, 0.75, 1],
+    "musicVolumeSteps": [0.2, 0.4, 0.6, 0.8, 1],
     "animationSpeed": 1,
     "animationSpeeds": [
       0.5,

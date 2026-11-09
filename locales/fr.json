@@ -118,8 +118,8 @@
         "result": "Décalage : {{offset}} ms",
         "reset": "Réinitialiser",
         "done": "Terminé",
-        "progress": "{{done}} / {{total}} taps",
-        "tooFew": "Pas assez de taps (au moins {{min}}). Appuyez sur le bouton pour recommencer."
+        "progress": "{{done}} / {{total}} appuis",
+        "tooFew": "Pas assez d'appuis (au moins {{min}}). Appuyez sur le bouton pour recommencer."
       }
     }
   },
@@ -577,7 +577,9 @@
         "freeze": "Cryo : gèle la descente et calme l'oscillation magnétique. Sélectionnez son emplacement lumineux, puis tirez.",
         "rocket": "Fusée : tire trois fusées à tête chercheuse sur les sphères les plus coriaces. Sélectionnez son emplacement lumineux, puis tirez.",
         "brush": "Pinceau : repeint les sphères voisines d'une même couleur et décape la rouille. Sélectionnez son emplacement lumineux, puis tirez."
-      }
+      },
+      "resonance": "Résonance : l'anneau autour du lanceur se resserre à chaque temps de la musique. Tirez quand il est plein et lumineux : un tir en résonance qui fait une combinaison ou une chute remplit davantage la Surcharge.",
+      "sag": "Affaissement : chaque tir qui ne détruit rien remplit la jauge d'Affaissement à côté du lanceur. Pleine, elle fait descendre l'amas. Les avalanches la vident."
     },
     "discovery": {
       "hint": "Nouveau : {{icon}} {{name}}. {{description}}"
@@ -748,6 +750,16 @@
             "icon": "🔋",
             "name": "Jauge de Surcharge",
             "description": "Se remplit à chaque groupe détruit et sphère collectée. Une fois pleine, elle forge automatiquement une sphère spéciale gratuite."
+          },
+          "resonance": {
+            "icon": "🎵",
+            "name": "Résonance",
+            "description": "Débloquée pendant la campagne. L'anneau autour du lanceur se resserre à chaque temps ; un tir lâché quand il est plein est en résonance et rapporte plus de Surcharge, ou frappe plus fort les charges en Duel de Polarité. Désactivée en Classique et dans les parties compétitives."
+          },
+          "sag": {
+            "icon": "⏬",
+            "name": "Affaissement",
+            "description": "En Survie, Défi du Jour et Puriste, chaque tir qui ne détruit rien remplit la jauge d'Affaissement ; quand elle est pleine, l'amas descend. Les avalanches la vident."
           }
         },
         "mutators": {
@@ -934,7 +946,7 @@
             "description": "Faire tomber au moins {{target}} sphères en une seule avalanche."
           },
           "comboMaster": {
-            "name": "Résonance en Chaîne",
+            "name": "Réaction en chaîne",
             "description": "Atteindre un multiplicateur de Combo x{{target}} ou supérieur."
           },
           "bossSlayer": {
@@ -962,11 +974,11 @@
             "description": "Faire tomber au moins {{target}} sphères en une seule avalanche."
           },
           "comboMasterSilver": {
-            "name": "Résonance en Chaîne II",
+            "name": "Réaction en chaîne II",
             "description": "Atteindre un multiplicateur de Combo x{{target}} ou supérieur."
           },
           "comboMasterGold": {
-            "name": "Résonance en Chaîne III",
+            "name": "Réaction en chaîne III",
             "description": "Atteindre un multiplicateur de Combo x{{target}} ou supérieur."
           },
           "bossSlayerSilver": {
@@ -1259,8 +1271,15 @@
           "fast": "Rapide"
         },
         "invertX": "Inverser la visée horizontale",
-        "rumble": "Vibration"
-      }
+        "rumble": "Vibration",
+        "noPad": "Aucune manette détectée. Branchez-en une et appuyez sur un bouton."
+      },
+      "groups": {
+        "audio": "Audio",
+        "gameplay": "Jeu",
+        "accessibility": "Accessibilité"
+      },
+      "vibration": "Vibration (téléphone et manette)"
     },
     "fluxPerk": {
       "title": "Choisissez un atout",

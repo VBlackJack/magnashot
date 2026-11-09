@@ -577,7 +577,9 @@
         "freeze": "Cryo: freezes the descent and calms the magnetic sway. Select its glowing slot, then shoot.",
         "rocket": "Rocket: fires three homing rockets at the toughest spheres. Select its glowing slot, then shoot.",
         "brush": "Brush: repaints nearby spheres into one color and scrubs off rust. Select its glowing slot, then shoot."
-      }
+      },
+      "resonance": "Resonance: the ring around the launcher closes on every beat of the music. Shoot while it is solid and bright: a Resonant shot that matches or drops fills more Overcharge.",
+      "sag": "Sag: every shot that clears nothing fills the Sag meter beside the launcher. When it is full, the cluster drops closer. Avalanches drain it."
     },
     "discovery": {
       "hint": "New: {{icon}} {{name}}. {{description}}"
@@ -748,6 +750,16 @@
             "icon": "🔋",
             "name": "Overcharge Gauge",
             "description": "Fills with every cleared group and collected sphere. When full, it automatically forges a free Special Sphere."
+          },
+          "resonance": {
+            "icon": "🎵",
+            "name": "Resonance",
+            "description": "Unlocked during the campaign. The ring around the launcher closes on each beat; a shot released while it is solid is Resonant and earns extra Overcharge, or hits charges harder in a Polarity Duel. Off in Classic and in competitive runs."
+          },
+          "sag": {
+            "icon": "⏬",
+            "name": "Sag",
+            "description": "In Survival, Daily and Purist, each shot that clears nothing fills the Sag meter; when it is full the cluster drops. Avalanches drain it."
           }
         },
         "mutators": {
@@ -934,7 +946,7 @@
             "description": "Drop at least {{target}} unanchored spheres in a single avalanche."
           },
           "comboMaster": {
-            "name": "Chain Resonance",
+            "name": "Chain Reaction",
             "description": "Reach a x{{target}} or higher Combo multiplier."
           },
           "bossSlayer": {
@@ -962,11 +974,11 @@
             "description": "Drop at least {{target}} unanchored spheres in a single avalanche."
           },
           "comboMasterSilver": {
-            "name": "Chain Resonance II",
+            "name": "Chain Reaction II",
             "description": "Reach a x{{target}} or higher Combo multiplier."
           },
           "comboMasterGold": {
-            "name": "Chain Resonance III",
+            "name": "Chain Reaction III",
             "description": "Reach a x{{target}} or higher Combo multiplier."
           },
           "bossSlayerSilver": {
@@ -1259,8 +1271,15 @@
           "fast": "Fast"
         },
         "invertX": "Invert horizontal aim",
-        "rumble": "Vibration"
-      }
+        "rumble": "Vibration",
+        "noPad": "No controller detected. Connect one and press any button."
+      },
+      "groups": {
+        "audio": "Audio",
+        "gameplay": "Gameplay",
+        "accessibility": "Accessibility"
+      },
+      "vibration": "Vibration (phone and controller)"
     },
     "fluxPerk": {
       "title": "Choose a Perk",

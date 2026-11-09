@@ -69,39 +69,64 @@ export function isInBeatWindow(frame, offsetFrames, framesPerBeatValue, windowFr
   return distanceToNearestBeat(frame, offsetFrames, framesPerBeatValue) <= windowFrames + FRAME_EPSILON;
 }
 
+/** Why Resonance is off on a board; null from getResonanceBlock means it is live. */
+export const RESONANCE_BLOCKS = Object.freeze({
+  SETTING: 'setting',
+  COMPETITIVE: 'competitive',
+  RULESET: 'ruleset',
+  OPTION: 'option',
+  LOCKED: 'locked'
+});
+
 /**
- * Whether Resonance applies to a run at all. The setting and the match option can switch it
- * off; the competitive runs (Daily, Weekly Flux, shared Flux seed, Ghost Duel) never use it
- * whatever the setting says, so their scores stay comparable.
+ * The reason Resonance is off for a run, or null when it is live. The setting and the match
+ * option can switch it off; the competitive runs (Daily, Weekly Flux, shared Flux seed, Ghost
+ * Duel) never use it whatever the setting says, so their scores stay comparable; Classic
+ * keeps its own ruleset; and solo boards wait for the campaign unlock (duel boards ignore it).
  *
  * @param {object} params
- * @param {string} params.mode Game mode id.
+ * @param {string} params.mode Game mode id (a duel board reports Versus).
  * @param {boolean} [params.isDailyRematch] Daily rematch run.
  * @param {boolean} [params.isWeeklyFluxRun] Weekly Flux run.
  * @param {boolean} [params.isSharedFluxRun] Flux run from a shared seed link.
  * @param {boolean} [params.ghostDuel] Ghost Duel run.
  * @param {boolean} [params.versusOption] Versus match option; undefined follows the setting.
  * @param {boolean} params.setting Player's Resonance setting.
+ * @param {boolean} [params.isUnlocked] Whether the campaign unlock is reached (solo boards).
+ * @returns {string|null}
  */
-export function isResonanceAllowed({
+export function getResonanceBlock({
   mode,
   isDailyRematch = false,
   isWeeklyFluxRun = false,
   isSharedFluxRun = false,
   ghostDuel = false,
   versusOption,
-  setting
+  setting,
+  isUnlocked = true
 } = {}) {
+  const isVersus = mode === GAME_MODES.VERSUS;
+  if (isVersus && versusOption === false) {
+    return RESONANCE_BLOCKS.OPTION;
+  }
   if (!setting) {
-    return false;
+    return RESONANCE_BLOCKS.SETTING;
   }
   if (mode === GAME_MODES.DAILY || isDailyRematch || isWeeklyFluxRun || isSharedFluxRun || ghostDuel) {
-    return false;
+    return RESONANCE_BLOCKS.COMPETITIVE;
   }
-  if (mode === GAME_MODES.VERSUS && versusOption === false) {
-    return false;
+  if (mode === GAME_MODES.CLASSIC || !Object.values(GAME_MODES).includes(mode)) {
+    return RESONANCE_BLOCKS.RULESET;
   }
-  return Object.values(GAME_MODES).includes(mode);
+  if (!isVersus && !isUnlocked) {
+    return RESONANCE_BLOCKS.LOCKED;
+  }
+  return null;
+}
+
+/** Whether Resonance applies to a run at all (see getResonanceBlock). */
+export function isResonanceAllowed(params = {}) {
+  return getResonanceBlock(params) === null;
 }
 
 /** Strength a charge loses from a hit: the configured amount when Resonant, else the base. */

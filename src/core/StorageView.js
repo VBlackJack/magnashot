@@ -69,6 +69,7 @@ export const VERSUS_STORAGE_POLICY = Object.freeze({
   init: P.INTERNAL,
   runSaveMigrations: P.INTERNAL,
   migrateLegacyKeys: P.INTERNAL,
+  migrateMusicVolumeSteps: P.INTERNAL,
   bindCrossTabSync: P.INTERNAL,
   handleExternalStorageChange: P.INTERNAL,
   buildKey: P.INTERNAL,

@@ -19,10 +19,12 @@ import assert from 'node:assert/strict';
 import {
   beatPhase,
   framesPerBeat,
+  getResonanceBlock,
   isInBeatWindow,
   isResonanceAllowed,
   offsetMsToFrames,
   resonantStrengthLoss,
+  RESONANCE_BLOCKS,
   ringVisual
 } from '../src/game/Resonance.js';
 import { GAME_MODES } from '../src/core/Constants.js';
@@ -89,7 +91,8 @@ const COMPETITIVE_FLAGS = [
 
 test('isResonanceAllowed matrix: every mode with the setting on and no flag', () => {
   for (const mode of ALL_MODES) {
-    const expected = mode !== GAME_MODES.DAILY;
+    // Daily is competitive and Classic keeps its own ruleset.
+    const expected = mode !== GAME_MODES.DAILY && mode !== GAME_MODES.CLASSIC;
     assert.equal(isResonanceAllowed({ mode, setting: true }), expected, mode);
   }
 });
@@ -120,6 +123,41 @@ test('isResonanceAllowed: versus option can turn it off and otherwise follows th
 test('isResonanceAllowed: unseeded Flux is on, an unknown mode is off', () => {
   assert.equal(isResonanceAllowed({ mode: GAME_MODES.FLUX, setting: true }), true);
   assert.equal(isResonanceAllowed({ mode: 'nope', setting: true }), false);
+});
+
+test('getResonanceBlock: the reason for every way Resonance can be off, in check order', () => {
+  const B = RESONANCE_BLOCKS;
+  const live = { mode: GAME_MODES.CAMPAIGN, setting: true };
+  assert.equal(getResonanceBlock(live), null);
+  assert.equal(getResonanceBlock({ ...live, setting: false }), B.SETTING);
+  assert.equal(getResonanceBlock({ ...live, mode: GAME_MODES.DAILY }), B.COMPETITIVE);
+  for (const flags of COMPETITIVE_FLAGS) {
+    assert.equal(getResonanceBlock({ ...live, ...flags }), B.COMPETITIVE, JSON.stringify(flags));
+  }
+  assert.equal(getResonanceBlock({ ...live, mode: GAME_MODES.CLASSIC }), B.RULESET);
+  assert.equal(getResonanceBlock({ ...live, mode: 'nope' }), B.RULESET);
+  assert.equal(getResonanceBlock({ ...live, isUnlocked: false }), B.LOCKED);
+  assert.equal(getResonanceBlock({ ...live, isUnlocked: true }), null);
+  // Check order: the setting first, then competitive, then the ruleset, then the unlock.
+  assert.equal(getResonanceBlock({ ...live, setting: false, isUnlocked: false }), B.SETTING);
+  assert.equal(getResonanceBlock({ ...live, mode: GAME_MODES.DAILY, isUnlocked: false }), B.COMPETITIVE);
+  assert.equal(getResonanceBlock({ ...live, mode: GAME_MODES.CLASSIC, isUnlocked: false }), B.RULESET);
+  assert.equal(getResonanceBlock({ ...live, ghostDuel: true, mode: GAME_MODES.CLASSIC }), B.COMPETITIVE);
+});
+
+test('getResonanceBlock: duel boards ignore the unlock and answer to the match option', () => {
+  const B = RESONANCE_BLOCKS;
+  const duel = { mode: GAME_MODES.VERSUS, setting: true };
+  assert.equal(getResonanceBlock({ ...duel, isUnlocked: false }), null);
+  assert.equal(getResonanceBlock({ ...duel, versusOption: false, isUnlocked: false }), B.OPTION);
+  assert.equal(getResonanceBlock({ ...duel, versusOption: false, setting: false }), B.OPTION);
+  assert.equal(getResonanceBlock({ ...duel, setting: false }), B.SETTING);
+  assert.equal(getResonanceBlock({ ...duel, setting: true, versusOption: true }), null);
+  assert.equal(getResonanceBlock({ ...duel, ghostDuel: true }), B.COMPETITIVE);
+  // The option concerns versus only.
+  assert.equal(getResonanceBlock({ mode: GAME_MODES.CAMPAIGN, setting: true, versusOption: false }), null);
+  assert.equal(isResonanceAllowed({ ...duel, isUnlocked: false }), true);
+  assert.equal(isResonanceAllowed({ mode: GAME_MODES.ENDLESS, setting: true, isUnlocked: false }), false);
 });
 
 test('resonantStrengthLoss returns the configured loss only when Resonant', () => {

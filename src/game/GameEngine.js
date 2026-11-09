@@ -33,7 +33,6 @@ import { captureRunSnapshot, isValidRunSnapshot, applyRunSnapshot, isRunSnapshot
 import { LevelCatalog } from './LevelCatalog.js';
 import { DISCOVERY_INTERACTIONS } from './Discovery.js';
 
-const FIRST_PLAYED_FRAME = 1;
 const ACHIEVEMENT_TIER_ORDER = Object.freeze(['bronze', 'silver', 'gold']);
 
 import { installMethods } from '../core/installMethods.js';
@@ -1287,8 +1286,9 @@ export class GameEngine {
     if (this.state !== GAME_STATES.PLAYING) {
       return;
     }
-    this.beatFrame++;
-    if (this.beatFrame === FIRST_PLAYED_FRAME) {
+    const isFirstPlayedFrame = this.beatFrame === 0;
+    this.beatFrame += this.getBeatAdvance();
+    if (isFirstPlayedFrame) {
       this.announceResonanceDisabled();
     }
     if (this.resonanceFlashFrames > 0) {

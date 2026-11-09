@@ -24,6 +24,8 @@ import { createVersusStorageView } from '../src/core/StorageView.js';
 import { createAudioChannel } from '../src/core/AudioChannel.js';
 import { applyWorldGeometry } from '../src/core/WorldGeometry.js';
 import { GAME_STATES } from '../src/core/Constants.js';
+import { RESONANCE_BLOCKS } from '../src/game/Resonance.js';
+import { RESONANCE_MECHANIC_ID } from '../src/game/Discovery.js';
 import { Ball } from '../src/entities/Ball.js';
 import { GameEngine, ENGINE_ROLES } from '../src/game/GameEngine.js';
 import { createVersusMatch, resolveCpuTier } from '../src/game/VersusMatch.js';
@@ -75,6 +77,8 @@ const LCG_MODULUS = 2147483647;
 const LCG_START = 4242;
 const CALIBRATED_OFFSET_MS = 100;
 const HALF = 0.5;
+// Share of a beat the whole window (both sides plus the beat frame) may cover at the tuned tempos.
+const MAX_WINDOW_SHARE = 0.26;
 // Campaign plays at 96 BPM: the window is capped to a fraction of the beat (see the cap test).
 const CAMPAIGN_WINDOW = Math.min(
   RES.windowFrames,
@@ -92,11 +96,18 @@ const createAudioSpy = () => {
   };
 };
 
-const createManager = ({ resonance = true, offsetMs = 0 } = {}) => {
+// Level the campaign is cleared up to once Resonance is unlocked (resonance.unlockAfterCampaignLevel).
+const UNLOCK_LEVEL = RES.unlockAfterCampaignLevel + 1;
+
+/** A fresh profile by default is not enough for Resonance: progress seeds the unlock unless asked otherwise. */
+const createManager = ({ resonance = true, offsetMs = 0, progress = true } = {}) => {
   const manager = new StorageManager();
   manager.init();
   manager.setResonanceEnabled(resonance);
   manager.setRhythmOffsetMs(offsetMs);
+  if (progress) {
+    manager.unlockLevel(UNLOCK_LEVEL);
+  }
   return manager;
 };
 
@@ -112,10 +123,10 @@ const createEngine = (options = {}) => {
   return engine;
 };
 
-const createBoard = (resonanceOption) => {
+const createBoard = (resonanceOption, managerOptions = {}) => {
   const engine = new GameEngine({
     ...configs,
-    storageManager: createVersusStorageView(createManager()),
+    storageManager: createVersusStorageView(createManager(managerOptions)),
     audioManager: createAudioChannel(createAudioSpy(), { muted: true }),
     onStateChange: () => {},
     role: ENGINE_ROLES.VERSUS
@@ -321,7 +332,6 @@ test('the solo modes use Resonance when the setting is on', () => {
     const starters = [
       (engine) => engine.startCampaignLevel(1),
       (engine) => engine.startEndlessMode(),
-      (engine) => engine.startClassicMode(1),
       (engine) => engine.startBlitzMode(),
       (engine) => engine.startCascadeMode()
     ];
@@ -333,7 +343,50 @@ test('the solo modes use Resonance when the setting is on', () => {
       engine.refreshPulseSettings();
       assert.equal(engine.getBeatState().resonanceActive, false, `${engine.mode} with the setting off`);
     }
+    const classic = createEngine();
+    classic.startClassicMode(1);
+    assert.equal(classic.getBeatState().resonanceActive, false, 'Classic keeps its own ruleset');
+    assert.equal(classic.getResonanceBlockReason(), RESONANCE_BLOCKS.RULESET);
   });
+});
+
+test('a fresh profile has no Resonance on levels 1 to 5: no ring, no Resonant shot', () => {
+  withFixedRandom(() => {
+    for (const levelId of [1, 2, 3, 4, 5]) {
+      const engine = createEngine({ progress: false });
+      engine.storageManager.unlockLevel(levelId);
+      engine.startCampaignLevel(levelId);
+      assert.equal(engine.getBeatState().resonanceActive, false, `level ${levelId}`);
+      assert.equal(engine.getResonanceBlockReason(), RESONANCE_BLOCKS.LOCKED, `level ${levelId}`);
+      engine.beatFrame = 0;
+      shootUp(engine);
+      assert.equal(engine.turnResonant, false, `level ${levelId}`);
+      assert.equal(engine.physicsWorld.projectile.isResonant, false, `level ${levelId}`);
+    }
+    const unlocked = createEngine({ progress: false });
+    unlocked.storageManager.unlockLevel(UNLOCK_LEVEL);
+    unlocked.startCampaignLevel(1);
+    assert.equal(unlocked.getBeatState().resonanceActive, true, 'live once the unlock level is cleared');
+    assert.equal(unlocked.getResonanceBlockReason(), null);
+  });
+});
+
+test('the unlock follows the run start, not the frame: clearing a level mid-run does not flip the board', () => {
+  withFixedRandom(() => {
+    const engine = createEngine({ progress: false });
+    engine.startCampaignLevel(1);
+    engine.storageManager.unlockLevel(UNLOCK_LEVEL);
+    assert.equal(engine.getBeatState().resonanceActive, false, 'cached at the run start');
+    engine.refreshPulseSettings();
+    assert.equal(engine.getBeatState().resonanceActive, true);
+  });
+});
+
+test('duel boards are live through the storage view on a fresh profile', () => {
+  const engine = createBoard(undefined, { progress: false });
+  assert.equal(engine.storageManager.getClearedCampaignLevel(), 0);
+  assert.equal(engine.getResonanceBlockReason(), null);
+  assert.equal(engine.getBeatState().resonanceActive, true);
 });
 
 test('getPulseState reports the clock, the beat length, whether Resonance is live and the pressure', () => {
@@ -525,7 +578,7 @@ test('getBeatState and the Resonance judgement read no storage per call', () => 
     const engine = createEngine({ offsetMs: CALIBRATED_OFFSET_MS });
     engine.startCampaignLevel(1);
     let reads = 0;
-    for (const name of ['getResonanceEnabled', 'getRhythmOffsetMs']) {
+    for (const name of ['getResonanceEnabled', 'getRhythmOffsetMs', 'getClearedCampaignLevel']) {
       const original = engine.storageManager[name].bind(engine.storageManager);
       engine.storageManager[name] = (...args) => {
         reads += 1;
@@ -542,15 +595,16 @@ test('getBeatState and the Resonance judgement read no storage per call', () => 
     engine.storageManager.setResonanceEnabled(false);
     assert.equal(engine.getBeatState().resonanceActive, true, 'the cache holds until it is refreshed');
     engine.refreshPulseSettings();
-    assert.equal(reads, 2, 'a refresh reads both values once');
+    assert.equal(reads, 3, 'a refresh reads each value once, the unlock progress included');
     assert.equal(engine.getBeatState().resonanceActive, false);
   });
 });
 
 test('the beat window is capped to a fraction of the beat so fast tempos stay selective', () => {
   withFixedRandom(() => {
-    assert.equal(RES.maxWindowBeatFraction, 0.15);
-    const expectedFrames = { puzzle: [84, 6], blitz: [132, 4], campaign: [96, 5] };
+    assert.equal(RES.maxWindowBeatFraction, 0.12);
+    assert.equal(RES.windowFrames, 5);
+    const expectedFrames = { puzzle: [84, 5], blitz: [132, 3], campaign: [96, 4] };
     for (const [mode, [bpm, frames]] of Object.entries(expectedFrames)) {
       assert.equal(audioConfig.music.modes[mode].bpm, bpm);
       const engine = createEngine();
@@ -559,7 +613,7 @@ test('the beat window is capped to a fraction of the beat so fast tempos stay se
       const timing = engine.getPulseTiming();
       assert.equal(timing.windowFrames, frames, `${bpm} BPM`);
       assert.equal(timing.windowFrames, Math.min(RES.windowFrames, Math.floor(beatLength(mode) * RES.maxWindowBeatFraction)));
-      assert.ok((timing.windowFrames * 2 + 1) / timing.framesPerBeat < 0.4, `${bpm} BPM: the window is not most of the beat`);
+      assert.ok((timing.windowFrames * 2 + 1) / timing.framesPerBeat < MAX_WINDOW_SHARE, `${bpm} BPM: the window is not most of the beat`);
     }
   });
 });
@@ -571,17 +625,88 @@ test('a competitive run announces once that Resonance is off; a normal run does 
       engine.particleSystem.spawnFloatingText = (x, y, text) => seen.push(text);
       return seen;
     };
+    const newcomer = createEngine();
+    newcomer.startDailyChallenge(DAILY_SEED);
+    const newcomerSeen = texts(newcomer);
+    for (let i = 0; i < 5; i++) {
+      newcomer.update();
+    }
+    assert.equal(newcomerSeen.filter((x) => /disabledCompetitive|competitive/.test(x)).length, 0, 'no popup about an unknown feature');
     const daily = createEngine();
+    daily.storageManager.markDiscovered([RESONANCE_MECHANIC_ID]);
     daily.startDailyChallenge(DAILY_SEED);
     const seen = texts(daily);
     for (let i = 0; i < 5; i++) {
       daily.update();
     }
     assert.equal(seen.filter((x) => /disabledCompetitive|competitive/.test(x)).length, 1, 'once per run');
+    const classic = createEngine();
+    classic.storageManager.markDiscovered([RESONANCE_MECHANIC_ID]);
+    classic.startClassicMode(1);
+    const classicSeen = texts(classic);
+    classic.update();
+    assert.equal(classicSeen.filter((x) => /disabledCompetitive|competitive/.test(x)).length, 0, 'Classic is a ruleset, not a competitive run: no popup');
     const solo = createEngine();
     solo.startCampaignLevel(1);
     const soloSeen = texts(solo);
     solo.update();
     assert.equal(soloSeen.length, 0);
   });
+});
+
+const SLOW_MOTION_FRAMES = 36;
+const SLOW_MOTION_SCALE = 0.4;
+const SLOW_MOTION_ADVANCE = 2.5;
+const LONG_SLOW_MOTION_FRAMES = 100000;
+const REAL_FRAMES_PER_SECOND = 60;
+const BEAT_TOLERANCE_FRAMES = 1;
+
+test('the beat clock keeps real-time pace under slow motion', () => {
+  const engine = createEngine();
+  engine.startCampaignLevel(1);
+  engine.triggerSpecialSlowMo(SLOW_MOTION_FRAMES, SLOW_MOTION_SCALE);
+  assert.equal(engine.getBeatAdvance(), SLOW_MOTION_ADVANCE);
+  engine.update();
+  assert.equal(engine.beatFrame, SLOW_MOTION_ADVANCE, 'one slowed update advances the beat by 1 / scale');
+  assert.ok(Number.isFinite(engine.getBeatState().beatPhase));
+});
+
+test('a slowed second of real time still moves the beat clock by one second of frames', () => {
+  const engine = createEngine();
+  engine.startCampaignLevel(1);
+  engine.triggerSpecialSlowMo(LONG_SLOW_MOTION_FRAMES, SLOW_MOTION_SCALE);
+  let carried = 0;
+  for (let realFrame = 0; realFrame < REAL_FRAMES_PER_SECOND; realFrame++) {
+    carried += engine.getTimeScale();
+    while (carried >= 1) {
+      engine.update();
+      carried -= 1;
+    }
+  }
+  assert.ok(Math.abs(engine.beatFrame - REAL_FRAMES_PER_SECOND) <= BEAT_TOLERANCE_FRAMES, `beatFrame ${engine.beatFrame}`);
+});
+
+test('a duel board, reduced motion and normal speed advance the beat by exactly one frame', () => {
+  const board = createBoard(undefined);
+  board.specialSlowMoFrames = SLOW_MOTION_FRAMES;
+  board.specialSlowMoTotalFrames = SLOW_MOTION_FRAMES;
+  board.specialSlowMoMinScale = SLOW_MOTION_SCALE;
+  assert.equal(board.getBeatAdvance(), 1, 'a versus-role board never slows');
+  const before = board.beatFrame;
+  board.update();
+  assert.equal(board.beatFrame - before, 1);
+
+  const reduced = createEngine();
+  reduced.startCampaignLevel(1);
+  reduced.isReducedMotion = true;
+  reduced.specialSlowMoFrames = SLOW_MOTION_FRAMES;
+  reduced.specialSlowMoTotalFrames = SLOW_MOTION_FRAMES;
+  reduced.specialSlowMoMinScale = SLOW_MOTION_SCALE;
+  assert.equal(reduced.getBeatAdvance(), 1);
+  reduced.update();
+  assert.equal(reduced.beatFrame, 1);
+
+  const normal = createEngine();
+  normal.startCampaignLevel(1);
+  assert.equal(normal.getBeatAdvance(), 1);
 });
