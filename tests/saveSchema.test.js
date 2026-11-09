@@ -367,12 +367,12 @@ test('v3: an existing history is never overwritten', () => {
   });
 });
 
-test('v5: the schema reaches 5 on a fresh profile', () => {
-  assert.equal(CURRENT_SAVE_SCHEMA_VERSION, 5);
+test('v5: the schema reaches the current version on a fresh profile', () => {
+  assert.ok(CURRENT_SAVE_SCHEMA_VERSION >= 5);
   const storage = createFakeStorage();
   withStorage(storage, () => {
     initManager();
-    assert.equal(storage.getItem(VERSION_KEY), '5');
+    assert.equal(storage.getItem(VERSION_KEY), String(CURRENT_SAVE_SCHEMA_VERSION));
   });
 });
 
@@ -387,7 +387,7 @@ test('v5: a veteran on schema 4 gets Polarity Duel announced as new, once', () =
     const stored = JSON.parse(storage.getItem(unlocksKey));
     assert.equal(stored.versus, gameConfig.modeUnlocks.stateNew);
     assert.equal(stored.classic, gameConfig.modeUnlocks.stateSeen);
-    assert.equal(storage.getItem(VERSION_KEY), '5');
+    assert.equal(storage.getItem(VERSION_KEY), String(CURRENT_SAVE_SCHEMA_VERSION));
     const first = storage.getItem(unlocksKey);
     assert.equal(manager.announceIntroducedModes(), true);
     assert.equal(storage.getItem(unlocksKey), first);
@@ -410,4 +410,82 @@ test('v5: a seen versus entry is never downgraded and a fresh profile stays unto
     initManager();
     assert.equal(fresh.getItem(unlocksKey), null);
   });
+});
+
+const VOLUME_KEY = `${prefix}${keys.musicVolume}`;
+const MUSIC_ENABLED_KEY = `${prefix}${keys.musicEnabled}`;
+const DEFAULT_VOLUME = gameConfig.defaults.musicVolume;
+
+/** Runs the v6 migration on a profile saved at schema 5 with the given stored volume. */
+const migrateVolume = (storedVolume, extra = {}) => {
+  const storage = createFakeStorage();
+  storage.setItem(VERSION_KEY, '5');
+  if (storedVolume !== null) {
+    storage.setItem(VOLUME_KEY, String(storedVolume));
+  }
+  for (const [key, value] of Object.entries(extra)) {
+    storage.setItem(key, value);
+  }
+  withStorage(storage, () => {
+    initManager();
+  });
+  return storage;
+};
+
+test('v6: the schema reaches 6 on a fresh profile and the stored version is written', () => {
+  assert.equal(CURRENT_SAVE_SCHEMA_VERSION, 6);
+  const storage = createFakeStorage();
+  withStorage(storage, () => {
+    initManager();
+  });
+  assert.equal(storage.getItem(VERSION_KEY), '6');
+  assert.equal(storage.getItem(VOLUME_KEY), null, 'a fresh profile gets no volume key written');
+});
+
+test('v6: an off-step music volume snaps to the nearest step, ties going up', () => {
+  const cases = [['0.25', '0.2'], ['0.5', '0.6'], ['0.75', '0.8'], ['0.9', '1']];
+  for (const [stored, expected] of cases) {
+    const storage = migrateVolume(stored);
+    assert.equal(storage.getItem(VOLUME_KEY), expected, `${stored} snaps to ${expected}`);
+    assert.equal(storage.getItem(VERSION_KEY), '6');
+  }
+});
+
+test('v6: a stored volume of 0 turns the music off and restores the default volume', () => {
+  const storage = migrateVolume('0');
+  assert.equal(storage.getItem(MUSIC_ENABLED_KEY), 'false');
+  assert.equal(storage.getItem(VOLUME_KEY), String(DEFAULT_VOLUME));
+});
+
+test('v6: a volume already on a step and a missing volume are left alone', () => {
+  const onStep = migrateVolume('0.8');
+  assert.equal(onStep.getItem(VOLUME_KEY), '0.8');
+  assert.equal(onStep.getItem(MUSIC_ENABLED_KEY), null);
+  const missing = migrateVolume(null);
+  assert.equal(missing.getItem(VOLUME_KEY), null);
+  const garbage = migrateVolume('loud');
+  assert.equal(garbage.getItem(VOLUME_KEY), 'loud', 'unreadable values are not rewritten');
+});
+
+test('v6: the migration is idempotent and keeps the other music settings', () => {
+  const storage = migrateVolume('0.25', { [MUSIC_ENABLED_KEY]: 'true' });
+  const first = [...storage.data.entries()].sort().join('|');
+  withStorage(storage, () => {
+    const manager = initManager();
+    assert.equal(manager.migrateMusicVolumeSteps(), true);
+    assert.equal(manager.getMusicVolume(), 0.2);
+    assert.equal(manager.getMusicEnabled(), true);
+  });
+  assert.equal([...storage.data.entries()].sort().join('|'), first);
+});
+
+test('v6: a failing write leaves the version at 5 so the next launch retries', () => {
+  const storage = createFakeStorage({ failWrite: (key) => key === VOLUME_KEY });
+  storage.data.set(VERSION_KEY, '5');
+  storage.data.set(VOLUME_KEY, '0.25');
+  withStorage(storage, () => {
+    initManager();
+  });
+  assert.equal(storage.getItem(VERSION_KEY), '5');
+  assert.equal(storage.getItem(VOLUME_KEY), '0.25');
 });

@@ -20,12 +20,14 @@ import { readFileSync } from 'node:fs';
 
 import { GAME_MODES } from '../src/core/Constants.js';
 import { i18n, t, formatNumber } from '../src/core/I18n.js';
+import { SeededRandom } from '../src/core/SeededRandom.js';
 import { getUtcIsoWeekKey } from '../src/game/WeeklyFlux.js';
 import { applyWorldGeometry } from '../src/core/WorldGeometry.js';
 import { UIManager } from '../src/ui/UIManager.js';
 import {
   ARCADE_CARD_SPECS,
   MODE_NAME_KEYS,
+  WEEKLY_ACCESS_KEY,
   describeModeLock,
   formatUnlockedModesText,
   isAriaDisabled,
@@ -153,7 +155,7 @@ function makeUi({ access = {}, engine = {}, storage = {}, elements = {} } = {}) 
 }
 
 test('plainModeName drops the leading emoji and keeps the words', () => {
-  assert.equal(plainModeName('🎯 Puzzle'), 'Puzzle');
+  assert.equal(plainModeName('Puzzle'), 'Puzzle');
   assert.equal(plainModeName('⏱ Blitz 90s'), 'Blitz 90s');
   assert.equal(plainModeName('Survival'), 'Survival');
   assert.equal(plainModeName(''), '');
@@ -222,67 +224,83 @@ test('setModeLabel adds the New badge once and removes it again', () => {
   });
 });
 
-test('refreshModeLocks locks the menu buttons and the arcade cards with aria-disabled, never disabled', () => {
+test('refreshModeLocks locks the Play hub cards with aria-disabled, never disabled, and badges Play', () => {
   withDocument(() => {
     const cards = Object.fromEntries(Object.keys(ARCADE_CARD_SPECS).map((mode) => [mode, fakeCard()]));
     const elements = {
-      btnEndless: fakeElement(),
-      btnFlux: fakeElement(),
-      btnWeekly: fakeElement(),
-      puzzleStagesStrip: fakeElement()
+      btnPuzzleStagesToggle: fakeElement(),
+      btnPlay: fakeElement(),
+      playNewBadge: fakeElement('hidden')
     };
     for (const [mode, spec] of Object.entries(ARCADE_CARD_SPECS)) {
       elements[spec.card] = cards[mode].card;
       elements[spec.best] = fakeElement();
     }
     const ui = makeUi({ elements });
-    ui.getWeeklyButtonLabel = () => 'Weekly Flux';
+    ui.describeWeeklyRewardChip = () => ({ text: '+40 ⬡', ariaLabel: 'Bonus' });
     ui.refreshModeLocks(LOCKED_ACCESS);
 
-    assert.equal(elements.btnEndless.textContent, '🔒 Survival');
-    assert.equal(elements.btnWeekly.textContent, '🔒 Weekly Flux', 'Weekly Flux locks together with Flux');
-    assert.equal(elements.btnFlux.textContent, '🔒 Flux Mode');
-    for (const key of ['btnEndless', 'btnFlux', 'btnWeekly']) {
-      assert.ok(isAriaDisabled(elements[key]), `${key} is aria-disabled`);
-      assert.ok(elements[key].classList.contains('is-locked'));
-      assert.equal(elements[key].hasAttribute('disabled'), false, `${key} stays focusable`);
-      assert.ok(elements[key].getAttribute('aria-label').includes('locked'));
+    for (const mode of ['endless', 'flux', 'puzzle', 'boss_rush']) {
+      const { card, title } = cards[mode];
+      assert.ok(isAriaDisabled(card), `${mode} is aria-disabled`);
+      assert.ok(card.classList.contains('is-locked'));
+      assert.equal(card.hasAttribute('disabled'), false, `${mode} stays focusable`);
+      assert.ok(card.getAttribute('aria-label').includes('locked'));
+      assert.ok(title.textContent.startsWith('🔒'), `${mode} title carries the lock`);
     }
-    assert.equal(elements.btnWeekly.getAttribute('aria-label'), 'Weekly Flux, locked. Clear campaign level 8 to unlock it.');
-    assert.equal(cards.puzzle.title.textContent, '🔒 Puzzle');
+    assert.equal(cards.endless.title.textContent, '🔒 Survival');
+    assert.equal(cards.flux.title.textContent, '🔒 Flux');
     assert.equal(cards.puzzle.desc.textContent, 'Clear level 5 to unlock');
     assert.ok(elements.arcadeBestPuzzle.classList.contains('hidden'), 'the best line is hidden while locked');
-    assert.ok(elements.puzzleStagesStrip.classList.contains('hidden'), 'the stage strip is hidden while Puzzle is locked');
+    assert.ok(elements.btnPuzzleStagesToggle.classList.contains('hidden'), 'the stage toggle is hidden while Puzzle is locked');
     assert.equal(cards.boss_rush.card.getAttribute('aria-label'), 'Boss Rush, locked. Clear campaign level 12 to unlock it.');
+    assert.equal(elements.playNewBadge.classList.contains('hidden'), true, 'nothing new: Play carries no badge');
 
     // Everything earned: labels return, the badge shows only on the newly unlocked mode.
     const open = Object.fromEntries(
       Object.entries(LOCKED_ACCESS).map(([mode, entry]) => [mode, { ...entry, unlocked: true, isNew: mode === 'flux' }])
     );
+    open.weekly = { unlocked: true, isNew: false, requiredLevel: 5 };
     ui.refreshModeLocks(open);
-    assert.equal(elements.btnEndless.textContent, 'Survival');
-    assert.equal(isAriaDisabled(elements.btnEndless), false);
-    assert.equal(elements.btnFlux.textContent, 'Flux Mode New');
-    assert.equal(elements.btnFlux.getAttribute('aria-label'), 'Flux Mode, newly unlocked');
-    assert.equal(elements.btnWeekly.textContent, 'Weekly Flux', 'Weekly Flux never carries the New badge');
-    assert.equal(elements.btnWeekly.getAttribute('aria-label'), null);
-    assert.equal(cards.puzzle.title.textContent, '🎯 Puzzle');
+    assert.equal(cards.endless.title.textContent, 'Survival');
+    assert.equal(isAriaDisabled(cards.endless.card), false);
+    assert.equal(cards.flux.title.textContent, 'Flux New');
+    assert.equal(cards.weekly.title.textContent, 'Weekly Flux', 'Weekly Flux never carries the New badge');
+    assert.equal(cards.weekly.card.getAttribute('aria-label'), null);
+    assert.equal(elements.weeklyReward.textContent, '+40 ⬡', 'the Weekly chip shows once the card is open');
+    assert.equal(elements.weeklyReward.classList.contains('hidden'), false);
+    assert.equal(cards.puzzle.title.textContent, 'Puzzle');
     assert.equal(cards.puzzle.desc.textContent, gameConfigDescription('puzzleDesc'));
     assert.equal(elements.arcadeBestPuzzle.classList.contains('hidden'), false);
-    assert.equal(elements.puzzleStagesStrip.classList.contains('hidden'), false);
+    assert.equal(elements.playNewBadge.classList.contains('hidden'), false, 'a new mode badges the Play button');
+    assert.equal(elements.btnPlay.getAttribute('aria-label'), 'Play: new modes unlocked');
+
+    ui.refreshModeLocks({ ...open, flux: { ...open.flux, isNew: false } });
+    assert.equal(elements.playNewBadge.classList.contains('hidden'), true);
+    assert.equal(elements.btnPlay.getAttribute('aria-label'), null);
   });
+});
+
+test('the Weekly pseudo access key is a card of the hub with its own name and never new', () => {
+  assert.equal(MODE_NAME_KEYS[WEEKLY_ACCESS_KEY], 'app.nav.button.weekly');
+  const spec = ARCADE_CARD_SPECS[WEEKLY_ACCESS_KEY];
+  assert.equal(spec.card, 'btnWeekly');
+  assert.equal(spec.best, 'weeklyReward');
+  assert.equal(spec.showNew, false);
+  const lock = describeModeLock(WEEKLY_ACCESS_KEY, { weekly: { unlocked: false, requiredLevel: 5 } }, t);
+  assert.equal(lock.ariaLabel, 'Weekly Flux, locked. Clear campaign level 5 to unlock it.');
 });
 
 function gameConfigDescription(key) {
   return locales.en.modals.levelSelect.arcade[key];
 }
 
-test('a locked mode starts nothing and says what to do; an open one starts', () => {
+test('a locked mode starts nothing and says what to do in the hub status line; an open one starts', () => {
   const hint = fakeElement('hidden');
   const started = [];
   const ui = makeUi({
     access: LOCKED_ACCESS,
-    elements: { navModeLockHint: hint, modalLevels: fakeElement('hidden'), levelsChapterHint: fakeElement('hidden') }
+    elements: { playHubHint: hint, modalPlay: fakeElement(), modalLevels: fakeElement('hidden'), levelsChapterHint: fakeElement('hidden') }
   });
   assert.equal(ui.runIfModeUnlocked(GAME_MODES.ENDLESS, () => started.push('endless')), false);
   assert.deepEqual(started, []);
@@ -294,36 +312,42 @@ test('a locked mode starts nothing and says what to do; an open one starts', () 
   assert.deepEqual(started, ['endless']);
 });
 
-test('inside the level select the lock hint uses the dialog status line', () => {
+test('the lock hint goes to the window on top: the map over the hub, the hub, else an announcement', () => {
   const levelsHint = fakeElement('hidden');
-  const navHint = fakeElement('hidden');
+  const hubHint = fakeElement('hidden');
+  const announced = [];
   const ui = makeUi({
     access: LOCKED_ACCESS,
-    elements: { navModeLockHint: navHint, modalLevels: fakeElement(), levelsChapterHint: levelsHint }
+    elements: { playHubHint: hubHint, modalPlay: fakeElement(), modalLevels: fakeElement(), levelsChapterHint: levelsHint }
   });
   ui.runIfModeUnlocked(GAME_MODES.BOSS_RUSH, () => assert.fail('boss rush is locked'));
   assert.equal(levelsHint.textContent, 'Clear campaign level 12 to unlock Boss Rush.');
-  assert.equal(navHint.classList.contains('hidden'), true);
+  assert.equal(hubHint.classList.contains('hidden'), true, 'the hub line stays quiet under the map');
+
+  ui.elements.modalLevels = fakeElement('hidden');
+  assert.equal(ui.getStatusHintTarget(), hubHint);
+
+  ui.elements.modalPlay = fakeElement('hidden');
+  ui.announce = (message) => announced.push(message);
+  ui.runIfModeUnlocked(GAME_MODES.BOSS_RUSH, () => assert.fail('boss rush is locked'));
+  assert.deepEqual(announced, ['Clear campaign level 12 to unlock Boss Rush.']);
 });
 
-test('the drawer stays open when a locked mode is activated', () => {
-  const lockedButton = fakeElement();
-  lockedButton.setAttribute('aria-disabled', 'true');
-  const openButton = fakeElement();
-  const handlers = new Map();
-  for (const button of [lockedButton, openButton]) {
-    button.addEventListener = (type, fn) => handlers.set(button, fn);
-  }
-  const closes = [];
+test('a hub card for a locked mode starts nothing and keeps the hub open', () => {
+  const started = [];
+  const closed = [];
   const ui = makeUi({
-    elements: { drawer: { querySelectorAll: () => [lockedButton, openButton] }, btnMenu: null, drawerBackdrop: null, btnCloseDrawer: null }
+    access: LOCKED_ACCESS,
+    elements: { playHubHint: fakeElement('hidden'), modalPlay: fakeElement() }
   });
-  ui.closeDrawer = (options) => closes.push(options);
-  ui.bindDrawerEvents();
-  handlers.get(lockedButton)();
-  assert.deepEqual(closes, [], 'a locked button leaves the drawer open');
-  handlers.get(openButton)();
-  assert.deepEqual(closes, [{ resume: false }]);
+  ui.hideAllModals = () => closed.push('hidden');
+  const launch = () => ui.runIfModeUnlocked(GAME_MODES.ENDLESS, () => {
+    ui.hideAllModals();
+    started.push('endless');
+  });
+  launch();
+  assert.deepEqual([started, closed], [[], []], 'nothing starts and the hub is not closed');
+  assert.equal(ui.elements.modalPlay.classList.contains('hidden'), false);
 });
 
 test('the Weekly Flux button starts this week through the engine, or the shared seed path without it', () => {
@@ -340,14 +364,14 @@ test('the Weekly Flux button starts this week through the engine, or the shared 
   assert.deepEqual(fallbackCalls[0][1], { isShared: true });
 });
 
-test('the Weekly Flux label shows the best, then the unclaimed bonus, then the plain name', () => {
+test('the Weekly Flux chip shows the best, then the unclaimed bonus, then nothing', () => {
   const best = makeUi({ storage: { getWeeklyFluxBest: () => ({ score: 4200 }) } });
-  assert.equal(best.getWeeklyButtonLabel(), `Weekly Flux ✓ ${formatNumber(4200)}`);
+  assert.equal(best.getWeeklyRewardText(), `Best: ${formatNumber(4200)}`);
 
   const unclaimed = makeUi({
     storage: { getWeeklyFluxBest: () => null, hasClaimedWeeklyFluxBonus: () => false }
   });
-  assert.equal(unclaimed.getWeeklyButtonLabel(), `Weekly Flux +${gameConfig.weeklyFlux.firstPlayBonusCoins} ⬡`);
+  assert.equal(unclaimed.getWeeklyRewardText(), `+${gameConfig.weeklyFlux.firstPlayBonusCoins} ⬡`);
 
   const claimed = makeUi({
     storage: {
@@ -355,7 +379,17 @@ test('the Weekly Flux label shows the best, then the unclaimed bonus, then the p
       hasClaimedWeeklyFluxBonus: (weekKey) => weekKey === getUtcIsoWeekKey(Date.now())
     }
   });
-  assert.equal(claimed.getWeeklyButtonLabel(), 'Weekly Flux');
+  assert.equal(claimed.getWeeklyRewardText(), '');
+});
+
+test('the Daily chip says done today (with the streak), else the first-play bonus', () => {
+  const today = SeededRandom.getTodayDateKey();
+  const done = makeUi({ storage: { hasPlayedDailyToday: (key) => key === today, getDailyStreak: () => 1 } });
+  assert.equal(done.getDailyRewardText(), 'Done today ✓');
+  const streak = makeUi({ storage: { hasPlayedDailyToday: () => true, getDailyStreak: () => 4 } });
+  assert.equal(streak.getDailyRewardText(), 'Done ✓ • 4-day streak');
+  const fresh = makeUi({ storage: { hasPlayedDailyToday: () => false, getDailyStreak: () => 0 } });
+  assert.equal(fresh.getDailyRewardText(), `+${gameConfig.daily.firstPlayBonusCoins} ⬡`);
 });
 
 test('the stats overview lists play time, shots, modes with their best and the campaign notes', () => {
@@ -383,7 +417,7 @@ test('the stats overview lists play time, shots, modes with their best and the c
   assert.match(overview.since, /^Recorded since .*2026/);
   assert.deepEqual(overview.general[0], { label: 'Play time', value: '2 h 5 min' });
   assert.deepEqual(overview.modes.map((mode) => mode.mode), ['campaign', 'flux']);
-  assert.equal(overview.modes[0].name, 'Levels');
+  assert.equal(overview.modes[0].name, 'Campaign');
   assert.equal(overview.modes[0].runs, '10 runs, 6 wins, 1 left');
   assert.equal(overview.modes[0].best, '', 'no best line without a score');
   assert.equal(overview.modes[1].best, `Best ${formatNumber(9000)}, shape 5`);
@@ -559,10 +593,10 @@ test('stats tabs switch with aria-selected and a roving tabindex', () => {
 const html = readFileSync('./index.html', 'utf8');
 const css = readFileSync('./styles/main.css', 'utf8');
 
-test('the page carries the mode lock hint, the weekly button, the stats window and the History button', () => {
-  assert.match(html, /<button id="btn-flux"[^>]*>[\s\S]{0,40}<\/button>\s*<button id="btn-weekly"[^>]*data-closes-drawer/);
-  assert.match(html, /<p id="nav-mode-lock-hint" class="nav-lock-hint hidden" role="status" aria-live="polite"><\/p>\s*<\/div>/);
-  assert.match(html, /<\/dl>\s*<button id="btn-stats"[^>]*data-closes-drawer/);
+test('the page carries the hub status line, the weekly card, the stats window and the History button', () => {
+  assert.match(html, /<button id="btn-daily"[^>]*class="arcade-mode-card">[\s\S]*?<\/button>\s*<button id="btn-weekly"[^>]*class="arcade-mode-card">/);
+  assert.match(html, /<p id="play-hub-hint" class="modal-subtext hidden" role="status" aria-live="polite"><\/p>/);
+  assert.match(html, /<\/dl>\s*<button id="btn-play"[^>]*data-closes-drawer[\s\S]*?<button id="btn-stats"[^>]*data-closes-drawer/);
   assert.match(html, /<p id="victory-unlock" class="modal-subtext hidden">/);
   assert.match(html, /<button id="btn-daily-history-gameover"[^>]*class="modal-btn hidden"/);
   assert.match(html, /<div id="modal-stats"[^>]*role="dialog" aria-modal="true" aria-labelledby="modal-stats-title"/);
@@ -621,24 +655,33 @@ test('the overlay list holds the stats window and Escape closes it', () => {
   assert.equal(ui.isAnyOverlayModalOpen(), true);
 });
 
-test('the drawer decides on the live mode access, not on a stale aria-disabled', () => {
+test('a hub card decides on the live mode access, not on a stale aria-disabled', () => {
   const makeCase = (liveUnlocked, staleDisabled) => {
-    const button = fakeElement();
-    button.setAttribute('aria-disabled', String(staleDisabled));
-    let handler = null;
-    button.addEventListener = (type, fn) => { handler = fn; };
-    const closes = [];
+    const card = fakeElement();
+    card.setAttribute('aria-disabled', String(staleDisabled));
+    const started = [];
     const ui = makeUi({
-      access: { [GAME_MODES.ENDLESS]: { unlocked: liveUnlocked } },
-      elements: { drawer: { querySelectorAll: () => [button] }, btnEndless: button, btnMenu: null, drawerBackdrop: null, btnCloseDrawer: null }
+      access: { [GAME_MODES.ENDLESS]: { unlocked: liveUnlocked, requiredLevel: 3 } },
+      elements: { btnEndless: card, playHubHint: fakeElement('hidden'), modalPlay: fakeElement() }
     });
-    ui.closeDrawer = (options) => closes.push(options);
-    ui.bindDrawerEvents();
-    handler();
-    return closes;
+    ui.runIfModeUnlocked(GAME_MODES.ENDLESS, () => started.push('endless'));
+    return started;
   };
-  assert.deepEqual(makeCase(true, true), [{ resume: false }], 'another tab unlocked it: the menu closes');
-  assert.deepEqual(makeCase(false, false), [], 'still locked live: the menu stays open');
+  assert.deepEqual(makeCase(true, true), ['endless'], 'another tab unlocked it: the card starts the mode');
+  assert.deepEqual(makeCase(false, false), [], 'still locked live: the card starts nothing');
+});
+
+test('getModeAccess adds Weekly Flux: open with Flux or at its own level, never new, nothing stored', () => {
+  const level = gameConfig.weeklyFlux.unlockAfterCampaignLevel;
+  const accessOf = (cleared, fluxUnlocked) => makeUi({
+    access: { flux: { unlocked: fluxUnlocked, isNew: true, requiredLevel: 8 } },
+    storage: { getClearedCampaignLevel: () => cleared }
+  }).getModeAccess();
+  assert.deepEqual(accessOf(level - 1, false)[WEEKLY_ACCESS_KEY], { unlocked: false, isNew: false, requiredLevel: level });
+  assert.equal(accessOf(level, false)[WEEKLY_ACCESS_KEY].unlocked, true, 'open at its own level while Flux is locked');
+  assert.equal(accessOf(0, true)[WEEKLY_ACCESS_KEY].unlocked, true, 'open with Flux');
+  assert.equal(accessOf(level, true)[WEEKLY_ACCESS_KEY].isNew, false, 'never new, whatever Flux says');
+  assert.deepEqual(makeUi({ storage: { getModeAccess: undefined } }).getModeAccess(), {}, 'storage that cannot say gives an empty table');
 });
 
 test('only the weekly run of the current week lights the Weekly button', () => {

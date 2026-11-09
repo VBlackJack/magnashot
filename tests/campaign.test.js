@@ -437,3 +437,13 @@ test('Precision levels are small with one bomb, arsenal levels big with twice th
   assert.equal(smaller, chapterCount, 'precision boards are smaller than the standard ones of their chapter');
   assert.equal(bigger, chapterCount, 'arsenal boards are bigger than the standard ones of their chapter');
 });
+
+test('The settle check settings are coherent and every calibrated variant lies in the allowed range', () => {
+  const { calibration } = generated;
+  assert.ok(Number.isInteger(calibration.settleFrames) && calibration.settleFrames > 0);
+  assert.ok(calibration.maxSeedVariants >= calibration.seedVariants);
+  for (const id of generatedIds()) {
+    const { variant } = campaignTuning.levels[id];
+    assert.ok(variant >= 0 && variant < calibration.maxSeedVariants, `level ${id}: variant ${variant} out of range`);
+  }
+});

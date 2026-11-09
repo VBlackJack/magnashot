@@ -11,13 +11,9 @@
     },
     "nav": {
       "button": {
-        "levels": "Levels",
         "endless": "Survival",
-        "daily": "Daily",
-        "dailyBonusBadge": "Daily (+{{coins}} ⬡)",
-        "dailyPlayedBadge": "Daily ✓",
-        "dailyPlayedStreakBadge": "Daily ✓ ({{streak}}d)",
-        "flux": "Flux Mode",
+        "daily": "Daily Challenge",
+        "flux": "Flux",
         "shop": "Workshop",
         "shopBadge": "Workshop ({{count}})",
         "restart": "Restart",
@@ -68,8 +64,6 @@
         "resetHintsDone": "✓",
         "resetHintsDoneCaption": "Reset ✓",
         "weekly": "Weekly Flux",
-        "weeklyBonusBadge": "Weekly Flux +{{coins}} ⬡",
-        "weeklyBestBadge": "Weekly Flux ✓ {{score}}",
         "musicOn": "🎵",
         "musicOff": "🔕",
         "musicOnAria": "Music: ON",
@@ -86,7 +80,6 @@
         "calibrateIcon": "⏱"
       },
       "groups": {
-        "modes": "Game modes",
         "round": "Current round"
       },
       "locked": {
@@ -104,7 +97,9 @@
       "button": {
         "openAria": "Open menu",
         "closeAria": "Close menu",
-        "stats": "My stats"
+        "stats": "My stats",
+        "play": "Play",
+        "playNewAria": "Play: new modes unlocked"
       },
       "stats": {
         "round": "Current run"
@@ -145,20 +140,20 @@
       },
       "mode": {
         "campaign": "Level {{level}}: {{name}}",
-        "endless": "Survival Mode • Wave {{wave}}",
+        "endless": "Survival • Wave {{wave}}",
         "daily": "Daily Challenge ({{mutator}}) • Wave {{wave}}",
-        "flux": "Flux Mode • Shape {{stage}}: {{shape}}",
-        "fluxBoss": "Flux Mode • Shape {{stage}}: {{shape}} (Boss)",
-        "fluxBossMagnetar": "Flux Mode • Shape {{stage}}: {{shape}} (Boss, {{moorings}} moorings)",
-        "puzzle": "Puzzle Mode • Stage {{stage}} / {{total}}",
+        "flux": "Flux • Shape {{stage}}: {{shape}}",
+        "fluxBoss": "Flux • Shape {{stage}}: {{shape}} (Boss)",
+        "fluxBossMagnetar": "Flux • Shape {{stage}}: {{shape}} (Boss, {{moorings}} moorings)",
+        "puzzle": "Puzzle {{stage}} / {{total}}",
         "blitz": "Blitz 90s • Wave {{wave}}",
         "bossRush": "Boss Rush • Wave {{wave}} (👑 {{shields}})",
         "bossRushMagnetar": "Boss Rush • Wave {{wave}} ({{moorings}} moorings)",
-        "cascade": "Cascade Drop • Wave {{wave}}",
+        "cascade": "Cascade • Wave {{wave}}",
         "coreRescueProgress": "💎 {{rescued}}/{{total}}",
         "switchHint": "Click to change mode or level",
         "switchHintTouch": "Tap to change mode or level",
-        "classic": "Purist - Stage {{stage}}"
+        "classic": "Purist • Stage {{stage}}"
       },
       "shots": {
         "label": "Shots Left",
@@ -577,7 +572,9 @@
         "freeze": "Cryo: freezes the descent and calms the magnetic sway. Select its glowing slot, then shoot.",
         "rocket": "Rocket: fires three homing rockets at the toughest spheres. Select its glowing slot, then shoot.",
         "brush": "Brush: repaints nearby spheres into one color and scrubs off rust. Select its glowing slot, then shoot."
-      }
+      },
+      "resonance": "Resonance: the ring around the launcher closes on every beat of the music. Shoot while it is solid and bright: a Resonant shot that matches or drops fills more Overcharge.",
+      "sag": "Sag: every shot that clears nothing fills the Sag meter beside the launcher. When it is full, the cluster drops closer. Avalanches drain it."
     },
     "discovery": {
       "hint": "New: {{icon}} {{name}}. {{description}}"
@@ -603,18 +600,16 @@
   "modals": {
     "levelSelect": {
       "title": {
-        "main": "Modes & Level Select"
+        "main": "Campaign map"
       },
-      "starsTotal": "Campaign Stars: {{stars}} / {{maxStars}} ★",
+      "starsTotal": "Campaign stars: {{stars}} / {{maxStars}} ★",
       "card": {
-        "levelNumber": "Level {{id}}",
         "locked": "Locked: clear level {{previous}}",
         "ariaLocked": "Level {{id}}: {{name}}, locked, clear level {{previous}}",
         "aria": "Level {{id}}: {{name}}, {{stars}} of {{maxStars}} stars, {{best}}",
         "ariaCurrent": "Level {{id}} (Current): {{name}}, {{stars}} of {{maxStars}} stars, {{best}}",
         "bestScore": "Best: {{score}}",
         "starsAria": "Stars: {{stars}} of {{maxStars}}",
-        "current": "Current",
         "formatBadge": {
           "landmark": "Boss",
           "precision": "Precision",
@@ -632,11 +627,10 @@
         "tutorial": "Basics",
         "numbered": "Ch. {{chapter}}: {{theme}}",
         "stars": "{{stars}} / {{maxStars}} ★",
-        "locked": "🔒 Locked",
-        "aria": "{{name}}, levels {{first}} to {{last}}, {{stars}} of {{maxStars}} stars",
-        "ariaLocked": "{{name}}, levels {{first}} to {{last}}, locked",
         "starsCompleted": "{{stars}} / {{maxStars}} ★ ✓",
-        "ariaCompleted": "{{name}}, levels {{first}} to {{last}}, completed with {{stars}} of {{maxStars}} stars"
+        "prev": "Previous chapter",
+        "next": "Next chapter",
+        "optionLocked": "{{name}} (locked)"
       },
       "chapterLockedHint": "Complete level {{level}} to unlock this chapter.",
       "cardLockedHint": "Complete level {{level}} to unlock this level.",
@@ -653,23 +647,39 @@
         "invalidHint": "Enter a valid {{length}}-character Flux seed (letters a-z and digits 0-9)."
       },
       "arcade": {
-        "sectionTitle": "Arcade Modes",
-        "puzzle": "🎯 Puzzle",
+        "puzzle": "Puzzle",
         "puzzleDesc": "10 trick-shot stages • Rescue Cores 💎",
-        "puzzleRecord": "Stage {{stage}}/{{total}} • Best: {{score}}",
+        "puzzleRecord": "Puzzle {{stage}}/{{total}} • Best: {{score}}",
         "puzzleStage": "Puzzle {{stage}}",
         "puzzleStageLocked": "Clear Puzzle {{previous}} to unlock.",
-        "blitz": "⏱ Blitz 90s",
+        "blitz": "Blitz 90s",
         "blitzDesc": "90s timer • Unlimited shots",
-        "bossRush": "👑 Boss Rush",
+        "bossRush": "Boss Rush",
         "bossRushDesc": "Titan Core • Overcharge -1 shield",
         "bossRushRecord": "Wave {{wave}} • Best: {{score}}",
-        "cascade": "⬇ Cascade",
+        "cascade": "Cascade",
         "cascadeDesc": "High-gravity well • Platforms",
         "lockedDesc": "Clear level {{level}} to unlock",
         "classic": "Purist",
         "classicDesc": "Pure rules: no specials, no upgrades. Misses lower the ceiling.",
         "classicBest": "Best: stage {{stage}}"
+      },
+      "jumpCurrent": "Current level",
+      "grid": {
+        "aria": "Levels of {{chapter}}"
+      },
+      "tile": {
+        "withBadge": "{{name}} ({{badge}})",
+        "mark": {
+          "landmark": "👑",
+          "precision": "◎",
+          "arsenal": "✦",
+          "twist": "↻"
+        }
+      },
+      "detail": {
+        "header": "Level {{id}} • {{chapter}}",
+        "empty": "Pick a level to see its details."
       }
     },
     "shop": {
@@ -748,6 +758,16 @@
             "icon": "🔋",
             "name": "Overcharge Gauge",
             "description": "Fills with every cleared group and collected sphere. When full, it automatically forges a free Special Sphere."
+          },
+          "resonance": {
+            "icon": "🎵",
+            "name": "Resonance",
+            "description": "Unlocked during the campaign. The ring around the launcher closes on each beat; a shot released while it is solid is Resonant and earns extra Overcharge, or hits charges harder in a Polarity Duel. Off in Purist and in competitive runs."
+          },
+          "sag": {
+            "icon": "⏬",
+            "name": "Sag",
+            "description": "In Survival, Daily and Purist, each shot that clears nothing fills the Sag meter; when it is full the cluster drops. Avalanches drain it."
           }
         },
         "mutators": {
@@ -934,7 +954,7 @@
             "description": "Drop at least {{target}} unanchored spheres in a single avalanche."
           },
           "comboMaster": {
-            "name": "Chain Resonance",
+            "name": "Chain Reaction",
             "description": "Reach a x{{target}} or higher Combo multiplier."
           },
           "bossSlayer": {
@@ -962,11 +982,11 @@
             "description": "Drop at least {{target}} unanchored spheres in a single avalanche."
           },
           "comboMasterSilver": {
-            "name": "Chain Resonance II",
+            "name": "Chain Reaction II",
             "description": "Reach a x{{target}} or higher Combo multiplier."
           },
           "comboMasterGold": {
-            "name": "Chain Resonance III",
+            "name": "Chain Reaction III",
             "description": "Reach a x{{target}} or higher Combo multiplier."
           },
           "bossSlayerSilver": {
@@ -1115,8 +1135,8 @@
         "nextLevel": "Next Level",
         "nextIncomplete": "Next < 3★ Level",
         "replay": "Replay",
-        "levels": "Level Select",
-        "backToLevels": "Back to Levels"
+        "levels": "Campaign map",
+        "backToLevels": "Campaign map"
       },
       "unlock": {
         "single": "New mode unlocked: {{mode}}. Find it in the menu.",
@@ -1147,7 +1167,6 @@
         "continueShots": "+{{shots}} Shots ({{cost}} ⬡)",
         "retry": "Try Again",
         "sameSeed": "Same Seed (#{{seed}})",
-        "levels": "Select Level",
         "share": "Share",
         "shareCopied": "Copied ✓",
         "dailyHistory": "History",
@@ -1212,8 +1231,7 @@
       },
       "button": {
         "resume": "Resume",
-        "restart": "Restart",
-        "levels": "Select Level"
+        "restart": "Restart"
       }
     },
     "confirm": {
@@ -1259,8 +1277,15 @@
           "fast": "Fast"
         },
         "invertX": "Invert horizontal aim",
-        "rumble": "Vibration"
-      }
+        "rumble": "Vibration",
+        "noPad": "No controller detected. Connect one and press any button."
+      },
+      "groups": {
+        "audio": "Audio",
+        "gameplay": "Gameplay",
+        "accessibility": "Accessibility"
+      },
+      "vibration": "Vibration (phone and controller)"
     },
     "fluxPerk": {
       "title": "Choose a Perk",
@@ -1328,6 +1353,56 @@
         "title": "Duels",
         "record": "{{won}} won - {{lost}} lost",
         "empty": "No duels yet."
+      }
+    },
+    "play": {
+      "title": "Play",
+      "section": {
+        "campaign": "Campaign",
+        "challenges": "Challenges",
+        "arcade": "Arcade",
+        "duel": "Duel"
+      },
+      "campaign": {
+        "summary": "{{chapter}} • {{stars}} / {{maxStars}} ★",
+        "progressAria": "Chapter stars: {{stars}} of {{maxStars}}",
+        "continue": "Continue level {{level}}",
+        "map": "Campaign map"
+      },
+      "reward": "+{{coins}} ⬡",
+      "rewardAria": "Bonus: {{coins}} coins on your first run",
+      "daily": {
+        "desc": "The same board for everyone today, with one twist.",
+        "done": "Done today ✓",
+        "doneStreak": "Done ✓ • {{streak}}-day streak"
+      },
+      "weekly": {
+        "desc": "A new Flux seed every Monday, the same for everyone."
+      },
+      "arcade": {
+        "endlessDesc": "Endless waves. Every miss brings the cluster closer.",
+        "fluxDesc": "Generated shapes, one bonus to pick after each.",
+        "fluxRecord": "Shape {{stage}} • Best: {{score}}"
+      },
+      "puzzle": {
+        "stagesToggle": "Choose a puzzle"
+      },
+      "flux": {
+        "seedToggle": "Play a seed"
+      },
+      "changeMode": "Change mode",
+      "icon": {
+        "campaign": "★",
+        "daily": "📅",
+        "weekly": "📆",
+        "endless": "∞",
+        "classic": "◇",
+        "puzzle": "🎯",
+        "blitz": "⏱",
+        "flux": "🌀",
+        "cascade": "⬇",
+        "bossRush": "👑",
+        "versus": "⚔"
       }
     }
   },

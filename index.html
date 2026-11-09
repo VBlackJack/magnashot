@@ -65,23 +65,15 @@
           <dd id="drawer-perks" class="perk-chips"></dd>
         </div>
       </dl>
+      <button id="btn-play" type="button" data-closes-drawer class="nav-btn primary play-btn" aria-haspopup="dialog"><span class="play-btn-label" data-i18n="app.drawer.button.play"></span> <span id="play-new-badge" class="mode-new-badge hidden" aria-hidden="true" data-i18n="app.nav.locked.newBadge"></span></button>
       <button id="btn-stats" type="button" data-closes-drawer class="nav-btn stats-btn" aria-haspopup="dialog" data-i18n="app.drawer.button.stats"></button>
+      <button id="btn-settings" type="button" data-closes-drawer class="nav-btn settings-btn" aria-haspopup="dialog"><span class="settings-btn-icon" aria-hidden="true" data-i18n="app.nav.button.settingsIcon"></span> <span data-i18n="app.nav.button.settings"></span></button>
       <nav class="nav-controls">
-        <div class="nav-group nav-modes" role="group" aria-labelledby="nav-group-modes-title">
-          <span id="nav-group-modes-title" class="nav-group-title" data-i18n="app.nav.groups.modes"></span>
-          <button id="btn-levels" type="button" data-closes-drawer class="nav-btn mode-btn" data-i18n="app.nav.button.levels"></button>
-          <button id="btn-endless" type="button" data-closes-drawer class="nav-btn mode-btn" data-i18n="app.nav.button.endless"></button>
-          <button id="btn-daily" type="button" data-closes-drawer class="nav-btn mode-btn" data-i18n="app.nav.button.daily"></button>
-          <button id="btn-flux" type="button" data-closes-drawer class="nav-btn mode-btn" data-i18n="app.nav.button.flux"></button>
-          <button id="btn-weekly" type="button" data-closes-drawer class="nav-btn mode-btn" data-i18n="app.nav.button.weekly"></button>
-          <p id="nav-mode-lock-hint" class="nav-lock-hint hidden" role="status" aria-live="polite"></p>
-        </div>
         <div class="nav-group nav-actions" role="group" aria-labelledby="nav-group-round-title">
           <span id="nav-group-round-title" class="nav-group-title" data-i18n="app.nav.groups.round"></span>
-          <button id="btn-pause" type="button" data-closes-drawer class="nav-btn primary" data-i18n="app.nav.button.pause" data-i18n-title="app.nav.button.pauseTooltip"></button>
+          <button id="btn-pause" type="button" data-closes-drawer class="nav-btn" data-i18n="app.nav.button.pause" data-i18n-title="app.nav.button.pauseTooltip"></button>
           <button id="btn-restart" type="button" data-closes-drawer class="nav-btn" data-i18n="app.nav.button.restart"></button>
           <button id="btn-shop" type="button" data-closes-drawer class="nav-btn gold" data-i18n="app.nav.button.shop"></button>
-          <button id="btn-settings" type="button" data-closes-drawer class="nav-btn settings-btn" aria-haspopup="dialog"><span class="settings-btn-icon" aria-hidden="true" data-i18n="app.nav.button.settingsIcon"></span> <span data-i18n="app.nav.button.settings"></span></button>
         </div>
       </nav>
     </header>
@@ -169,62 +161,150 @@
   <div id="sr-announcer" class="visually-hidden" role="status" aria-live="polite" aria-atomic="true"></div>
   <div id="toast" class="toast hidden" aria-hidden="true"></div>
 
-  <!-- Level Select Modal -->
-  <div id="modal-levels" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="modal-levels-title">
-    <div class="modal-card wide">
-      <h2 id="modal-levels-title" class="modal-title" data-i18n="modals.levelSelect.title.main"></h2>
-      <div class="arcade-modes-section">
-        <div class="arcade-modes-header" data-i18n="modals.levelSelect.arcade.sectionTitle"></div>
-        <div class="arcade-modes-strip">
-          <button id="btn-mode-classic" type="button" class="arcade-mode-card">
-            <span class="arcade-card-title" data-i18n="modals.levelSelect.arcade.classic"></span>
-            <span class="arcade-card-desc" data-i18n="modals.levelSelect.arcade.classicDesc"></span>
-            <span id="arcade-best-classic" class="arcade-card-best gold-text"></span>
-          </button>
-          <button id="btn-mode-puzzle" type="button" class="arcade-mode-card">
-            <span class="arcade-card-title" data-i18n="modals.levelSelect.arcade.puzzle"></span>
-            <span class="arcade-card-desc" data-i18n="modals.levelSelect.arcade.puzzleDesc"></span>
-            <span id="arcade-best-puzzle" class="arcade-card-best gold-text"></span>
-          </button>
-          <button id="btn-mode-blitz" type="button" class="arcade-mode-card">
-            <span class="arcade-card-title" data-i18n="modals.levelSelect.arcade.blitz"></span>
-            <span class="arcade-card-desc" data-i18n="modals.levelSelect.arcade.blitzDesc"></span>
-            <span id="arcade-best-blitz" class="arcade-card-best gold-text"></span>
-          </button>
-          <button id="btn-mode-boss-rush" type="button" class="arcade-mode-card">
-            <span class="arcade-card-title" data-i18n="modals.levelSelect.arcade.bossRush"></span>
-            <span class="arcade-card-desc" data-i18n="modals.levelSelect.arcade.bossRushDesc"></span>
-            <span id="arcade-best-boss-rush" class="arcade-card-best gold-text"></span>
-          </button>
-          <button id="btn-mode-cascade" type="button" class="arcade-mode-card">
-            <span class="arcade-card-title" data-i18n="modals.levelSelect.arcade.cascade"></span>
-            <span class="arcade-card-desc" data-i18n="modals.levelSelect.arcade.cascadeDesc"></span>
-            <span id="arcade-best-cascade" class="arcade-card-best gold-text"></span>
-          </button>
-          <button id="btn-mode-versus" type="button" class="arcade-mode-card" aria-haspopup="dialog">
-            <span class="arcade-card-title" data-i18n="versus.card.title"></span>
-            <span class="arcade-card-desc" data-i18n="versus.card.description"></span>
-            <span id="arcade-best-versus" class="arcade-card-best gold-text"></span>
-          </button>
-        </div>
-        <div id="puzzle-stages-strip" class="puzzle-stages-strip"></div>
+  <!-- Play hub: every mode in one window -->
+  <div id="modal-play" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="modal-play-title">
+    <div class="modal-card wide play-hub">
+      <div class="play-hub-header">
+        <h2 id="modal-play-title" class="modal-title" data-i18n="modals.play.title"></h2>
+        <button id="btn-close-play" type="button" class="modal-btn" data-i18n="modals.levelSelect.button.close"></button>
       </div>
-      <div class="levels-toolbar">
-        <p id="levels-stars-summary" class="modal-stat-line gold-text"></p>
-        <div class="levels-toolbar-actions">
-          <button id="btn-levels-filter-incomplete" type="button" class="nav-btn badge-btn" aria-pressed="false" data-i18n="modals.levelSelect.filter.incomplete"></button>
-          <div class="flux-seed-entry">
+      <p id="play-hub-hint" class="modal-subtext hidden" role="status" aria-live="polite"></p>
+      <div class="play-hub-layout">
+        <section class="play-hub-section play-hub-campaign" aria-labelledby="play-section-campaign-title">
+          <h3 id="play-section-campaign-title" class="play-section-title"><span class="play-section-icon" aria-hidden="true" data-i18n="modals.play.icon.campaign"></span> <span data-i18n="modals.play.section.campaign"></span></h3>
+          <p id="play-campaign-summary" class="play-campaign-summary"></p>
+          <div id="play-campaign-meter" class="star-meter play-campaign-meter" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" aria-labelledby="play-campaign-summary"><span id="play-campaign-meter-fill" class="star-meter-fill"></span></div>
+          <div class="play-hub-campaign-actions">
+            <button id="btn-campaign-continue" type="button" class="modal-btn primary"></button>
+            <button id="btn-campaign-map" type="button" class="modal-btn" aria-haspopup="dialog" data-i18n="modals.play.campaign.map"></button>
+          </div>
+        </section>
+        <section class="play-hub-section play-hub-challenges" aria-labelledby="play-section-challenges-title">
+          <h3 id="play-section-challenges-title" class="play-section-title" data-i18n="modals.play.section.challenges"></h3>
+          <div class="play-hub-grid">
+            <button id="btn-daily" type="button" class="arcade-mode-card">
+              <span class="arcade-card-icon" aria-hidden="true" data-i18n="modals.play.icon.daily"></span>
+              <span class="arcade-card-title" data-i18n="app.nav.button.daily"></span>
+              <span class="arcade-card-desc" data-i18n="modals.play.daily.desc"></span>
+              <span id="daily-reward" class="arcade-card-best gold-text hidden"></span>
+            </button>
+            <button id="btn-weekly" type="button" class="arcade-mode-card">
+              <span class="arcade-card-icon" aria-hidden="true" data-i18n="modals.play.icon.weekly"></span>
+              <span class="arcade-card-title" data-i18n="app.nav.button.weekly"></span>
+              <span class="arcade-card-desc" data-i18n="modals.play.weekly.desc"></span>
+              <span id="weekly-reward" class="arcade-card-best gold-text hidden"></span>
+            </button>
+          </div>
+        </section>
+        <section class="play-hub-section play-hub-arcade" aria-labelledby="play-section-arcade-title">
+          <h3 id="play-section-arcade-title" class="play-section-title" data-i18n="modals.play.section.arcade"></h3>
+          <div class="play-hub-grid">
+            <button id="btn-endless" type="button" class="arcade-mode-card">
+                <span class="arcade-card-icon" aria-hidden="true" data-i18n="modals.play.icon.endless"></span>
+                <span class="arcade-card-title" data-i18n="app.nav.button.endless"></span>
+                <span class="arcade-card-desc" data-i18n="modals.play.arcade.endlessDesc"></span>
+                <span id="arcade-best-endless" class="arcade-card-best gold-text"></span>
+              </button>
+            <button id="btn-mode-classic" type="button" class="arcade-mode-card">
+                <span class="arcade-card-icon" aria-hidden="true" data-i18n="modals.play.icon.classic"></span>
+                <span class="arcade-card-title" data-i18n="modals.levelSelect.arcade.classic"></span>
+                <span class="arcade-card-desc" data-i18n="modals.levelSelect.arcade.classicDesc"></span>
+                <span id="arcade-best-classic" class="arcade-card-best gold-text"></span>
+              </button>
+            <div class="play-hub-cell">
+              <button id="btn-mode-puzzle" type="button" class="arcade-mode-card">
+                <span class="arcade-card-icon" aria-hidden="true" data-i18n="modals.play.icon.puzzle"></span>
+                <span class="arcade-card-title" data-i18n="modals.levelSelect.arcade.puzzle"></span>
+                <span class="arcade-card-desc" data-i18n="modals.levelSelect.arcade.puzzleDesc"></span>
+                <span id="arcade-best-puzzle" class="arcade-card-best gold-text"></span>
+              </button>
+              <button id="btn-puzzle-stages-toggle" type="button" class="nav-btn badge-btn arcade-card-toggle" aria-expanded="false" aria-controls="puzzle-stages-strip" data-i18n="modals.play.puzzle.stagesToggle"></button>
+            </div>
+            <button id="btn-mode-blitz" type="button" class="arcade-mode-card">
+                <span class="arcade-card-icon" aria-hidden="true" data-i18n="modals.play.icon.blitz"></span>
+                <span class="arcade-card-title" data-i18n="modals.levelSelect.arcade.blitz"></span>
+                <span class="arcade-card-desc" data-i18n="modals.levelSelect.arcade.blitzDesc"></span>
+                <span id="arcade-best-blitz" class="arcade-card-best gold-text"></span>
+              </button>
+            <div class="play-hub-cell">
+              <button id="btn-flux" type="button" class="arcade-mode-card">
+                <span class="arcade-card-icon" aria-hidden="true" data-i18n="modals.play.icon.flux"></span>
+                <span class="arcade-card-title" data-i18n="app.nav.button.flux"></span>
+                <span class="arcade-card-desc" data-i18n="modals.play.arcade.fluxDesc"></span>
+                <span id="arcade-best-flux" class="arcade-card-best gold-text"></span>
+              </button>
+              <button id="btn-flux-seed-toggle" type="button" class="nav-btn badge-btn arcade-card-toggle" aria-expanded="false" aria-controls="flux-seed-entry" data-i18n="modals.play.flux.seedToggle"></button>
+            </div>
+            <button id="btn-mode-cascade" type="button" class="arcade-mode-card">
+                <span class="arcade-card-icon" aria-hidden="true" data-i18n="modals.play.icon.cascade"></span>
+                <span class="arcade-card-title" data-i18n="modals.levelSelect.arcade.cascade"></span>
+                <span class="arcade-card-desc" data-i18n="modals.levelSelect.arcade.cascadeDesc"></span>
+                <span id="arcade-best-cascade" class="arcade-card-best gold-text"></span>
+              </button>
+            <button id="btn-mode-boss-rush" type="button" class="arcade-mode-card">
+                <span class="arcade-card-icon" aria-hidden="true" data-i18n="modals.play.icon.bossRush"></span>
+                <span class="arcade-card-title" data-i18n="modals.levelSelect.arcade.bossRush"></span>
+                <span class="arcade-card-desc" data-i18n="modals.levelSelect.arcade.bossRushDesc"></span>
+                <span id="arcade-best-boss-rush" class="arcade-card-best gold-text"></span>
+              </button>
+          </div>
+          <div id="puzzle-stages-strip" class="puzzle-stages-strip play-disclosure hidden" role="group" data-i18n-aria-label="modals.play.puzzle.stagesToggle"></div>
+          <div id="flux-seed-entry" class="flux-seed-entry play-disclosure hidden">
             <input id="input-flux-seed" type="text" class="flux-seed-input" autocomplete="off" spellcheck="false" data-i18n-placeholder="modals.levelSelect.fluxSeed.placeholder" data-i18n-aria-label="modals.levelSelect.fluxSeed.ariaLabel">
             <button id="btn-flux-seed-go" type="button" class="nav-btn badge-btn" data-i18n="modals.levelSelect.fluxSeed.launch"></button>
           </div>
-        </div>
+        </section>
+        <section class="play-hub-section play-hub-duel" aria-labelledby="play-section-duel-title">
+          <h3 id="play-section-duel-title" class="play-section-title" data-i18n="modals.play.section.duel"></h3>
+          <div class="play-hub-grid">
+            <button id="btn-mode-versus" type="button" class="arcade-mode-card" aria-haspopup="dialog">
+                <span class="arcade-card-icon" aria-hidden="true" data-i18n="modals.play.icon.versus"></span>
+                <span class="arcade-card-title" data-i18n="versus.card.title"></span>
+                <span class="arcade-card-desc" data-i18n="versus.card.description"></span>
+                <span id="arcade-best-versus" class="arcade-card-best gold-text"></span>
+              </button>
+              <button id="btn-versus-local-hub" type="button" class="modal-btn hidden" aria-haspopup="dialog" data-i18n="versus.local.entry"></button>
+              <p id="versus-local-hub-hint" class="modal-subtext hidden" data-i18n="versus.local.entryHint"></p>
+          </div>
+        </section>
       </div>
-      <div id="levels-chapters" class="level-chapters" role="tablist" data-i18n-aria-label="modals.levelSelect.chapters.label"></div>
-      <p id="levels-chapter-hint" class="modal-subtext hidden" role="status" aria-live="polite"></p>
-      <div id="levels-grid" class="levels-grid" role="tabpanel"></div>
-      <div class="modal-actions">
-        <button id="btn-play-level-modal" type="button" class="modal-btn primary"></button>
+    </div>
+  </div>
+
+  <!-- Campaign map: chapter switcher, level tiles and the detail of the selected level -->
+  <div id="modal-levels" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="modal-levels-title">
+    <div class="modal-card wide levels-map">
+      <div class="levels-map-header">
+        <h2 id="modal-levels-title" class="modal-title" data-i18n="modals.levelSelect.title.main"></h2>
         <button id="btn-close-levels" type="button" class="modal-btn" data-i18n="modals.levelSelect.button.close"></button>
+      </div>
+      <p id="levels-stars-summary" class="modal-stat-line gold-text"></p>
+      <div class="levels-switcher">
+        <button id="btn-chapter-prev" type="button" class="nav-btn badge-btn levels-switcher-btn" data-pad-tab-prev data-i18n-aria-label="modals.levelSelect.chapters.prev" data-i18n-title="modals.levelSelect.chapters.prev"><span aria-hidden="true">&lt;</span></button>
+        <select id="levels-chapter-select" class="levels-chapter-select" data-i18n-aria-label="modals.levelSelect.chapters.label"></select>
+        <button id="btn-chapter-next" type="button" class="nav-btn badge-btn levels-switcher-btn" data-pad-tab-next data-i18n-aria-label="modals.levelSelect.chapters.next" data-i18n-title="modals.levelSelect.chapters.next"><span aria-hidden="true">&gt;</span></button>
+      </div>
+      <div class="levels-chapter-summary">
+        <p id="levels-chapter-progress" class="modal-stat-line gold-text"></p>
+        <div class="star-meter levels-chapter-meter" aria-hidden="true"><span id="levels-chapter-meter-fill" class="star-meter-fill"></span></div>
+      </div>
+      <div class="levels-toolbar">
+        <button id="btn-levels-filter-incomplete" type="button" class="nav-btn badge-btn" aria-pressed="false" data-i18n="modals.levelSelect.filter.incomplete"></button>
+        <button id="btn-levels-jump-current" type="button" class="nav-btn badge-btn" data-i18n="modals.levelSelect.jumpCurrent"></button>
+      </div>
+      <p id="levels-chapter-hint" class="modal-subtext hidden" role="status" aria-live="polite"></p>
+      <div class="levels-map-body">
+        <div id="levels-grid" class="levels-grid level-tiles" role="listbox"></div>
+        <aside id="levels-detail" class="levels-detail" aria-labelledby="levels-detail-title">
+          <p id="levels-detail-header" class="levels-detail-header"></p>
+          <h3 id="levels-detail-title" class="levels-detail-title"></h3>
+          <span id="levels-detail-badge" class="level-format-badge hidden"></span>
+          <p id="levels-detail-desc" class="levels-detail-desc"></p>
+          <p id="levels-detail-stars" class="levels-detail-stars"></p>
+          <p id="levels-detail-best" class="levels-detail-best"></p>
+          <p id="levels-detail-lock" class="levels-detail-lock hidden"></p>
+          <button id="btn-play-level-modal" type="button" class="modal-btn primary"></button>
+        </aside>
       </div>
     </div>
   </div>
@@ -355,7 +435,7 @@
         <button id="btn-continue-gameover" type="button" class="modal-btn primary hidden"></button>
         <button id="btn-retry" type="button" class="modal-btn primary" data-i18n="modals.gameOver.button.retry"></button>
         <button id="btn-same-seed-gameover" type="button" class="modal-btn hidden"></button>
-        <button id="btn-levels-gameover" type="button" class="modal-btn" data-i18n="modals.gameOver.button.levels"></button>
+        <button id="btn-levels-gameover" type="button" class="modal-btn" aria-haspopup="dialog" data-i18n="modals.play.changeMode"></button>
         <button id="btn-share-gameover" type="button" class="modal-btn hidden" data-i18n="modals.gameOver.button.share"></button>
         <button id="btn-daily-history-gameover" type="button" class="modal-btn hidden" aria-haspopup="dialog" data-i18n="modals.gameOver.button.dailyHistory"></button>
       </div>
@@ -385,7 +465,7 @@
       <div class="modal-actions">
         <button id="btn-resume" type="button" class="modal-btn primary" data-i18n="modals.pause.button.resume"></button>
         <button id="btn-restart-pause" type="button" class="modal-btn" data-i18n="modals.pause.button.restart"></button>
-        <button id="btn-levels-pause" type="button" class="modal-btn" data-i18n="modals.pause.button.levels"></button>
+        <button id="btn-levels-pause" type="button" class="modal-btn" aria-haspopup="dialog" data-i18n="modals.play.changeMode"></button>
         <button id="btn-settings-pause" type="button" class="modal-btn" aria-haspopup="dialog"><span class="settings-btn-icon" aria-hidden="true" data-i18n="app.nav.button.settingsIcon"></span> <span data-i18n="app.nav.button.settings"></span></button>
       </div>
     </div>
@@ -404,89 +484,105 @@
   <div id="modal-settings" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="modal-settings-title">
     <div class="modal-card">
       <h2 id="modal-settings-title" class="modal-title" data-i18n="modals.settings.title.main"></h2>
-      <div class="pause-settings-row">
-        <div class="pause-setting">
-          <button id="btn-sound" type="button" class="nav-btn icon-btn"></button>
-          <span class="pause-setting-caption" data-caption-for="btn-sound" aria-hidden="true"></span>
+      <section class="settings-controller settings-group" aria-labelledby="settings-group-audio-title">
+        <h3 id="settings-group-audio-title" class="stats-section-title" data-i18n="modals.settings.groups.audio"></h3>
+        <div class="pause-settings-row">
+          <div class="pause-setting">
+            <button id="btn-sound" type="button" class="nav-btn icon-btn"></button>
+            <span class="pause-setting-caption" data-caption-for="btn-sound" aria-hidden="true"></span>
+          </div>
+          <div class="pause-setting">
+            <button id="btn-music" type="button" class="nav-btn icon-btn"></button>
+            <span class="pause-setting-caption" data-caption-for="btn-music" aria-hidden="true"></span>
+          </div>
+          <div class="pause-setting">
+            <button id="btn-music-volume" type="button" class="nav-btn badge-btn"></button>
+            <span class="pause-setting-caption" data-caption-for="btn-music-volume" aria-hidden="true"></span>
+          </div>
         </div>
-        <div class="pause-setting">
-          <button id="btn-contrast" type="button" class="nav-btn icon-btn"></button>
-          <span class="pause-setting-caption" data-caption-for="btn-contrast" aria-hidden="true"></span>
+      </section>
+      <section class="settings-controller settings-group" aria-labelledby="settings-group-gameplay-title">
+        <h3 id="settings-group-gameplay-title" class="stats-section-title" data-i18n="modals.settings.groups.gameplay"></h3>
+        <div class="pause-settings-row">
+          <div class="pause-setting">
+            <button id="btn-resonance" type="button" class="nav-btn icon-btn"></button>
+            <span class="pause-setting-caption" data-caption-for="btn-resonance" aria-hidden="true"></span>
+          </div>
+          <div class="pause-setting">
+            <button id="btn-calibrate" type="button" class="nav-btn icon-btn" aria-haspopup="dialog" data-i18n="app.nav.button.calibrateIcon" data-i18n-aria-label="app.settings.calibrate.title" data-i18n-title="app.settings.calibrate.title"></button>
+            <span class="pause-setting-caption" data-i18n="app.settings.calibrate.title" aria-hidden="true"></span>
+          </div>
+          <div class="pause-setting">
+            <button id="btn-tilt" type="button" class="nav-btn icon-btn"></button>
+            <span class="pause-setting-caption" data-caption-for="btn-tilt" aria-hidden="true"></span>
+          </div>
+          <div class="pause-setting">
+            <button id="btn-reset-hints" type="button" class="nav-btn icon-btn" data-i18n="app.nav.button.resetHints" data-i18n-aria-label="app.nav.button.resetHintsAria" data-i18n-title="app.nav.button.resetHintsAria"></button>
+            <span class="pause-setting-caption" data-i18n="app.nav.button.resetHintsCaption" data-caption-for="btn-reset-hints" aria-hidden="true"></span>
+          </div>
+          <div class="pause-setting">
+            <button id="btn-fullscreen" type="button" class="nav-btn icon-btn"></button>
+            <span class="pause-setting-caption" data-caption-for="btn-fullscreen" aria-hidden="true"></span>
+          </div>
+          <div class="pause-setting">
+            <button id="btn-lang" type="button" class="nav-btn badge-btn"></button>
+            <span class="pause-setting-caption" data-i18n="app.nav.button.languageCaption" aria-hidden="true"></span>
+          </div>
         </div>
-        <div class="pause-setting">
-          <button id="btn-patterns" type="button" class="nav-btn icon-btn"></button>
-          <span class="pause-setting-caption" data-caption-for="btn-patterns" aria-hidden="true"></span>
+        <div class="settings-duel-name">
+          <label id="duel-name-label" class="settings-duel-name-label" for="input-duel-name" data-i18n="modals.settings.duelName.label"></label>
+          <input id="input-duel-name" type="text" class="flux-seed-input settings-duel-name-input" autocomplete="off" autocapitalize="off" spellcheck="false" aria-describedby="duel-name-hint">
+          <p id="duel-name-hint" class="install-hint" data-i18n="modals.settings.duelName.hint"></p>
         </div>
-        <div class="pause-setting">
-          <button id="btn-tilt" type="button" class="nav-btn icon-btn"></button>
-          <span class="pause-setting-caption" data-caption-for="btn-tilt" aria-hidden="true"></span>
+      </section>
+      <section class="settings-controller settings-group" aria-labelledby="settings-group-accessibility-title">
+        <h3 id="settings-group-accessibility-title" class="stats-section-title" data-i18n="modals.settings.groups.accessibility"></h3>
+        <div class="pause-settings-row">
+          <div class="pause-setting">
+            <button id="btn-contrast" type="button" class="nav-btn icon-btn"></button>
+            <span class="pause-setting-caption" data-caption-for="btn-contrast" aria-hidden="true"></span>
+          </div>
+          <div class="pause-setting">
+            <button id="btn-patterns" type="button" class="nav-btn icon-btn"></button>
+            <span class="pause-setting-caption" data-caption-for="btn-patterns" aria-hidden="true"></span>
+          </div>
+          <div class="pause-setting">
+            <button id="btn-motion" type="button" class="nav-btn icon-btn"></button>
+            <span class="pause-setting-caption" data-caption-for="btn-motion" aria-hidden="true"></span>
+          </div>
+          <div class="pause-setting">
+            <button id="btn-anim-speed" type="button" class="nav-btn badge-btn"></button>
+            <span class="pause-setting-caption" data-caption-for="btn-anim-speed" aria-hidden="true"></span>
+          </div>
         </div>
-        <div class="pause-setting">
-          <button id="btn-motion" type="button" class="nav-btn icon-btn"></button>
-          <span class="pause-setting-caption" data-caption-for="btn-motion" aria-hidden="true"></span>
-        </div>
-        <div class="pause-setting">
-          <button id="btn-anim-speed" type="button" class="nav-btn badge-btn"></button>
-          <span class="pause-setting-caption" data-caption-for="btn-anim-speed" aria-hidden="true"></span>
-        </div>
-        <div class="pause-setting">
-          <button id="btn-music" type="button" class="nav-btn icon-btn"></button>
-          <span class="pause-setting-caption" data-caption-for="btn-music" aria-hidden="true"></span>
-        </div>
-        <div class="pause-setting">
-          <button id="btn-music-volume" type="button" class="nav-btn badge-btn"></button>
-          <span class="pause-setting-caption" data-caption-for="btn-music-volume" aria-hidden="true"></span>
-        </div>
-        <div class="pause-setting">
-          <button id="btn-resonance" type="button" class="nav-btn icon-btn"></button>
-          <span class="pause-setting-caption" data-caption-for="btn-resonance" aria-hidden="true"></span>
-        </div>
-        <div class="pause-setting">
-          <button id="btn-calibrate" type="button" class="nav-btn icon-btn" aria-haspopup="dialog" data-i18n="app.nav.button.calibrateIcon" data-i18n-aria-label="app.settings.calibrate.title" data-i18n-title="app.settings.calibrate.title"></button>
-          <span class="pause-setting-caption" data-i18n="app.settings.calibrate.title" aria-hidden="true"></span>
-        </div>
-        <div class="pause-setting">
-          <button id="btn-fullscreen" type="button" class="nav-btn icon-btn"></button>
-          <span class="pause-setting-caption" data-caption-for="btn-fullscreen" aria-hidden="true"></span>
-        </div>
-        <div class="pause-setting">
-          <button id="btn-reset-hints" type="button" class="nav-btn icon-btn" data-i18n="app.nav.button.resetHints" data-i18n-aria-label="app.nav.button.resetHintsAria" data-i18n-title="app.nav.button.resetHintsAria"></button>
-          <span class="pause-setting-caption" data-i18n="app.nav.button.resetHintsCaption" data-caption-for="btn-reset-hints" aria-hidden="true"></span>
-        </div>
-        <div class="pause-setting">
-          <button id="btn-lang" type="button" class="nav-btn badge-btn"></button>
-          <span class="pause-setting-caption" data-i18n="app.nav.button.languageCaption" aria-hidden="true"></span>
-        </div>
-      </div>
-      <div class="settings-duel-name">
-        <label id="duel-name-label" class="settings-duel-name-label" for="input-duel-name" data-i18n="modals.settings.duelName.label"></label>
-        <input id="input-duel-name" type="text" class="flux-seed-input settings-duel-name-input" autocomplete="off" autocapitalize="off" spellcheck="false" aria-describedby="duel-name-hint">
-        <p id="duel-name-hint" class="install-hint" data-i18n="modals.settings.duelName.hint"></p>
-      </div>
-      <section class="settings-controller" aria-labelledby="settings-controller-title">
-        <h3 id="settings-controller-title" class="stats-section-title" data-i18n="modals.settings.controller.title"></h3>
-        <p id="settings-controller-hint" class="install-hint" data-i18n="modals.settings.controller.hint"></p>
-        <span class="pad-glyphs"><span class="pad-glyph pad-face" data-pos="bottom" aria-hidden="true"></span><span class="pad-glyph pad-bumper" data-i18n="hud.pad.glyph.leftBumper" aria-hidden="true"></span><span class="pad-glyph pad-bumper" data-i18n="hud.pad.glyph.rightBumper" aria-hidden="true"></span><span class="pad-glyph pad-pill" data-i18n="hud.pad.glyph.start" aria-hidden="true"></span><span class="pad-glyph pad-pill" data-i18n="hud.pad.glyph.select" aria-hidden="true"></span></span>
-        <label class="settings-controller-field">
-          <input id="input-gamepad-enabled" type="checkbox">
-          <span data-i18n="modals.settings.controller.enabled"></span>
-        </label>
-        <label class="settings-controller-field" for="select-gamepad-deadzone">
-          <span data-i18n="modals.settings.controller.deadzone"></span>
-          <select id="select-gamepad-deadzone" class="flux-seed-input settings-controller-select"></select>
-        </label>
-        <label class="settings-controller-field" for="select-gamepad-aim-speed">
-          <span data-i18n="modals.settings.controller.aimSpeed"></span>
-          <select id="select-gamepad-aim-speed" class="flux-seed-input settings-controller-select"></select>
-        </label>
-        <label class="settings-controller-field">
-          <input id="input-gamepad-invert-x" type="checkbox">
-          <span data-i18n="modals.settings.controller.invertX"></span>
-        </label>
         <label class="settings-controller-field">
           <input id="input-gamepad-rumble" type="checkbox">
-          <span data-i18n="modals.settings.controller.rumble"></span>
+          <span data-i18n="modals.settings.vibration"></span>
         </label>
+      </section>
+      <section class="settings-controller settings-group" aria-labelledby="settings-controller-title">
+        <h3 id="settings-controller-title" class="stats-section-title" data-i18n="modals.settings.controller.title"></h3>
+        <p id="settings-controller-nopad" class="install-hint" data-i18n="modals.settings.controller.noPad"></p>
+        <div id="settings-controller-fields" class="hidden">
+          <p id="settings-controller-hint" class="install-hint" data-i18n="modals.settings.controller.hint"></p>
+          <span class="pad-glyphs"><span class="pad-glyph pad-face" data-pos="bottom" aria-hidden="true"></span><span class="pad-glyph pad-bumper" data-i18n="hud.pad.glyph.leftBumper" aria-hidden="true"></span><span class="pad-glyph pad-bumper" data-i18n="hud.pad.glyph.rightBumper" aria-hidden="true"></span><span class="pad-glyph pad-pill" data-i18n="hud.pad.glyph.start" aria-hidden="true"></span><span class="pad-glyph pad-pill" data-i18n="hud.pad.glyph.select" aria-hidden="true"></span></span>
+          <label class="settings-controller-field">
+            <input id="input-gamepad-enabled" type="checkbox">
+            <span data-i18n="modals.settings.controller.enabled"></span>
+          </label>
+          <label class="settings-controller-field" for="select-gamepad-deadzone">
+            <span data-i18n="modals.settings.controller.deadzone"></span>
+            <select id="select-gamepad-deadzone" class="flux-seed-input settings-controller-select"></select>
+          </label>
+          <label class="settings-controller-field" for="select-gamepad-aim-speed">
+            <span data-i18n="modals.settings.controller.aimSpeed"></span>
+            <select id="select-gamepad-aim-speed" class="flux-seed-input settings-controller-select"></select>
+          </label>
+          <label class="settings-controller-field">
+            <input id="input-gamepad-invert-x" type="checkbox">
+            <span data-i18n="modals.settings.controller.invertX"></span>
+          </label>
+        </div>
       </section>
       <div class="settings-install-row">
         <button id="btn-install" type="button" class="modal-btn hidden" data-i18n="modals.settings.install.button"></button>

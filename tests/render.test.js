@@ -610,6 +610,10 @@ test('A device pixel ratio change invalidates the backing store and re-arms the 
     devicePixelRatio: 1,
     addEventListener() {},
     matchMedia(query) {
+      if (query === gameConfig.defaults.coarsePointerMediaQuery) {
+        // The pointer-type probe is not a resolution watch.
+        return { matches: false };
+      }
       const entry = { query, listeners: [] };
       queries.push(entry);
       return {
@@ -1186,6 +1190,10 @@ const createListenerWindow = () => {
     addEventListener: (type, handler) => log.added.push({ type, handler }),
     removeEventListener: (type, handler) => log.removed.push({ type, handler }),
     matchMedia(query) {
+      if (query === gameConfig.defaults.coarsePointerMediaQuery) {
+        // The pointer-type probe is not a resolution watch.
+        return { matches: false };
+      }
       const entry = { query, added: [], removed: [] };
       log.queries.push(entry);
       return {
@@ -1784,4 +1792,142 @@ test('drawChargeList: versus charge drawing equals the shared list drawing', () 
   const direct = createChargeRecorder();
   renderer.drawChargeList(direct, charges, new Set([7]), 20 * gameConfig.versus.chargeRadius);
   assert.deepEqual(viaVersus.calls, direct.calls);
+});
+
+const createGradientCountingContext = () => {
+  const counts = { radial: 0, saves: 0, restores: 0, fills: 0 };
+  const ctx = new Proxy({}, {
+    get(target, prop) {
+      if (prop === 'counts') {
+        return counts;
+      }
+      if (prop in target) {
+        return target[prop];
+      }
+      return () => {
+        if (prop === 'createRadialGradient') {
+          counts.radial++;
+          return { addColorStop() {} };
+        }
+        if (prop === 'save') {
+          counts.saves++;
+        } else if (prop === 'restore') {
+          counts.restores++;
+        } else if (prop === 'fill') {
+          counts.fills++;
+        }
+        return undefined;
+      };
+    },
+    set(target, prop, value) {
+      target[prop] = value;
+      return true;
+    }
+  });
+  return ctx;
+};
+
+const makeParticles = (explosions, flashes) => {
+  const system = new ParticleSystem(gameConfig.juice);
+  system.explosions = explosions;
+  system.flashes = flashes;
+  return system;
+};
+
+test('Same-colour explosions over several frames reuse a bounded set of unit gradients', () => {
+  const renderer = createRenderer();
+  const ctx = createGradientCountingContext();
+  const pCfg = gameConfig.juice.particles;
+  const color = '#ff8800';
+  const explosions = [];
+  for (let i = 0; i < 20; i++) {
+    const kind = i % 2 === 0 ? 'puff' : 'core';
+    explosions.push({ kind, x: 10 + i, y: 20 + i, radius: 12 + i, alpha: 0.8, age: 1, maxAge: 10, color });
+  }
+  const phaseAges = [0, pCfg.explosionHotPhaseEnd + 0.01, pCfg.explosionFirePhaseEnd + 0.01];
+  const flashes = [{ x: 5, y: 6, radius: 9, alpha: 0.7, color }, { x: 8, y: 9, radius: 11, alpha: 0.6, color }];
+  for (const age of phaseAges) {
+    for (const ex of explosions) {
+      ex.age = age * ex.maxAge;
+      ex.prevAge = ex.age;
+    }
+    renderer.drawParticles(ctx, makeParticles(explosions, flashes), 1);
+  }
+  assert.ok(ctx.counts.radial <= 5, `at most 3 puff + 1 core + 1 flash gradients, got ${ctx.counts.radial}`);
+  assert.ok(ctx.counts.radial >= 3, 'each kind builds its gradient');
+  assert.equal(ctx.counts.saves, ctx.counts.restores, 'save and restore stay balanced');
+  assert.ok(ctx.counts.fills >= explosions.length, 'every explosion is still filled');
+
+  const otherCtx = createGradientCountingContext();
+  const before = renderer.unitRadialGradients;
+  renderer.drawParticles(otherCtx, makeParticles([explosions[0]], []), 1);
+  assert.equal(otherCtx.counts.radial, 1, 'a new context rebuilds the gradient it needs');
+  assert.equal(before, renderer.unitRadialGradients);
+  assert.equal(renderer.unitRadialGradients.size, 1, 'the cache is cleared when the context changes');
+});
+
+const withWindow = (win, fn) => {
+  globalThis.window = win;
+  try {
+    return fn();
+  } finally {
+    delete globalThis.window;
+  }
+};
+
+const sizedCanvas = () => {
+  const canvas = createStubCanvas();
+  canvas.getBoundingClientRect = () => ({ left: 0, top: 0, width: 100, height: 100 });
+  return canvas;
+};
+
+const makeDprConfig = (canvasOverrides) => ({
+  ...gameConfig,
+  canvas: { ...gameConfig.canvas, ...canvasOverrides }
+});
+
+test('The device pixel ratio cap honours the coarse pointer and the renderer option', () => {
+  const coarseQuery = gameConfig.defaults.coarsePointerMediaQuery;
+  const buildWindow = (coarse, dpr) => ({
+    devicePixelRatio: dpr,
+    addEventListener() {},
+    matchMedia: (query) => ({ matches: coarse && query === coarseQuery, addEventListener() {} })
+  });
+  const cfg = makeDprConfig({ maxDevicePixelRatio: 3, coarsePointerMaxDevicePixelRatio: 2 });
+  const dprFor = (win, options) => withWindow(win, () => {
+    const renderer = new Renderer(sizedCanvas(), cfg, ballsConfig, obstaclesConfig, options);
+    return renderer.dpr;
+  });
+  assert.equal(dprFor(buildWindow(false, 3)), 3, 'fine pointer keeps the global cap');
+  assert.equal(dprFor(buildWindow(true, 3)), 2, 'coarse pointer uses the coarse cap');
+  assert.equal(dprFor(buildWindow(false, 3), { maxDevicePixelRatio: 1.5 }), 1.5, 'the option lowers the cap');
+  assert.equal(dprFor(buildWindow(true, 3), { maxDevicePixelRatio: 4 }), 2, 'the option never raises the cap');
+
+  const fallbackCfg = makeDprConfig({ maxDevicePixelRatio: 3, coarsePointerMaxDevicePixelRatio: undefined });
+  const fallback = withWindow(buildWindow(true, 3), () => new Renderer(sizedCanvas(), fallbackCfg, ballsConfig, obstaclesConfig).dpr);
+  assert.equal(fallback, 3, 'a missing coarse cap falls back to the global cap');
+});
+
+test('setMaxDevicePixelRatio schedules a resize and applies the new cap', () => {
+  const cfg = makeDprConfig({ maxDevicePixelRatio: 3 });
+  withWindow({ devicePixelRatio: 3, addEventListener() {} }, () => {
+    const renderer = new Renderer(sizedCanvas(), cfg, ballsConfig, obstaclesConfig);
+    assert.equal(renderer.dpr, 3);
+    renderer.setMaxDevicePixelRatio(2);
+    assert.equal(renderer.resolutionDirty, true);
+    renderer.updateCanvasResolution();
+    assert.equal(renderer.dpr, 2);
+    renderer.setMaxDevicePixelRatio(null);
+    renderer.updateCanvasResolution();
+    assert.equal(renderer.dpr, 3);
+  });
+});
+
+test('The device pixel ratio logic does not throw without a window', () => {
+  assert.equal(typeof globalThis.window, 'undefined');
+  const renderer = new Renderer(sizedCanvas(), makeDprConfig({}), ballsConfig, obstaclesConfig, { maxDevicePixelRatio: 2 });
+  assert.equal(renderer.dpr, 1);
+  renderer.setMaxDevicePixelRatio(1);
+  renderer.updateCanvasResolution();
+  assert.equal(renderer.dpr, 1);
 });

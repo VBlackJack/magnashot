@@ -52,6 +52,7 @@ import {
   shouldIgnoreRepeatedKey,
   splitRefreshExtra
 } from '../src/ui/UIManager.js';
+import { ARCADE_CARD_SPECS } from '../src/ui/UIHelpers.js';
 import { applyWorldGeometry } from '../src/core/WorldGeometry.js';
 import { StorageManager } from '../src/core/StorageManager.js';
 import { LevelCatalog, LEVEL_FORMATS } from '../src/game/LevelCatalog.js';
@@ -383,19 +384,25 @@ const SETTING_TOGGLE_IDS = [
   'btn-lang'
 ];
 
-test('the header holds game modes and round actions; the setting toggles live in the Settings dialog', () => {
+test('the header holds Play, stats, Settings and the round actions; the setting toggles live in the Settings dialog', () => {
   const header = elementMarkup(indexHtml, 'app-drawer');
   const settings = elementMarkup(indexHtml, 'modal-settings');
   for (const id of SETTING_TOGGLE_IDS) {
     assert.ok(!header.includes(`id="${id}"`), `#${id} must leave the header`);
     assert.ok(settings.includes(`id="${id}"`), `#${id} must be in the Settings dialog`);
   }
-  // Mode buttons share one neutral style; only the mode being played is lit, at run time.
-  for (const id of ['btn-levels', 'btn-endless', 'btn-daily', 'btn-flux']) {
-    assert.match(header, new RegExp(`id="${id}"[^>]*class="nav-btn mode-btn"`));
+  // The modes left the drawer for the Play hub: the drawer launches the hub and nothing else.
+  for (const id of ['btn-levels', 'btn-endless', 'btn-daily', 'btn-flux', 'btn-weekly', 'nav-mode-lock-hint']) {
+    assert.ok(!header.includes(`id="${id}"`), `#${id} is not in the drawer`);
   }
-  assert.match(elementMarkup(header, 'btn-pause'), /class="nav-btn primary"/, 'Pause is the one highlighted action');
+  assert.match(elementMarkup(header, 'btn-play'), /class="nav-btn primary play-btn"[^>]*aria-haspopup="dialog"/, 'Play is the one highlighted action');
+  assert.match(elementMarkup(header, 'btn-play'), /id="play-new-badge"/);
+  assert.match(header, /id="btn-stats"/);
   assert.match(header, /id="btn-settings"/);
+  assert.match(header, /aria-labelledby="nav-group-round-title"/);
+  for (const id of ['btn-pause', 'btn-restart', 'btn-shop']) {
+    assert.match(header, new RegExp(`id="${id}"`));
+  }
 });
 
 test('the Workshop has one name, in the menu and on its dialog', () => {
@@ -496,7 +503,7 @@ test('the star gauge runs from the last star earned to the next one', () => {
   assert.equal(computeStarProgressPct(5000, thresholds, undefined), 100, 'all stars: full gauge');
 });
 
-const UI_MODULE_FILES = ['UIManager.js', 'UIHelpers.js', 'UIInputBindings.js', 'UIModals.js', 'UISettingsControls.js', 'UIHudRefresh.js', 'CodexView.js', 'WorkshopView.js', 'LevelSelectView.js', 'UIStats.js'];
+const UI_MODULE_FILES = ['UIManager.js', 'UIHelpers.js', 'UIInputBindings.js', 'UIModals.js', 'UISettingsControls.js', 'UIHudRefresh.js', 'CodexView.js', 'WorkshopView.js', 'LevelSelectView.js', 'PlayHubView.js', 'UIStats.js'];
 const uiManagerSource = UI_MODULE_FILES.map((file) => readFileSync(`./src/ui/${file}`, 'utf8')).join('\n');
 const uiManagerCode = uiManagerSource.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
 
@@ -578,13 +585,14 @@ test('the menu star progress is built once: hidden glyphs, a spoken count, then 
   }
 });
 
-test('the level grid is labelled by the active chapter tab', () => {
-  assert.match(uiManagerCode, /tab\.id = `\$\{LEVEL_CHAPTER_TAB_ID_PREFIX\}\$\{chapter\.index\}`/);
+test('the level tile list is a listbox named after the open chapter', () => {
+  assert.match(elementMarkup(indexHtml, 'modal-levels'), /id="levels-grid"[^>]*class="levels-grid level-tiles"[^>]*role="listbox"/);
   assert.match(
     uiManagerCode,
-    /this\.elements\.levelsGrid,\s*'aria-labelledby',\s*`\$\{LEVEL_CHAPTER_TAB_ID_PREFIX\}\$\{this\.levelsChapterIndex\}`/
+    /this\.elements\.levelsGrid,\s*'aria-label',\s*t\('modals\.levelSelect\.grid\.aria', \{ chapter: this\.formatChapterName\(chapter\) \}\)/
   );
-  assert.match(uiManagerCode, /const LEVEL_CHAPTER_TAB_ID_PREFIX = 'levels-chapter-tab-';/);
+  assert.doesNotMatch(uiManagerCode, /levels-chapter-tab-/);
+  assert.match(uiManagerCode, /option\.disabled = isLocked/, 'a locked chapter is a disabled option of the chapter select');
 });
 
 test('a cleared Flux stage is announced once, not again on a refresh with the last extras', () => {
@@ -599,7 +607,7 @@ test('UIManager keeps its numbers and icon gradient in named constants', () => {
   assert.match(uiManagerCode, /radial-gradient\(circle at \$\{SPECIAL_ICON_HIGHLIGHT_POSITION\}/);
   assert.match(
     uiManagerCode,
-    /t\('modals\.levelSelect\.starsTotal', \{\s*stars: formatNumber\(totalStars\),\s*maxStars: formatNumber\(maxCampaignStars\)/
+    /t\('modals\.levelSelect\.starsTotal', \{\s*stars: formatNumber\(this\.storageManager\.getTotalStars\(\)\),\s*maxStars: formatNumber\(maxCampaignStars\)/
   );
 });
 
@@ -626,8 +634,10 @@ test('the scroll containers of the level select leave room for the whole focus r
   const ring = outlineWidth + outlineOffset;
   const grid = cssBlock(mainCss, '.levels-grid {').match(/padding:\s*([^;]+);/)[1].split(/\s+/).map(pxValue);
   assert.ok(grid.every((side) => side >= ring), `.levels-grid padding ${grid} under ${ring}px`);
-  const chapters = cssBlock(mainCss, '.level-chapters {').match(/padding:\s*([^;]+);/)[1].split(/\s+/).map(pxValue);
-  assert.ok(chapters.every((side) => side >= ring), `.level-chapters padding ${chapters} under ${ring}px`);
+  for (const selector of ['.level-tiles {', '.levels-switcher {']) {
+    const sides = cssBlock(mainCss, selector).match(/padding:\s*([^;]+);/)[1].split(/\s+/).map(pxValue);
+    assert.ok(sides.every((side) => side >= ring), `${selector} padding ${sides} under ${ring}px`);
+  }
 });
 
 test('every custom property defined in main.css is used somewhere, and every referenced one is defined', () => {
@@ -661,39 +671,112 @@ test('the drawer duration is written once', () => {
   assert.match(mainCss, /visibility 0s linear var\(--drawer-duration\)/);
 });
 
-test('btnPlayLevelModal closes the level select over a campaign run and asks to confirm otherwise', () => {
-  const { ui, el, calls } = bindEventsHarness({ engine: { mode: 'campaign', state: 'playing' } });
-  let closed = 0;
-  ui.closeOverlayModal = () => {
-    closed++;
+/** A UI stand-in for playSelectedLevel: the selected level, the run, and what the dialog did. */
+function playSelectedLevelHarness({ engine = {}, selectedId = 3, unlocked = 10 } = {}) {
+  const calls = { destructive: [], closed: [], hints: [], started: [] };
+  const ui = Object.create(UIManager.prototype);
+  ui.levelsSelectedId = selectedId;
+  ui.autoPausedByOverlay = false;
+  ui.elements = { modalLevels: { id: 'modal-levels' } };
+  ui.storageManager = { getUnlockedLevel: () => unlocked };
+  ui.engine = {
+    mode: 'campaign',
+    state: 'playing',
+    currentLevelId: 3,
+    startCampaignLevel: (id) => calls.started.push(id),
+    ...engine
   };
   ui.requestDestructiveAction = (action) => calls.destructive.push(action);
-  el('btnPlayLevelModal').click();
-  assert.equal(closed, 1, 'an active campaign run just resumes');
+  ui.closeOverlayModal = () => calls.closed.push(ui.engine.state);
+  ui.showLockedLevelHint = (...args) => calls.hints.push(args);
+  return { ui, calls };
+}
+
+test('playSelectedLevel closes the campaign map over the running level and asks to confirm otherwise', () => {
+  const { ui, calls } = playSelectedLevelHarness();
+  ui.playSelectedLevel();
+  assert.deepEqual(calls.closed, ['playing'], 'the selected level of an active campaign run just resumes');
   assert.equal(calls.destructive.length, 0);
 
   ui.engine.mode = 'endless';
-  el('btnPlayLevelModal').click();
+  ui.playSelectedLevel();
   assert.equal(calls.destructive.length, 1, 'switching from another run asks to confirm');
+
+  ui.engine.mode = 'campaign';
+  ui.levelsSelectedId = 4;
+  ui.playSelectedLevel();
+  assert.equal(calls.destructive.length, 2, 'another level than the running one asks to confirm');
+  assert.equal(calls.closed.length, 1);
 });
 
-test('btnPlayLevelModal opened from Pause unpauses before closing Level Select so Pause stays hidden and focus returns to the board', () => {
-  const stateAtClose = [];
-  const { ui, el } = bindEventsHarness({
+/** Stacks the campaign map over the Play hub on a real closeOverlayModal, to check where the run ends up. */
+function stackedMapOverHubHarness({ autoPaused, state = 'paused' }) {
+  const makeModal = (hidden) => {
+    const classes = new Set(hidden ? ['hidden'] : []);
+    return {
+      classList: {
+        add: (name) => classes.add(name),
+        remove: (name) => classes.delete(name),
+        contains: (name) => classes.has(name)
+      }
+    };
+  };
+  const { ui } = playSelectedLevelHarness({
     engine: {
-      mode: 'campaign',
+      state,
+      togglePause() {
+        this.state = this.state === 'paused' ? 'playing' : 'paused';
+      }
+    }
+  });
+  const modals = {
+    modalLevels: makeModal(false),
+    modalPlay: makeModal(false),
+    modalPause: makeModal(true),
+    modalConfirm: makeModal(true)
+  };
+  ui.elements = modals;
+  ui.autoPausedByOverlay = autoPaused;
+  ui.isDrawerOpen = false;
+  ui.isRunHeldByUi = () => false;
+  ui.isAnyOverlayModalOpen = () => ['modalLevels', 'modalPlay'].some((key) => !modals[key].classList.contains('hidden'));
+  ui.syncModalInertState = () => {};
+  ui.closeOverlayModal = UIManager.prototype.closeOverlayModal;
+  return { ui, modals };
+}
+
+test('playSelectedLevel resumes the run and leaves no dialog open when the map is stacked over the hub', () => {
+  const cases = [
+    { name: 'hub opened during play', autoPaused: true },
+    { name: 'hub opened from Pause', autoPaused: false }
+  ];
+  for (const { name, autoPaused } of cases) {
+    const { ui, modals } = stackedMapOverHubHarness({ autoPaused });
+    ui.playSelectedLevel();
+    assert.equal(ui.engine.state, 'playing', `${name}: the run resumes`);
+    for (const [key, modal] of Object.entries(modals)) {
+      assert.equal(modal.classList.contains('hidden'), true, `${name}: ${key} is closed`);
+    }
+    assert.equal(ui.autoPausedByOverlay, false, `${name}: the overlay hold is released`);
+  }
+});
+
+test('playSelectedLevel opened from Pause unpauses before closing the campaign map so Pause stays hidden and focus returns to the board', () => {
+  const { ui, calls } = playSelectedLevelHarness({
+    engine: {
       state: 'paused',
       togglePause() {
         this.state = 'playing';
       }
     }
   });
-  ui.autoPausedByOverlay = false;
-  ui.closeOverlayModal = () => {
-    stateAtClose.push(ui.engine.state);
-  };
-  el('btnPlayLevelModal').click();
-  assert.deepEqual(stateAtClose, ['playing'], 'the run is already playing when closeOverlayModal runs');
+  ui.playSelectedLevel();
+  assert.deepEqual(calls.closed, ['playing'], 'the run is already playing when closeOverlayModal runs');
+
+  const locked = playSelectedLevelHarness({ selectedId: 12, unlocked: 10 });
+  locked.ui.playSelectedLevel();
+  assert.equal(locked.calls.hints.length, 1, 'a locked level shows its requirement and starts nothing');
+  assert.equal(locked.calls.destructive.length, 0);
   assert.match(
     uiManagerCode,
     /t\('modals\.shop\.achievements\.reward',\s*\{\s*coins:\s*formatNumber\(shown\.spec\.rewardCoins\)\s*\}\)/
@@ -794,10 +877,12 @@ test('rerenderShopKeepingFocus keeps focus at or after the upgraded slot index w
   assert.equal(focusedId, 'upgrade-2', 'focus moves to the next upgrade button after slot 1 reaches MAX');
 });
 
-test('unlocked level cards expose a concise aria-label and aria-describedby', () => {
+test('unlocked level tiles expose a concise aria-label, selection state and a roving tab stop', () => {
   assert.match(uiManagerCode, /modals\.levelSelect\.card\.ariaCurrent/);
-  assert.match(uiManagerCode, /modals\.levelSelect\.card\.aria/);
-  assert.match(uiManagerCode, /card\.setAttribute\('aria-describedby',\s*descId\)/);
+  assert.match(uiManagerCode, /modals\.levelSelect\.card\.aria'/);
+  assert.match(uiManagerCode, /tile\.setAttribute\('role', 'option'\)/);
+  assert.match(uiManagerCode, /tile\.setAttribute\('aria-selected'/);
+  assert.match(uiManagerCode, /tile\.tabIndex = isSelected \? 0 : -1/);
   for (const lang of SUPPORTED) {
     const cardLocale = loadJson(`./locales/${lang}.json`).modals.levelSelect.card;
     assert.deepEqual(placeholdersOf(cardLocale.aria), ['best', 'id', 'maxStars', 'name', 'stars']);
@@ -853,9 +938,9 @@ test('powerup buttons include keyboard badge 1-6 and locked chapters expose chap
   }
 });
 
-test('Pause modal exposes Level Select button, Pause nav button exposes Esc tooltip, and locked cards expose ariaLocked and cardLockedHint', () => {
+test('Pause modal exposes the Change mode button, Pause nav button exposes Esc tooltip, and locked cards expose ariaLocked and cardLockedHint', () => {
   const pauseModal = elementMarkup(indexHtml, 'modal-pause');
-  assert.match(pauseModal, /id="btn-levels-pause"[^>]*data-i18n="modals\.pause\.button\.levels"/);
+  assert.match(pauseModal, /id="btn-levels-pause"[^>]*aria-haspopup="dialog"[^>]*data-i18n="modals\.play\.changeMode"/);
   const pauseNav = elementMarkup(indexHtml, 'btn-pause');
   assert.match(pauseNav, /data-i18n-title="app\.nav\.button\.pauseTooltip"/);
   assert.match(uiManagerCode, /this\.engine\.applyUpgradePurchase\(upgradeKey\)/);
@@ -866,7 +951,7 @@ test('Pause modal exposes Level Select button, Pause nav button exposes Esc tool
   for (const lang of SUPPORTED) {
     const locale = loadJson(`./locales/${lang}.json`);
     assert.ok(locale.app.nav.button.pauseTooltip);
-    assert.ok(locale.modals.pause.button.levels);
+    assert.ok(locale.modals.play.changeMode);
     assert.deepEqual(placeholdersOf(locale.modals.levelSelect.card.ariaLocked), ['id', 'name', 'previous']);
     assert.deepEqual(placeholdersOf(locale.modals.levelSelect.cardLockedHint), ['level']);
     assert.deepEqual(placeholdersOf(locale.modals.shop.upgrades.startingShots.description), ['shots']);
@@ -1131,16 +1216,18 @@ test('resolveLevelFormatBadgeKey and LevelCatalog.summarize expose landmark and 
   );
 });
 
-test('Arcade modes live in the rich cards of Modes & Level Select while the burger drawer groups primary modes and round actions', () => {
+test('Arcade modes live in the rich cards of the Play hub while the burger drawer keeps Play and round actions', () => {
   const header = elementMarkup(indexHtml, 'app-drawer');
-  for (const id of ['btn-puzzle', 'btn-blitz', 'btn-boss-rush', 'btn-cascade']) {
+  for (const id of ['btn-puzzle', 'btn-blitz', 'btn-boss-rush', 'btn-cascade', 'btn-mode-puzzle', 'btn-mode-blitz']) {
     assert.ok(!header.includes(`id="${id}"`), `#${id} is not duplicated in the burger drawer`);
   }
-  assert.match(header, /aria-labelledby="nav-group-modes-title"/);
   assert.match(header, /aria-labelledby="nav-group-round-title"/);
+  assert.doesNotMatch(header, /nav-group-modes-title/);
+  const hub = elementMarkup(indexHtml, 'modal-play');
   const levelsModal = elementMarkup(indexHtml, 'modal-levels');
   for (const id of ['btn-mode-puzzle', 'btn-mode-blitz', 'btn-mode-boss-rush', 'btn-mode-cascade']) {
-    assert.match(levelsModal, new RegExp(`id="${id}"[^>]*class="arcade-mode-card"`));
+    assert.match(hub, new RegExp(`id="${id}"[^>]*class="arcade-mode-card"`));
+    assert.ok(!levelsModal.includes(`id="${id}"`), `#${id} left the campaign map`);
   }
   assert.match(
     indexHtml,
@@ -1161,7 +1248,8 @@ test('Arcade modes live in the rich cards of Modes & Level Select while the burg
   ui.engine = { mode: 'puzzle', currentPuzzleStage: 3 };
   assert.equal(ui.getSuggestedPuzzleStage(), 3, 'Clicking Puzzle on the highest unlocked stage stays on stage 3');
 
-  assert.match(levelsModal, /id="puzzle-stages-strip"[^>]*class="puzzle-stages-strip"/);
+  assert.match(hub, /id="puzzle-stages-strip"[^>]*class="puzzle-stages-strip play-disclosure hidden"/);
+  assert.match(hub, /id="btn-puzzle-stages-toggle"[^>]*aria-expanded="false"[^>]*aria-controls="puzzle-stages-strip"/);
   assert.match(uiManagerCode, /style-preview-orb style-preview-\$\{styleId\}/);
   i18n.dictionaries.set('fr', JSON.parse(readFileSync('./locales/fr.json', 'utf8')));
   assert.ok(
@@ -1254,20 +1342,28 @@ test('UX audit guards: Blitz HUD wave banner, locked Puzzle aria-disabled hint, 
   }
 
   const ui = Object.create(UIManager.prototype);
-  const playBtn = { id: 'btn-play-level-modal' };
-  const closeBtn = { id: 'btn-close-levels' };
+  const continueBtn = { id: 'btn-campaign-continue' };
+  const closeBtn = { id: 'btn-close-play' };
   const blitzBtn = { id: 'btn-mode-blitz' };
+  const endlessBtn = { id: 'btn-endless' };
   ui.elements = {
-    btnCloseLevels: closeBtn,
-    btnModeBlitz: blitzBtn
+    btnCampaignContinue: continueBtn,
+    btnClosePlay: closeBtn,
+    btnModeBlitz: blitzBtn,
+    btnEndless: endlessBtn
   };
-  ui.isRunActive = () => true;
-  ui.engine = { mode: 'campaign' };
-  assert.equal(ui.getLevelsModalInitialFocus(playBtn), playBtn, 'Campaign run focuses the Campaign play/resume CTA');
-  ui.engine = { mode: 'blitz' };
-  assert.equal(ui.getLevelsModalInitialFocus(playBtn), blitzBtn, 'Blitz run focuses the Blitz Arcade card instead of Campaign play');
-  ui.engine = { mode: 'endless' };
-  assert.equal(ui.getLevelsModalInitialFocus(playBtn), closeBtn, 'Survival run focuses Close instead of Campaign play');
+  ui.storageManager = { getModeAccess: () => ({}) };
+  ui.engine = { mode: 'campaign', state: 'playing' };
+  assert.equal(ui.getPlayHubInitialFocus(), continueBtn, 'Campaign run focuses the Campaign continue button');
+  ui.engine = { mode: 'blitz', state: 'playing' };
+  assert.equal(ui.getPlayHubInitialFocus(), blitzBtn, 'Blitz run focuses the Blitz card instead of Campaign continue');
+  ui.engine = { mode: 'endless', state: 'playing' };
+  assert.equal(ui.getPlayHubInitialFocus(), endlessBtn, 'Survival run focuses the Survival card');
+  ui.engine = { mode: 'blitz', state: 'game_over' };
+  assert.equal(ui.getPlayHubInitialFocus(), continueBtn, 'without a run the hub starts on Continue');
+  ui.storageManager = { getModeAccess: () => ({ endless: { unlocked: false } }) };
+  ui.engine = { mode: 'endless', state: 'playing' };
+  assert.equal(ui.getPlayHubInitialFocus(), continueBtn, 'a locked running mode falls back to Continue');
 });
 
 test('Settings modal exposes #btn-anim-speed cycling through configured animation speeds (0.5x, 1x, 1.5x, 2x)', async () => {
@@ -2498,7 +2594,7 @@ test('tier colors are defined in every contrast theme', () => {
 
 const DAILY_INTRO_TEST_SEED = '2026-11-08';
 
-test('Daily mutator intro banner, completed chapter tabs, and collectorMagnet upgrade are localized and wired', () => {
+test('Daily mutator intro banner, completed chapter summary, and collectorMagnet upgrade are localized and wired', () => {
   const previous = i18n.currentLocale;
   try {
     for (const lang of SUPPORTED) {
@@ -2509,10 +2605,6 @@ test('Daily mutator intro banner, completed chapter tabs, and collectorMagnet up
       assert.deepEqual(
         placeholdersOf(locale.modals.shop.upgrades.collectorMagnet.description),
         ['overcharge', 'points']
-      );
-      assert.deepEqual(
-        placeholdersOf(locale.modals.levelSelect.chapters.ariaCompleted),
-        ['first', 'last', 'maxStars', 'name', 'stars']
       );
       assert.deepEqual(
         placeholdersOf(locale.modals.levelSelect.chapters.starsCompleted),
@@ -2529,7 +2621,7 @@ test('Daily mutator intro banner, completed chapter tabs, and collectorMagnet up
       }
     }
 
-    assert.match(uiManagerCode, /modals\.levelSelect\.chapters\.ariaCompleted/);
+    assert.match(uiManagerCode, /modals\.levelSelect\.chapters\.optionLocked/);
     assert.match(uiManagerCode, /modals\.levelSelect\.chapters\.starsCompleted/);
     assert.match(workshopViewCode, /points:\s*formatNumber\(spec\.pointsBonusPerLevel \|\| 0\)/);
     assert.match(workshopViewCode, /overcharge:\s*formatNumber\(spec\.overchargeBonusPerLevel \|\| 0\)/);
@@ -2580,4 +2672,67 @@ test('closing the last dialog falls back to the game canvas when no opener can t
   } finally {
     globalThis.document = prevDoc;
   }
+});
+
+test('the Play hub lists the Arcade cards in campaign unlock order, then the Duel card', () => {
+  const hub = elementMarkup(indexHtml, 'modal-play');
+  const arcade = hub.slice(hub.indexOf('play-hub-arcade'), hub.indexOf('play-hub-duel'));
+  const duel = hub.slice(hub.indexOf('play-hub-duel'));
+  const toId = (key) => key.replace(/[A-Z]/g, (letter) => `-${letter.toLowerCase()}`);
+  const cardIds = (markup) =>
+    [...markup.matchAll(/<button id="([\w-]+)" type="button" class="arcade-mode-card"/g)].map((match) => match[1]);
+
+  const unlockModes = Object.entries(gameConfig.modeUnlocks.campaignLevelCleared)
+    .filter(([mode]) => mode !== 'versus')
+    .sort((a, b) => a[1] - b[1])
+    .map(([mode]) => mode);
+  assert.deepEqual(
+    cardIds(arcade),
+    unlockModes.map((mode) => toId(ARCADE_CARD_SPECS[mode].card)),
+    'Arcade cards follow modeUnlocks.campaignLevelCleared'
+  );
+  assert.deepEqual(Object.keys(ARCADE_CARD_SPECS).slice(0, unlockModes.length), unlockModes, 'ARCADE_CARD_SPECS keeps the same order');
+  assert.deepEqual(cardIds(duel), ['btn-mode-versus']);
+  const challenges = hub.slice(hub.indexOf('play-hub-challenges'), hub.indexOf('play-hub-arcade'));
+  assert.deepEqual(cardIds(challenges), ['btn-daily', 'btn-weekly']);
+});
+
+test('every data-i18n key of the Play hub and the campaign map exists in both locales', () => {
+  const lookup = (dictionary, key) => key.split('.').reduce((node, part) => node?.[part], dictionary);
+  const dictionaries = SUPPORTED.map((lang) => [lang, loadJson(`./locales/${lang}.json`)]);
+  let checked = 0;
+  for (const id of ['modal-play', 'modal-levels']) {
+    const markup = elementMarkup(indexHtml, id);
+    for (const match of markup.matchAll(/data-i18n(?:-[a-z-]+)?="([^"]+)"/g)) {
+      checked++;
+      for (const [lang, dictionary] of dictionaries) {
+        assert.equal(typeof lookup(dictionary, match[1]), 'string', `${lang}: ${match[1]} (in #${id})`);
+      }
+    }
+  }
+  assert.ok(checked > 40, 'the scan must find the keys of both windows');
+});
+
+test('the Play hub keeps its moved ids, the new ids exist once, and the removed ids are gone', () => {
+  const ids = [...indexHtml.matchAll(/\sid="([^"]+)"/g)].map((match) => match[1]);
+  const hub = elementMarkup(indexHtml, 'modal-play');
+  for (const id of [
+    'btn-endless', 'btn-daily', 'btn-flux', 'btn-weekly', 'btn-mode-classic', 'btn-mode-puzzle', 'btn-mode-blitz',
+    'btn-mode-boss-rush', 'btn-mode-cascade', 'btn-mode-versus', 'puzzle-stages-strip', 'input-flux-seed', 'btn-flux-seed-go',
+    'btn-close-play', 'play-hub-hint', 'btn-campaign-continue', 'btn-campaign-map', 'play-campaign-summary', 'play-campaign-meter',
+    'daily-reward', 'weekly-reward', 'btn-puzzle-stages-toggle', 'btn-flux-seed-toggle', 'flux-seed-entry', 'btn-versus-local-hub',
+    'versus-local-hub-hint', 'arcade-best-endless', 'arcade-best-flux'
+  ]) {
+    assert.ok(hub.includes(`id="${id}"`), `#${id} is in the Play hub`);
+  }
+  for (const id of [
+    'btn-play', 'modal-play', 'btn-chapter-prev', 'levels-chapter-select', 'btn-chapter-next', 'btn-levels-jump-current',
+    'levels-detail', 'levels-detail-title', 'btn-play-level-modal'
+  ]) {
+    assert.equal(ids.filter((entry) => entry === id).length, 1, `#${id} exists once`);
+  }
+  for (const id of ['btn-levels', 'nav-mode-lock-hint', 'nav-group-modes-title', 'levels-chapters']) {
+    assert.ok(!ids.includes(id), `#${id} is removed`);
+  }
+  assert.ok(indexHtml.indexOf('id="modal-play"') < indexHtml.indexOf('id="modal-levels"'), '#modal-play comes before #modal-levels');
 });

@@ -23,7 +23,10 @@ import { StorageManager } from '../src/core/StorageManager.js';
 import { GameEngine } from '../src/game/GameEngine.js';
 import { BOARD_MECHANICS, CLUSTER_MODIFIERS, INPUT_MODES, OBSTACLE_TYPES, SPECIAL_TYPES } from '../src/core/Constants.js';
 import {
+  DISCOVERY_INTERACTIONS,
   POLARITY_MECHANIC_ID,
+  RESONANCE_MECHANIC_ID,
+  SAG_MECHANIC_ID,
   toSpecialMechanicId,
   listBoardMechanics,
   listLevelMechanics,
@@ -65,6 +68,8 @@ const ALL_MECHANICS = [
   ...Object.values(OBSTACLE_TYPES),
   ...Object.values(BOARD_MECHANICS),
   POLARITY_MECHANIC_ID,
+  RESONANCE_MECHANIC_ID,
+  SAG_MECHANIC_ID,
   ...Object.values(SPECIAL_TYPES).map(toSpecialMechanicId)
 ].sort();
 
@@ -360,4 +365,67 @@ test('Showing the hints again forgets every discovery and explains the board at 
   engine.resetDiscoveries();
   assert.equal(engine.activeDiscoveryId, BOARD_MECHANICS.BASICS);
   assert.deepEqual(engine.storageManager.getDiscoveries(), {}, 'a shown hint is not yet learned');
+});
+
+const RESONANCE_UNLOCK_LEVEL = gameConfig.resonance.unlockAfterCampaignLevel + 1;
+const VETERAN_LEVEL = 14;
+
+test('Resonance and Sag are present only where the run switches them on', () => {
+  const presence = (storage, start) => {
+    const engine = createTestEngine(storage);
+    start(engine);
+    const present = engine.listPresentMechanics();
+    return { resonance: present.has(RESONANCE_MECHANIC_ID), sag: present.has(SAG_MECHANIC_ID) };
+  };
+  const veteran = () => {
+    const storage = createTestStorage();
+    storage.unlockLevel(RESONANCE_UNLOCK_LEVEL);
+    return storage;
+  };
+  assert.deepEqual(presence(veteran(), (e) => e.startCampaignLevel(1)), { resonance: true, sag: false });
+  assert.deepEqual(presence(veteran(), (e) => e.startEndlessMode()), { resonance: true, sag: true });
+  assert.deepEqual(presence(veteran(), (e) => e.startClassicMode(1)), { resonance: false, sag: true });
+  assert.deepEqual(presence(veteran(), (e) => e.startDailyChallenge('2025-01-02')), { resonance: false, sag: true });
+  assert.deepEqual(
+    presence(createTestStorage(), (e) => e.startCampaignLevel(1)),
+    { resonance: false, sag: false },
+    'a fresh profile has not unlocked Resonance'
+  );
+  const off = veteran();
+  off.setResonanceEnabled(false);
+  assert.equal(presence(off, (e) => e.startEndlessMode()).resonance, false, 'the setting off hides it');
+});
+
+test('Resonance and Sag are never credited from progress', () => {
+  const storage = createTestStorage();
+  storage.unlockLevel(VETERAN_LEVEL);
+  createTestEngine(storage);
+  const seen = storage.getDiscoveries();
+  assert.equal(seen[POLARITY_MECHANIC_ID], true, 'the campaign mechanics are credited');
+  assert.equal(seen[RESONANCE_MECHANIC_ID], undefined);
+  assert.equal(seen[SAG_MECHANIC_ID], undefined);
+});
+
+test('A veteran meets the Resonance hint once, and a shot learns it', () => {
+  const storage = createTestStorage();
+  storage.unlockLevel(VETERAN_LEVEL);
+  const engine = createTestEngine(storage);
+  engine.startCampaignLevel(1);
+  assert.equal(engine.activeDiscoveryId, RESONANCE_MECHANIC_ID);
+  assert.equal(onboarding.mechanics[RESONANCE_MECHANIC_ID].interaction, DISCOVERY_INTERACTIONS.SHOT);
+  engine.recordDiscoveryInteraction(DISCOVERY_INTERACTIONS.SHOT);
+  assert.equal(storage.getDiscoveries()[RESONANCE_MECHANIC_ID], true);
+  engine.startCampaignLevel(1);
+  assert.equal(engine.activeDiscoveryId, null);
+});
+
+test('The Sag hint comes up in a Sag mode after Resonance for a veteran', () => {
+  const storage = createTestStorage();
+  storage.unlockLevel(VETERAN_LEVEL);
+  const engine = createTestEngine(storage);
+  storage.markDiscovered([RESONANCE_MECHANIC_ID]);
+  engine.startEndlessMode();
+  assert.equal(engine.activeDiscoveryId, SAG_MECHANIC_ID);
+  assert.ok(onboarding.order.indexOf(RESONANCE_MECHANIC_ID) > onboarding.order.indexOf(POLARITY_MECHANIC_ID));
+  assert.equal(onboarding.order.indexOf(SAG_MECHANIC_ID), onboarding.order.indexOf(RESONANCE_MECHANIC_ID) + 1);
 });

@@ -675,3 +675,31 @@ test('calibration guard: no campaign landmark holds a Magnetar and campaign leve
     );
   }
 });
+
+const fallJuiceProbe = (reducedMotion) => {
+  const engine = bossRushEngine(1);
+  engine.isReducedMotion = reducedMotion;
+  const effects = [];
+  const shakes = [];
+  engine.audioManager.playEffect = (name) => effects.push(name);
+  engine.particleSystem.addScreenShake = (...args) => {
+    if (args[0] === cfg.render.fallShake) {
+      shakes.push(args);
+    }
+  };
+  removeMoorings(engine, 0);
+  engine.handlePostTurnCleanup(true);
+  return { effects, shakes };
+};
+
+test('a Magnetar fall plays its sound and shakes the screen', () => {
+  const { effects, shakes } = fallJuiceProbe(false);
+  assert.equal(effects.filter((name) => name === 'magnetarFall').length, 1);
+  assert.deepEqual(shakes, [[cfg.render.fallShake, gameConfig.juice.maxShakeOffset]]);
+});
+
+test('with reduced motion the Magnetar fall keeps its sound but no screen shake', () => {
+  const { effects, shakes } = fallJuiceProbe(true);
+  assert.equal(effects.filter((name) => name === 'magnetarFall').length, 1);
+  assert.equal(shakes.length, 0);
+});

@@ -489,6 +489,7 @@ export const engineMagnetarMethods = {
     const reward = fallReward(dropped, cfg);
     this.addScore(reward.points);
     this.awardRunCoins(reward.coins);
+    this.audioManager.playEffect?.('magnetarFall');
     this.particleSystem.spawnFloatingText(
       ball.x,
       ball.y + this.gameConfig.canvas.floatingTextOffsetY,
@@ -501,6 +502,7 @@ export const engineMagnetarMethods = {
       this.particleSystem.spawnFlash?.(ball.x, ball.y, spec.ringColor, cfg.render.fallShockwaveRadius);
       this.particleSystem.spawnShockwave(ball.x, ball.y, spec.ringColor, cfg.render.fallShockwaveRadius);
       this.triggerSpecialSlowMo(cfg.render.fallSlowMoFrames, cfg.render.fallSlowMoTimeScale, spec.ringColor);
+      this.particleSystem.addScreenShake?.(cfg.render.fallShake, this.gameConfig.juice.maxShakeOffset);
     }
     this.bossesDestroyedInRun++;
     this.storageManager?.recordAchievementProgress?.({ bossesDestroyed: this.bossesDestroyedInRun });

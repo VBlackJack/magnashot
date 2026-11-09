@@ -34,6 +34,12 @@ const REDUCED_MOTION_QUERY = '(prefers-reduced-motion: reduce)';
 /** Role of the container that holds the tabs of a dialog (Workshop, chapters, stats). */
 const TABLIST_SELECTOR = '[role="tablist"]';
 const TAB_SELECTOR = '[role="tab"]';
+/** Buttons that stand in for a tab list (the campaign map's chapter arrows). */
+const PAD_TAB_PREV_SELECTOR = '[data-pad-tab-prev]';
+const PAD_TAB_NEXT_SELECTOR = '[data-pad-tab-next]';
+/** Level tiles of the campaign map: the one in the tab order is the selected one. */
+const TILE_SELECTOR = '[role="option"]';
+const SELECTED_TILE_SELECTOR = '[role="option"][tabindex="0"]';
 
 /** Navigation directions as unit steps on the screen axes (y grows downward). */
 const NAV_VECTORS = Object.freeze({
@@ -243,6 +249,7 @@ export const uiGamepadMethods = {
     const message = t(isConnected ? 'toast.gamepad.connected' : 'toast.gamepad.disconnected');
     this.showToast(message);
     this.announce(message);
+    this.refreshControllerFields();
     if (event !== GAMEPAD_EVENTS.DISCONNECTED) {
       return;
     }
@@ -423,13 +430,25 @@ export const uiGamepadMethods = {
     if (items.length === 0) {
       return;
     }
+    const vector = NAV_VECTORS[action];
+    // The campaign map's tiles are roving (tabindex -1 but one), so spatial navigation cannot see
+    // them: while focus is on a tile the press moves the selection through the grid, and a null
+    // result (an edge) lets spatial navigation take over.
+    const grid = this.elements.levelsGrid;
+    if (grid && document.activeElement && grid.contains?.(document.activeElement)) {
+      const tile = this.moveLevelTileFocus?.(vector.x, vector.y, { wrapRows: false });
+      if (tile) {
+        this.padLastMove = null;
+        this.focusFromPad(tile);
+        return;
+      }
+    }
     const current = items.indexOf(document.activeElement);
     if (current < 0) {
       this.focusFromPad(items[0]);
       return;
     }
     const focused = items[current];
-    const vector = NAV_VECTORS[action];
     if (focused.tagName === 'SELECT' && vector.x !== 0) {
       this.stepSelect(focused, vector.x);
       return;
@@ -452,10 +471,17 @@ export const uiGamepadMethods = {
     }
   },
 
-  /** A select changes value with left and right, like a stepper. */
+  /** A select changes value with left and right, like a stepper; disabled options are skipped. */
   stepSelect(select, direction) {
-    const next = Math.min(select.options.length - 1, Math.max(0, select.selectedIndex + direction));
-    if (next === select.selectedIndex) {
+    const step = Math.sign(direction);
+    if (step === 0) {
+      return;
+    }
+    let next = select.selectedIndex + step;
+    while (next >= 0 && next < select.options.length && select.options[next].disabled) {
+      next += step;
+    }
+    if (next < 0 || next >= select.options.length) {
       return;
     }
     select.selectedIndex = next;
@@ -489,6 +515,24 @@ export const uiGamepadMethods = {
       (list) => filterFocusTrapCandidates([list]).length > 0 || list.getClientRects?.().length > 0
     );
     if (lists.length === 0) {
+      // No tab list (the campaign map): the previous or next button stands in, unless it is disabled.
+      const button = root.querySelector?.(step < 0 ? PAD_TAB_PREV_SELECTOR : PAD_TAB_NEXT_SELECTOR);
+      if (!button || button.disabled || button.getAttribute?.('aria-disabled') === 'true') {
+        return;
+      }
+      const grid = this.elements.levelsGrid;
+      const fromGrid = Boolean(grid && active && grid.contains?.(active));
+      button.click();
+      // Focus follows the trigger (A12): from a tile it lands on the selected tile of the new chapter,
+      // from the chapter controls it stays where it was.
+      const target = fromGrid
+        ? grid.querySelector?.(SELECTED_TILE_SELECTOR) || grid.querySelector?.(TILE_SELECTOR)
+        : active && root.contains?.(active)
+          ? active
+          : null;
+      if (target) {
+        this.focusFromPad(target);
+      }
       return;
     }
     const list = (active && active.closest?.(TABLIST_SELECTOR)) || this.nearestTabList(lists, active);
@@ -549,8 +593,28 @@ export const uiGamepadMethods = {
     el.inputGamepadRumble?.addEventListener('change', () => {
       this.storageManager.setGamepadRumble(el.inputGamepadRumble.checked);
       this.updateGamepadSettings({ rumble: el.inputGamepadRumble.checked });
+      this.audioManager?.setVibrationEnabled?.(el.inputGamepadRumble.checked);
     });
+    this.audioManager?.setVibrationEnabled?.(this.storageManager.getGamepadRumble());
     this.updateGamepadControls();
+    this.refreshControllerFields();
+  },
+
+  /** @returns {boolean} Whether the browser reports at least one connected controller. */
+  hasConnectedGamepad() {
+    try {
+      const pads = typeof navigator !== 'undefined' ? navigator.getGamepads?.() : null;
+      return Array.from(pads ?? []).some((pad) => pad && pad.connected !== false);
+    } catch {
+      return false;
+    }
+  },
+
+  /** Shows the controller fields only while a pad is connected, else the no-controller message. */
+  refreshControllerFields() {
+    const connected = this.hasConnectedGamepad();
+    this.elements.settingsControllerFields?.classList.toggle('hidden', !connected);
+    this.elements.settingsControllerNoPad?.classList.toggle('hidden', connected);
   },
 
   /** Rebuilds the option labels (language change) and shows the stored values. */

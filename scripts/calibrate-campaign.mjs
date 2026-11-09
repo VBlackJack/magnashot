@@ -25,12 +25,18 @@
  * the candidate that fails the fewest floors, then the most winnable for the greedy bot,
  * is kept. Star thresholds come from the median score of the bot named by
  * `calibration.starPolicy` over all its games on the chosen candidate.
+ * A seed variant is only kept when the board it builds survives `calibration.settleFrames`
+ * frames idle (no shot fired, danger check off) with its lowest sphere at least
+ * `canvas.dangerWarningMarginY` above the danger line: the bots shoot on frame 0 and never see
+ * the board sag. Variants are tried up to `calibration.seedVariants`; when none settles safely
+ * the range grows, one variant at a time, up to `calibration.maxSeedVariants`.
  * The result, with each level's fingerprint, is written to configs/campaignTuning.json;
  * tests/campaign.test.js fails on any level whose board no longer matches the fingerprint
  * it was measured with.
  *
- * Usage: node scripts/calibrate-campaign.mjs [--from <id>] [--to <id>] [--workers <n>] [--dry-run]
- * Levels outside the range keep their current entry. --dry-run prints the measures of
+ * Usage: node scripts/calibrate-campaign.mjs [--from <id>] [--to <id>] [--workers <n>] [--dry-run] [--unsettled]
+ * Levels outside the range keep their current entry. With --unsettled, a level whose current
+ * variant already settles safely keeps its entry too, and only the others are measured again. --dry-run prints the measures of
  * both bots and writes nothing; only a dry run may start on an authored level, which a
  * writing run skips. A candidate whose board is the same as one already tried for the
  * level is skipped. A worker that crashes hands its level back to the queue, up to
@@ -49,15 +55,17 @@ import { StorageManager } from '../src/core/StorageManager.js';
 import { GameEngine } from '../src/game/GameEngine.js';
 import { LevelCatalog, fingerprintLevel, starThresholdsFromMedian } from '../src/game/LevelCatalog.js';
 import { BOT_POLICIES, playGame } from './bot/CampaignBot.js';
+import { idleSettleMargin } from './bot/SettleProbe.js';
 
 const SCRIPT_PATH = fileURLToPath(import.meta.url);
 const REPO_ROOT = fileURLToPath(new URL('../', import.meta.url));
 const TUNING_PATH = `${REPO_ROOT}configs/campaignTuning.json`;
 const WORKER_FLAG = '--worker';
 const DRY_RUN_FLAG = '--dry-run';
+const UNSETTLED_FLAG = '--unsettled';
 /** Options that take an integer value, by flag, with the option key they set. */
 const VALUE_FLAGS = Object.freeze({ '--from': 'from', '--to': 'to', '--workers': 'workers' });
-const USAGE = 'Usage: node scripts/calibrate-campaign.mjs [--from <id>] [--to <id>] [--workers <n>] [--dry-run]';
+const USAGE = 'Usage: node scripts/calibrate-campaign.mjs [--from <id>] [--to <id>] [--workers <n>] [--dry-run] [--unsettled]';
 const INTEGER_PATTERN = /^\d+$/;
 const EXIT_CODES = Object.freeze({ FAILURE: 1, USAGE: 2 });
 const MIN_WORKERS = 1;
@@ -194,19 +202,36 @@ function compareFallback(a, b, calibration) {
     || b.arsenal.winRate - a.arsenal.winRate;
 }
 
+/** The margin the settled board must keep above the danger line: the warning band's height. */
+const requiredSettleMargin = (configs) => configs.game.canvas.dangerWarningMarginY;
+
 /**
  * Finds the first candidate that passes both floors, or else the best fallback (see
- * compareFallback; the first tried wins a tie). A candidate that builds the same board as
- * one already tried (same fingerprint, as for an authored level, which no tuning changes)
- * is skipped and counted in `measured.skipped`.
+ * compareFallback; the first tried wins a tie). Only seed variants that settle safely idle are
+ * tried (see idleSettleMargin); the variant range grows past `seedVariants` only while none
+ * does, or while a variant was rejected and no settled candidate yet meets the floors. A candidate that builds the same board as one already tried (same fingerprint, as for
+ * an authored level, which no tuning changes) is skipped and counted in `measured.skipped`.
+ * When no variant up to `maxSeedVariants` settles safely, the variant that settles highest is
+ * measured and kept, and the result says so (`settle.settleBelowFloor`).
  */
 function calibrateLevel(configs, levelId) {
   const generated = configs.campaign.generated;
   const calibration = generated.calibration;
+  const required = requiredSettleMargin(configs);
+  const settleMargins = new Map();
+  const settleOf = (variant) => {
+    if (!settleMargins.has(variant)) {
+      const tuning = { levels: { [levelId]: { variant, extraShots: 0 } } };
+      settleMargins.set(variant, idleSettleMargin(configs, tuning, levelId).margin);
+    }
+    return settleMargins.get(variant);
+  };
   const tried = [];
   const seenFingerprints = new Set();
   let skipped = 0;
-  search: for (let variant = 0; variant < calibration.seedVariants; variant++) {
+  let rejectedVariants = 0;
+  /** Tries the extra-shot steps of one variant; true when a candidate passes both floors. */
+  const searchVariant = (variant) => {
     for (const extraShots of [0, ...calibration.extraShotSteps]) {
       const candidate = { variant, extraShots };
       const fingerprint = fingerprintLevel(buildCandidateLevel(configs, levelId, candidate));
@@ -218,14 +243,35 @@ function calibrateLevel(configs, levelId) {
       const result = {
         ...candidate,
         fingerprint,
+        settle: settleOf(variant),
         greedy: measureCandidate(configs, levelId, candidate, BOT_POLICIES.GREEDY),
         arsenal: measureCandidate(configs, levelId, candidate, BOT_POLICIES.ARSENAL)
       };
       tried.push(result);
       if (candidatePasses(result, calibration)) {
-        break search;
+        return true;
       }
     }
+    return false;
+  };
+  let found = false;
+  for (let variant = 0; variant < calibration.maxSeedVariants && !found; variant++) {
+    // Past the base range only while nothing settled safely, or a rejected variant left the
+    // settled ones short of a floor: a level the settle check never touched keeps its old search.
+    if (variant >= calibration.seedVariants && tried.length > 0 && rejectedVariants === 0) {
+      break;
+    }
+    if (settleOf(variant) < required) {
+      rejectedVariants++;
+      continue;
+    }
+    found = searchVariant(variant);
+  }
+  let settleBelowFloor = false;
+  if (tried.length === 0) {
+    settleBelowFloor = true;
+    const best = [...settleMargins.entries()].reduce((top, entry) => (entry[1] > top[1] ? entry : top));
+    searchVariant(best[0]);
   }
   const chosen = tried.find((result) => candidatePasses(result, calibration))
     || tried.reduce((best, result) => (compareFallback(result, best, calibration) < 0 ? result : best));
@@ -233,6 +279,7 @@ function calibrateLevel(configs, levelId) {
   const starMedian = calibration.starPolicy === BOT_POLICIES.ARSENAL ? arsenal.medianScore : greedy.medianScore;
   return {
     levelId,
+    settle: { margin: chosen.settle, required, rejectedVariants, settleBelowFloor },
     entry: {
       variant: chosen.variant,
       extraShots: chosen.extraShots,
@@ -252,6 +299,17 @@ function calibrateLevel(configs, levelId) {
   };
 }
 
+/**
+ * Settle check of a level as it is tuned now; --unsettled uses it to leave alone the levels
+ * that already hold their margin.
+ * @returns {{margin: number, required: number, ok: boolean}}
+ */
+function checkCurrentSettle(configs, levelId, currentEntry) {
+  const required = requiredSettleMargin(configs);
+  const { margin } = idleSettleMargin(configs, { levels: { [levelId]: currentEntry } }, levelId);
+  return { margin, required, ok: margin >= required };
+}
+
 /** The end of a progress line: which floors the chosen candidate failed, if any. */
 function describeFloors(measured, calibration) {
   const failed = failedFloors(measured, calibration);
@@ -264,7 +322,21 @@ function describeFloors(measured, calibration) {
 
 function runWorker() {
   const configs = loadConfigs();
-  process.on('message', (levelId) => {
+  const currentLevels = fs.existsSync(TUNING_PATH) ? JSON.parse(fs.readFileSync(TUNING_PATH, 'utf8')).levels : {};
+  process.on('message', ({ levelId, unsettledOnly }) => {
+    if (unsettledOnly) {
+      const current = currentLevels[levelId];
+      const check = current
+        ? checkCurrentSettle(configs, levelId, { variant: current.variant, extraShots: current.extraShots })
+        : { ok: false, margin: 0 };
+      if (check.ok) {
+        process.send({ levelId, unchanged: true, settle: check.margin });
+        return;
+      }
+      const result = calibrateLevel(configs, levelId);
+      process.send({ ...result, previous: current ? { variant: current.variant, settle: check.margin } : null });
+      return;
+    }
     process.send(calibrateLevel(configs, levelId));
   });
   process.send({ ready: true });
@@ -293,6 +365,10 @@ export function parseArgs(argv, { firstId, firstGenerated, lastId, workers }) {
     const flag = argv[i];
     if (flag === DRY_RUN_FLAG) {
       options.dryRun = true;
+      continue;
+    }
+    if (flag === UNSETTLED_FLAG) {
+      options.unsettled = true;
       continue;
     }
     const key = VALUE_FLAGS[flag];
@@ -392,7 +468,7 @@ async function runMain() {
         }
         inFlight = id;
         attempts.set(id, (attempts.get(id) || 0) + 1);
-        worker.send(id);
+        worker.send({ levelId: id, unsettledOnly: Boolean(options.unsettled) });
       };
       worker.on('message', (message) => {
         if (message.ready) {
@@ -400,14 +476,22 @@ async function runMain() {
           return;
         }
         inFlight = null;
-        levels[message.levelId] = message.entry;
         measuredIds.add(message.levelId);
+        if (message.unchanged) {
+          console.log(`${measuredIds.size}/${total} level ${message.levelId}: settles at ${message.settle.toFixed(1)} px, kept`);
+          next();
+          return;
+        }
+        levels[message.levelId] = message.entry;
         const { candidates, skipped, greedy, arsenal } = message.entry.measured;
         console.log(
           `${measuredIds.size}/${total} level ${message.levelId}: greedy win ${greedy.winRate.toFixed(2)} median ${greedy.medianScore}`
           + ` after ${candidates} candidate(s) and ${skipped} skipped, arsenal win ${arsenal.winRate.toFixed(2)}`
           + ` median ${arsenal.medianScore} specials ${arsenal.medianSpecialsUsed},`
           + ` +${message.entry.extraShots} shots variant ${message.entry.variant}: ${describeFloors(message.entry.measured, calibration)}`
+          + `; settle ${message.settle.margin.toFixed(1)} px (need ${message.settle.required}),`
+          + ` ${message.settle.rejectedVariants} variant(s) rejected${message.settle.settleBelowFloor ? ', NO VARIANT SETTLES SAFELY' : ''}`
+          + (message.previous ? `; was variant ${message.previous.variant} settle ${message.previous.settle.toFixed(1)} px` : '')
         );
         next();
       });

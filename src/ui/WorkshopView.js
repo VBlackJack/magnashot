@@ -17,7 +17,7 @@
 import { BALL_STYLES, BALL_STYLES_ORDER, GAME_MODES, SPECIAL_TYPES_ORDER } from '../core/Constants.js';
 import { t, formatNumber } from '../core/I18n.js';
 import { specialIconBackground } from './CodexView.js';
-import { filterFocusTrapCandidates } from './UIManager.js';
+import { filterFocusTrapCandidates } from './UIHelpers.js';
 
 /** Percent scale of the HUD gauges (star progress, overcharge, tutorial offset, achievements). */
 const FULL_PERCENT = 100;

@@ -21,10 +21,12 @@ import {
   beatPhase,
   combineIntensity,
   framesPerBeat,
+  getResonanceBlock,
   isInBeatWindow,
-  isResonanceAllowed,
-  offsetMsToFrames
+  offsetMsToFrames,
+  RESONANCE_BLOCKS
 } from './Resonance.js';
+import { RESONANCE_MECHANIC_ID } from './Discovery.js';
 
 /*
  * Pulse and Resonance on the engine side. The beat clock is the frame counter beatFrame
@@ -45,21 +47,37 @@ export const enginePulseMethods = {
   },
 
   /**
-   * Whether Resonance applies to this board now: the setting (or the versus match option),
-   * and never in the competitive runs.
+   * Why Resonance is off on this board now (a RESONANCE_BLOCKS value), or null when it is
+   * live: the setting (or the versus match option), the competitive runs, the Classic
+   * ruleset, and the campaign unlock for solo boards.
    */
-  isResonanceEnabled() {
+  getResonanceBlockReason() {
     const option = this.versus ? this.versusResonanceOption : undefined;
-    const storedSetting = this.getPulseSettings().resonanceEnabled;
-    return isResonanceAllowed({
+    const pulse = this.getPulseSettings();
+    return getResonanceBlock({
       mode: this.getResonanceMode(),
       isDailyRematch: this.isDailyRematch,
       isWeeklyFluxRun: this.isWeeklyFluxRun,
       isSharedFluxRun: this.isSharedFluxRun,
       ghostDuel: Boolean(this.ghostDuel),
       versusOption: option,
-      setting: option === true ? true : storedSetting
+      setting: option === true ? true : pulse.resonanceEnabled,
+      isUnlocked: pulse.isUnlocked
     });
+  },
+
+  /** Whether Resonance applies to this board now. */
+  isResonanceEnabled() {
+    return this.getResonanceBlockReason() === null;
+  },
+
+  /**
+   * How far the beat clock moves on one update(): one frame on a duel board, otherwise the
+   * inverse of the time scale, so the beat keeps real-time pace under slow motion (the
+   * scale is already 1 under reduced motion, hit-stop and outside PLAYING).
+   */
+  getBeatAdvance() {
+    return this.isVersusRole ? FULL_SHARE : FULL_SHARE / this.getTimeScale();
   },
 
   /**
@@ -73,20 +91,29 @@ export const enginePulseMethods = {
     return this.pulseSettings;
   },
 
-  /** Re-reads the Resonance setting and the offset: at run start and when the player changes them. */
+  /**
+   * Re-reads the Resonance setting, the offset and the campaign unlock: at run start and
+   * when the player changes them. The unlock is cached here so no frame reads storage.
+   */
   refreshPulseSettings() {
+    const clearedLevel = this.storageManager?.getClearedCampaignLevel?.() ?? NO_AMOUNT;
     this.pulseSettings = {
       resonanceEnabled: Boolean(this.storageManager?.getResonanceEnabled?.()),
-      rhythmOffsetMs: this.storageManager?.getRhythmOffsetMs?.() ?? NO_TIME
+      rhythmOffsetMs: this.storageManager?.getRhythmOffsetMs?.() ?? NO_TIME,
+      isUnlocked: clearedLevel >= this.gameConfig.resonance.unlockAfterCampaignLevel
     };
   },
 
   /**
    * Tells the player once per run that Resonance is off here although the setting is on:
-   * the competitive runs (Daily, Weekly Flux, shared seeds, Ghost Duels) never use it.
+   * only in the competitive runs (Daily, Weekly Flux, shared seeds, Ghost Duels), and only
+   * once they have discovered Resonance, so a newcomer sees no popup about an unknown feature.
    */
   announceResonanceDisabled() {
-    if (this.versus || !this.getPulseSettings().resonanceEnabled || this.isResonanceEnabled()) {
+    if (this.versus || this.getResonanceBlockReason() !== RESONANCE_BLOCKS.COMPETITIVE) {
+      return;
+    }
+    if (this.storageManager?.getDiscoveries?.()?.[RESONANCE_MECHANIC_ID] !== true) {
       return;
     }
     const canvasCfg = this.gameConfig.canvas;

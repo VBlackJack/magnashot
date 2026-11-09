@@ -29,6 +29,7 @@ import {
   createAnnouncementQueue,
   fitBoard,
   formatMatchTimer,
+  getVersusDevicePixelRatioCap,
   renderAnnouncement
 } from '../src/ui/VersusHud.js';
 
@@ -110,6 +111,17 @@ test('the CPU board of the mini-view is miniScale of the logical size and shrink
   const short = computeMiniSize(canvasCfg, layoutCfg, 100);
   assert.ok(short.height <= 100 && short.width < nominal.width);
   assert.deepEqual(computeMiniSize(canvasCfg, layoutCfg, 0), { width: 0, height: 0 });
+});
+
+test('the portrait strip keeps the CPU board under the configured height', () => {
+  const strip = computeMiniSize(canvasCfg, layoutCfg, layoutCfg.portraitMiniMaxHeightPx);
+  assert.ok(strip.height <= layoutCfg.portraitMiniMaxHeightPx);
+  assert.ok(strip.width > 0);
+});
+
+test('only the split layout caps the device pixel ratio of the renderers', () => {
+  assert.equal(getVersusDevicePixelRatioCap(layoutCfg, VERSUS_LAYOUTS.SPLIT), layoutCfg.splitMaxDevicePixelRatio);
+  assert.equal(getVersusDevicePixelRatioCap(layoutCfg, VERSUS_LAYOUTS.MINI), null);
 });
 
 test('the timer is written as minutes and two-digit seconds', () => {
