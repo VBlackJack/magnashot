@@ -593,7 +593,8 @@ export class GameEngine {
    * @param {number} amount - Coins to pay.
    */
   awardRunCoins(amount) {
-    if (amount <= 0) {
+    // Puzzle pays only its star rewards at victory, never run coins.
+    if (amount <= 0 || this.mode === GAME_MODES.PUZZLE) {
       return;
     }
     this.runCoinsEarned += amount;
@@ -832,8 +833,8 @@ export class GameEngine {
   }
 
   /**
-   * Workshop level that counts in this run: the Daily Challenge fixes every upgrade at its
-   * configured baseline so all players start equal; other modes use the owned level.
+   * Workshop level that counts in this run: the Daily Challenge and Puzzle fix every upgrade at
+   * their configured baseline so all players start equal; other modes use the owned level.
    * @param {string} upgradeKey - Upgrade identifier.
    * @returns {number}
    */
@@ -845,6 +846,9 @@ export class GameEngine {
     if (this.mode === GAME_MODES.DAILY) {
       return this.gameConfig.seededFairness?.dailyUpgradeLevels?.[upgradeKey] ?? 0;
     }
+    if (this.mode === GAME_MODES.PUZZLE) {
+      return this.gameConfig.seededFairness?.puzzleUpgradeLevels?.[upgradeKey] ?? 0;
+    }
     return this.storageManager.getUpgradeLevel(upgradeKey);
   }
 
@@ -855,8 +859,8 @@ export class GameEngine {
   }
 
   getOverchargeMultiplier() {
-    // Classic has no specials, so nothing may charge toward one; a duel board still charges its pulse.
-    if (this.mode === GAME_MODES.CLASSIC && !this.versus) {
+    // Classic and Puzzle have no earned specials, so nothing may charge toward one; a duel board still charges its pulse.
+    if ((this.mode === GAME_MODES.CLASSIC && !this.versus) || this.mode === GAME_MODES.PUZZLE) {
       return 0;
     }
     const lvl = this.getEffectiveUpgradeLevel('overchargeRate');
