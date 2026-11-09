@@ -4,6 +4,8 @@ All notable changes to **MagnaShot** are documented in this file.
 
 ## [Unreleased]
 
+## [1.22.0] - 2026-11-09
+
 ### Added
 - **Resonance Unlock (`Resonance`, `EnginePulse`, `GameEngine`, `EngineDiscovery`, `Discovery`, `CodexView`, `resonance.unlockAfterCampaignLevel`)**: Resonance now unlocks after campaign level 5, in every solo mode (the music plays from the start). Duel boards ignore the gate. The first run where it applies shows a hint and the Codex gains a **Resonance** entry; profiles that already play see the hint once. A Sag hint and Codex entry arrive the same way. The notice that Resonance is off in competitive runs only shows to players who already met it. Classic stays without Resonance.
 - **Settings Groups (`index.html`, `UISettingsControls`, `UIGamepad`)**: Settings are split into four titled groups: Audio, Gameplay, Accessibility and Controller. The controller options show only while a controller is connected; without one, a short line says how to connect it.
