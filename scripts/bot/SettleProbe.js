@@ -94,6 +94,8 @@ const LANE_HEX_DIGITS = 8;
 /** Run seed and stage of the Flux shape settle: stage 1 has no obstacle to move the board. */
 const FLUX_SETTLE_SEED = 'settle';
 const FLUX_SETTLE_STAGE = 1;
+/** Modes idleSettleMode can settle. */
+export const IDLE_SETTLE_MODES = Object.freeze({ BOSS_RUSH: 'bossRush', CASCADE: 'cascade' });
 /** Separator of the ids in the pool hash. */
 const POOL_ID_SEPARATOR = '\n';
 
@@ -189,14 +191,14 @@ function withReplayableRandom(lcgSeed, work) {
 }
 
 /**
- * Engine for a Flux settle: the danger check is off (a private copy of the game config), so a
+ * Engine for an idle settle: the danger check is off (a private copy of the game config), so a
  * board that sags past the line is measured instead of ending the run, and the Resonance bonus
  * is off as for the calibration bots.
  * @param {object} configs - Loaded configs: game, physics, balls, obstacles, levels, campaign, flux.
  * @param {object|null} fluxShapeTuning - configs/fluxShapeTuning.json, or null for the previous shapes.
  * @returns {GameEngine}
  */
-function createFluxSettleEngine(configs, fluxShapeTuning) {
+function createSettleEngine(configs, fluxShapeTuning) {
   const storageManager = new StorageManager();
   storageManager.init();
   storageManager.setResonanceEnabled(false);
@@ -243,7 +245,7 @@ function settleBoard(engine, dangerLineY, frames) {
 export function idleSettleFluxShape(configs, params) {
   const { frames, minMarginPx, settleSeedBase } = configs.flux.shapeSettle;
   return withReplayableRandom(settleSeedBase, () => {
-    const engine = createFluxSettleEngine(configs, null);
+    const engine = createSettleEngine(configs, null);
     engine.initFluxRun(FLUX_SETTLE_SEED);
     engine.fluxStage = FLUX_SETTLE_STAGE;
     engine.buildFluxStage({
@@ -275,7 +277,7 @@ export function idleSettleFluxShape(configs, params) {
  */
 export function idleSettleFluxRun(configs, fluxShapeTuning, { seed, stageCount, frames, lcgSeed, settleFromStage = 1 }) {
   return withReplayableRandom(lcgSeed, () => {
-    const engine = createFluxSettleEngine(configs, fluxShapeTuning);
+    const engine = createSettleEngine(configs, fluxShapeTuning);
     engine.initFluxRun(seed);
     const stages = [];
     for (let stage = 1; stage <= stageCount; stage++) {
@@ -296,5 +298,47 @@ export function idleSettleFluxRun(configs, fluxShapeTuning, { seed, stageCount, 
       });
     }
     return stages;
+  });
+}
+
+/**
+ * Settles a Boss Rush wave or a Cascade board with no shot and measures its lowest point.
+ * Mode-specific content comes from the real engine start path; the launcher is left untouched.
+ * @param {object} configs - Loaded configs: game, physics, balls, obstacles, levels, campaign, flux.
+ * @param {{mode: 'bossRush'|'cascade', wave?: number, lcgSeed: number, frames: number,
+ *   extraDropWaves?: number}} options - Mode, Boss Rush wave, start of the replayable stream,
+ *   frames to settle, and how many extra Cascade drop waves to spawn after the start.
+ * @returns {{margin: number, state: string, balls: number, magnetar: boolean}} The smallest
+ *   distance, in logical pixels, between the lowest sphere bottom and the real danger line over
+ *   the settle (negative when it crosses), the engine state and sphere count at the end (a
+ *   sanity check that the mode really started and kept running), and whether a Magnetar is set.
+ */
+export function idleSettleMode(configs, { mode, wave = 1, lcgSeed, frames, extraDropWaves = 0 }) {
+  return withReplayableRandom(lcgSeed, () => {
+    const engine = createSettleEngine(configs, null);
+    if (mode === IDLE_SETTLE_MODES.BOSS_RUSH) {
+      engine.startBossRushMode(wave);
+    } else if (mode === IDLE_SETTLE_MODES.CASCADE) {
+      engine.startCascadeMode();
+      for (let drop = 0; drop < extraDropWaves; drop++) {
+        engine.spawnCascadeDropWave();
+      }
+    } else {
+      throw new Error(`Unknown idle settle mode: ${mode}`);
+    }
+    const dangerLineY = configs.game.canvas.dangerLineY;
+    let margin = Infinity;
+    for (let frame = 0; frame < frames; frame++) {
+      engine.update();
+      for (const ball of engine.physicsWorld.balls) {
+        margin = Math.min(margin, dangerLineY - (ball.y + ball.radius));
+      }
+    }
+    return {
+      margin,
+      state: engine.state,
+      balls: engine.physicsWorld.balls.length,
+      magnetar: Boolean(engine.magnetar)
+    };
   });
 }
