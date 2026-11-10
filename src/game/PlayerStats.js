@@ -18,9 +18,14 @@
  * Pure local statistics. Shape:
  * { v, since (epoch ms, 0 when unknown), shots, playMs, seq,
  *   modes: { [mode]: { runs, wins, losses, quits } },
- *   levels: { [id]: { a: attempts, f: fails, q: quits, t: last-touched seq } } }.
+ *   levels: { [id]: { a: attempts, f: fails, q: quits, t: last-touched seq } },
+ *   m?: { avalanche?, loss?, secondMode?, legacy? } } where `m` holds, for each funnel milestone,
+ *   the stats playMs at its first occurrence (absent until one happens). `legacy` is set once, at
+ *   the first delta: true when the profile already had activity (its first avalanche and first
+ *   loss are unknown, so those two lines are not shown), false for a profile born with milestones.
  * A delta has the same shape with additive (possibly negative) counters; a level entry
- * with `touch: true` bumps seq and stamps the entry.
+ * with `touch: true` bumps seq and stamps the entry. `m: { loss: true }` stamps a milestone
+ * once (never overwritten, never retracted).
  */
 
 const STATS_FORMAT_VERSION = 1;
@@ -35,6 +40,19 @@ const OUTCOME_MODE_FIELD = Object.freeze({
   [OUTCOME_LOSS]: 'losses',
   [OUTCOME_QUIT]: 'quits'
 });
+const MILESTONE_AVALANCHE = 'avalanche';
+const MILESTONE_LOSS = 'loss';
+const MILESTONE_SECOND_MODE = 'secondMode';
+const MILESTONE_KEYS = Object.freeze([MILESTONE_AVALANCHE, MILESTONE_LOSS, MILESTONE_SECOND_MODE]);
+const MILESTONE_LEGACY = 'legacy';
+/** Milestones whose first occurrence is unknown for a profile that predates them. */
+const LEGACY_HIDDEN_MILESTONES = Object.freeze([MILESTONE_AVALANCHE, MILESTONE_LOSS]);
+const SECOND_MODE_RUN_COUNT = 2;
+const MILESTONE_COPY_KEYS = Object.freeze([
+  [MILESTONE_AVALANCHE, 'stats.copy.milestoneAvalanche'],
+  [MILESTONE_LOSS, 'stats.copy.milestoneLoss'],
+  [MILESTONE_SECOND_MODE, 'stats.copy.milestoneSecondMode']
+]);
 const RECORD_KIND_STAGE = 'stage';
 const RECORD_KIND_CLASSIC_STAGE = 'classicStage';
 const RECORD_KIND_WAVE = 'wave';
@@ -103,7 +121,40 @@ export function normalizePlayerStats(raw, nowMs = 0) {
       };
     }
   }
+  if (isRecord(raw.m)) {
+    const milestones = {};
+    for (const key of MILESTONE_KEYS) {
+      if (Number.isFinite(raw.m[key])) {
+        milestones[key] = clampCount(raw.m[key]);
+      }
+    }
+    if (typeof raw.m.legacy === 'boolean') {
+      milestones.legacy = raw.m.legacy;
+    }
+    if (Object.keys(milestones).length > 0) {
+      stats.m = milestones;
+    }
+  }
   return stats;
+}
+
+function hasPriorActivity(stats) {
+  return stats.playMs > 0 || stats.shots > 0;
+}
+
+function hasLoss(stats) {
+  return Object.values(stats.modes).some((entry) => entry.losses > 0);
+}
+
+function countPlayedModes(stats) {
+  return Object.values(stats.modes).filter((entry) => entry.runs > 0).length;
+}
+
+/** Stamps a funnel milestone with the current play time, unless it is already set. */
+function stampMilestone(stats, key) {
+  if (stats.m?.[key] === undefined) {
+    stats.m = { ...stats.m, [key]: stats.playMs };
+  }
 }
 
 /**
@@ -120,6 +171,7 @@ export function applyPlayerStatsDelta(stats, delta, cfg = {}) {
   if (!isRecord(delta)) {
     return next;
   }
+  const before = normalizePlayerStats(next, next.since);
   next.shots = clampCount(next.shots + toInt(delta.shots));
   next.playMs = clampCount(next.playMs + toInt(delta.playMs));
   for (const [mode, change] of safeEntries(delta.modes)) {
@@ -128,6 +180,20 @@ export function applyPlayerStatsDelta(stats, delta, cfg = {}) {
     if (next.modes[mode] || MODE_FIELDS.some((field) => updated[field] > 0)) {
       next.modes[mode] = updated;
     }
+  }
+  if (countPlayedModes(next) >= SECOND_MODE_RUN_COUNT && countPlayedModes(before) < SECOND_MODE_RUN_COUNT) {
+    stampMilestone(next, MILESTONE_SECOND_MODE);
+  }
+  if (isRecord(delta.m)) {
+    for (const key of MILESTONE_KEYS) {
+      // A first loss is a first only when no mode had one before this delta.
+      if (delta.m[key] === true && !(key === MILESTONE_LOSS && hasLoss(before))) {
+        stampMilestone(next, key);
+      }
+    }
+  }
+  if (before.m === undefined) {
+    next.m = { ...next.m, [MILESTONE_LEGACY]: hasPriorActivity(before) };
   }
   const levelChanges = safeEntries(delta.levels);
   if (levelChanges.some(([, change]) => change?.touch === true)) {
@@ -311,6 +377,20 @@ export function buildPlayerStatsText(stats, records, meta, translate) {
   const [hardest] = pickHardestLevels(stats, 1);
   if (hardest) {
     lines.push(translate('stats.copy.hardestLine', { level: hardest.levelId, fails: hardest.fails }));
+  }
+  const [mostLeft] = pickMostLeftLevels(stats, 1);
+  if (mostLeft) {
+    lines.push(translate('stats.copy.mostLeftLine', { level: mostLeft.levelId, quits: mostLeft.quits }));
+  }
+  const isLegacy = stats?.m?.[MILESTONE_LEGACY] === true;
+  for (const [key, copyKey] of MILESTONE_COPY_KEYS) {
+    if (isLegacy && LEGACY_HIDDEN_MILESTONES.includes(key)) {
+      continue;
+    }
+    if (Number.isFinite(stats?.m?.[key])) {
+      // At least one minute, so an early event never reads as "0 min".
+      lines.push(translate(copyKey, { minutes: Math.max(1, Math.ceil(clampCount(stats.m[key]) / MS_PER_MINUTE)) }));
+    }
   }
   lines.push(translate('stats.copy.schemaLine', { version: meta?.schemaVersion }));
   return sanitizeStatsText(lines.join('\n'));

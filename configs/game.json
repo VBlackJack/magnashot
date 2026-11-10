@@ -1899,7 +1899,10 @@
     "maxLevelEntries": 100,
     "flushEveryShots": 25,
     "flushEveryPlayMs": 60000,
-    "topLevelsInSummary": 3
+    "topLevelsInSummary": 3,
+    "funnel": {
+      "avalancheMinDrops": 6
+    }
   },
   "shotTimeline": {
     "formatVersion": 1,

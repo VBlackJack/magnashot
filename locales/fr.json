@@ -1626,6 +1626,10 @@
       "modeLineNoBest": "{{mode}} : {{runs}} parties, {{wins}} victoires, {{quits}} abandons",
       "campaignLine": "Campagne : niveau {{level}} atteint, {{stars}} ★",
       "hardestLine": "Niveau le plus dur : {{level}} ({{fails}} échecs)",
+      "mostLeftLine": "Niveau le plus quitté : {{level}} ({{quits}} abandons)",
+      "milestoneAvalanche": "Première avalanche après {{minutes}} min de jeu",
+      "milestoneLoss": "Premier game over après {{minutes}} min de jeu",
+      "milestoneSecondMode": "Deuxième mode essayé après {{minutes}} min de jeu",
       "schemaLine": "Schéma de sauvegarde {{version}}"
     }
   },

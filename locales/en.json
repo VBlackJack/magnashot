@@ -1626,6 +1626,10 @@
       "modeLineNoBest": "{{mode}}: {{runs}} runs, {{wins}} wins, {{quits}} left",
       "campaignLine": "Campaign: level {{level}} reached, {{stars}} ★",
       "hardestLine": "Hardest level: {{level}} ({{fails}} failed attempts)",
+      "mostLeftLine": "Most left level: {{level}} ({{quits}} times left)",
+      "milestoneAvalanche": "First avalanche after {{minutes}} min of play",
+      "milestoneLoss": "First game over after {{minutes}} min of play",
+      "milestoneSecondMode": "Second mode tried after {{minutes}} min of play",
       "schemaLine": "Save schema {{version}}"
     }
   },

@@ -159,6 +159,9 @@ export class GameEngine {
     this.runShotsFired = 0;
     this.pendingShots = 0;
     this.pendingPlayMs = 0;
+    // Set once the first-avalanche milestone is stored, or hidden anyway (legacy profile).
+    const storedMilestones = this.storageManager?.getPlayerStats?.()?.m;
+    this.avalancheMilestoneStamped = storedMilestones?.avalanche !== undefined || storedMilestones?.legacy === true;
     // Weekly Flux: set when the run's seed is the seed of the week it was started in.
     this.isWeeklyFluxRun = false;
     this.weeklyWeekKey = null;

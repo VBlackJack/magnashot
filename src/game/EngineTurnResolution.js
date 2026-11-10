@@ -591,6 +591,15 @@ export const engineTurnResolutionMethods = {
       const scoring = this.gameConfig.scoring;
       const juice = this.gameConfig.juice;
       this.noteVersusDrop(detached.length, detached[0].colorId);
+      const funnelCfg = this.gameConfig.playerStats.funnel;
+      if (!this.avalancheMilestoneStamped && !this.isVersusRole && !this.isRestoringRun
+        && detached.length >= funnelCfg.avalancheMinDrops) {
+        // Local first-avalanche milestone: written once per session, with the buffered play time.
+        this.avalancheMilestoneStamped = true;
+        const milestoneDelta = { playMs: this.pendingPlayMs, m: { avalanche: true } };
+        this.pendingPlayMs = 0;
+        this.storageManager.applyPlayerStatsDelta?.(milestoneDelta);
+      }
       const dropPoints = detached.length * scoring.droppedBallPoints * Math.max(1, this.combo);
       this.addScore(dropPoints);
       this.addOvercharge(detached.length * scoring.overchargePerDroppedBall);

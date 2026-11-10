@@ -47,6 +47,9 @@ export const engineProgressMethods = {
     this.lastRunOutcome = run;
     delta.shots = this.pendingShots;
     delta.playMs = this.pendingPlayMs;
+    if (outcome === OUTCOME_LOSS) {
+      delta.m = { loss: true };
+    }
     this.pendingShots = 0;
     this.pendingPlayMs = 0;
     this.storageManager.applyPlayerStatsDelta?.(delta);

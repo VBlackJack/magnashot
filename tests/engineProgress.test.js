@@ -411,3 +411,63 @@ test('a damaged weekly key in a snapshot is ignored', () => {
     assert.equal(engine.weeklyWeekKey, null);
   });
 });
+
+const AVALANCHE_MIN_DROPS = STATS_CFG.funnel.avalancheMinDrops;
+
+/** Makes the next avalanche check drop `count` spheres. */
+const stubAvalanche = (engine, count) => {
+  engine.physicsWorld.detachUnanchoredBalls = () => Array.from({ length: count }, (_, i) => ({
+    x: i, y: i, colorId: 'red', clusterModifier: null, id: `fake-${i}`
+  }));
+};
+
+test('the first big avalanche stamps its milestone once, with the buffered play time', () => {
+  withEngine((engine, storage) => {
+    engine.startCampaignLevel(FIRST_LEVEL);
+    const playMs = 1500;
+    engine.countPlayTimeForStats(playMs);
+    stubAvalanche(engine, AVALANCHE_MIN_DROPS - 1);
+    engine.detachAndRewardAvalanche();
+    assert.equal(storage.getPlayerStats().m, undefined, 'a small avalanche is not a milestone');
+    stubAvalanche(engine, AVALANCHE_MIN_DROPS);
+    engine.detachAndRewardAvalanche();
+    assert.equal(storage.getPlayerStats().m.avalanche, playMs);
+    assert.equal(engine.pendingPlayMs, 0);
+    engine.countPlayTimeForStats(playMs);
+    engine.detachAndRewardAvalanche();
+    engine.flushPlayerStats();
+    assert.equal(storage.getPlayerStats().m.avalanche, playMs, 'set once');
+    assert.equal(storage.getPlayerStats().playMs, playMs * 2);
+  });
+});
+
+test('an avalanche in a versus role or during a restore is not a milestone', () => {
+  withEngine((engine, storage) => {
+    engine.startCampaignLevel(FIRST_LEVEL);
+    stubAvalanche(engine, AVALANCHE_MIN_DROPS);
+    engine.isRestoringRun = true;
+    engine.detachAndRewardAvalanche();
+    engine.isRestoringRun = false;
+    engine.isVersusRole = true;
+    engine.detachAndRewardAvalanche();
+    engine.isVersusRole = false;
+    assert.equal(storage.getPlayerStats().m, undefined);
+    // The flag is initialised by the constructor (intended change: it used to be created lazily).
+    assert.equal(engine.avalancheMilestoneStamped, false);
+  });
+});
+
+test('the first game over stamps its milestone and continuing does not remove it', () => {
+  withEngine((engine, storage) => {
+    engine.startCampaignLevel(FIRST_LEVEL);
+    fireShots(engine, 1);
+    const playMs = 2000;
+    engine.countPlayTimeForStats(playMs);
+    storage.setCoins(TOP_UP_COINS);
+    engine.shotsRemaining = 0;
+    engine.triggerGameOver(GAME_OVER_REASONS.OUT_OF_SHOTS);
+    assert.equal(storage.getPlayerStats().m.loss, playMs);
+    assert.equal(engine.continueOutOfShots(), true);
+    assert.equal(storage.getPlayerStats().m.loss, playMs);
+  });
+});
