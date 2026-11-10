@@ -26,7 +26,7 @@
       "highlight": "#6ee7b7",
       "shadow": "#064e3b",
       "glow": "rgba(16, 185, 129, 0.55)",
-      "symbol": "+",
+      "symbol": "Ξ",
       "polarity": 1,
       "pattern": "stripesD"
     },
@@ -36,7 +36,7 @@
       "highlight": "#fde68a",
       "shadow": "#78350f",
       "glow": "rgba(245, 158, 11, 0.55)",
-      "symbol": "-",
+      "symbol": "Π",
       "polarity": -1,
       "pattern": "dots"
     },
