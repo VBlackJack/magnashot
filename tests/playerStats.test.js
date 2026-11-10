@@ -289,3 +289,117 @@ test('summary text leaves out the best of a mode that has no record', () => {
     assert.equal(/\{\{/.test(text), false, lang);
   }
 });
+
+test('milestones normalize to the three known keys and are dropped when absent', () => {
+  assert.equal(normalizePlayerStats({ m: {} }).m, undefined);
+  assert.equal(normalizePlayerStats({ m: { other: 5, loss: 'x' } }).m, undefined);
+  assert.equal(normalizePlayerStats({ m: 'bad' }).m, undefined);
+  assert.equal('m' in createPlayerStats(NOW_MS), false);
+  assert.deepEqual(
+    normalizePlayerStats({ m: { avalanche: 10.7, loss: -4, secondMode: 0, other: 5 } }).m,
+    { avalanche: 10, loss: 0, secondMode: 0 }
+  );
+});
+
+test('a milestone is stamped once, after the delta play time is added', () => {
+  let stats = createPlayerStats(NOW_MS);
+  stats = applyPlayerStatsDelta(stats, { playMs: 500, m: { loss: true } });
+  // Intended change: a profile born with milestones also carries legacy: false.
+  assert.deepEqual(stats.m, { loss: 500, legacy: false });
+  stats = applyPlayerStatsDelta(stats, { playMs: 700, m: { loss: true, avalanche: true } });
+  assert.deepEqual(stats.m, { loss: 500, avalanche: 1200, legacy: false });
+  stats = applyPlayerStatsDelta(stats, { m: { loss: 'yes' } });
+  assert.deepEqual(stats.m, { loss: 500, avalanche: 1200, legacy: false });
+});
+
+test('retracting a loss keeps the first game over milestone', () => {
+  let stats = applyPlayerStatsDelta(createPlayerStats(NOW_MS), { playMs: 300, m: { loss: true } });
+  stats = applyRunOutcome(stats, { mode: CAMPAIGN, levelId: 1, outcome: 'loss' });
+  stats = retractRunOutcome(stats, { mode: CAMPAIGN, levelId: 1, outcome: 'loss' });
+  assert.equal(stats.m.loss, 300);
+});
+
+test('the second distinct mode stamps its milestone, a repeat of one mode does not', () => {
+  let stats = applyPlayerStatsDelta(createPlayerStats(NOW_MS), { playMs: 100 });
+  stats = applyRunOutcome(stats, { mode: CAMPAIGN, levelId: 1, outcome: 'win' });
+  stats = applyRunOutcome(stats, { mode: CAMPAIGN, levelId: 2, outcome: 'loss' });
+  assert.deepEqual(stats.m, { legacy: false });
+  stats = applyPlayerStatsDelta(stats, { playMs: 50, modes: { [FLUX]: { runs: 1, quits: 1 } } });
+  assert.equal(stats.m.secondMode, 150);
+  stats = applyPlayerStatsDelta(stats, { playMs: 900, modes: { versus: { runs: 1 } } });
+  assert.equal(stats.m.secondMode, 150);
+});
+
+test('a first delta on a profile with no activity is not legacy, and stays so', () => {
+  let stats = applyPlayerStatsDelta(createPlayerStats(NOW_MS), { shots: 3, playMs: 1000 });
+  assert.equal(stats.m.legacy, false);
+  stats = applyPlayerStatsDelta(stats, { playMs: 500, m: { loss: true } });
+  assert.deepEqual(stats.m, { legacy: false, loss: 1500 });
+});
+
+test('a profile with prior activity and no milestones is marked legacy once', () => {
+  const existing = { v: 1, since: NOW_MS, shots: 12, playMs: 90_000, seq: 0, modes: {}, levels: {} };
+  let stats = applyPlayerStatsDelta(existing, { playMs: 10 });
+  assert.equal(stats.m.legacy, true);
+  const shotsOnly = applyPlayerStatsDelta({ ...existing, playMs: 0 }, { playMs: 0 });
+  assert.equal(shotsOnly.m.legacy, true);
+  stats = applyPlayerStatsDelta(stats, { m: { loss: true } });
+  assert.equal(stats.m.legacy, true);
+  assert.equal(normalizePlayerStats({ m: { legacy: 'yes' } }).m, undefined);
+  assert.equal(normalizePlayerStats({ m: { legacy: true } }).m.legacy, true);
+});
+
+test('the first game over is not stamped when a mode already had a loss', () => {
+  const existing = {
+    v: 1, since: NOW_MS, shots: 5, playMs: 60_000, seq: 0,
+    modes: { [CAMPAIGN]: { runs: 2, wins: 1, losses: 1, quits: 0 } }, levels: {}
+  };
+  let stats = applyPlayerStatsDelta(existing, { playMs: 100, m: { loss: true } });
+  assert.equal(stats.m.loss, undefined);
+  const fresh = applyPlayerStatsDelta(createPlayerStats(NOW_MS), {
+    playMs: 100, modes: { [CAMPAIGN]: { runs: 1, losses: 1 } }, m: { loss: true }
+  });
+  assert.equal(fresh.m.loss, 100);
+  stats = applyPlayerStatsDelta(fresh, { modes: { [CAMPAIGN]: { runs: 1, losses: 1 } }, m: { loss: true } });
+  assert.equal(stats.m.loss, 100);
+});
+
+test('summary text skips the avalanche and loss lines of a legacy profile and never reads 0 min', () => {
+  const dictionaries = { en: loadJson('./locales/en.json'), fr: loadJson('./locales/fr.json') };
+  const meta = { schemaVersion: CURRENT_SAVE_SCHEMA_VERSION, modeOrder: [CAMPAIGN], modeLabels: {} };
+  const legacy = { ...createPlayerStats(NOW_MS), m: { legacy: true, avalanche: 1000, loss: 1000, secondMode: 1000 } };
+  const early = { ...createPlayerStats(NOW_MS), m: { loss: 1000, avalanche: 61_000, legacy: false } };
+  for (const lang of ['en', 'fr']) {
+    i18n.dictionaries.set(lang, dictionaries[lang]);
+    i18n.currentLocale = lang;
+    const translate = (key, params) => i18n.t(key, params);
+    const legacyText = buildPlayerStatsText(legacy, {}, meta, translate);
+    assert.equal(legacyText.includes(translate('stats.copy.milestoneLoss', { minutes: 1 })), false, lang);
+    assert.equal(legacyText.includes(translate('stats.copy.milestoneAvalanche', { minutes: 1 })), false, lang);
+    assert.ok(legacyText.includes(translate('stats.copy.milestoneSecondMode', { minutes: 1 })), lang);
+    const earlyText = buildPlayerStatsText(early, {}, meta, translate);
+    assert.ok(earlyText.includes(translate('stats.copy.milestoneLoss', { minutes: 1 })), lang);
+    assert.ok(earlyText.includes(translate('stats.copy.milestoneAvalanche', { minutes: 2 })), lang);
+  }
+});
+
+test('summary text lists the most left level and the present milestones only', () => {
+  const dictionaries = { en: loadJson('./locales/en.json'), fr: loadJson('./locales/fr.json') };
+  let stats = createPlayerStats(NOW_MS);
+  stats = applyRunOutcome(stats, { mode: CAMPAIGN, levelId: 4, outcome: 'quit' });
+  stats = applyPlayerStatsDelta(stats, { playMs: 3 * MS_PER_MINUTE, m: { loss: true } });
+  for (const lang of ['en', 'fr']) {
+    i18n.dictionaries.set(lang, dictionaries[lang]);
+    i18n.currentLocale = lang;
+    const translate = (key, params) => i18n.t(key, params);
+    const meta = { schemaVersion: CURRENT_SAVE_SCHEMA_VERSION, modeOrder: [CAMPAIGN], modeLabels: {} };
+    const text = buildPlayerStatsText(stats, {}, meta, translate);
+    assert.ok(text.includes(translate('stats.copy.mostLeftLine', { level: '4', quits: 1 })), lang);
+    assert.ok(text.includes(translate('stats.copy.milestoneLoss', { minutes: 3 })), lang);
+    assert.equal(text.includes(translate('stats.copy.milestoneAvalanche', { minutes: 3 })), false, lang);
+    assert.equal(/\{\{|undefined/.test(text), false, lang);
+    assert.equal(text.includes('\u00A0'), false, lang);
+    const plain = buildPlayerStatsText(createPlayerStats(NOW_MS), {}, meta, translate);
+    assert.equal(plain.includes(translate('stats.copy.mostLeftLine', { level: '4', quits: 1 })), false, lang);
+  }
+});

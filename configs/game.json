@@ -413,7 +413,7 @@
   "daily": {
     "firstPlayBonusCoins": 30,
     "streakStepCoins": 15,
-    "maxStreakBonusCoins": 90,
+    "maxStreakBonusCoins": 150,
     "streakGraceDays": 1,
     "streakGraceWindowDays": 7,
     "countdownRefreshMs": 60000,
@@ -1899,7 +1899,10 @@
     "maxLevelEntries": 100,
     "flushEveryShots": 25,
     "flushEveryPlayMs": 60000,
-    "topLevelsInSummary": 3
+    "topLevelsInSummary": 3,
+    "funnel": {
+      "avalancheMinDrops": 6
+    }
   },
   "shotTimeline": {
     "formatVersion": 1,
