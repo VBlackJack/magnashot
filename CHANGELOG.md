@@ -4,6 +4,8 @@ All notable changes to **MagnaShot** are documented in this file.
 
 ## [Unreleased]
 
+## [1.24.0] - 2026-11-10
+
 ### Added
 - **Idle Settle Test for Boss Rush and Cascade (`SettleProbe`, `tests/slow/modeSettle.test.js`)**: A slow test lets an untouched board settle in Boss Rush (wave 1: with no shot every wave starts from the same board, and the test checks the Magnetar is there) and in Cascade (start plus 0 to 3 extra drop waves), 20 seeds each. The smallest margin to the danger line is 361.2 px in Boss Rush and 258.8 px in Cascade, well above the 72 px warning threshold (`dangerWarningMarginY`).
 - **Funnel Lines in "Copy my stats" (`PlayerStats`, `EngineProgress`, `EngineTurnResolution`, `locales`)**: The copied stats gain a most-left level line and the play time, in minutes, at three first moments: the first avalanche (6 or more spheres dropped in one go), the first game over and the first run in a second mode. Everything stays on the device and nothing is sent; older builds ignore the new field and may drop it. The milestone lines show only for profiles that start recording after this update: a profile with earlier play does not show first game over or first avalanche lines, since its real first time is unknown.
