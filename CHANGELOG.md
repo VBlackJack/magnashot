@@ -4,6 +4,8 @@ All notable changes to **MagnaShot** are documented in this file.
 
 ## [Unreleased]
 
+## [1.25.0] - 2026-11-11
+
 ### Added
 - **Five Sphere-Physics Arcade Modes (`src/game/modes/*`, `configs/modes.json`, `PhysicsWorld`, `EngineModes`, `EngineControls`, `EngineLauncher`, `EngineTurnResolution`, `EngineRoundFlow`, `RunSnapshot`, `DailyShare`, `PlayerStats`, `Renderer`, `CanvasInput`, `PlayHubView`, `CodexView`, `UIStats`, `StorageManager`, `StorageView`, `audio.json`, `game.json`, `locales`)**: Five new Arcade modes built on a pluggable `ModeBehavior` registry, unlocked progressively from campaign levels 13 to 17 while leaving all 824 campaign levels untouched:
   - **Hex Grid (`hex_grid`, level 13)**: Straight-line shots (`disableMagneticCurve`), ceiling snap (`snapCeilingY`), rigid 6-neighbor hexagonal lattice (`skipClusterStep`), ceiling-connected avalanches, periodic ceiling descent and purist fair-play rules; Polarity (`F`) arms a previewed 1-cell magnetic pulse on landing.
