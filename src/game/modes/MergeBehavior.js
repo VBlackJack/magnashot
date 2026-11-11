@@ -144,6 +144,7 @@ export class MergeBehavior extends ModeBehavior {
 
     engine.modeState = {
       dropCooldownSec: 0,
+      shakeRemaining: engine.mergeShakePrototype ? cfg.shake?.rechargeDrops ?? null : null,
       mergesCount: 0,
       supernovas: 0,
       maxOverflowRatio: 0
@@ -181,6 +182,9 @@ export class MergeBehavior extends ModeBehavior {
     dropped.mergeOverflowSec = 0;
     dropped.mergePolaritySec = engine.isPolarityFlipped ? cfg.polarityWindowSec : 0;
     engine.physicsWorld.addBall(dropped);
+    if (engine.modeState.shakeRemaining > 0) {
+      engine.modeState.shakeRemaining -= 1;
+    }
 
     engine.mergeBestTier = Math.max(engine.mergeBestTier || 1, tierSpec.tier + 1);
     engine.modeState.dropCooldownSec = cfg.dropCooldownSec;
@@ -195,6 +199,25 @@ export class MergeBehavior extends ModeBehavior {
 
     engine.hasFiredInRound = true;
     engine.audioManager.playEffect('shoot');
+    engine.saveRunSnapshot();
+    engine.notifyUI();
+    return true;
+  }
+
+  /** Nudge the pile towards the emptier side, with smaller spheres moving more. */
+  shake(engine) {
+    const { balls } = engine.physicsWorld;
+    if (balls.length === 0) {
+      return false;
+    }
+    const cfg = engine.modesConfig.merge;
+    const midpoint = (cfg.basinLeftX + cfg.basinRightX) * MATH_CONSTANTS.HALF;
+    const averageX = balls.reduce((sum, ball) => sum + ball.x, 0) / balls.length;
+    const direction = averageX > midpoint ? -1 : 1;
+    for (const ball of balls) {
+      ball.vx += direction * cfg.shake.maxImpulsePxPerSec * (cfg.tiers[0].radius / ball.radius);
+    }
+    engine.modeState.shakeRemaining = cfg.shake.rechargeDrops;
     engine.saveRunSnapshot();
     engine.notifyUI();
     return true;
@@ -477,7 +500,9 @@ export class MergeBehavior extends ModeBehavior {
           engine.gameConfig.theme.victoryPopupColor
         );
         this.emitMergeShockwave(engine, mx, my, a.radius, cfg.supernovaShockwaveImpulse, -1);
-        engine.unlockAchievementTiers('mergeTiers', cfg.tiers.length);
+        if (engine.getMergeShakeRemaining() === null) {
+          engine.unlockAchievementTiers('mergeTiers', cfg.tiers.length);
+        }
         continue;
       }
 
@@ -531,9 +556,11 @@ export class MergeBehavior extends ModeBehavior {
       );
 
       this.emitMergeShockwave(engine, clampedX, clampedY, nextSpec.radius, cfg.shockwaveImpulse, nextSpec.tier);
-      engine.unlockAchievementTiers('mergeTiers', engine.mergeBestTier);
-      engine.storageManager?.recordAchievementProgress?.({ maxCombo: engine.combo });
-      engine.unlockAchievementTiers('comboMaster', engine.combo);
+      if (engine.getMergeShakeRemaining() === null) {
+        engine.unlockAchievementTiers('mergeTiers', engine.mergeBestTier);
+        engine.storageManager?.recordAchievementProgress?.({ maxCombo: engine.combo });
+        engine.unlockAchievementTiers('comboMaster', engine.combo);
+      }
     }
 
     engine.persistRunHighScore();
@@ -552,6 +579,7 @@ export class MergeBehavior extends ModeBehavior {
       bestTier: engine.mergeBestTier ?? 1,
       mergesCount: state.mergesCount ?? 0,
       supernovas: state.supernovas ?? 0,
+      ...(Number.isInteger(state.shakeRemaining) ? { shakeRemaining: state.shakeRemaining } : {}),
       ballTiers: engine.physicsWorld.balls.map((b) => (Number.isInteger(b.mergeTier) ? b.mergeTier : 0))
     };
   }
@@ -577,6 +605,9 @@ export class MergeBehavior extends ModeBehavior {
 
     engine.modeState = {
       dropCooldownSec: 0,
+      shakeRemaining: cfg.shake && Number.isInteger(rawState.shakeRemaining)
+        ? Math.min(cfg.shake.rechargeDrops, Math.max(0, rawState.shakeRemaining))
+        : null,
       mergesCount: Math.max(0, rawState.mergesCount || 0),
       supernovas: Math.max(0, rawState.supernovas || 0),
       maxOverflowRatio: 0

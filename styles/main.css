@@ -1160,6 +1160,74 @@ body {
   min-height: 0;
 }
 
+.billiard-tables,
+.progress-backup-controls {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+}
+
+.billiard-tables [aria-pressed='true'] {
+  border-color: var(--accent-blue);
+  color: var(--text-info-bright);
+}
+
+#billiard-canvas {
+  display: block;
+  align-self: center;
+  max-width: 100%;
+  max-height: min(46dvh, 360px);
+  height: auto;
+  width: auto;
+  border-radius: 12px;
+  cursor: crosshair;
+  touch-action: none;
+}
+
+#billiard-canvas:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.billiard-readout,
+.billiard-power {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  color: var(--text-secondary);
+}
+
+.billiard-power input {
+  flex: 1;
+  min-width: 0;
+  min-height: var(--touch-target);
+  accent-color: var(--accent-emerald);
+}
+
+.billiard-card .modal-actions {
+  flex-wrap: wrap;
+}
+
+.billiard-pad-hint,
+:root[data-input='gamepad'] .billiard-input-hint {
+  display: none;
+}
+
+:root[data-input='gamepad'] .billiard-pad-hint {
+  display: block;
+}
+
+#progress-backup-status:empty {
+  display: none;
+}
+
+#progress-backup-status {
+  color: var(--text-info-soft);
+  text-align: center;
+}
+
 .modal-card.wide {
   max-width: 640px;
 }
@@ -2881,6 +2949,9 @@ body {
     min-width: 0;
     min-height: var(--control-row-height);
     padding: 2px;
+  }
+  #btn-merge-shake {
+    grid-column: span 2;
   }
   .polarity-floating-btn {
     margin-left: max(4px, env(safe-area-inset-left));

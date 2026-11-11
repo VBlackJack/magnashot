@@ -208,6 +208,7 @@ export const uiInputBindingMethods = {
     const isVersus = scene === UI_SCENES.VERSUS && Boolean(controller);
     this.activeScene = isVersus ? UI_SCENES.VERSUS : UI_SCENES.MAIN;
     this.sceneController = isVersus ? controller : null;
+    this.syncMergeShakeGesture?.();
   },
 
   /** Pauses the run (or the versus match) when the page is hidden. */
@@ -429,6 +430,7 @@ export const uiInputBindingMethods = {
 
     document.addEventListener('visibilitychange', () => {
       this.handleVisibilityChange();
+      this.syncMergeShakeGesture?.();
     });
 
     const toggleLang = () => {
@@ -450,6 +452,8 @@ export const uiInputBindingMethods = {
         this.engine.togglePolarityFlip();
       });
     }
+
+    this.elements.mergeShakeBtn?.addEventListener('click', () => this.tryMergeShake());
 
     this.elements.hintReplayBtn?.addEventListener('click', () => {
       this.engine.replayLevelHints?.();
@@ -778,6 +782,14 @@ export const uiInputBindingMethods = {
     if (this.handleVersusBack()) {
       return;
     }
+    if (this.progressBackup && this.getActiveTopModal() === this.elements.modalProgressImport) {
+      this.progressBackup.dismiss();
+      return;
+    }
+    if (this.billiard?.isActive()) {
+      this.billiard.close();
+      return;
+    }
     if (this.isCalibrationOpen()) {
       this.closeCalibration();
       return;
@@ -833,6 +845,11 @@ export const uiInputBindingMethods = {
       return;
     }
 
+    if (this.billiard?.isActive()) {
+      this.billiard.handleKey(e);
+      return;
+    }
+
     // The perk choice is the top dialog: its digits pick a card and never equip a special ball.
     if (this.isFluxPerkModalTop()) {
       const cardIndex = fluxPerkIndexForKey(e.code, this.engine.fluxPerkOffer?.length || 0);
@@ -878,6 +895,11 @@ export const uiInputBindingMethods = {
       }
       e.preventDefault();
       this.engine.swapLauncherBalls();
+    } else if (this.engine.getMergeShakeRemaining?.() != null && e.code === this.engine.modesConfig.merge.shake.keyCode) {
+      if (!isKeyboardInteractiveFocused) {
+        e.preventDefault();
+        if (!e.repeat) this.tryMergeShake();
+      }
     } else if (e.code === 'KeyF') {
       e.preventDefault();
       this.engine.togglePolarityFlip();

@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-import { GAME_MODES } from '../core/Constants.js';
+import { GAME_MODES, INPUT_MODES } from '../core/Constants.js';
 import { FULL_PERCENT } from './WorkshopView.js';
 import { i18n, t, formatNumber } from '../core/I18n.js';
 import { SeededRandom } from '../core/SeededRandom.js';
@@ -30,6 +30,54 @@ import {
   setTextIfChanged,
   setAttributeIfChanged
 } from './UIHelpers.js';
+
+/** Recognizes one reversal on either screen axis and rearms only after a quiet interval. */
+export function createShakeDetector(config) {
+  let gravity = null;
+  let peak = null;
+  let quietSince = null;
+  let latched = false;
+
+  return (event) => {
+    const time = event.timeStamp;
+    let { x, y } = event.acceleration ?? {};
+    if (!Number.isFinite(x) || !Number.isFinite(y)) {
+      const sample = event.accelerationIncludingGravity;
+      if (!Number.isFinite(sample?.x) || !Number.isFinite(sample?.y)) {
+        return false;
+      }
+      gravity ??= { x: sample.x, y: sample.y };
+      const weight = config.gravitySmoothing;
+      gravity.x = weight * gravity.x + (1 - weight) * sample.x;
+      gravity.y = weight * gravity.y + (1 - weight) * sample.y;
+      x = sample.x - gravity.x;
+      y = sample.y - gravity.y;
+    }
+
+    const magnitude = Math.max(Math.abs(x), Math.abs(y));
+    if (latched) {
+      quietSince = magnitude <= config.quietAcceleration ? quietSince ?? time : null;
+      if (quietSince !== null && time - quietSince >= config.quietWindowMs) {
+        latched = false;
+      }
+      return false;
+    }
+    if (magnitude < config.peakAcceleration) {
+      return false;
+    }
+
+    const axis = Math.abs(x) >= Math.abs(y) ? 'x' : 'y';
+    const sign = Math.sign(axis === 'x' ? x : y);
+    if (peak && peak.axis === axis && peak.sign !== sign && time - peak.time <= config.reversalWindowMs) {
+      peak = null;
+      quietSince = null;
+      latched = true;
+      return true;
+    }
+    peak = { axis, sign, time };
+    return false;
+  };
+}
 
 /** Methods installed on UIManager.prototype by UIManager.js. */
 export const uiSettingsControlMethods = {
@@ -174,6 +222,118 @@ export const uiSettingsControlMethods = {
     if (btn) {
       btn.disabled = isLocked;
       setAttributeIfChanged(btn, 'aria-disabled', String(isLocked));
+    }
+  },
+
+  refreshMergeShakeControls() {
+    const button = this.elements.mergeShakeBtn;
+    const remaining = this.engine.getMergeShakeRemaining?.() ?? null;
+    if (button) {
+      button.classList.toggle('hidden', remaining === null);
+      button.disabled = remaining !== 0;
+      if (remaining !== null) {
+        const key = 'hud.launcher.shake';
+        const label = remaining === 0
+          ? t(`${key}.ready`)
+          : t(remaining === 1 ? `${key}.chargingOne` : `${key}.charging`, { count: formatNumber(remaining) });
+        setTextIfChanged(button.querySelector('.launcher-text'),
+          this.inputMode === INPUT_MODES.POINTER
+            ? t('hud.launcher.shortcutFormat', { label, key: t(`${key}.shortcut`) })
+            : label);
+        setTextIfChanged(button.querySelector('.launcher-caption'),
+          t(remaining === 0 ? `${key}.label` : `${key}.compact`, { count: formatNumber(remaining) }));
+        setAttributeIfChanged(button, 'aria-label', label);
+        button.title = label;
+      }
+    }
+    this.updateMergeShakeGestureSetting();
+  },
+
+  canReceiveMergeShakeInput() {
+    return this.engine.getMergeShakeRemaining?.() != null
+      && this.engine.isRunPlaying()
+      && !document.hidden
+      && !this.isDrawerOpen
+      && !this.isAnyModalOpen()
+      && !this.getSceneController();
+  },
+
+  tryMergeShake() {
+    return this.canReceiveMergeShakeInput() && this.engine.tryMergeShake();
+  },
+
+  setupMergeShakeGesture() {
+    const button = this.elements.btnMergeShakeGesture;
+    this.mergeShakeGestureSupported = Boolean(window.isSecureContext
+      && typeof window.DeviceMotionEvent === 'function'
+      && window.matchMedia?.(this.gameConfig.tilt.touchMediaQuery).matches);
+    this.mergeShakeGestureEnabled = this.mergeShakeGestureSupported && this.storageManager.getMergeShakeGesture();
+    this.handleMergeShakeMotion = (event) => {
+      if (this.detectMergeShake?.(event)) {
+        this.tryMergeShake();
+      }
+    };
+    if (this.mergeShakeGestureSupported) {
+      button?.addEventListener('click', () => this.toggleMergeShakeGesture());
+    }
+    this.updateMergeShakeGestureSetting();
+  },
+
+  async toggleMergeShakeGesture() {
+    if (this.mergeShakePermissionPending) {
+      return;
+    }
+    const enable = !this.mergeShakeGestureEnabled;
+    this.mergeShakePermissionDenied = false;
+    if (enable && typeof window.DeviceMotionEvent.requestPermission === 'function') {
+      this.mergeShakePermissionPending = true;
+      this.updateMergeShakeGestureSetting();
+      try {
+        this.mergeShakePermissionDenied = (await window.DeviceMotionEvent.requestPermission()) !== 'granted';
+      } catch {
+        this.mergeShakePermissionDenied = true;
+      } finally {
+        this.mergeShakePermissionPending = false;
+      }
+    }
+    this.mergeShakeGestureEnabled = enable && !this.mergeShakePermissionDenied;
+    this.storageManager.setMergeShakeGesture(this.mergeShakeGestureEnabled);
+    this.updateMergeShakeGestureSetting();
+    this.syncMergeShakeGesture();
+  },
+
+  updateMergeShakeGestureSetting() {
+    const button = this.elements.btnMergeShakeGesture;
+    if (!button) {
+      return;
+    }
+    const visible = this.mergeShakeGestureSupported && (this.engine.mergeShakePrototype
+      || this.engine.getMergeShakeRemaining?.() != null);
+    button.closest('.pause-setting')?.classList.toggle('hidden', !visible);
+    const key = 'modals.settings.shakeGesture';
+    const enabled = Boolean(this.mergeShakeGestureEnabled);
+    this.applyToggleState([button], {
+      label: t(`${key}.icon`),
+      ariaLabel: t(`${key}.label`),
+      tooltip: t(this.mergeShakePermissionDenied ? `${key}.denied` : `${key}.${enabled ? 'on' : 'off'}`),
+      pressed: enabled
+    });
+    button.disabled = Boolean(this.mergeShakePermissionPending);
+    setTextIfChanged(this.elements.mergeShakeGestureStatus, this.mergeShakePermissionDenied ? t(`${key}.denied`) : '');
+  },
+
+  syncMergeShakeGesture() {
+    const run = this.mergeShakeGestureEnabled && this.canReceiveMergeShakeInput() ? this.engine.modeState : null;
+    if (run === (this.mergeShakeGestureRun ?? null)) {
+      return;
+    }
+    if (this.mergeShakeGestureRun) {
+      window.removeEventListener('devicemotion', this.handleMergeShakeMotion);
+    }
+    this.mergeShakeGestureRun = run;
+    this.detectMergeShake = run ? createShakeDetector(this.engine.modesConfig.merge.shake.gesture) : null;
+    if (run) {
+      window.addEventListener('devicemotion', this.handleMergeShakeMotion);
     }
   },
 

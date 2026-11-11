@@ -139,6 +139,7 @@ export const DEFAULT_MODES_CONFIG = Object.freeze({
     tracks: Object.freeze(['spiral', 'serpent', 'figure8', 'orbitLoop'])
   }),
   merge: Object.freeze({
+    shake: null,
     launcherY: 82,
     dropStepPx: 14,
     nextOffsetX: 156,

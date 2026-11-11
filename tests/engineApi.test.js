@@ -109,6 +109,8 @@ const EXPECTED_PROTOTYPE_NAMES = [
   'isDailyAmmoLocked',
   'isObjectiveCleared',
   'isRunPlaying',
+  'getMergeShakeRemaining',
+  'tryMergeShake',
   'isStageChanging',
   'isSurvivalMode',
   'isTiltLocked',

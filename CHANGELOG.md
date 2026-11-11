@@ -4,6 +4,13 @@ All notable changes to **MagnaShot** are documented in this file.
 
 ## [Unreleased]
 
+## [1.26.0] - 2026-11-11
+
+### Added
+- **Billiards prototype**: Three solo tables teach direct shots, one-cushion shots and cue-ball placement. Aim in any direction, adjust power, and replay each table from its opening layout.
+- **Progress transfer**: Export campaign progress, records and unlocks from Settings to a JSON file. Import that file on another device after reviewing the confirmation. Device settings and the destination's saved run stay local.
+- **Merge Basin shake prototype**: A lateral nudge becomes ready after four drops, with a dedicated button, keyboard and controller controls and an opt-in phone gesture. Start a new run with `?mergeShake=1` to try it. Prototype records are separate.
+
 ## [1.25.0] - 2026-11-11
 
 ### Added

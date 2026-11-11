@@ -550,7 +550,7 @@ export const engineRoundFlowMethods = {
     } else if (this.mode === GAME_MODES.CONVOY) {
       previousBestScore = this.storageManager.getConvoyHighScore?.() || 0;
     } else if (this.mode === GAME_MODES.MERGE) {
-      previousBestScore = this.storageManager.getMergeHighScore?.() || 0;
+      previousBestScore = this.storageManager.getMergeHighScore?.(this.getMergeShakeRemaining() !== null) || 0;
     }
     // A Daily rematch persists nothing, so it never sets a record.
     const isNewRecord = this.mode !== GAME_MODES.CAMPAIGN && this.mode !== GAME_MODES.PUZZLE && !this.isDailyRematch && previousBestScore > 0 && this.score > previousBestScore;

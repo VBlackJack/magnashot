@@ -527,14 +527,14 @@ export function applyRunSnapshot(engine, snapshot) {
   engine.isDailyRematch = snapshot.mode === GAME_MODES.DAILY && snapshot.isDailyRematch === true;
   engine.ghostDuel = null;
   engine.restoreGhostDuel?.(snapshot.ghostDuelCode);
-  // Optional: a run saved before the baseline existed (or a damaged one) re-reads the record.
-  engine.restoreRunBestBaseline(snapshot.runBestBaseline);
   if (engine.seededRng && Number.isFinite(snapshot.rngState)) {
     engine.seededRng.state = snapshot.rngState;
   }
   engine.currentBall = engine.createRandomLauncherBall(snapshot.currentBall.specialType, snapshot.currentBall.colorId);
   engine.nextBall = engine.createRandomLauncherBall(snapshot.nextBall.specialType, snapshot.nextBall.colorId);
   engine.getModeBehavior().restoreModeState(engine, snapshot.modeState ?? null);
+  // The restored mode variant determines which record the run started against.
+  engine.restoreRunBestBaseline(snapshot.runBestBaseline);
   // Runs saved before the queue existed, or with a damaged one, get a fresh queue.
   const savedQueue = snapshot.upcomingColorIds;
   const isValidQueue = Array.isArray(savedQueue) && savedQueue.every((color) => engine.activePalette.includes(color));

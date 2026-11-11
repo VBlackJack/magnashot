@@ -302,7 +302,7 @@ export const uiHudRefreshMethods = {
     } else if (engine.mode === GAME_MODES.CONVOY) {
       bestScore = this.storageManager.getConvoyHighScore?.() || 0;
     } else if (engine.mode === GAME_MODES.MERGE) {
-      bestScore = this.storageManager.getMergeHighScore?.() || 0;
+      bestScore = this.storageManager.getMergeHighScore?.(engine.getMergeShakeRemaining() !== null) || 0;
     } else {
       bestScore = this.storageManager.getEndlessHighScore();
     }
@@ -679,6 +679,7 @@ export const uiHudRefreshMethods = {
 
     this.syncShopAmmoAvailability();
     this.updateTiltButton();
+    this.refreshMergeShakeControls?.();
     this.updatePowerupButtons(engine);
 
     const transitionedState = this.prevEngineState !== engine.state;
