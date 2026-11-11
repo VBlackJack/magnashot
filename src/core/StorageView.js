@@ -86,6 +86,8 @@ export const VERSUS_STORAGE_POLICY = Object.freeze({
   getMuted: P.FORWARD,
   getHighContrast: P.FORWARD,
   getTilt: P.FORWARD,
+  getMergeShakeGesture: P.FALSE,
+  setMergeShakeGesture: P.NOOP,
   getColorPatterns: P.FORWARD,
   getReducedMotion: P.FORWARD,
   getGamepadEnabled: P.FORWARD,

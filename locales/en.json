@@ -194,6 +194,15 @@
       }
     },
     "launcher": {
+      "shake": {
+        "icon": "↔",
+        "label": "Shake",
+        "shortcut": "G",
+        "ready": "Shake ready",
+        "charging": "Shake in {{count}} drops",
+        "chargingOne": "Shake in 1 drop",
+        "compact": "Shake · {{count}}"
+      },
       "swap": {
         "icon": "⇄",
         "label": "Swap",
@@ -646,6 +655,48 @@
     }
   },
   "modals": {
+    "billiard": {
+      "icon": "🎱",
+      "title": "Billiards (prototype)",
+      "card": "Three solo tables for direct shots, cushions and cue-ball position.",
+      "tables": "Solo tables",
+      "table": {
+        "direct": {
+          "name": "Direct shot",
+          "objective": "Pot ball 1 in two shots."
+        },
+        "bank": {
+          "name": "One cushion",
+          "objective": "Send the cue ball around the blocker with one cushion to pot ball 1."
+        },
+        "position": {
+          "name": "Position play",
+          "objective": "Pot ball 1, then ball 2. Choose a speed that leaves a good second shot."
+        }
+      },
+      "board": "Billiards table, aim here",
+      "power": "Power",
+      "percent": "{{value}}%",
+      "shoot": "Shoot",
+      "replay": "Replay",
+      "close": "Back to Play",
+      "shots": "Shots {{used}} / {{limit}}",
+      "hint": "Point or drag to aim. On the table, use left and right to aim, up and down for power, and Enter to shoot. Hold Shift for finer aim.",
+      "padHint": "Stick to aim. Shoulder buttons adjust power. Bottom face shoots, left face replays, Start selects tables, right face goes back.",
+      "ball": {
+        "one": "1",
+        "two": "2"
+      },
+      "status": {
+        "aiming": "Ready to shoot",
+        "moving": "Balls in motion",
+        "won": "Table cleared",
+        "lost": "Table incomplete",
+        "scratch": "Cue ball potted",
+        "wrongTarget": "Target potted out of order",
+        "shotsExhausted": "Out of shots"
+      }
+    },
     "levelSelect": {
       "title": {
         "main": "Campaign map"
@@ -1407,6 +1458,32 @@
       }
     },
     "settings": {
+      "progress": {
+        "export": "Export progress",
+        "import": "Import progress",
+        "confirm": {
+          "title": "Import progress?",
+          "summary": "This file contains {{count}} progress entries.",
+          "warning": "Entries from the file replace the corresponding progress on this device. Other entries, device settings and the current saved run stay here. The game reloads after import.",
+          "cancel": "Cancel",
+          "apply": "Import and reload"
+        },
+        "status": {
+          "download": "Progress file prepared.",
+          "exportError": "Could not export your progress.",
+          "tooLarge": "This progress file is too large.",
+          "empty": "This file has no progress to import.",
+          "invalid": "This is not a valid MagnaShot progress file for this version.",
+          "importError": "The import could not be completed. Keep your progress file and try again."
+        }
+      },
+      "shakeGesture": {
+        "icon": "↔",
+        "label": "Shake phone to nudge the basin",
+        "on": "Shake gesture on",
+        "off": "Shake gesture off",
+        "denied": "Motion access unavailable. Use the Shake button."
+      },
       "title": {
         "main": "Settings"
       },

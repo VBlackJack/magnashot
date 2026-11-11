@@ -355,6 +355,14 @@ export class StorageManager {
     return stored === null ? defaultEnabled : stored === 'true';
   }
 
+  getMergeShakeGesture() {
+    return this.safeGetItem(this.storageConfig.keys.mergeShakeGesture) === 'true';
+  }
+
+  setMergeShakeGesture(enabled) {
+    this.safeSetItem(this.storageConfig.keys.mergeShakeGesture, Boolean(enabled));
+  }
+
   setTilt(enabled) {
     this.safeSetItem(this.storageConfig.keys.tilt, Boolean(enabled));
   }
@@ -1169,25 +1177,25 @@ export class StorageManager {
     }
   }
 
-  getMergeHighScore() {
-    const key = this.storageConfig?.keys?.mergeHighScore;
+  getMergeHighScore(prototype = false) {
+    const key = this.storageConfig?.keys?.[prototype ? 'mergeShakeHighScore' : 'mergeHighScore'];
     return key ? this.readNonNegativeInt(key) : 0;
   }
 
-  getMergeBestTier() {
-    const key = this.storageConfig?.keys?.mergeBestTier;
+  getMergeBestTier(prototype = false) {
+    const key = this.storageConfig?.keys?.[prototype ? 'mergeShakeBestTier' : 'mergeBestTier'];
     return key ? this.readNonNegativeInt(key) : 0;
   }
 
-  setMergeRecord(score, tier) {
-    const scoreKey = this.storageConfig?.keys?.mergeHighScore;
-    const tierKey = this.storageConfig?.keys?.mergeBestTier;
+  setMergeRecord(score, tier, prototype = false) {
+    const scoreKey = this.storageConfig?.keys?.[prototype ? 'mergeShakeHighScore' : 'mergeHighScore'];
+    const tierKey = this.storageConfig?.keys?.[prototype ? 'mergeShakeBestTier' : 'mergeBestTier'];
     const cleanScore = Math.max(0, Math.floor(Number(score) || 0));
     const cleanTier = Math.max(0, Math.floor(Number(tier) || 0));
-    if (scoreKey && cleanScore > this.getMergeHighScore()) {
+    if (scoreKey && cleanScore > this.getMergeHighScore(prototype)) {
       this.safeSetItem(scoreKey, cleanScore);
     }
-    if (tierKey && cleanTier > this.getMergeBestTier()) {
+    if (tierKey && cleanTier > this.getMergeBestTier(prototype)) {
       this.safeSetItem(tierKey, cleanTier);
     }
   }

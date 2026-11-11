@@ -3691,3 +3691,277 @@ describe('puzzle stage intro (desktop)', () => {
     }
   });
 });
+
+describe('Merge shake', () => {
+  const modes = JSON.parse(readFileSync(new URL('../../configs/modes.json', import.meta.url), 'utf8'));
+  const { shake } = modes.merge;
+  const path = `/?${shake.queryParam}=${shake.queryValue}`;
+  const selector = '#btn-merge-shake';
+  const initStorage = {
+    ...languageStorage('en'),
+    [`${STORAGE_PREFIX}${STORAGE_KEYS.unlockedLevel}`]: String(GAME_CONFIG.modeUnlocks.campaignLevelCleared.merge + 2)
+  };
+
+  async function startBasin(page, viewport) {
+    await openPlayHub(page, viewport);
+    await page.locator('#btn-mode-merge').click();
+    await page.waitForFunction(() => window.__fluxEngine.mode === 'merge' && window.__fluxEngine.isRunPlaying());
+  }
+
+  async function charge(page) {
+    await page.evaluate((drops) => {
+      const engine = window.__fluxEngine;
+      for (let i = 0; i < drops; i += 1) {
+        engine.modeState.dropCooldownSec = 0;
+        engine.shoot();
+      }
+    }, shake.rechargeDrops);
+    assert.equal(await page.locator(selector).isEnabled(), true);
+  }
+
+  test('the desktop HUD, keyboard and right bumper each use one charge', async () => {
+    const viewport = VIEWPORTS[0];
+    const { context, page, errors } = await openGame(viewport, { initStorage, path, initScript: installPadStub });
+    try {
+      await startBasin(page, viewport);
+      await waitShown(page, selector);
+      assert.equal(await page.locator(selector).isDisabled(), true);
+      await charge(page);
+      await page.locator(selector).click();
+      assert.equal(await page.locator(selector).isDisabled(), true);
+
+      await charge(page);
+      await page.locator('#game-canvas').focus();
+      await page.keyboard.down(shake.keyCode);
+      assert.equal(await page.locator(selector).isDisabled(), true);
+      await charge(page);
+      await page.keyboard.down(shake.keyCode);
+      assert.equal(await page.locator(selector).isEnabled(), true, 'repeat cannot spend the recharged impulse');
+      await page.keyboard.up(shake.keyCode);
+
+      await connectPad(page);
+      await tapPad(page, GAME_CONFIG.gamepad.buttons.specialNext[0]);
+      assert.equal(await page.locator(selector).isDisabled(), true);
+      assert.deepEqual(errors, []);
+    } finally {
+      await context.close();
+    }
+  });
+
+  for (const viewport of VIEWPORTS.filter(({ isTouch }) => isTouch)) {
+    test(`the French control fits on ${viewport.name}`, async () => {
+      const { context, page } = await openGame(viewport, {
+        initStorage: { ...initStorage, ...languageStorage('fr') },
+        path
+      });
+      try {
+        await startBasin(page, viewport);
+        await waitShown(page, selector);
+        await assertLayoutFits(page, 'Merge shake');
+        const button = await page.locator(selector).boundingBox();
+        assert.ok(button.width >= 44 && button.height >= 44, 'the shake has a full touch target');
+      } finally {
+        await context.close();
+      }
+    });
+  }
+
+  test('the touch button works before permission and a motion gesture is active only in play', async () => {
+    const viewport = VIEWPORTS.find(({ name }) => name === 'phone portrait');
+    const { context, page, errors } = await openGame(viewport, {
+      initStorage,
+      path,
+      initScript: () => {
+        window.__motionPermissionRequests = 0;
+        window.DeviceMotionEvent.requestPermission = async () => {
+          window.__motionPermissionRequests += 1;
+          return window.__motionPermissionRequests === 1 ? 'denied' : 'granted';
+        };
+        window.__sendMotion = (x) => {
+          window.dispatchEvent(new DeviceMotionEvent('devicemotion', { acceleration: { x, y: 0, z: 0 } }));
+        };
+      }
+    });
+    const sendShake = () => page.evaluate((peak) => {
+      window.__sendMotion(peak);
+      window.__sendMotion(-peak);
+    }, shake.gesture.peakAcceleration * 2);
+
+    try {
+      await startBasin(page, viewport);
+      await charge(page);
+      await sendShake();
+      assert.equal(await page.locator(selector).isEnabled(), true);
+      await page.locator(selector).tap();
+      assert.equal(await page.locator(selector).isDisabled(), true);
+      await charge(page);
+
+      await clickMenuButton(page, viewport, '#btn-settings');
+      const setting = page.locator('#btn-merge-shake-gesture');
+      await setting.tap();
+      await page.waitForFunction(() => document.getElementById('merge-shake-gesture-status').textContent.length > 0);
+      assert.equal(await setting.getAttribute('aria-pressed'), 'false');
+      await setting.tap();
+      await page.waitForFunction(() => document.getElementById('btn-merge-shake-gesture').ariaPressed === 'true');
+
+      // A peak seen in Settings must not combine with a peak after resuming.
+      await page.evaluate((peak) => window.__sendMotion(peak), shake.gesture.peakAcceleration * 2);
+      await page.locator('#btn-close-settings').tap();
+      await page.waitForFunction(() => window.__fluxEngine.isRunPlaying());
+      await page.evaluate((peak) => window.__sendMotion(-peak), shake.gesture.peakAcceleration * 2);
+      assert.equal(await page.locator(selector).isEnabled(), true);
+      await sendShake();
+      assert.equal(await page.locator(selector).isDisabled(), true);
+      assert.equal(await page.evaluate(() => window.__motionPermissionRequests), 2);
+      assert.deepEqual(errors, []);
+    } finally {
+      await context.close();
+    }
+  });
+});
+
+describe('Billiards prototype', () => {
+  const billiardConfig = JSON.parse(readFileSync(new URL('../../configs/billiard.json', import.meta.url), 'utf8'));
+  const desktop = VIEWPORTS[0];
+  const phone = VIEWPORTS.find(({ name }) => name === 'narrow phone portrait');
+  const table = '#billiard-canvas';
+  const shoot = '#btn-billiard-shoot';
+
+  async function openBilliards(page, viewport) {
+    await openPlayHub(page, viewport);
+    await page.locator('#btn-mode-billiard').click();
+    await waitShown(page, '#modal-billiard');
+  }
+
+  async function aimAt(page, point, touch) {
+    const box = await page.locator(table).boundingBox();
+    const position = {
+      x: point.x * box.width / billiardConfig.width,
+      y: point.y * box.height / billiardConfig.height
+    };
+    if (touch) {
+      await page.locator(table).tap({ position });
+    } else {
+      await page.locator(table).click({ position });
+    }
+  }
+
+  test('opens all tables, accepts angle and power, and returns to the paused game', async () => {
+    const { context, page, errors } = await openGame(desktop, { initStorage: languageStorage('en'), initScript: installPadStub });
+    try {
+      const mainBefore = await page.evaluate(() => ({
+        score: window.__fluxEngine.score,
+        shots: window.__fluxEngine.runShotsFired
+      }));
+      await openBilliards(page, desktop);
+      assert.equal(await engineState(page), 'paused');
+      assert.equal(await page.locator('#billiard-tables button').count(), 3);
+      const [target] = billiardConfig.tables[0].balls.filter(({ id }) => id === 'one');
+      await aimAt(page, target, false);
+      await page.keyboard.press('ArrowUp');
+      assert.equal(await textOf(page, '#billiard-power-value'), '50%');
+      await page.keyboard.press('Enter');
+      await page.waitForFunction((won) => document.getElementById('billiard-status').textContent === won,
+        localeText('en', 'modals.billiard.status.won'));
+      await connectPad(page);
+      await tapPad(page, GAME_CONFIG.gamepad.buttons.swap[0]);
+      assert.equal(await textOf(page, '#billiard-shots'), localeText('en', 'modals.billiard.shots', { used: 0, limit: 2 }));
+
+      await page.locator('#billiard-tables button').nth(1).click();
+      assert.equal(await textOf(page, '#billiard-objective'), localeText('en', 'modals.billiard.table.bank.objective'));
+      await page.locator('#billiard-tables button').nth(2).click();
+      assert.equal(await textOf(page, '#billiard-objective'), localeText('en', 'modals.billiard.table.position.objective'));
+      await page.keyboard.press('Escape');
+      assert.equal(await focusedId(page), 'btn-mode-billiard');
+      await page.keyboard.press('Escape');
+      await page.waitForFunction(() => window.__fluxEngine.isRunPlaying());
+      assert.deepEqual(await page.evaluate(() => ({
+        score: window.__fluxEngine.score,
+        shots: window.__fluxEngine.runShotsFired
+      })), mainBefore);
+      assert.deepEqual(errors, []);
+    } finally {
+      await context.close();
+    }
+  });
+
+  test('touch aims without shooting, and the table fits a narrow phone', async () => {
+    const { context, page, errors } = await openGame(phone, { initStorage: languageStorage('fr') });
+    try {
+      await openBilliards(page, phone);
+      await assertLayoutFits(page, 'Billard');
+      const [target] = billiardConfig.tables[0].balls.filter(({ id }) => id === 'one');
+      await aimAt(page, target, true);
+      assert.equal(await textOf(page, '#billiard-shots'), localeText('fr', 'modals.billiard.shots', { used: 0, limit: 2 }));
+      await page.locator('#billiard-power').fill('0.5');
+      await page.locator(shoot).tap();
+      await page.waitForFunction((won) => document.getElementById('billiard-status').textContent === won,
+        localeText('fr', 'modals.billiard.status.won'));
+      assert.deepEqual(errors, []);
+    } finally {
+      await context.close();
+    }
+  });
+});
+
+describe('Progress transfer', () => {
+  const viewport = VIEWPORTS[0];
+  const unlockedKey = `${STORAGE_PREFIX}${STORAGE_KEYS.unlockedLevel}`;
+  const coinsKey = `${STORAGE_PREFIX}${STORAGE_KEYS.coins}`;
+  const contrastKey = `${STORAGE_PREFIX}${STORAGE_KEYS.highContrast}`;
+  const foreignKey = 'unrelated-app-key';
+  const newLevel = String(GAME_CONFIG.modeUnlocks.campaignLevelCleared.merge + 1);
+
+  async function openSettings(page) {
+    await clickMenuButton(page, viewport, '#btn-settings');
+    await waitShown(page, '#modal-settings');
+  }
+
+  test('downloads and imports a real file into a fresh profile and unlocks Merge Basin', async () => {
+    const source = await openGame(viewport, { initStorage: {
+      [unlockedKey]: newLevel, [coinsKey]: '30', [contrastKey]: 'true', [foreignKey]: 'source'
+    } });
+    const target = await openGame(viewport, { path: '/?mergeShake=1' });
+    try {
+      await openSettings(source.page);
+      const [download] = await Promise.all([
+        source.page.waitForEvent('download'),
+        source.page.locator('#btn-export-progress').click()
+      ]);
+      assert.equal(download.suggestedFilename(), GAME_CONFIG.storage.progressBackup.filename);
+      const file = await download.path();
+      const backup = JSON.parse(readFileSync(file, 'utf8'));
+      assert.equal(backup.fields.unlockedLevel, newLevel);
+      assert.equal(backup.fields.highContrast, undefined);
+      assert.equal(backup.fields.runSnapshot, undefined);
+
+      await target.page.evaluate((key) => localStorage.setItem(key, 'target'), foreignKey);
+      await openSettings(target.page);
+      const picker = target.page.locator('#input-import-progress');
+      await picker.setInputFiles({ name: 'invalid.json', mimeType: 'application/json', buffer: Buffer.from('{}') });
+      await target.page.waitForFunction(() => document.getElementById('progress-backup-status').textContent !== '');
+      assert.equal(await isShown(target.page, '#modal-progress-import'), false);
+
+      await picker.setInputFiles(file);
+      await waitShown(target.page, '#modal-progress-import');
+      await target.page.locator('#btn-cancel-progress-import').click();
+      assert.notEqual(await target.page.evaluate((key) => localStorage.getItem(key), unlockedKey), newLevel);
+      await picker.setInputFiles(file);
+      await waitShown(target.page, '#modal-progress-import');
+      await Promise.all([
+        target.page.waitForEvent('load'),
+        target.page.locator('#btn-apply-progress-import').click()
+      ]);
+      await captureEngine(target.page);
+      assert.deepEqual(await target.page.evaluate((keys) => keys.map((key) => localStorage.getItem(key)),
+        [unlockedKey, coinsKey, contrastKey, foreignKey]), [newLevel, '30', null, 'target']);
+      await openPlayHub(target.page, viewport);
+      await target.page.locator('#btn-mode-merge').click();
+      await waitShown(target.page, '#btn-merge-shake');
+      assert.deepEqual([...source.errors, ...target.errors], []);
+    } finally {
+      await source.context.close();
+      await target.context.close();
+    }
+  });
+});

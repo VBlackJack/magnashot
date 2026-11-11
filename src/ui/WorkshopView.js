@@ -444,12 +444,13 @@ export function renderWorkshopContents() {
     const persistedRecords = this.storageManager.getAchievementRecords?.() || {};
     const achEntries = Object.entries(this.gameConfig.achievements);
     const liveEndlessWave = this.engine.mode === GAME_MODES.ENDLESS ? this.engine.waveCount || 0 : 0;
+    const prototype = this.engine.getMergeShakeRemaining?.() != null;
     const progressContext = {
       maxCombo: Math.max(
         persistedRecords.maxCombo || 0,
-        this.engine.combo || 0,
-        this.engine.maxComboInRound || 0,
-        this.engine.currentComboChain || 0
+        prototype ? 0 : this.engine.combo || 0,
+        prototype ? 0 : this.engine.maxComboInRound || 0,
+        prototype ? 0 : this.engine.currentComboChain || 0
       ),
       totalStars: this.storageManager.getTotalStars(),
       endlessWave: Math.max(persistedRecords.endlessWave || 0, liveEndlessWave),
@@ -479,7 +480,7 @@ export function renderWorkshopContents() {
       ),
       mergeTier: Math.max(
         this.storageManager.getMergeBestTier?.() || 0,
-        this.engine.mode === GAME_MODES.MERGE ? this.engine.mergeBestTier || 0 : 0
+        this.engine.mode === GAME_MODES.MERGE && !prototype ? this.engine.mergeBestTier || 0 : 0
       ),
       unlockedLevel: this.storageManager.getUnlockedLevel(),
       campaignLevelCount: this.engine.levelCatalog.count

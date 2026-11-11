@@ -194,6 +194,15 @@
       }
     },
     "launcher": {
+      "shake": {
+        "icon": "↔",
+        "label": "Secousse",
+        "shortcut": "G",
+        "ready": "Secousse prête",
+        "charging": "Secousse dans {{count}} lâchers",
+        "chargingOne": "Secousse dans 1 lâcher",
+        "compact": "Secousse · {{count}}"
+      },
       "swap": {
         "icon": "⇄",
         "label": "Échanger",
@@ -646,6 +655,48 @@
     }
   },
   "modals": {
+    "billiard": {
+      "icon": "🎱",
+      "title": "Billard (prototype)",
+      "card": "Trois tables solo pour le tir direct, la bande et le placement de la blanche.",
+      "tables": "Tables solo",
+      "table": {
+        "direct": {
+          "name": "Tir direct",
+          "objective": "Empoche la bille 1 en deux coups."
+        },
+        "bank": {
+          "name": "Une bande",
+          "objective": "Fais rebondir la blanche sur une bande pour contourner l'obstacle et empocher la bille 1."
+        },
+        "position": {
+          "name": "Placement",
+          "objective": "Empoche la bille 1, puis la bille 2. Dose la puissance pour préparer le deuxième coup."
+        }
+      },
+      "board": "Table de billard, zone de visée",
+      "power": "Puissance",
+      "percent": "{{value}} %",
+      "shoot": "Tirer",
+      "replay": "Rejouer",
+      "close": "Retour à Jouer",
+      "shots": "Coups {{used}} / {{limit}}",
+      "hint": "Pointe ou fais glisser pour viser. Sur la table, utilise Gauche et Droite pour viser, Haut et Bas pour la puissance, et Entrée pour tirer. Maj affine la visée.",
+      "padHint": "Vise au stick et dose avec les boutons d'épaule. Le bouton du bas tire, celui de gauche rejoue, Start ouvre la sélection et celui de droite revient.",
+      "ball": {
+        "one": "1",
+        "two": "2"
+      },
+      "status": {
+        "aiming": "Prêt à tirer",
+        "moving": "Billes en mouvement",
+        "won": "Table réussie",
+        "lost": "Table incomplète",
+        "scratch": "Blanche empochée",
+        "wrongTarget": "Bille empochée dans le mauvais ordre",
+        "shotsExhausted": "Plus de coups"
+      }
+    },
     "levelSelect": {
       "title": {
         "main": "Carte de campagne"
@@ -1407,6 +1458,32 @@
       }
     },
     "settings": {
+      "progress": {
+        "export": "Exporter la progression",
+        "import": "Importer la progression",
+        "confirm": {
+          "title": "Importer la progression ?",
+          "summary": "Ce fichier contient {{count}} entrées de progression.",
+          "warning": "Les entrées du fichier remplacent la progression correspondante sur cet appareil. Les autres entrées, les réglages de l'appareil et la partie en cours sauvegardée restent ici. Le jeu se recharge après l'import.",
+          "cancel": "Annuler",
+          "apply": "Importer et recharger"
+        },
+        "status": {
+          "download": "Fichier de progression préparé.",
+          "exportError": "Impossible d'exporter ta progression.",
+          "tooLarge": "Ce fichier de progression est trop volumineux.",
+          "empty": "Ce fichier ne contient aucune progression à importer.",
+          "invalid": "Ce fichier de progression MagnaShot est invalide pour cette version.",
+          "importError": "L'import n'a pas pu se terminer. Garde ton fichier de progression et réessaie."
+        }
+      },
+      "shakeGesture": {
+        "icon": "↔",
+        "label": "Secouer le téléphone pour remuer le bassin",
+        "on": "Geste de secousse activé",
+        "off": "Geste de secousse désactivé",
+        "denied": "Accès au capteur indisponible. Utilisez le bouton Secousse."
+      },
       "title": {
         "main": "Réglages"
       },

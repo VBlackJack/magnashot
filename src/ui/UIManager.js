@@ -30,6 +30,8 @@ import {
   formatChapterName,
   uiLevelSelectMethods
 } from './LevelSelectView.js';
+import { BilliardView } from './BilliardView.js';
+import { ProgressBackupView } from './ProgressBackupView.js';
 import { uiPlayHubMethods } from './PlayHubView.js';
 import { installMethods } from '../core/installMethods.js';
 import {
@@ -115,7 +117,7 @@ export {
  * and keyboard/button event bindings.
  */
 export class UIManager {
-  constructor({ engine, renderer, storageManager, audioManager, gameConfig, ballsConfig, versusConfigs = null }) {
+  constructor({ engine, renderer, storageManager, audioManager, gameConfig, ballsConfig, billiardConfig = null, versusConfigs = null }) {
     this.engine = engine;
     this.renderer = renderer;
     this.storageManager = storageManager;
@@ -123,6 +125,7 @@ export class UIManager {
     this.gameConfig = gameConfig;
     this.ballsConfig = ballsConfig;
     this.versusConfigs = versusConfigs;
+    this.billiardConfig = billiardConfig;
 
     this.elements = {
       appShell: document.querySelector('.app-shell'),
@@ -167,6 +170,8 @@ export class UIManager {
       btnContrast: document.getElementById('btn-contrast'),
       btnPatterns: document.getElementById('btn-patterns'),
       btnTilt: document.getElementById('btn-tilt'),
+      btnMergeShakeGesture: document.getElementById('btn-merge-shake-gesture'),
+      mergeShakeGestureStatus: document.getElementById('merge-shake-gesture-status'),
       btnMotion: document.getElementById('btn-motion'),
       btnAnimSpeed: document.getElementById('btn-anim-speed'),
       btnMusic: document.getElementById('btn-music'),
@@ -187,6 +192,7 @@ export class UIManager {
       btnLang: document.getElementById('btn-lang'),
       swapBtn: document.getElementById('btn-swap-ball'),
       polarityBtn: document.getElementById('btn-polarity'),
+      mergeShakeBtn: document.getElementById('btn-merge-shake'),
       hintReplayBtn: document.getElementById('btn-hint-replay'),
       levelIntroBanner: document.getElementById('level-intro-banner'),
       levelIntroText: document.getElementById('level-intro-text'),
@@ -208,6 +214,8 @@ export class UIManager {
       specialEquippedBanner: document.getElementById('special-equipped-banner'),
       cancelAimBanner: document.getElementById('cancel-aim-banner'),
       modalPlay: document.getElementById('modal-play'),
+      modalBilliard: document.getElementById('modal-billiard'),
+      btnModeBilliard: document.getElementById('btn-mode-billiard'),
       btnClosePlay: document.getElementById('btn-close-play'),
       playHubHint: document.getElementById('play-hub-hint'),
       btnCampaignContinue: document.getElementById('btn-campaign-continue'),
@@ -325,6 +333,7 @@ export class UIManager {
       btnSettingsPause: document.getElementById('btn-settings-pause'),
       btnSettings: document.getElementById('btn-settings'),
       modalSettings: document.getElementById('modal-settings'),
+      modalProgressImport: document.getElementById('modal-progress-import'),
       btnCloseSettings: document.getElementById('btn-close-settings'),
       btnInstall: document.getElementById('btn-install'),
       installIosHint: document.getElementById('install-ios-hint'),
@@ -565,6 +574,9 @@ export class UIManager {
     this.updateContrastButton();
     this.updatePatternsButton();
     this.setupTiltControl();
+    this.setupMergeShakeGesture();
+    if (this.billiardConfig) this.billiard = new BilliardView(this, this.billiardConfig);
+    if (this.elements.modalProgressImport) this.progressBackup = new ProgressBackupView(this);
     this.updateMotionButton();
     this.updateAnimSpeedButton();
     this.setupPulseControls();
@@ -595,6 +607,8 @@ export class UIManager {
       this.updateResetHintsFeedback();
       this.updateShareButtonLabel();
       this.updateConfirmButtonLabel();
+      this.billiard?.refresh();
+      this.progressBackup?.refresh();
       this.refreshVersusLanguage();
       this.refreshVersusLocalLanguage();
       this.refreshStatsIfOpen();
@@ -916,6 +930,7 @@ export class UIManager {
 
   syncDrawerState() {
     const isOpen = this.isDrawerOpen;
+    this.syncMergeShakeGesture?.();
     if (this.elements.appShell) {
       this.elements.appShell.classList.toggle(DRAWER_OPEN_CLASS, isOpen);
     }
@@ -1303,7 +1318,7 @@ export class UIManager {
     if (engine.mode === GAME_MODES.MERGE) {
       return t('modals.gameOver.stats.mergeSummary', {
         tier: formatNumber(engine.mergeBestTier || 1),
-        best: formatNumber(Math.max(engine.mergeBestTier || 1, this.storageManager.getMergeBestTier?.() || 1)),
+        best: formatNumber(Math.max(engine.mergeBestTier || 1, this.storageManager.getMergeBestTier?.(engine.getMergeShakeRemaining() !== null) || 1)),
         coins: formatNumber(summary?.earnedCoins || 0)
       });
     }

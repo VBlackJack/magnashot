@@ -128,6 +128,20 @@
     ]
   },
   "merge": {
+    "shake": {
+      "queryParam": "mergeShake",
+      "queryValue": "1",
+      "keyCode": "KeyG",
+      "rechargeDrops": 4,
+      "maxImpulsePxPerSec": 120,
+      "gesture": {
+        "peakAcceleration": 10,
+        "quietAcceleration": 4,
+        "reversalWindowMs": 280,
+        "quietWindowMs": 240,
+        "gravitySmoothing": 0.85
+      }
+    },
     "launcherY": 82,
     "dropStepPx": 14,
     "nextOffsetX": 156,

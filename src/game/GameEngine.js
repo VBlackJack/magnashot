@@ -87,7 +87,8 @@ export class GameEngine {
     storageManager,
     onStateChange,
     role = ENGINE_ROLES.MAIN,
-    seedSource = null
+    seedSource = null,
+    mergeShakePrototype = false
   }) {
     this.gameConfig = gameConfig;
     this.physicsConfig = physicsConfig;
@@ -96,6 +97,7 @@ export class GameEngine {
     this.levelsConfig = levelsConfig;
     this.fluxConfig = fluxConfig;
     this.modesConfig = resolveModesConfig(modesConfig);
+    this.mergeShakePrototype = mergeShakePrototype;
     /** Idle settle margins of the generated Flux shapes (configs/fluxShapeTuning.json); null draws every shape. */
     this.fluxShapeTuning = fluxShapeTuning;
     this.levelCatalog = new LevelCatalog({
@@ -428,6 +430,17 @@ export class GameEngine {
     return this.state === GAME_STATES.PLAYING;
   }
 
+  getMergeShakeRemaining() {
+    return this.mode === GAME_MODES.MERGE ? this.modeState?.shakeRemaining ?? null : null;
+  }
+
+  tryMergeShake() {
+    if (this.getMergeShakeRemaining() !== 0 || !this.isRunPlaying()) {
+      return false;
+    }
+    return this.getModeBehavior().shake(this);
+  }
+
   /**
    * True during the short pause after a campaign victory in which the last matches,
    * falling balls and particles keep animating before the victory modal is shown.
@@ -506,7 +519,7 @@ export class GameEngine {
     } else if (this.mode === GAME_MODES.CONVOY) {
       best = storage.getConvoyBestWave?.() || 0;
     } else if (this.mode === GAME_MODES.MERGE) {
-      best = storage.getMergeHighScore?.() || 0;
+      best = storage.getMergeHighScore?.(this.getMergeShakeRemaining() !== null) || 0;
     }
     this.runBestBaseline = { metric: measured.metric, best };
     return this.runBestBaseline;
@@ -627,8 +640,11 @@ export class GameEngine {
       this.storageManager.setConvoyRecord?.(this.score, this.waveCount);
       this.unlockAchievementTiers('convoyWaves', this.waveCount);
     } else if (this.mode === GAME_MODES.MERGE) {
-      this.storageManager.setMergeRecord?.(this.score, this.mergeBestTier);
-      this.unlockAchievementTiers('mergeTiers', this.mergeBestTier);
+      const prototype = this.getMergeShakeRemaining() !== null;
+      this.storageManager.setMergeRecord?.(this.score, this.mergeBestTier, prototype);
+      if (!prototype) {
+        this.unlockAchievementTiers('mergeTiers', this.mergeBestTier);
+      }
     }
   }
 

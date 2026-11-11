@@ -16,6 +16,7 @@
 
 import { configRegistry } from './core/ConfigRegistry.js';
 import { i18n, t, resolveInitialLocale } from './core/I18n.js';
+import { recoverProgressImport } from './core/ProgressBackup.js';
 import { StorageManager } from './core/StorageManager.js';
 import { GamepadInput } from './core/GamepadInput.js';
 import { AudioManager } from './core/AudioManager.js';
@@ -47,6 +48,14 @@ class Application {
       const fluxConfig = configRegistry.get('flux');
       const modesConfig = configRegistry.get('modes');
 
+      let storage;
+      try {
+        storage = window.localStorage;
+      } catch {
+        // A browser can block storage entirely; the game already supports an in-memory profile.
+        storage = null;
+      }
+      if (storage) recoverProgressImport(storage, gameConfig.storage);
       const storageManager = new StorageManager();
       storageManager.init();
 
@@ -80,6 +89,8 @@ class Application {
         fluxShapeTuning,
         fluxConfig,
         modesConfig,
+        mergeShakePrototype: new URLSearchParams(window.location.search).get(modesConfig.merge.shake.queryParam)
+          === modesConfig.merge.shake.queryValue,
         audioManager,
         storageManager,
         onStateChange: (eng, extra) => {
@@ -100,6 +111,7 @@ class Application {
         audioManager,
         gameConfig,
         ballsConfig,
+        billiardConfig: configRegistry.get('billiard'),
         versusConfigs: {
           gameConfig,
           physicsConfig,
@@ -136,6 +148,7 @@ class Application {
       // High scores are only written at run end; also flush them when the page is left mid-run.
       // The run itself is stored too: mobile browsers discard hidden tabs without warning.
       const persistOnLeave = () => {
+        if (uiManager.isRestoringProgress) return;
         engine.persistRunHighScore();
         engine.flushPlayerStats();
         engine.saveRunSnapshot();

@@ -325,6 +325,8 @@ export const uiModalMethods = {
   /** Dialogs opened from the menu over a run, which they pause until they close. */
   getOverlayModals() {
     return [
+      this.elements.modalProgressImport,
+      this.elements.modalBilliard,
       this.elements.modalCalibrate,
       this.elements.modalVersusLocal,
       this.elements.modalVersusTiers,
@@ -408,6 +410,7 @@ export const uiModalMethods = {
   },
 
   syncModalInertState() {
+    this.syncMergeShakeGesture?.();
     const anyOpen = this.isAnyModalOpen();
     // The versus screen is a layer of its own over the shell: the shell stays out of reach while it is open.
     const isShellHeld = anyOpen || Boolean(this.versus);

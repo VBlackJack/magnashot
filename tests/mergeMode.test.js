@@ -20,6 +20,8 @@ import fs from 'node:fs';
 
 import { configRegistry } from '../src/core/ConfigRegistry.js';
 import { i18n } from '../src/core/I18n.js';
+import { SeededRandom } from '../src/core/SeededRandom.js';
+import { createShakeDetector } from '../src/ui/UISettingsControls.js';
 import { StorageManager } from '../src/core/StorageManager.js';
 import { applyWorldGeometry } from '../src/core/WorldGeometry.js';
 import {
@@ -60,7 +62,7 @@ i18n.dictionaries.set('en', loadJson('./locales/en.json'));
 i18n.dictionaries.set('fr', loadJson('./locales/fr.json'));
 i18n.currentLocale = 'en';
 
-const createEngine = () => {
+const createEngine = (mergeShakePrototype = false) => {
   const storageManager = new StorageManager();
   storageManager.init();
   return new GameEngine({
@@ -73,6 +75,7 @@ const createEngine = () => {
     campaignTuning,
     fluxConfig,
     modesConfig,
+    mergeShakePrototype,
     audioManager: { playEffect: () => {}, stopAll: () => {}, isMuted: () => true, setMuted: () => {} },
     storageManager,
     onStateChange: () => {}
@@ -217,4 +220,125 @@ test('Merge Basin drops spheres with initial velocity, scales fine vs coarse rai
   engine.shoot();
   assert.equal(engine.physicsWorld.balls.length, 1);
   assert.ok(engine.physicsWorld.balls[0].vy > 0, 'dropped sphere starts with downward velocity');
+});
+
+test('An unused shake leaves a seeded game identical through overflow', () => {
+  const play = (prototype) => {
+    const engine = createEngine(prototype);
+    const random = new SeededRandom('merge-shake-comparison');
+    engine.random = () => random.next();
+    engine.startMergeMode();
+    const timeline = [];
+
+    for (let drop = 0; drop < 24 && engine.isRunPlaying(); drop += 1) {
+      engine.updateAim(modesConfig.merge.basinLeftX, modesConfig.merge.launcherY);
+      engine.shoot();
+      for (let frame = 0; frame < 25 && engine.isRunPlaying(); frame += 1) {
+        engine.update();
+        timeline.push({
+          score: engine.score,
+          merges: engine.modeState.mergesCount,
+          bestTier: engine.mergeBestTier,
+          overflow: engine.modeState.maxOverflowRatio,
+          balls: engine.physicsWorld.balls.map(({ x, y, vx, vy, mergeTier }) => [x, y, vx, vy, mergeTier])
+        });
+      }
+    }
+    assert.ok(engine.modeState.mergesCount > 0);
+    const cfg = modesConfig.merge;
+    const tier = cfg.tiers.at(-1);
+    const overflow = new Ball({ x: cfg.basinRightX - tier.radius, y: cfg.launcherY, radius: tier.radius, colorId: tier.id });
+    overflow.mergeTier = tier.tier;
+    overflow.mergeOverflowSec = cfg.overflowGraceSec - 0.05;
+    engine.physicsWorld.addBall(overflow);
+    let overflowFrames = 0;
+    while (overflowFrames < 20 && engine.isRunPlaying()) {
+      engine.update();
+      overflowFrames += 1;
+    }
+    assert.equal(engine.gameOverSummary?.reasonKey, GAME_OVER_REASONS.BASIN_OVERFLOW);
+    timeline.push({ overflowFrames });
+    assert.equal(engine.getMergeShakeRemaining(), prototype ? 0 : null);
+    return timeline;
+  };
+
+  assert.deepEqual(play(true), play(false));
+});
+
+test('Only successful drops charge the shake and only one input consumes it', () => {
+  const engine = createEngine(true);
+  engine.startMergeMode();
+  const cfg = modesConfig.merge.shake;
+
+  for (let i = 0; i < cfg.rechargeDrops; i += 1) {
+    engine.modeState.dropCooldownSec = 0;
+    engine.shoot();
+    engine.shoot(); // The second attempt hits the drop cooldown.
+    assert.equal(engine.getMergeShakeRemaining(), cfg.rechargeDrops - i - 1);
+  }
+  const balls = engine.physicsWorld.balls;
+  const before = balls.map(({ x, y, vx, vy, mergeOverflowSec }) => [x, y, vx, vy, mergeOverflowSec]);
+  engine.togglePause();
+  assert.equal(engine.tryMergeShake(), false);
+  engine.togglePause();
+  assert.equal(engine.tryMergeShake(), true);
+  assert.equal(engine.tryMergeShake(), false);
+  assert.equal(engine.getMergeShakeRemaining(), cfg.rechargeDrops);
+  balls.forEach((ball, i) => {
+    const [x, y, vx, vy, overflow] = before[i];
+    assert.deepEqual([ball.x, ball.y, ball.vy, ball.mergeOverflowSec], [x, y, vy, overflow]);
+    assert.ok(Math.abs(Math.abs(ball.vx - vx) - cfg.maxImpulsePxPerSec * modesConfig.merge.tiers[0].radius / ball.radius) < 1e-9);
+  });
+
+  const restored = createEngine();
+  restored.storageManager = engine.storageManager;
+  assert.equal(restored.restoreSavedRun(), true);
+  assert.equal(restored.getMergeShakeRemaining(), cfg.rechargeDrops);
+  assert.equal(restored.tryMergeShake(), false);
+  assert.deepEqual(restored.physicsWorld.balls.map((b) => b.vx), balls.map((b) => b.vx));
+});
+
+test('A legacy save stays in the baseline and the two variants write independent records', () => {
+  const legacy = createEngine();
+  legacy.startMergeMode();
+  legacy.shoot();
+  legacy.score = 45;
+  legacy.mergeBestTier = 3;
+  legacy.saveRunSnapshot();
+  legacy.persistRunHighScore();
+
+  const prototype = createEngine(true);
+  prototype.storageManager = legacy.storageManager;
+  assert.equal(prototype.restoreSavedRun(), true);
+  assert.equal(prototype.getMergeShakeRemaining(), null);
+  prototype.startMergeMode();
+  prototype.score = 100;
+  prototype.mergeBestTier = 4;
+  prototype.persistRunHighScore();
+
+  assert.equal(legacy.storageManager.getMergeHighScore(), 45);
+  assert.equal(legacy.storageManager.getMergeBestTier(), 3);
+  assert.equal(legacy.storageManager.getMergeHighScore(true), 100);
+  assert.equal(legacy.storageManager.getMergeBestTier(true), 4);
+});
+
+test('Shake motion rejects slow tilt and isolated spikes, then latches until quiet', () => {
+  const cfg = modesConfig.merge.shake.gesture;
+  const detect = createShakeDetector(cfg);
+  const peak = cfg.peakAcceleration * 2;
+  const read = (timeStamp, x, y = 0) => detect({ timeStamp, acceleration: { x, y } });
+
+  for (let i = 0; i <= 20; i += 1) {
+    assert.equal(detect({ timeStamp: i * 20, accelerationIncludingGravity: { x: i / 2, y: 0 } }), false);
+  }
+  assert.equal(read(500, peak), false);
+  assert.equal(read(500 + cfg.reversalWindowMs + 1, -peak), false);
+  assert.equal(read(1000, 0, peak), false);
+  assert.equal(read(1050, 0, -peak), true);
+  assert.equal(read(1100, 0, peak), false);
+  assert.equal(read(1150, 0, -peak), false);
+  assert.equal(read(1200, 0), false);
+  assert.equal(read(1200 + cfg.quietWindowMs, 0), false);
+  assert.equal(read(1500, peak), false);
+  assert.equal(read(1550, -peak), true);
 });
