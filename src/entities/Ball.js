@@ -22,6 +22,8 @@ export class Ball {
   constructor({
     x,
     y,
+    vx = 0,
+    vy = 0,
     radius,
     colorId,
     specialType = null,
@@ -40,8 +42,8 @@ export class Ball {
     this.y = y;
     this.prevX = x;
     this.prevY = y;
-    this.vx = 0;
-    this.vy = 0;
+    this.vx = vx;
+    this.vy = vy;
     this.radius = radius;
     // Drawing scale of the impact wave; never read by the physics.
     this.impactScale = 1;

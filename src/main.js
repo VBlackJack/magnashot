@@ -45,6 +45,7 @@ class Application {
       const campaignTuning = configRegistry.get('campaign_tuning');
       const fluxShapeTuning = configRegistry.get('flux_shape_tuning');
       const fluxConfig = configRegistry.get('flux');
+      const modesConfig = configRegistry.get('modes');
 
       const storageManager = new StorageManager();
       storageManager.init();
@@ -62,7 +63,7 @@ class Application {
       });
 
       const canvas = document.getElementById('game-canvas');
-      const renderer = new Renderer(canvas, gameConfig, ballsConfig, obstaclesConfig);
+      const renderer = new Renderer(canvas, gameConfig, ballsConfig, obstaclesConfig, { modesConfig });
       renderer.setHighContrast(storageManager.getHighContrast());
       renderer.setColorPatterns(storageManager.getColorPatterns());
       renderer.setBallStyle(storageManager.getActiveBallStyle());
@@ -78,6 +79,7 @@ class Application {
         campaignTuning,
         fluxShapeTuning,
         fluxConfig,
+        modesConfig,
         audioManager,
         storageManager,
         onStateChange: (eng, extra) => {
@@ -107,7 +109,8 @@ class Application {
           campaignConfig,
           campaignTuning,
           fluxShapeTuning,
-          fluxConfig
+          fluxConfig,
+          modesConfig
         }
       });
       uiManager.init();

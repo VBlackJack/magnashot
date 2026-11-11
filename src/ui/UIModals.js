@@ -62,9 +62,15 @@ export const uiModalMethods = {
   requestDestructiveAction(actionCallback, confirmLabelResolver = null, { always = false } = {}) {
     // `always` guards a run that holds progress before the first shot (a restored Flux run between shapes).
     // Past the first Flux shape the run holds cleared shapes and perks, whether or not a shot was fired.
-    const holdsFluxProgress = this.engine.mode === GAME_MODES.FLUX && this.engine.fluxStage > 1;
+    const holdsStageProgress =
+      (this.engine.mode === GAME_MODES.FLUX && this.engine.fluxStage > 1) ||
+      (this.engine.mode === GAME_MODES.PINBALL && this.engine.pinballStage > 1) ||
+      ((this.engine.mode === GAME_MODES.CONVOY ||
+        this.engine.mode === GAME_MODES.HEX_GRID ||
+        this.engine.mode === GAME_MODES.ORBITAL) &&
+        this.engine.waveCount > 1);
     const runHasBalls = this.isRunActive() && this.engine.physicsWorld.balls.length > 0;
-    const isMidRound = runHasBalls && (always || holdsFluxProgress || this.engine.hasFiredInRound);
+    const isMidRound = runHasBalls && (always || holdsStageProgress || this.engine.hasFiredInRound);
 
     if (!isMidRound || !this.elements.modalConfirm) {
       actionCallback();

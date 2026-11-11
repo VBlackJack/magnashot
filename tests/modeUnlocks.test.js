@@ -93,7 +93,12 @@ test('every gated mode follows its threshold exactly', () => {
     [GAME_MODES.BLITZ]: 7,
     [GAME_MODES.FLUX]: 8,
     [GAME_MODES.CASCADE]: 10,
-    [GAME_MODES.BOSS_RUSH]: 12
+    [GAME_MODES.BOSS_RUSH]: 12,
+    [GAME_MODES.HEX_GRID]: 13,
+    [GAME_MODES.PINBALL]: 14,
+    [GAME_MODES.ORBITAL]: 15,
+    [GAME_MODES.CONVOY]: 16,
+    [GAME_MODES.MERGE]: 17
   });
 });
 
@@ -212,10 +217,39 @@ test('storage: a mode with a record of its own is open without a stored unlock',
 test('classic: unlocks at campaign level 4, right after Survival, and is announced as introduced', () => {
   assert.equal(cfg.order.indexOf(CLASSIC_MODE), cfg.order.indexOf(GAME_MODES.ENDLESS) + 1);
   assert.equal(cfg.campaignLevelCleared[CLASSIC_MODE], 4);
-  assert.deepEqual(cfg.introduced, { [CLASSIC_MODE]: 4, [GAME_MODES.VERSUS]: 6 });
+  assert.deepEqual(cfg.introduced, {
+    [CLASSIC_MODE]: 4,
+    [GAME_MODES.VERSUS]: 6,
+    [GAME_MODES.HEX_GRID]: 13,
+    [GAME_MODES.PINBALL]: 14,
+    [GAME_MODES.ORBITAL]: 15,
+    [GAME_MODES.CONVOY]: 16,
+    [GAME_MODES.MERGE]: 17
+  });
   assert.deepEqual(cfg.recordKeys[CLASSIC_MODE], ['classicHighScore', 'classicBestStage']);
   assert.equal(resolveModeAccess({}, 3, cfg)[CLASSIC_MODE].unlocked, false);
   assert.equal(resolveModeAccess({}, 4, cfg)[CLASSIC_MODE].unlocked, true);
+});
+
+test('arcade behavior modes: records only ever rise and a record opens each mode', () => {
+  withManager(null, (manager) => {
+    manager.setHexGridRecord(1200, 4);
+    manager.setPinballRecord(1500, 3);
+    manager.setOrbitalRecord(1800, 5);
+    manager.setConvoyRecord(2100, 6);
+    manager.setMergeRecord(2400, 7);
+    assert.equal(manager.getHexGridBestWave(), 4);
+    assert.equal(manager.getPinballBestStage(), 3);
+    assert.equal(manager.getOrbitalBestWave(), 5);
+    assert.equal(manager.getConvoyBestWave(), 6);
+    assert.equal(manager.getMergeBestTier(), 7);
+    const access = manager.getModeAccess();
+    assert.equal(access[GAME_MODES.HEX_GRID].unlocked, true);
+    assert.equal(access[GAME_MODES.PINBALL].unlocked, true);
+    assert.equal(access[GAME_MODES.ORBITAL].unlocked, true);
+    assert.equal(access[GAME_MODES.CONVOY].unlocked, true);
+    assert.equal(access[GAME_MODES.MERGE].unlocked, true);
+  });
 });
 
 test('classic: records only ever rise and a record opens the mode', () => {

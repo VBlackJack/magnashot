@@ -313,6 +313,61 @@
           "arp": 9,
           "hat": 7
         }
+      },
+      "hex_grid": {
+        "bpm": 94,
+        "rootHz": 146.83,
+        "scale": [0, 2, 3, 5, 7, 9, 10],
+        "progression": [0, 4, 2, 5],
+        "euclid": {
+          "bass": 4,
+          "arp": 8,
+          "hat": 6
+        }
+      },
+      "pinball": {
+        "bpm": 116,
+        "rootHz": 164.81,
+        "scale": [0, 2, 4, 5, 7, 9, 10],
+        "progression": [0, 4, 5, 3],
+        "euclid": {
+          "bass": 6,
+          "arp": 9,
+          "hat": 8
+        }
+      },
+      "orbital": {
+        "bpm": 108,
+        "rootHz": 110,
+        "scale": [0, 2, 4, 6, 7, 9, 11],
+        "progression": [0, 3, 5, 4],
+        "euclid": {
+          "bass": 5,
+          "arp": 7,
+          "hat": 6
+        }
+      },
+      "convoy": {
+        "bpm": 126,
+        "rootHz": 138.59,
+        "scale": [0, 2, 3, 5, 7, 8, 10],
+        "progression": [0, 5, 3, 6],
+        "euclid": {
+          "bass": 6,
+          "arp": 10,
+          "hat": 8
+        }
+      },
+      "merge": {
+        "bpm": 88,
+        "rootHz": 130.81,
+        "scale": [0, 2, 4, 7, 9],
+        "progression": [0, 2, 4, 1],
+        "euclid": {
+          "bass": 4,
+          "arp": 6,
+          "hat": 5
+        }
       }
     }
   }

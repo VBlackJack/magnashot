@@ -1476,6 +1476,111 @@
       "tier": "gold",
       "threshold": 10,
       "rewardCoins": 300
+    },
+    "hexGridWaves": {
+      "id": "hexGridWaves",
+      "tierOf": "hexGridWaves",
+      "tier": "bronze",
+      "threshold": 5,
+      "rewardCoins": 60
+    },
+    "hexGridWavesSilver": {
+      "id": "hexGridWavesSilver",
+      "tierOf": "hexGridWaves",
+      "tier": "silver",
+      "threshold": 10,
+      "rewardCoins": 120
+    },
+    "hexGridWavesGold": {
+      "id": "hexGridWavesGold",
+      "tierOf": "hexGridWaves",
+      "tier": "gold",
+      "threshold": 20,
+      "rewardCoins": 220
+    },
+    "orbitalWaves": {
+      "id": "orbitalWaves",
+      "tierOf": "orbitalWaves",
+      "tier": "bronze",
+      "threshold": 5,
+      "rewardCoins": 60
+    },
+    "orbitalWavesSilver": {
+      "id": "orbitalWavesSilver",
+      "tierOf": "orbitalWaves",
+      "tier": "silver",
+      "threshold": 10,
+      "rewardCoins": 120
+    },
+    "orbitalWavesGold": {
+      "id": "orbitalWavesGold",
+      "tierOf": "orbitalWaves",
+      "tier": "gold",
+      "threshold": 20,
+      "rewardCoins": 220
+    },
+    "pinballStages": {
+      "id": "pinballStages",
+      "tierOf": "pinballStages",
+      "tier": "bronze",
+      "threshold": 3,
+      "rewardCoins": 60
+    },
+    "pinballStagesSilver": {
+      "id": "pinballStagesSilver",
+      "tierOf": "pinballStages",
+      "tier": "silver",
+      "threshold": 7,
+      "rewardCoins": 120
+    },
+    "pinballStagesGold": {
+      "id": "pinballStagesGold",
+      "tierOf": "pinballStages",
+      "tier": "gold",
+      "threshold": 12,
+      "rewardCoins": 220
+    },
+    "convoyWaves": {
+      "id": "convoyWaves",
+      "tierOf": "convoyWaves",
+      "tier": "bronze",
+      "threshold": 4,
+      "rewardCoins": 60
+    },
+    "convoyWavesSilver": {
+      "id": "convoyWavesSilver",
+      "tierOf": "convoyWaves",
+      "tier": "silver",
+      "threshold": 8,
+      "rewardCoins": 120
+    },
+    "convoyWavesGold": {
+      "id": "convoyWavesGold",
+      "tierOf": "convoyWaves",
+      "tier": "gold",
+      "threshold": 15,
+      "rewardCoins": 220
+    },
+    "mergeTiers": {
+      "id": "mergeTiers",
+      "tierOf": "mergeTiers",
+      "tier": "bronze",
+      "threshold": 6,
+      "rewardCoins": 60
+    },
+    "mergeTiersSilver": {
+      "id": "mergeTiersSilver",
+      "tierOf": "mergeTiers",
+      "tier": "silver",
+      "threshold": 8,
+      "rewardCoins": 120
+    },
+    "mergeTiersGold": {
+      "id": "mergeTiersGold",
+      "tierOf": "mergeTiers",
+      "tier": "gold",
+      "threshold": 10,
+      "rewardCoins": 240
     }
   },
   "onboarding": {
@@ -1850,7 +1955,10 @@
     }
   },
   "modeUnlocks": {
-    "order": ["campaign", "daily", "endless", "classic", "versus", "puzzle", "blitz", "flux", "cascade", "boss_rush"],
+    "order": [
+      "campaign", "daily", "endless", "classic", "versus", "puzzle", "blitz", "flux", "cascade", "boss_rush",
+      "hex_grid", "pinball", "orbital", "convoy", "merge"
+    ],
     "always": ["campaign", "daily"],
     "campaignLevelCleared": {
       "endless": 3,
@@ -1860,7 +1968,12 @@
       "blitz": 7,
       "flux": 8,
       "cascade": 10,
-      "boss_rush": 12
+      "boss_rush": 12,
+      "hex_grid": 13,
+      "pinball": 14,
+      "orbital": 15,
+      "convoy": 16,
+      "merge": 17
     },
     "recordKeys": {
       "endless": ["endlessHighScore"],
@@ -1870,16 +1983,33 @@
       "flux": ["fluxHighScore", "fluxBestStage"],
       "cascade": ["cascadeHighScore"],
       "boss_rush": ["bossRushHighScore", "bossRushBestWave"],
-      "versus": ["versusRecords"]
+      "versus": ["versusRecords"],
+      "hex_grid": ["hexGridHighScore", "hexGridBestWave"],
+      "pinball": ["pinballHighScore", "pinballBestStage"],
+      "orbital": ["orbitalHighScore", "orbitalBestWave"],
+      "convoy": ["convoyHighScore", "convoyBestWave"],
+      "merge": ["mergeHighScore", "mergeBestTier"]
     },
-    "introduced": { "classic": 4, "versus": 6 },
+    "introduced": {
+      "classic": 4,
+      "versus": 6,
+      "hex_grid": 13,
+      "pinball": 14,
+      "orbital": 15,
+      "convoy": 16,
+      "merge": 17
+    },
     "stateNew": "new",
     "stateSeen": "seen",
     "grandfather": {
       "progressKeys": [
         "levelStats", "endlessHighScore", "fluxHighScore", "fluxBestStage", "blitzHighScore",
         "bossRushHighScore", "bossRushBestWave", "cascadeHighScore", "puzzleHighScore",
-        "puzzleBestStage", "classicHighScore", "classicBestStage", "versusRecords", "dailyBest", "dailyLastPlayedDate", "coins", "upgrades",
+        "puzzleBestStage", "classicHighScore", "classicBestStage", "versusRecords",
+        "hexGridHighScore", "hexGridBestWave", "pinballHighScore", "pinballBestStage",
+        "orbitalHighScore", "orbitalBestWave", "convoyHighScore", "convoyBestWave",
+        "mergeHighScore", "mergeBestTier",
+        "dailyBest", "dailyLastPlayedDate", "coins", "upgrades",
         "achievements", "achievementRecords", "unlockedBallStyles", "runSnapshot", "discoveries"
       ],
       "emptyValues": ["", "0", "{}", "[]", "null", "false"],
@@ -2003,6 +2133,16 @@
       "puzzleStageStats": "puzzle_stage_stats",
       "classicHighScore": "classic_high_score",
       "classicBestStage": "classic_best_stage",
+      "hexGridHighScore": "hex_grid_high_score",
+      "hexGridBestWave": "hex_grid_best_wave",
+      "orbitalHighScore": "orbital_high_score",
+      "orbitalBestWave": "orbital_best_wave",
+      "pinballHighScore": "pinball_high_score",
+      "pinballBestStage": "pinball_best_stage",
+      "convoyHighScore": "convoy_high_score",
+      "convoyBestWave": "convoy_best_wave",
+      "mergeHighScore": "merge_high_score",
+      "mergeBestTier": "merge_best_tier",
       "versusRecords": "versus_records",
       "versusLocalMatches": "versus_local_matches",
       "versusTutorialSeen": "versus_tutorial_seen",

@@ -296,7 +296,16 @@ const EXPECTED_PROTOTYPE_NAMES = [
   'getMusicIntensity',
   'getBeatState',
   'getPulseState',
-  'settleOvercharge'
+  'settleOvercharge',
+  'getModeBehavior',
+  'getLauncherSpec',
+  'recenterAim',
+  'isSpecialTypeAllowed',
+  'startHexGridMode',
+  'startOrbitalMode',
+  'startPinballMode',
+  'startConvoyMode',
+  'startMergeMode'
 ];
 
 test('GameEngine.prototype exposes exactly the same members after the module split', () => {

@@ -15,6 +15,7 @@
  */
 
 import { OBSTACLE_TYPES, SPECIAL_TYPES, CLUSTER_MODIFIERS, MATH_CONSTANTS, SEPARATION_FALLBACK_AXIS } from '../core/Constants.js';
+import { resolveModesConfig } from '../game/modes/ModeConfig.js';
 import { SpatialHashGrid } from './SpatialHashGrid.js';
 
 const NOT_FOUND_INDEX = -1;
@@ -39,13 +40,17 @@ export class PhysicsWorld {
    * @param {object} gameConfig - Canvas geometry and gameplay configuration.
    * @param {object} ballsConfig - Ball palette, special types, and modifiers configuration.
    */
-  constructor(physicsConfig, gameConfig, ballsConfig) {
+  constructor(physicsConfig, gameConfig, ballsConfig, modesConfig = null) {
     this.physicsConfig = physicsConfig;
     this.gameConfig = gameConfig;
     this.ballsConfig = ballsConfig;
+    this.modesConfig = resolveModesConfig(modesConfig);
     this.polarityMap = new Map();
     for (const c of ballsConfig.standardColors) {
       this.polarityMap.set(c.id, c.polarity || 0);
+    }
+    for (const tier of this.modesConfig.merge.tiers) {
+      this.polarityMap.set(tier.id, tier.polarity || 0);
     }
     this.balls = [];
     this.droppingBalls = [];
@@ -66,6 +71,14 @@ export class PhysicsWorld {
     this.rotorSpeedMultiplier = 1.0;
     this.allowTensionBreak = false;
     this.hasBrokenBondThisStep = false;
+    this.disableMagneticCurve = false;
+    this.projectileGravity = 0;
+    this.projectileLaunchSpeedOverride = 0;
+    this.disableBounceCap = false;
+    this.snapCeilingY = null;
+    this.skipClusterStep = false;
+    this.customProjectileStep = null;
+    this.customPivotDamping = null;
     this.randomSource = Math.random;
     const attractRange = physicsConfig.ball.radius * physicsConfig.magnetism.attractionRangeFactor;
     this.spatialGrid = new SpatialHashGrid(attractRange);
@@ -208,6 +221,14 @@ export class PhysicsWorld {
     this.rotorSpeedMultiplier = 1.0;
     this.allowTensionBreak = false;
     this.hasBrokenBondThisStep = false;
+    this.disableMagneticCurve = false;
+    this.projectileGravity = 0;
+    this.projectileLaunchSpeedOverride = 0;
+    this.disableBounceCap = false;
+    this.snapCeilingY = null;
+    this.skipClusterStep = false;
+    this.customProjectileStep = null;
+    this.customPivotDamping = null;
     this.aimCacheValid = false;
   }
 
@@ -389,6 +410,9 @@ export class PhysicsWorld {
    */
   accumulateGravityTorques(out) {
     out.clear();
+    if (this.gravityMultiplier === 0) {
+      return out;
+    }
     const sim = this.physicsConfig.simulation;
     const torqueFactor = sim.pivotGravityTorqueFactor * this.rotorSpeedMultiplier;
     const rootPivots = this.computeBallRootPivots();
@@ -508,15 +532,18 @@ export class PhysicsWorld {
     }
 
     this.applyGravityTorqueToPivots();
+    const pivotDamping = this.customPivotDamping ?? sim.pivotAngularDamping;
     for (const obstacle of this.obstacles) {
-      obstacle.update(sim.pivotAngularDamping);
+      obstacle.update(pivotDamping);
     }
 
     // The cluster runs every substep even once the shot has landed: the pivots above have
     // already turned by a full step, and the spheres they carry must follow them all the way.
     let hasLanded = false;
     for (let s = 0; s < substeps; s++) {
-      this.stepCluster(1 / substeps);
+      if (!this.skipClusterStep) {
+        this.stepCluster(1 / substeps);
+      }
       if (this.projectile && !hasLanded) {
         hasLanded = this.stepProjectile(1 / substeps, callbacks);
       }
@@ -624,7 +651,7 @@ export class PhysicsWorld {
         ball.vy += dy * sim.anchorStiffness * dt;
       } else {
         ball.vy += sim.clusterGravity * this.gravityMultiplier * dt;
-        ball.vx += sim.clusterGravity * this.tiltFactor * dt;
+        ball.vx += sim.clusterGravity * this.gravityMultiplier * this.tiltFactor * dt;
         if (fields.length > 0) {
           this.applyClusterFields(ball, fields, fieldScale);
         }
@@ -974,7 +1001,12 @@ export class PhysicsWorld {
       this.applyProjectileField(state, field.x, field.y, field.radius, field.force, dt);
     }
 
-    if (!isAnvil) {
+    if (!isAnvil && this.projectileGravity !== 0) {
+      state.vy += this.projectileGravity * dt;
+      this.clampProjectileSpeed(state);
+    }
+
+    if (!isAnvil && !this.disableMagneticCurve && !state.disableMagneticCurve) {
       const attractRange = r * mag.attractionRangeFactor;
       const attractRangeSq = attractRange * attractRange;
       const isFlipped = Boolean(state.isPolarityFlipped);
@@ -1020,7 +1052,7 @@ export class PhysicsWorld {
       }
     }
 
-    if (!isAnvil && state.y <= minWallY) {
+    if (!isAnvil && this.snapCeilingY === null && state.y <= minWallY) {
       state.y = minWallY;
       state.vy = Math.abs(state.vy) * ballCfg.wallRestitution;
       state.bounces++;
@@ -1226,6 +1258,13 @@ export class PhysicsWorld {
       return false;
     }
 
+    if (!isAnvil && typeof this.customProjectileStep === 'function') {
+      const handled = this.customProjectileStep(p, dt, callbacks);
+      if (handled !== null && handled !== undefined) {
+        return Boolean(handled);
+      }
+    }
+
     const snapDist = p.radius * sim.projectileSnapDistanceFactor;
     const snapIndex = this.findNearestSnapIndex(p.x, p.y, snapDist * snapDist);
     if (snapIndex !== NOT_FOUND_INDEX) {
@@ -1233,9 +1272,15 @@ export class PhysicsWorld {
       return true;
     }
 
+    if (this.snapCeilingY !== null && p.y <= this.snapCeilingY) {
+      p.y = this.snapCeilingY;
+      this.snapProjectile(p, null, callbacks);
+      return true;
+    }
+
     if (
       p.y > this.gameConfig.canvas.logicalHeight + p.radius * sim.outOfBoundsMarginFactor ||
-      p.bounces > sim.maxProjectileBounces ||
+      (!this.disableBounceCap && p.bounces > sim.maxProjectileBounces) ||
       this.isFlightExhausted(p)
     ) {
       this.projectile = null;
@@ -1274,7 +1319,7 @@ export class PhysicsWorld {
       hitTarget.vy += impactVy * sim.impactImpulseMultiplier;
 
       const rootPivot = this.findRootPivotForBall(hitTarget);
-      if (rootPivot) {
+      if (rootPivot && this.customPivotDamping === null) {
         const rx = hitTarget.x - rootPivot.x;
         const ry = hitTarget.y - rootPivot.y;
         const rotorMult = this.rotorSpeedMultiplier;
@@ -1302,7 +1347,7 @@ export class PhysicsWorld {
     }
 
     if (callbacks?.onProjectileSnapped) {
-      callbacks.onProjectileSnapped(projectile, hitTarget);
+      callbacks.onProjectileSnapped(projectile, hitTarget, impactVx, impactVy);
     }
   }
 
@@ -1541,6 +1586,10 @@ export class PhysicsWorld {
       this.balls.length,
       this.obstacles.length,
       this.boardPolarityInverted,
+      this.disableMagneticCurve,
+      this.projectileGravity,
+      this.projectileLaunchSpeedOverride,
+      this.snapCeilingY,
       this.projectileFields.length
     );
     for (const field of this.projectileFields) {
@@ -1760,7 +1809,9 @@ export class PhysicsWorld {
     const dt = 1 / substeps;
 
     const isAnvil = specialType === SPECIAL_TYPES.ANVIL;
-    const speed = isAnvil ? ballCfg.anvilSpeed : ballCfg.projectileSpeed;
+    const speed = isAnvil
+      ? ballCfg.anvilSpeed
+      : (this.projectileLaunchSpeedOverride > 0 ? this.projectileLaunchSpeedOverride : ballCfg.projectileSpeed);
     const snapDist = r * sim.projectileSnapDistanceFactor;
     const snapDistSq = snapDist * snapDist;
     const targetDist = r * sim.bondRestDistanceFactor;
@@ -1833,6 +1884,13 @@ export class PhysicsWorld {
           );
           landingX = landing.x;
           landingY = landing.y;
+          break;
+        }
+        if (this.snapCeilingY !== null && state.y <= this.snapCeilingY) {
+          landingY = this.snapCeilingY;
+          break;
+        }
+        if (state.vy > 0 && state.y > canvasCfg.logicalHeight + r) {
           break;
         }
       }

@@ -24,7 +24,8 @@ export const CONFIG_PATHS = Object.freeze({
   CAMPAIGN_TUNING: './configs/campaignTuning.json',
   AUDIO: './configs/audio.json',
   FLUX: './configs/flux.json',
-  FLUX_SHAPE_TUNING: './configs/fluxShapeTuning.json'
+  FLUX_SHAPE_TUNING: './configs/fluxShapeTuning.json',
+  MODES: './configs/modes.json'
 });
 
 /**
@@ -48,7 +49,12 @@ export const GAME_MODES = Object.freeze({
   BOSS_RUSH: 'boss_rush',
   CASCADE: 'cascade',
   CLASSIC: 'classic',
-  VERSUS: 'versus'
+  VERSUS: 'versus',
+  HEX_GRID: 'hex_grid',
+  ORBITAL: 'orbital',
+  PINBALL: 'pinball',
+  CONVOY: 'convoy',
+  MERGE: 'merge'
 });
 
 export const OBJECTIVE_TYPES = Object.freeze({
@@ -85,7 +91,17 @@ export const GAME_STATES = Object.freeze({
 export const GAME_OVER_REASONS = Object.freeze({
   OUT_OF_SHOTS: 'outOfShots',
   LINE_CROSSED: 'lineCrossed',
-  TIME_UP: 'timeUp'
+  TIME_UP: 'timeUp',
+  RING_BREACHED: 'ringBreached',
+  VORTEX_REACHED: 'vortexReached',
+  BASIN_OVERFLOW: 'basinOverflow'
+});
+
+export const LAUNCHER_POSTURES = Object.freeze({
+  UPWARD: 'upward',
+  DOWNWARD: 'downward',
+  OMNI_360: 'omni360',
+  DROP_RAIL: 'dropRail'
 });
 
 /** How the player is currently driving the game; selects touch or mouse/keyboard hints. */
@@ -113,6 +129,13 @@ export const SPECIAL_TYPES_ORDER = Object.freeze([
   SPECIAL_TYPES.FREEZE,
   SPECIAL_TYPES.ROCKET,
   SPECIAL_TYPES.BRUSH
+]);
+
+export const PINBALL_ALLOWED_SPECIALS = Object.freeze([
+  SPECIAL_TYPES.BOMB,
+  SPECIAL_TYPES.LIGHTNING,
+  SPECIAL_TYPES.ANVIL,
+  SPECIAL_TYPES.ROCKET
 ]);
 
 export const BALL_STYLES = Object.freeze({

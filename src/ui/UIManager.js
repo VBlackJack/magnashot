@@ -228,6 +228,11 @@ export class UIManager {
       btnModeBlitz: document.getElementById('btn-mode-blitz'),
       btnModeBossRush: document.getElementById('btn-mode-boss-rush'),
       btnModeCascade: document.getElementById('btn-mode-cascade'),
+      btnModeHexGrid: document.getElementById('btn-mode-hex-grid'),
+      btnModePinball: document.getElementById('btn-mode-pinball'),
+      btnModeOrbital: document.getElementById('btn-mode-orbital'),
+      btnModeConvoy: document.getElementById('btn-mode-convoy'),
+      btnModeMerge: document.getElementById('btn-mode-merge'),
       btnModeVersus: document.getElementById('btn-mode-versus'),
       arcadeBestEndless: document.getElementById('arcade-best-endless'),
       arcadeBestFlux: document.getElementById('arcade-best-flux'),
@@ -236,6 +241,11 @@ export class UIManager {
       arcadeBestBlitz: document.getElementById('arcade-best-blitz'),
       arcadeBestBossRush: document.getElementById('arcade-best-boss-rush'),
       arcadeBestCascade: document.getElementById('arcade-best-cascade'),
+      arcadeBestHexGrid: document.getElementById('arcade-best-hex-grid'),
+      arcadeBestPinball: document.getElementById('arcade-best-pinball'),
+      arcadeBestOrbital: document.getElementById('arcade-best-orbital'),
+      arcadeBestConvoy: document.getElementById('arcade-best-convoy'),
+      arcadeBestMerge: document.getElementById('arcade-best-merge'),
       arcadeBestVersus: document.getElementById('arcade-best-versus'),
       puzzleStagesStrip: document.getElementById('puzzle-stages-strip'),
       levelsStarsSummary: document.getElementById('levels-stars-summary'),
@@ -785,6 +795,11 @@ export class UIManager {
     const holdReason = ammoBlockKey ? t(ammoBlockKey) : '';
     for (const btn of buttons) {
       const type = btn.dataset.specialType;
+      const isAllowed = engine.isSpecialTypeAllowed?.(type) !== false;
+      btn.classList.toggle('hidden', !isAllowed);
+      if (!isAllowed) {
+        continue;
+      }
       const count = engine.specialInventory[type] || 0;
       const isEquipped = Boolean(engine.currentBall && engine.currentBall.specialType === type);
       const isEmpty = count <= 0 && !isEquipped;
@@ -1121,17 +1136,17 @@ export class UIManager {
     return this.isRunOpenToAmmo() && this.engine.canBuySpecialAmmo?.() !== false;
   }
 
-  /** True when the run sells special ammo at all (active, not Puzzle), whatever its state right now. */
+  /** True when the run sells special ammo at all (active, not Puzzle, and specials are offered), whatever its state right now. */
   isRunOpenToAmmo() {
-    return this.isRunActive() && this.engine.mode !== GAME_MODES.PUZZLE;
+    return this.isRunActive() && this.engine.mode !== GAME_MODES.PUZZLE && this.engine.offersSpecialBalls?.() !== false;
   }
 
   /**
    * i18n key explaining why special ammo cannot be bought right now, or null when the run is
-   * simply not open to ammo (no run, Puzzle) or the purchase is allowed.
+   * simply not open to ammo (no run, Puzzle, purist) or the purchase is allowed.
    */
   getSpecialAmmoBlockReasonKey() {
-    if (!this.isRunActive() || this.engine.mode === GAME_MODES.PUZZLE) {
+    if (!this.isRunOpenToAmmo()) {
       return null;
     }
     const reason = this.engine.getSpecialAmmoBlockReason?.();
@@ -1278,11 +1293,28 @@ export class UIManager {
         total: formatNumber(Math.max(1, this.gameConfig.puzzles?.length || 1))
       });
     }
+    if (engine.mode === GAME_MODES.PINBALL) {
+      return t('modals.gameOver.stats.pinballSummary', {
+        stage: formatNumber(engine.pinballStage || 1),
+        best: formatNumber(Math.max(engine.pinballStage || 1, this.storageManager.getPinballBestStage?.() || 1)),
+        coins: formatNumber(summary?.earnedCoins || 0)
+      });
+    }
+    if (engine.mode === GAME_MODES.MERGE) {
+      return t('modals.gameOver.stats.mergeSummary', {
+        tier: formatNumber(engine.mergeBestTier || 1),
+        best: formatNumber(Math.max(engine.mergeBestTier || 1, this.storageManager.getMergeBestTier?.() || 1)),
+        coins: formatNumber(summary?.earnedCoins || 0)
+      });
+    }
     if (
       engine.mode === GAME_MODES.ENDLESS ||
       engine.mode === GAME_MODES.DAILY ||
       engine.mode === GAME_MODES.BLITZ ||
-      engine.mode === GAME_MODES.CASCADE
+      engine.mode === GAME_MODES.CASCADE ||
+      engine.mode === GAME_MODES.HEX_GRID ||
+      engine.mode === GAME_MODES.ORBITAL ||
+      engine.mode === GAME_MODES.CONVOY
     ) {
       return t('modals.gameOver.stats.waveSummary', {
         wave: formatNumber(engine.waveCount),

@@ -101,7 +101,12 @@ function makeBoundUi({ access = {}, engineState = {} } = {}) {
     'startBlitzMode',
     'startBossRushMode',
     'startCascadeMode',
-    'startPuzzleMode'
+    'startPuzzleMode',
+    'startHexGridMode',
+    'startPinballMode',
+    'startOrbitalMode',
+    'startConvoyMode',
+    'startMergeMode'
   ]) {
     ui.engine[name] = (...args) => calls.push([`engine.${name}`, ...args]);
   }
@@ -211,7 +216,12 @@ test('every mode card tries to resume its running mode first, then starts throug
     ['btnModePuzzle', GAME_MODES.PUZZLE, GAME_MODES.PUZZLE, 'engine.startPuzzleMode'],
     ['btnModeBlitz', GAME_MODES.BLITZ, GAME_MODES.BLITZ, 'engine.startBlitzMode'],
     ['btnModeBossRush', GAME_MODES.BOSS_RUSH, GAME_MODES.BOSS_RUSH, 'engine.startBossRushMode'],
-    ['btnModeCascade', GAME_MODES.CASCADE, GAME_MODES.CASCADE, 'engine.startCascadeMode']
+    ['btnModeCascade', GAME_MODES.CASCADE, GAME_MODES.CASCADE, 'engine.startCascadeMode'],
+    ['btnModeHexGrid', GAME_MODES.HEX_GRID, GAME_MODES.HEX_GRID, 'engine.startHexGridMode'],
+    ['btnModePinball', GAME_MODES.PINBALL, GAME_MODES.PINBALL, 'engine.startPinballMode'],
+    ['btnModeOrbital', GAME_MODES.ORBITAL, GAME_MODES.ORBITAL, 'engine.startOrbitalMode'],
+    ['btnModeConvoy', GAME_MODES.CONVOY, GAME_MODES.CONVOY, 'engine.startConvoyMode'],
+    ['btnModeMerge', GAME_MODES.MERGE, GAME_MODES.MERGE, 'engine.startMergeMode']
   ];
   for (const [key, runKey, gateKey, startCall] of specs) {
     const { ui, calls, elements, restore } = makeBoundUi();

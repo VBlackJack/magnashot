@@ -25,7 +25,9 @@ const FULL_PERCENT = 100;
 /** Workshop note shown while a mode neutralises upgrades; Daily is the fallback. */
 const BASELINE_NOTE_KEYS = Object.freeze({
   [GAME_MODES.CLASSIC]: 'modals.shop.upgrades.classicBaselineNote',
-  [GAME_MODES.PUZZLE]: 'modals.shop.upgrades.puzzleBaselineNote'
+  [GAME_MODES.PUZZLE]: 'modals.shop.upgrades.puzzleBaselineNote',
+  [GAME_MODES.HEX_GRID]: 'modals.shop.upgrades.puristBaselineNote',
+  [GAME_MODES.MERGE]: 'modals.shop.upgrades.puristBaselineNote'
 });
 export { FULL_PERCENT };
 
@@ -109,6 +111,16 @@ export function computeAchievementProgress(achId, achSpec, isUnlocked, progressC
     rawCurrent = progressContext.fluxStage || 0;
   } else if (familyId === 'bossRushWaves') {
     rawCurrent = progressContext.bossRushWave || 0;
+  } else if (familyId === 'hexGridWaves') {
+    rawCurrent = progressContext.hexGridWave || 0;
+  } else if (familyId === 'orbitalWaves') {
+    rawCurrent = progressContext.orbitalWave || 0;
+  } else if (familyId === 'pinballStages') {
+    rawCurrent = progressContext.pinballStage || 0;
+  } else if (familyId === 'convoyWaves') {
+    rawCurrent = progressContext.convoyWave || 0;
+  } else if (familyId === 'mergeTiers') {
+    rawCurrent = progressContext.mergeTier || 0;
   } else if (familyId === 'campaignComplete') {
     target = Math.max(1, progressContext.campaignLevelCount || 1);
     rawCurrent = Math.max(0, (progressContext.unlockedLevel || 1) - 1);
@@ -258,14 +270,20 @@ export function renderWorkshopContents() {
     ammoGrid.replaceChildren();
     // Ammo is stocked into the current run, so it cannot be bought between runs or in Puzzle mode.
     const isPuzzleRun = this.engine.mode === GAME_MODES.PUZZLE && this.isRunActive();
+    const isPuristRun =
+      this.isRunActive() && !isPuzzleRun && this.engine.offersSpecialBalls?.() === false;
     const canBuyAmmo =
-      typeof this.canBuySpecialAmmo === 'function' ? this.canBuySpecialAmmo() : this.isRunActive() && !isPuzzleRun;
+      typeof this.canBuySpecialAmmo === 'function'
+        ? this.canBuySpecialAmmo()
+        : this.isRunActive() && !isPuzzleRun && !isPuristRun;
     const blockKey = typeof this.getSpecialAmmoBlockReasonKey === 'function' ? this.getSpecialAmmoBlockReasonKey() : null;
     for (let slotIndex = 0; slotIndex < SPECIAL_TYPES_ORDER.length; slotIndex++) {
       const type = SPECIAL_TYPES_ORDER[slotIndex];
       const spec = this.ballsConfig.specialTypes[type];
       const cost = this.gameConfig.specialShopCosts[type];
       const count = this.engine.specialInventory[type] || 0;
+      const isTypeAllowed = this.engine.isSpecialTypeAllowed?.(type) !== false;
+      const canBuyThisType = canBuyAmmo && isTypeAllowed;
 
       const card = document.createElement('div');
       card.className = 'ammo-card';
@@ -294,10 +312,13 @@ export function renderWorkshopContents() {
       buyAmmoBtn.className = 'modal-btn primary ammo-buy-btn';
       buyAmmoBtn.dataset.specialType = type;
       buyAmmoBtn.dataset.slotIndex = String(slotIndex);
-      buyAmmoBtn.disabled = !canBuyAmmo || coins < cost;
-      buyAmmoBtn.classList.toggle('unavailable', !canBuyAmmo);
-      if (canBuyAmmo) {
+      buyAmmoBtn.disabled = !canBuyThisType || coins < cost;
+      buyAmmoBtn.classList.toggle('unavailable', !canBuyThisType);
+      if (canBuyThisType) {
         buyAmmoBtn.textContent = t('modals.shop.specialAmmo.buy', { cost: formatNumber(cost) });
+      } else if (this.isRunActive() && !isTypeAllowed && !isPuzzleRun && !isPuristRun) {
+        buyAmmoBtn.textContent = t('modals.shop.specialAmmo.modeDisabled');
+        buyAmmoBtn.title = t('modals.shop.specialAmmo.modeDisabledHint');
       } else if (blockKey) {
         buyAmmoBtn.textContent = t('modals.shop.specialAmmo.blockedLabel');
         buyAmmoBtn.title = t(blockKey);
@@ -305,6 +326,9 @@ export function renderWorkshopContents() {
       } else if (isPuzzleRun) {
         buyAmmoBtn.textContent = t('modals.shop.specialAmmo.puzzleLocked');
         buyAmmoBtn.title = t('modals.shop.specialAmmo.puzzleLockedHint');
+      } else if (isPuristRun) {
+        buyAmmoBtn.textContent = t('modals.shop.specialAmmo.puristLocked');
+        buyAmmoBtn.title = t('modals.shop.specialAmmo.puristLockedHint');
       } else {
         buyAmmoBtn.textContent = t('modals.shop.specialAmmo.unavailable');
         buyAmmoBtn.title = t('modals.shop.specialAmmo.unavailableHint');
@@ -437,6 +461,26 @@ export function renderWorkshopContents() {
       shotsRemainingOnClear: persistedRecords.shotsRemainingOnClear || 0,
       fluxStage: this.storageManager.getFluxBestStage?.() || 0,
       bossRushWave: this.storageManager.getBossRushBestWave?.() || 0,
+      hexGridWave: Math.max(
+        this.storageManager.getHexGridBestWave?.() || 0,
+        this.engine.mode === GAME_MODES.HEX_GRID ? this.engine.waveCount || 0 : 0
+      ),
+      orbitalWave: Math.max(
+        this.storageManager.getOrbitalBestWave?.() || 0,
+        this.engine.mode === GAME_MODES.ORBITAL ? this.engine.waveCount || 0 : 0
+      ),
+      pinballStage: Math.max(
+        this.storageManager.getPinballBestStage?.() || 0,
+        this.engine.mode === GAME_MODES.PINBALL ? this.engine.pinballStage || 0 : 0
+      ),
+      convoyWave: Math.max(
+        this.storageManager.getConvoyBestWave?.() || 0,
+        this.engine.mode === GAME_MODES.CONVOY ? this.engine.waveCount || 0 : 0
+      ),
+      mergeTier: Math.max(
+        this.storageManager.getMergeBestTier?.() || 0,
+        this.engine.mode === GAME_MODES.MERGE ? this.engine.mergeBestTier || 0 : 0
+      ),
       unlockedLevel: this.storageManager.getUnlockedLevel(),
       campaignLevelCount: this.engine.levelCatalog.count
     };

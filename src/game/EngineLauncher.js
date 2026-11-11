@@ -35,6 +35,10 @@ export const engineLauncherMethods = {
    * @returns {string} A color id.
    */
   pickLauncherColor(roll = this.random()) {
+    const modeColor = this.getModeBehavior().pickLauncherColor(this, roll);
+    if (modeColor) {
+      return modeColor;
+    }
     const existingColors = new Set();
     for (const b of this.physicsWorld.balls) {
       if (b.colorId) {
@@ -83,14 +87,19 @@ export const engineLauncherMethods = {
    * @param {string|null} colorId - Color to restore on a regular ball.
    */
   createRandomLauncherBall(specialType = null, colorId = null) {
-    return new Ball({
-      x: this.gameConfig.canvas.launcherX,
-      y: this.gameConfig.canvas.launcherY,
+    const spec = this.getLauncherSpec();
+    const ball = new Ball({
+      x: spec.x,
+      y: spec.y,
       radius: this.physicsConfig.ball.radius,
       colorId: specialType ? null : colorId || this.drawLauncherColor(),
       specialType,
       isProjectile: false
     });
+    if (this.mode === GAME_MODES.MERGE && !specialType) {
+      this.getModeBehavior().syncLauncherBallTier?.(this, ball);
+    }
+    return ball;
   },
 
   /**
@@ -139,7 +148,7 @@ export const engineLauncherMethods = {
    * cleared color.
    */
   refreshStaleLauncherColors() {
-    if (this.mode === GAME_MODES.PUZZLE) {
+    if (this.mode === GAME_MODES.PUZZLE || this.mode === GAME_MODES.MERGE) {
       return;
     }
     const boardColors = new Set(this.physicsWorld.balls.map((b) => b.colorId).filter(Boolean));

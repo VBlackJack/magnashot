@@ -988,4 +988,89 @@ export const engineModeMethods = {
       this.notifyUI();
     }
   },
+
+  startHexGridMode() {
+    this.resetRunState(GAME_MODES.HEX_GRID);
+    this.audioManager.stopAll();
+    this.particleSystem.clear();
+    const behavior = this.getModeBehavior();
+    behavior.setupMode(this);
+    this.currentBall = this.createRandomLauncherBall();
+    this.nextBall = this.createRandomLauncherBall();
+    this.fillUpcomingColors();
+    this.state = GAME_STATES.PLAYING;
+    const spec = this.getLauncherSpec();
+    this.updateAimFromAngle(spec.defaultAngle);
+    this.refreshDiscovery();
+    this.notifyUI();
+  },
+
+  startOrbitalMode() {
+    this.resetRunState(GAME_MODES.ORBITAL);
+    this.specialInventory = Object.fromEntries(Object.values(SPECIAL_TYPES).map((type) => [type, 0]));
+    this.audioManager.stopAll();
+    this.particleSystem.clear();
+    const behavior = this.getModeBehavior();
+    behavior.setupMode(this);
+    this.currentBall = this.createRandomLauncherBall();
+    this.nextBall = this.createRandomLauncherBall();
+    this.fillUpcomingColors();
+    this.state = GAME_STATES.PLAYING;
+    const spec = this.getLauncherSpec();
+    this.updateAimFromAngle(spec.defaultAngle);
+    this.refreshDiscovery();
+    this.notifyUI();
+  },
+
+  startPinballMode(stage = 1) {
+    this.resetRunState(GAME_MODES.PINBALL);
+    this.specialInventory = Object.fromEntries(Object.values(SPECIAL_TYPES).map((type) => [type, 0]));
+    this.audioManager.stopAll();
+    this.particleSystem.clear();
+    const behavior = this.getModeBehavior();
+    behavior.setupMode(this, { stage });
+    this.currentBall = this.createRandomLauncherBall();
+    this.nextBall = this.createRandomLauncherBall();
+    this.fillUpcomingColors();
+    this.state = GAME_STATES.PLAYING;
+    const spec = this.getLauncherSpec();
+    this.updateAimFromAngle(spec.defaultAngle);
+    this.refreshDiscovery();
+    this.notifyUI();
+  },
+
+  startConvoyMode() {
+    this.resetRunState(GAME_MODES.CONVOY);
+    this.specialInventory = Object.fromEntries(Object.values(SPECIAL_TYPES).map((type) => [type, 0]));
+    this.audioManager.stopAll();
+    this.particleSystem.clear();
+    const behavior = this.getModeBehavior();
+    behavior.setupMode(this);
+    this.currentBall = this.createRandomLauncherBall();
+    this.nextBall = this.createRandomLauncherBall();
+    this.fillUpcomingColors();
+    this.state = GAME_STATES.PLAYING;
+    const spec = this.getLauncherSpec();
+    this.updateAimFromAngle(spec.defaultAngle);
+    this.refreshDiscovery();
+    this.notifyUI();
+  },
+
+  startMergeMode() {
+    this.resetRunState(GAME_MODES.MERGE);
+    this.audioManager.stopAll();
+    this.particleSystem.clear();
+    const behavior = this.getModeBehavior();
+    behavior.setupMode(this);
+    this.currentBall = this.createRandomLauncherBall();
+    this.nextBall = this.createRandomLauncherBall();
+    this.fillUpcomingColors();
+    behavior.syncLauncherBallTier?.(this, this.currentBall);
+    behavior.syncLauncherBallTier?.(this, this.nextBall);
+    this.state = GAME_STATES.PLAYING;
+    const spec = this.getLauncherSpec();
+    this.updateAimFromAngle(spec.defaultAngle);
+    this.refreshDiscovery();
+    this.notifyUI();
+  },
 };

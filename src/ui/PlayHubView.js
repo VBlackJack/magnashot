@@ -345,6 +345,41 @@ export const uiPlayHubMethods = {
         score: formatNumber(storage.getBossRushHighScore?.() || 0)
       })
     );
+    setTextIfChanged(
+      els.arcadeBestHexGrid,
+      t('modals.levelSelect.arcade.bossRushRecord', {
+        wave: formatNumber(Math.max(DEFAULT_STAGE, storage.getHexGridBestWave?.() || 1)),
+        score: formatNumber(storage.getHexGridHighScore?.() || 0)
+      })
+    );
+    setTextIfChanged(
+      els.arcadeBestPinball,
+      t('modals.levelSelect.arcade.pinballRecord', {
+        stage: formatNumber(Math.max(DEFAULT_STAGE, storage.getPinballBestStage?.() || 1)),
+        score: formatNumber(storage.getPinballHighScore?.() || 0)
+      })
+    );
+    setTextIfChanged(
+      els.arcadeBestOrbital,
+      t('modals.levelSelect.arcade.bossRushRecord', {
+        wave: formatNumber(Math.max(DEFAULT_STAGE, storage.getOrbitalBestWave?.() || 1)),
+        score: formatNumber(storage.getOrbitalHighScore?.() || 0)
+      })
+    );
+    setTextIfChanged(
+      els.arcadeBestConvoy,
+      t('modals.levelSelect.arcade.bossRushRecord', {
+        wave: formatNumber(Math.max(DEFAULT_STAGE, storage.getConvoyBestWave?.() || 1)),
+        score: formatNumber(storage.getConvoyHighScore?.() || 0)
+      })
+    );
+    setTextIfChanged(
+      els.arcadeBestMerge,
+      t('modals.levelSelect.arcade.mergeRecord', {
+        tier: formatNumber(Math.max(DEFAULT_STAGE, storage.getMergeBestTier?.() || 1)),
+        score: formatNumber(storage.getMergeHighScore?.() || 0)
+      })
+    );
     writeRewardChip(els.dailyReward, this.describeDailyRewardChip());
     writeRewardChip(els.weeklyReward, this.describeWeeklyRewardChip());
   },

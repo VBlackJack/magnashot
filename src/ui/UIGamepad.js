@@ -325,7 +325,11 @@ export const uiGamepadMethods = {
           engine.replayLevelHints?.();
           break;
         case A.RECENTER:
-          engine.adjustAimByDelta(-Math.PI * MATH_CONSTANTS.HALF - engine.aimAngle);
+          if (typeof engine.recenterAim === 'function') {
+            engine.recenterAim();
+          } else {
+            engine.adjustAimByDelta(-Math.PI * MATH_CONSTANTS.HALF - engine.aimAngle);
+          }
           this.updateAimState(engine);
           break;
         default:
@@ -340,7 +344,10 @@ export const uiGamepadMethods = {
    */
   cycleSpecialBall(step, engine = this.engine) {
     const equipped = engine.currentBall?.specialType ?? null;
-    const stops = [null, ...SPECIAL_TYPES_ORDER].filter(
+    const allowedTypes = SPECIAL_TYPES_ORDER.filter(
+      (type) => engine.isSpecialTypeAllowed?.(type) !== false
+    );
+    const stops = [null, ...allowedTypes].filter(
       (type) => type === null || type === equipped || (engine.specialInventory?.[type] || 0) > 0
     );
     const index = Math.max(0, stops.indexOf(equipped));
