@@ -14,7 +14,15 @@
  * limitations under the License.
  */
 
-import { GAME_MODES, OBSTACLE_TYPES, SPECIAL_TYPES, CLUSTER_MODIFIERS, BALL_STYLES, MATH_CONSTANTS } from '../core/Constants.js';
+import {
+  GAME_MODES,
+  OBSTACLE_TYPES,
+  SPECIAL_TYPES,
+  CLUSTER_MODIFIERS,
+  BALL_STYLES,
+  LAUNCHER_POSTURES,
+  MATH_CONSTANTS
+} from '../core/Constants.js';
 import { t } from '../core/I18n.js';
 import { isChainLink, isTetherLink } from '../physics/PhysicsWorld.js';
 import { Ball } from '../entities/Ball.js';
@@ -22,6 +30,7 @@ import { predictImpact } from './ImpactPreview.js';
 import { SAG_STEPS } from './SagMeter.js';
 import { CHARGE_OUTCOMES } from './VersusRules.js';
 import { ringVisual } from './Resonance.js';
+import { resolveModesConfig } from './modes/index.js';
 
 const BOND_STYLE = Object.freeze({
   STRESSED: 0,
@@ -78,6 +87,7 @@ const BRACKET_SERIF_FACTOR = 0.5;
 const BADGE_GLYPH_FACTOR = 0.55;
 const FIELD_RING_PULSE_DEPTH = 0.2;
 const FIELD_RING_BASE_ALPHA = 0.6;
+const DROP_RAIL_CARRIAGE_RADIUS_FACTOR = 0.55;
 const HALF = 0.5;
 
 /** Color-blind patterns a standard color may declare in configs/balls.json. */
@@ -148,6 +158,12 @@ export class Renderer {
     ballsConfig.standardColors.forEach((c, index) => {
       this.colorMap.set(c.id, c);
       this.colorWeights.set(c.id, index + 1);
+    });
+    const mergeTiers = resolveModesConfig(options?.modesConfig).merge.tiers;
+    const baseWeight = ballsConfig.standardColors.length;
+    mergeTiers.forEach((tierSpec, index) => {
+      this.colorMap.set(tierSpec.id, tierSpec);
+      this.colorWeights.set(tierSpec.id, baseWeight + index + 1);
     });
 
     this.logicalWidth = gameConfig.canvas.logicalWidth;
@@ -580,10 +596,22 @@ export class Renderer {
     if (!this.lite) {
       this.drawWallCracks(ctx, engineState.particleSystem);
     }
-    this.drawLiquid(ctx, engineState.particleSystem, width, height);
-    this.drawCollectorBins(ctx, width, height, theme, engineState);
+    const behavior = typeof engineState.getModeBehavior === 'function'
+      ? engineState.getModeBehavior()
+      : null;
+    const chrome = behavior ? behavior.getRenderChrome(engineState) : null;
 
-    this.drawDangerZone(ctx, width, height, theme, engineState.physicsWorld.balls, now, alpha);
+    if (!chrome || chrome.ambientLiquid) {
+      this.drawLiquid(ctx, engineState.particleSystem, width, height);
+    }
+    if (!chrome || chrome.collectorBins) {
+      this.drawCollectorBins(ctx, width, height, theme, engineState);
+    }
+    if (!chrome || chrome.dangerZone) {
+      this.drawDangerZone(ctx, width, height, theme, engineState.physicsWorld.balls, now, alpha);
+    }
+
+    behavior?.drawUnderlay?.(ctx, engineState, this, theme, now);
 
     // A new Flux shape slides down into place; only the drawing moves, not the physics.
     // After a Sag step the cluster is already lower in the physics: it eases down from its
@@ -622,11 +650,18 @@ export class Renderer {
     for (const ball of engineState.physicsWorld.droppingBalls) {
       this.drawBall(ctx, ball, now, alpha);
     }
+    behavior?.drawOverlay?.(ctx, engineState, this, theme, now);
     if (!this.lite) {
       this.drawShatteringBalls(ctx, engineState.particleSystem, now, alpha);
     }
 
-    if (!this.lite && engineState.aimPoints && !engineState.physicsWorld.projectile && !engineState.isAimCancelled) {
+    if (
+      (!chrome || chrome.aimLine)
+      && !this.lite
+      && engineState.aimPoints
+      && !engineState.physicsWorld.projectile
+      && !engineState.isAimCancelled
+    ) {
       this.drawAimTrajectory(
         ctx,
         engineState.aimPoints,
@@ -2392,6 +2427,11 @@ export class Renderer {
     const cfg = this.gameConfig.resonance;
     const ring = cfg.ring;
     const canvasCfg = this.gameConfig.canvas;
+    const spec = typeof engineState.getLauncherSpec === 'function' ? engineState.getLauncherSpec() : null;
+    const rx = spec
+      ? (spec.posture === LAUNCHER_POSTURES.DROP_RAIL ? (engineState.mergeDropX ?? spec.x) : spec.x)
+      : canvasCfg.launcherX;
+    const ry = spec ? spec.y : canvasCfg.launcherY;
     const baseRadius = canvasCfg.launcher.baseRadius * ring.radiusFactor;
     const visual = ringVisual(pulse.beatFrame, {
       framesPerBeat: pulse.framesPerBeat,
@@ -2409,21 +2449,21 @@ export class Renderer {
       ctx.globalAlpha = ring.bandAlpha;
       ctx.lineWidth = lineWidth * ring.bandWidthFactor;
       ctx.beginPath();
-      ctx.arc(canvasCfg.launcherX, canvasCfg.launcherY, baseRadius, 0, MATH_CONSTANTS.TWO_PI);
+      ctx.arc(rx, ry, baseRadius, 0, MATH_CONSTANTS.TWO_PI);
       ctx.stroke();
     }
     ctx.globalAlpha = visual.opacity;
     ctx.lineWidth = lineWidth;
     ctx.setLineDash(visual.inWindow ? EMPTY_DASH : ring.dashPattern);
     ctx.beginPath();
-    ctx.arc(canvasCfg.launcherX, canvasCfg.launcherY, radius, 0, MATH_CONSTANTS.TWO_PI);
+    ctx.arc(rx, ry, radius, 0, MATH_CONSTANTS.TWO_PI);
     ctx.stroke();
     ctx.setLineDash(EMPTY_DASH);
     if (engineState.resonanceFlashFrames > 0 && !this.isReducedMotion) {
       ctx.globalAlpha = ring.flashAlpha * (engineState.resonanceFlashFrames / ring.flashFrames);
       ctx.fillStyle = color;
       ctx.beginPath();
-      ctx.arc(canvasCfg.launcherX, canvasCfg.launcherY, baseRadius * ring.flashRadiusFactor, 0, MATH_CONSTANTS.TWO_PI);
+      ctx.arc(rx, ry, baseRadius * ring.flashRadiusFactor, 0, MATH_CONSTANTS.TWO_PI);
       ctx.fill();
     }
     ctx.restore();
@@ -2432,9 +2472,29 @@ export class Renderer {
   drawLauncher(ctx, engineState, theme, now) {
     const canvasCfg = this.gameConfig.canvas;
     const launcherGeom = canvasCfg.launcher;
-    const lx = canvasCfg.launcherX;
-    const ly = canvasCfg.launcherY;
+    const spec = typeof engineState.getLauncherSpec === 'function' ? engineState.getLauncherSpec() : null;
+    const posture = spec ? spec.posture : LAUNCHER_POSTURES.UPWARD;
+    const isDropRail = posture === LAUNCHER_POSTURES.DROP_RAIL;
+    const baseX = spec ? spec.x : canvasCfg.launcherX;
+    const lx = isDropRail ? (engineState.mergeDropX ?? baseX) : baseX;
+    const ly = spec ? spec.y : canvasCfg.launcherY;
+    const nextOffsetX = spec ? spec.nextOffsetX : canvasCfg.nextBallOffsetX;
+    const nextOffsetY = spec ? spec.nextOffsetY : canvasCfg.nextBallOffsetY;
     const angle = engineState.aimAngle;
+
+    if (isDropRail) {
+      const mergeCfg = engineState.modesConfig?.merge;
+      if (mergeCfg) {
+        ctx.save();
+        ctx.strokeStyle = theme.launcherAccentColor;
+        ctx.lineWidth = launcherGeom.baseBorderWidth;
+        ctx.beginPath();
+        ctx.moveTo(mergeCfg.basinLeftX, ly);
+        ctx.lineTo(mergeCfg.basinRightX, ly);
+        ctx.stroke();
+        ctx.restore();
+      }
+    }
 
     if (engineState.isAimCancelled) {
       ctx.save();
@@ -2447,37 +2507,47 @@ export class Renderer {
       ctx.restore();
     }
 
-    ctx.save();
-    ctx.translate(lx, ly);
-    ctx.rotate(angle + Math.PI * MATH_CONSTANTS.HALF);
+    if (!isDropRail) {
+      ctx.save();
+      ctx.translate(lx, ly);
+      ctx.rotate(angle + Math.PI * MATH_CONSTANTS.HALF);
 
-    ctx.fillStyle = theme.launcherBarrelColor;
-    ctx.strokeStyle = theme.launcherAccentColor;
-    ctx.lineWidth = launcherGeom.barrelBorderWidth;
-    ctx.beginPath();
-    ctx.roundRect(
-      launcherGeom.barrelX,
-      launcherGeom.barrelY,
-      launcherGeom.barrelWidth,
-      launcherGeom.barrelHeight,
-      launcherGeom.barrelCornerRadius
-    );
-    ctx.fill();
-    ctx.stroke();
+      ctx.fillStyle = theme.launcherBarrelColor;
+      ctx.strokeStyle = theme.launcherAccentColor;
+      ctx.lineWidth = launcherGeom.barrelBorderWidth;
+      ctx.beginPath();
+      ctx.roundRect(
+        launcherGeom.barrelX,
+        launcherGeom.barrelY,
+        launcherGeom.barrelWidth,
+        launcherGeom.barrelHeight,
+        launcherGeom.barrelCornerRadius
+      );
+      ctx.fill();
+      ctx.stroke();
 
-    ctx.restore();
+      ctx.restore();
+    }
 
     ctx.save();
     ctx.fillStyle = theme.launcherBaseColor;
     ctx.strokeStyle = theme.launcherAccentColor;
     ctx.lineWidth = launcherGeom.baseBorderWidth;
     ctx.beginPath();
-    ctx.arc(lx, ly, launcherGeom.baseRadius, 0, MATH_CONSTANTS.TWO_PI);
+    ctx.arc(
+      lx,
+      ly,
+      isDropRail ? launcherGeom.baseRadius * DROP_RAIL_CARRIAGE_RADIUS_FACTOR : launcherGeom.baseRadius,
+      0,
+      MATH_CONSTANTS.TWO_PI
+    );
     ctx.fill();
     ctx.stroke();
     ctx.restore();
 
-    this.drawBeatRing(ctx, engineState, theme);
+    if (!isDropRail) {
+      this.drawBeatRing(ctx, engineState, theme);
+    }
 
     if (
       engineState.mode === GAME_MODES.BLITZ &&
@@ -2530,8 +2600,8 @@ export class Renderer {
       engineState.nextBall &&
       !(engineState.mode === GAME_MODES.PUZZLE && engineState.shotsRemaining <= 1)
     ) {
-      const nx = lx + canvasCfg.nextBallOffsetX;
-      const ny = ly + canvasCfg.nextBallOffsetY;
+      const nx = baseX + nextOffsetX;
+      const ny = ly + nextOffsetY;
       ctx.save();
       ctx.strokeStyle = theme.launcherAccentColor;
       ctx.lineWidth = launcherGeom.nextBallRingWidth;
@@ -2549,7 +2619,9 @@ export class Renderer {
           ctx, nx, ny, engineState.nextBall.radius * this.gameConfig.versus.render.nextGlyphSizeFactor, nextPolarity
         );
       }
-      this.drawUpcomingBalls(ctx, engineState.upcomingColorIds, nx, ny, engineState.nextBall.radius, now);
+      if (!spec?.compactQueue) {
+        this.drawUpcomingBalls(ctx, engineState.upcomingColorIds, nx, ny, engineState.nextBall.radius, now);
+      }
     }
   }
 
@@ -2716,6 +2788,7 @@ export class Renderer {
     colorIds.forEach((colorId, index) => {
       const x = nextX + canvasCfg.upcomingBallSpacingX * (index + 1);
       this.upcomingPreviewBall.colorId = colorId;
+      this.upcomingPreviewBall.specialType = null;
       this.upcomingPreviewBall.radius = radius;
       ctx.save();
       ctx.translate(x, nextY);
@@ -2723,6 +2796,16 @@ export class Renderer {
       this.drawBallAt(ctx, this.upcomingPreviewBall, 0, 0, now);
       ctx.restore();
     });
+  }
+
+  /** Draws a detached sphere (such as Orbital radial drift) using the regular cached ball renderer. */
+  drawDetachedPreviewBall(ctx, x, y, radius, colorId, specialType = null) {
+    const now = this.isReducedMotion ? REDUCED_MOTION_CLOCK_MS : performance.now();
+    this.upcomingPreviewBall.colorId = specialType ? null : colorId;
+    this.upcomingPreviewBall.specialType = specialType || null;
+    this.upcomingPreviewBall.radius = radius;
+    this.drawBallAt(ctx, this.upcomingPreviewBall, x, y, now);
+    this.upcomingPreviewBall.specialType = null;
   }
 
   /**

@@ -153,13 +153,20 @@
         "coreRescueProgress": "💎 {{rescued}}/{{total}}",
         "switchHint": "Click to change mode or level",
         "switchHintTouch": "Tap to change mode or level",
-        "classic": "Purist • Stage {{stage}}"
+        "classic": "Purist • Stage {{stage}}",
+        "hexGrid": "Hex Grid • Wave {{wave}}",
+        "orbital": "Orbital 360 • Wave {{wave}}",
+        "pinball": "Pinball • Stage {{stage}} (⚡ {{cores}})",
+        "convoy": "Convoy • Wave {{wave}}",
+        "merge": "Merge Basin • Calibre {{tier}}"
       },
       "shots": {
         "label": "Shots Left",
         "waveLabel": "Next Wave",
         "shieldsLabel": "Boss Shields",
-        "mooringsLabel": "Moorings"
+        "mooringsLabel": "Moorings",
+        "convoyLabel": "Spheres Left",
+        "calibreLabel": "Max Calibre"
       },
       "time": {
         "label": "Time Left",
@@ -465,7 +472,27 @@
         "moorings": "MOORING SNAPPED! {{left}} LEFT",
         "down": "MAGNETAR DOWN! +{{points}}"
       },
-      "resonance": "Resonance!"
+      "resonance": "Resonance!",
+      "hexGrid": {
+        "pulse": "HEX PULSE! +{{points}}",
+        "waveCleared": "GRID CLEARED! +{{points}}"
+      },
+      "orbital": {
+        "arcCatch": "ORBITAL COLLECTOR +{{points}}",
+        "waveCleared": "ORBIT CLEARED! +{{points}}"
+      },
+      "pinball": {
+        "freeBall": "FREE BALL! +1 • +{{points}}",
+        "stageCleared": "STAGE CLEARED! +{{points}}"
+      },
+      "convoy": {
+        "snapback": "MAGNETIC SNAP-BACK! +{{points}}",
+        "waveCleared": "CONVOY CLEARED! +{{points}}"
+      },
+      "merge": {
+        "fused": "CALIBRE {{tier}}! +{{points}}",
+        "supernova": "SUPERNOVA FUSION! +{{points}}"
+      }
     },
     "mutators": {
       "hyperGravity": "Hyper Gravity",
@@ -684,7 +711,19 @@
         "classic": "Purist",
         "classicDesc": "Pure rules: no specials, no upgrades. Misses lower the ceiling.",
         "classicBest": "Best: stage {{stage}}",
-        "puzzleStageAria": "Puzzle {{stage}}, {{stars}} of {{maxStars}} stars"
+        "puzzleStageAria": "Puzzle {{stage}}, {{stars}} of {{maxStars}} stars",
+        "hexGrid": "Hex Grid",
+        "hexGridDesc": "Rigid hex lattice • Straight laser • Polarity pulse",
+        "pinball": "Magnetic Pinball",
+        "pinballDesc": "Top cannon • Core pegs • Live polarity & free-ball bucket",
+        "pinballRecord": "Stage {{stage}} • Best: {{score}}",
+        "orbital": "Orbital 360",
+        "orbitalDesc": "Zero-G rotor • 360° collector arcs • Containment ring",
+        "convoy": "Magnetic Convoy",
+        "convoyDesc": "360° turret • Moving rail train • Polarity snap-back",
+        "merge": "Merge Basin",
+        "mergeDesc": "10 calibre tiers • Top drop rail • Shockwave fusion",
+        "mergeRecord": "Calibre {{tier}} • Best: {{score}}"
       },
       "jumpCurrent": "Current level",
       "grid": {
@@ -751,6 +790,10 @@
         "unavailableHint": "Start a Campaign, Survival, Daily, Flux, Blitz, Boss Rush or Cascade run to buy ammo.",
         "puzzleLocked": "Fixed loadout",
         "puzzleLockedHint": "Puzzle stages use a fixed special-sphere loadout.",
+        "puristLocked": "Purist rules",
+        "puristLockedHint": "This mode plays without special spheres.",
+        "modeDisabled": "Off in this mode",
+        "modeDisabledHint": "This special sphere is not used in the current mode.",
         "blockedLabel": "Not now",
         "blocked": {
           "shotInFlight": "Wait for the shot to land to buy special ammo.",
@@ -963,6 +1006,36 @@
               "description": "Fires charged spheres from the danger line. Shoot the opposite polarity to neutralise them."
             }
           }
+        },
+        "behaviors": {
+          "title": "Arcade Ball Behaviors",
+          "items": {
+            "hexGrid": {
+              "icon": "⬡",
+              "name": "Hex Grid (Rigid Snap)",
+              "description": "Straight-line shots snap instantly onto a rigid hex lattice with zero magnetic curve. Flip polarity (F) before shooting to trigger a 1-cell magnetic pulse on landing."
+            },
+            "pinball": {
+              "icon": "🎱",
+              "name": "Magnetic Pinball (Gravity Ricochet)",
+              "description": "A top cannon fires downward under gravity across anchored pegs. Flip polarity (F) mid-flight to bend your shot live, light every Core Peg, and catch the bottom bucket for +1 shot."
+            },
+            "orbital": {
+              "icon": "🪐",
+              "name": "Orbital 360 (Zero-G Spin)",
+              "description": "Shot impacts spin a central Zero-G hex core by angular momentum. Detached spheres drift radially into 4 peripheral collector arcs; keep the cluster inside the containment ring."
+            },
+            "convoy": {
+              "icon": "🐍",
+              "name": "Magnetic Convoy (Rail Snap-Back)",
+              "description": "A central 360° turret fires into a continuous sphere train advancing toward a vortex. Opening a gap between matching colors or opposite poles snaps the front train backward into chain combos."
+            },
+            "merge": {
+              "icon": "🫧",
+              "name": "Merge Basin (10 Calibre Tiers)",
+              "description": "Drop spheres from a top rail into a rigid basin. Identical calibres fuse into the next tier (1 to 10) with a magnetic shockwave, while polarity biases attraction and repulsion."
+            }
+          }
         }
       },
       "achievements": {
@@ -1090,6 +1163,66 @@
           "magnetarLandslideGold": {
             "name": "Landslide III",
             "description": "Bring down a Magnetar in a huge avalanche (goal: {{target}})."
+          },
+          "hexGridWaves": {
+            "name": "Lattice Tactician",
+            "description": "Reach Wave {{target}} in Hex Grid."
+          },
+          "hexGridWavesSilver": {
+            "name": "Lattice Tactician II",
+            "description": "Reach Wave {{target}} in Hex Grid."
+          },
+          "hexGridWavesGold": {
+            "name": "Lattice Tactician III",
+            "description": "Reach Wave {{target}} in Hex Grid."
+          },
+          "orbitalWaves": {
+            "name": "Orbital Pilot",
+            "description": "Reach Wave {{target}} in Orbital Spin."
+          },
+          "orbitalWavesSilver": {
+            "name": "Orbital Pilot II",
+            "description": "Reach Wave {{target}} in Orbital Spin."
+          },
+          "orbitalWavesGold": {
+            "name": "Orbital Pilot III",
+            "description": "Reach Wave {{target}} in Orbital Spin."
+          },
+          "pinballStages": {
+            "name": "Pinball Wizard",
+            "description": "Reach Stage {{target}} in Magnetic Pinball."
+          },
+          "pinballStagesSilver": {
+            "name": "Pinball Wizard II",
+            "description": "Reach Stage {{target}} in Magnetic Pinball."
+          },
+          "pinballStagesGold": {
+            "name": "Pinball Wizard III",
+            "description": "Reach Stage {{target}} in Magnetic Pinball."
+          },
+          "convoyWaves": {
+            "name": "Rail Interceptor",
+            "description": "Reach Wave {{target}} in Magnetic Convoy."
+          },
+          "convoyWavesSilver": {
+            "name": "Rail Interceptor II",
+            "description": "Reach Wave {{target}} in Magnetic Convoy."
+          },
+          "convoyWavesGold": {
+            "name": "Rail Interceptor III",
+            "description": "Reach Wave {{target}} in Magnetic Convoy."
+          },
+          "mergeTiers": {
+            "name": "Fusion Alchemist",
+            "description": "Fuse up to Calibre {{target}} in Merge Basin."
+          },
+          "mergeTiersSilver": {
+            "name": "Fusion Alchemist II",
+            "description": "Fuse up to Calibre {{target}} in Merge Basin."
+          },
+          "mergeTiersGold": {
+            "name": "Fusion Alchemist III",
+            "description": "Fuse up to Calibre {{target}} in Merge Basin."
           }
         },
         "tier": {
@@ -1130,7 +1263,8 @@
           "name": "Collector Magnet",
           "description": "Adds +{{points}} bonus points and +{{overcharge}}% Overcharge per avalanche sphere in the bottom collector bins per rank."
         },
-        "puzzleBaselineNote": "Upgrades are paused in Puzzle: every player meets the same puzzle."
+        "puzzleBaselineNote": "Upgrades are paused in Puzzle: every player meets the same puzzle.",
+        "puristBaselineNote": "Upgrades are paused in this purist mode."
       },
       "feedback": {
         "upgradePurchased": "{{name}} upgraded to level {{level}} of {{maxLevel}}.",
@@ -1173,7 +1307,10 @@
       "reason": {
         "lineCrossed": "The magnetic cluster crossed the danger threshold.",
         "outOfShots": "You ran out of magnetic projectiles.",
-        "timeUp": "Time is up! The 90-second Blitz clock reached zero."
+        "timeUp": "Time is up! The 90-second Blitz clock reached zero.",
+        "ringBreached": "The orbital cluster breached the outer containment ring.",
+        "vortexReached": "The sphere convoy reached the central singularity.",
+        "basinOverflow": "Spheres overflowed above the basin safety line."
       },
       "stats": {
         "score": "Final Score: {{score}}",
@@ -1184,7 +1321,9 @@
         "bossRushSummary": "Boss Wave: {{wave}} (best: {{best}}) • Coins: +{{coins}} ⬡",
         "waveSummary": "Wave reached: {{wave}} • Max Combo: x{{combo}} • Coins: +{{coins}} ⬡",
         "puzzleSummary": "Puzzle Stage: {{stage}} / {{total}}",
-        "classicSummary": "Stage reached: {{stage}} (best: {{best}}) • Coins: +{{coins}} ⬡"
+        "classicSummary": "Stage reached: {{stage}} (best: {{best}}) • Coins: +{{coins}} ⬡",
+        "pinballSummary": "Pinball Stage: {{stage}} (best: {{best}}) • Coins: +{{coins}} ⬡",
+        "mergeSummary": "Best Calibre: {{tier}} (best: {{best}}) • Coins: +{{coins}} ⬡"
       },
       "button": {
         "continueShots": "+{{shots}} Shots ({{cost}} ⬡)",
@@ -1342,7 +1481,8 @@
         "mostLeftLevel": "Most often left: level {{level}} ({{quits}} times)",
         "empty": "Play a round and your stats will appear here.",
         "privacy": "Stored on this device only. Nothing is sent anywhere.",
-        "bestClassicStage": "Best {{score}}, stage {{stage}}"
+        "bestClassicStage": "Best {{score}}, stage {{stage}}",
+        "bestTier": "Best {{score}}, calibre {{tier}}"
       },
       "button": {
         "copy": "Copy my stats",
@@ -1425,6 +1565,11 @@
         "flux": "🌀",
         "cascade": "⬇",
         "bossRush": "👑",
+        "hexGrid": "⬡",
+        "pinball": "🎱",
+        "orbital": "🪐",
+        "convoy": "🐍",
+        "merge": "🫧",
         "versus": "⚔"
       }
     }
@@ -1614,6 +1759,26 @@
       "won": "won by {{gap}}",
       "lost": "lost by {{gap}}",
       "tie": "dead heat"
+    },
+    "hexGrid": {
+      "header": "MagnaShot - Hex Grid",
+      "stats": "Wave {{wave}} - {{score}} pts"
+    },
+    "orbital": {
+      "header": "MagnaShot - Orbital 360",
+      "stats": "Wave {{wave}} - {{score}} pts"
+    },
+    "pinball": {
+      "header": "MagnaShot - Magnetic Pinball",
+      "stats": "Stage {{stage}} - {{score}} pts"
+    },
+    "convoy": {
+      "header": "MagnaShot - Magnetic Convoy",
+      "stats": "Wave {{wave}} - {{score}} pts"
+    },
+    "merge": {
+      "header": "MagnaShot - Merge Basin",
+      "stats": "Calibre {{tier}} - {{score}} pts"
     }
   },
   "stats": {

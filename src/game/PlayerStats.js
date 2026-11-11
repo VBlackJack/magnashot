@@ -56,6 +56,7 @@ const MILESTONE_COPY_KEYS = Object.freeze([
 const RECORD_KIND_STAGE = 'stage';
 const RECORD_KIND_CLASSIC_STAGE = 'classicStage';
 const RECORD_KIND_WAVE = 'wave';
+const RECORD_KIND_TIER = 'tier';
 // Code points of typographic look-alikes of ASCII, mapped to their plain replacement.
 const ASCII_REPLACEMENTS = new Map([
   [[0x2010, 0x2011, 0x2012, 0x2013, 0x2014, 0x2015, 0x2212], '-'],
@@ -337,6 +338,9 @@ function buildBestText(record, translate) {
   }
   if (record?.kind === RECORD_KIND_WAVE && record.wave > 0) {
     return translate('modals.stats.overview.bestWave', { score, wave: record.wave });
+  }
+  if (record?.kind === RECORD_KIND_TIER && record.tier > 0) {
+    return translate('modals.stats.overview.bestTier', { score, tier: record.tier });
   }
   return score > 0 ? translate('modals.stats.overview.bestScore', { score }) : '';
 }

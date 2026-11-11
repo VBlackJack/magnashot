@@ -589,6 +589,36 @@ export const uiInputBindingMethods = {
       labelKey: 'modals.levelSelect.arcade.cascade',
       start: () => this.engine.startCascadeMode()
     });
+    bindModeCard(this, this.elements.btnModeHexGrid, {
+      modeKey: GAME_MODES.HEX_GRID,
+      accessKey: GAME_MODES.HEX_GRID,
+      labelKey: 'modals.levelSelect.arcade.hexGrid',
+      start: () => this.engine.startHexGridMode()
+    });
+    bindModeCard(this, this.elements.btnModePinball, {
+      modeKey: GAME_MODES.PINBALL,
+      accessKey: GAME_MODES.PINBALL,
+      labelKey: 'modals.levelSelect.arcade.pinball',
+      start: () => this.engine.startPinballMode()
+    });
+    bindModeCard(this, this.elements.btnModeOrbital, {
+      modeKey: GAME_MODES.ORBITAL,
+      accessKey: GAME_MODES.ORBITAL,
+      labelKey: 'modals.levelSelect.arcade.orbital',
+      start: () => this.engine.startOrbitalMode()
+    });
+    bindModeCard(this, this.elements.btnModeConvoy, {
+      modeKey: GAME_MODES.CONVOY,
+      accessKey: GAME_MODES.CONVOY,
+      labelKey: 'modals.levelSelect.arcade.convoy',
+      start: () => this.engine.startConvoyMode()
+    });
+    bindModeCard(this, this.elements.btnModeMerge, {
+      modeKey: GAME_MODES.MERGE,
+      accessKey: GAME_MODES.MERGE,
+      labelKey: 'modals.levelSelect.arcade.merge',
+      start: () => this.engine.startMergeMode()
+    });
 
     this.elements.inputFluxSeed?.addEventListener('keydown', (e) => {
       if (e.key === 'Enter') {
@@ -869,8 +899,11 @@ export const uiInputBindingMethods = {
     } else if (e.code.startsWith('Digit')) {
       const idx = Number.parseInt(e.code.replace('Digit', ''), 10) - 1;
       if (idx >= 0 && idx < SPECIAL_TYPES_ORDER.length) {
-        e.preventDefault();
         const type = SPECIAL_TYPES_ORDER[idx];
+        if (this.engine.isSpecialTypeAllowed?.(type) === false) {
+          return;
+        }
+        e.preventDefault();
         const count = this.engine.specialInventory?.[type] || 0;
         const isEquipped = this.engine.currentBall?.specialType === type;
         if (count <= 0 && !isEquipped && this.engine.offersSpecialBalls?.() && this.canBuySpecialAmmo()) {

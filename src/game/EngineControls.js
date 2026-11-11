@@ -16,7 +16,9 @@
 
 import {
   GAME_MODES,
-  GAME_STATES
+  GAME_STATES,
+  LAUNCHER_POSTURES,
+  MATH_CONSTANTS
 } from '../core/Constants.js';
 import { isRunSnapshotable } from './RunSnapshot.js';
 import { DISCOVERY_INTERACTIONS } from './Discovery.js';
@@ -32,6 +34,10 @@ export const engineControlsMethods = {
     if (this.mode === GAME_MODES.CLASSIC) {
       return false;
     }
+    const modeOverride = this.getModeBehavior().offersSpecialBalls(this);
+    if (modeOverride !== null) {
+      return modeOverride;
+    }
     if (this.mode !== GAME_MODES.CAMPAIGN) {
       return true;
     }
@@ -41,9 +47,9 @@ export const engineControlsMethods = {
     return grants || holds || Boolean(this.currentBall?.specialType);
   },
 
-  /** True while shop ammo is switched off: Daily fairness, or the Classic ruleset (no specials). */
+  /** True while shop ammo is switched off: Daily fairness, Classic, or purist Arcade behavior modes. */
   isDailyAmmoLocked() {
-    if (this.mode === GAME_MODES.CLASSIC) {
+    if (this.mode === GAME_MODES.CLASSIC || this.getModeBehavior().offersSpecialBalls(this) === false) {
       return true;
     }
     return this.mode === GAME_MODES.DAILY && !this.gameConfig.seededFairness?.dailyAllowsSpecialAmmo;
@@ -51,9 +57,12 @@ export const engineControlsMethods = {
 
   /**
    * True while the Workshop upgrades count for nothing in the current run: Classic always,
-   * the Daily Challenge and Puzzle while they hold a zero baseline.
+   * purist Arcade behavior modes, and the Daily Challenge / Puzzle while they hold a zero baseline.
    */
   areUpgradesNeutralised() {
+    if (this.getModeBehavior().neutralizesWorkshopUpgrades(this)) {
+      return true;
+    }
     if (this.mode === GAME_MODES.PUZZLE) {
       // Mirrors the Daily check: neutralised while every baseline level is 0 (missing config counts as 0).
       return Object.keys(this.gameConfig.upgrades || {}).every(
@@ -113,7 +122,7 @@ export const engineControlsMethods = {
    *   active (only PLAYING or PAUSED runs accept purchases), the item is not for sale, or coins are short.
    */
   buySpecialAmmo(specialType) {
-    if (!this.canBuySpecialAmmo()) {
+    if (!this.canBuySpecialAmmo() || !this.isSpecialTypeAllowed(specialType)) {
       return false;
     }
     if (this.mode === GAME_MODES.PUZZLE) {
@@ -173,6 +182,12 @@ export const engineControlsMethods = {
     const temp = this.currentBall;
     this.currentBall = this.nextBall;
     this.nextBall = temp;
+    if (this.mode === GAME_MODES.MERGE) {
+      const behavior = this.getModeBehavior();
+      behavior.syncLauncherBallTier?.(this, this.currentBall);
+      behavior.syncLauncherBallTier?.(this, this.nextBall);
+      this.mergeDropX = behavior.clampDropX(this, this.mergeDropX, this.currentBall.radius);
+    }
     this.audioManager.playEffect('snap');
     this.updateAimFromAngle(this.aimAngle);
     this.saveRunSnapshot({ force: true });
@@ -184,6 +199,7 @@ export const engineControlsMethods = {
       return;
     }
     this.isPolarityFlipped = !this.isPolarityFlipped;
+    this.getModeBehavior().onPolarityFlipped(this);
     this.recordDiscoveryInteraction(DISCOVERY_INTERACTIONS.TOGGLE);
     this.audioManager.playEffect('snap');
     this.updateAimFromAngle(this.aimAngle);
@@ -203,9 +219,53 @@ export const engineControlsMethods = {
     this.isAimCancelled = false;
     this.isAimLocked = true;
     this.aimLockOrigin = null;
-    const canvasCfg = this.gameConfig.canvas;
-    const clamped = Math.max(-canvasCfg.maxAimAngleRad, Math.min(-canvasCfg.minAimAngleRad, this.aimAngle + deltaRad));
+    const spec = this.getLauncherSpec();
+    if (spec.posture === LAUNCHER_POSTURES.DROP_RAIL) {
+      const behavior = this.getModeBehavior();
+      const radius = this.currentBall?.radius || this.physicsConfig.ball.radius;
+      const baseStepRad = this.gameConfig.canvas.keyboardAimStepRad;
+      const dropStepPx = this.modesConfig.merge.dropStepPx;
+      const stepPx = (deltaRad / baseStepRad) * dropStepPx;
+      this.mergeDropX = behavior.clampDropX
+        ? behavior.clampDropX(this, this.mergeDropX + stepPx, radius)
+        : this.mergeDropX + stepPx;
+      this.updateAimFromAngle(spec.defaultAngle);
+      return;
+    }
+    if (spec.posture === LAUNCHER_POSTURES.OMNI_360) {
+      let wrapped = (this.aimAngle + deltaRad) % MATH_CONSTANTS.TWO_PI;
+      if (wrapped > Math.PI) {
+        wrapped -= MATH_CONSTANTS.TWO_PI;
+      } else if (wrapped < -Math.PI) {
+        wrapped += MATH_CONSTANTS.TWO_PI;
+      }
+      this.updateAimFromAngle(wrapped);
+      return;
+    }
+    if (spec.posture === LAUNCHER_POSTURES.DOWNWARD) {
+      // In downward cannon posture, angle increases from right (0.18) to left (2.96):
+      // invert deltaRad so Right key still moves aim rightward and Left key moves aim leftward.
+      const clampedDown = Math.max(spec.minAngle, Math.min(spec.maxAngle, this.aimAngle - deltaRad));
+      this.updateAimFromAngle(clampedDown);
+      return;
+    }
+    const clamped = Math.max(spec.minAngle, Math.min(spec.maxAngle, this.aimAngle + deltaRad));
     this.updateAimFromAngle(clamped);
+  },
+
+  /** Centers the aim along the active launcher posture's default direction or drop-rail center. */
+  recenterAim() {
+    if (this.state !== GAME_STATES.PLAYING) {
+      return;
+    }
+    this.isAimCancelled = false;
+    this.isAimLocked = true;
+    this.aimLockOrigin = null;
+    const spec = this.getLauncherSpec();
+    if (spec.posture === LAUNCHER_POSTURES.DROP_RAIL) {
+      this.mergeDropX = spec.x;
+    }
+    this.updateAimFromAngle(spec.defaultAngle);
   },
 
   /**
@@ -239,31 +299,73 @@ export const engineControlsMethods = {
   },
 
   updateAim(targetX, targetY) {
+    const spec = this.getLauncherSpec();
+    if (spec.posture === LAUNCHER_POSTURES.DROP_RAIL) {
+      this.isAimCancelled = false;
+      const behavior = this.getModeBehavior();
+      const radius = this.currentBall?.radius || this.physicsConfig.ball.radius;
+      this.mergeDropX = behavior.clampDropX
+        ? behavior.clampDropX(this, targetX, radius)
+        : targetX;
+      this.updateAimFromAngle(spec.defaultAngle);
+      return;
+    }
+    if (spec.posture === LAUNCHER_POSTURES.OMNI_360) {
+      const dx = targetX - spec.x;
+      const dy = targetY - spec.y;
+      if (spec.cancelRadius > 0 && Math.hypot(dx, dy) <= spec.cancelRadius) {
+        this.isAimCancelled = true;
+        return;
+      }
+      this.isAimCancelled = false;
+      this.updateAimFromAngle(Math.atan2(dy, dx));
+      return;
+    }
+    if (spec.posture === LAUNCHER_POSTURES.DOWNWARD) {
+      if (targetY < spec.y - spec.cancelOffset) {
+        this.isAimCancelled = true;
+        return;
+      }
+      this.isAimCancelled = false;
+      const dx = targetX - spec.x;
+      const dy = targetY - spec.y;
+      let angle = Math.atan2(dy, dx);
+      if (angle < 0) {
+        angle = dx >= 0 ? spec.minAngle : spec.maxAngle;
+      }
+      angle = Math.max(spec.minAngle, Math.min(spec.maxAngle, angle));
+      this.updateAimFromAngle(angle);
+      return;
+    }
     const canvasCfg = this.gameConfig.canvas;
-    const cancelThresholdY = canvasCfg.launcherY + canvasCfg.cancelAimOffsetY;
+    const cancelThresholdY = spec.y + canvasCfg.cancelAimOffsetY;
     if (targetY > cancelThresholdY) {
       this.isAimCancelled = true;
       return;
     }
     this.isAimCancelled = false;
-    const dx = targetX - canvasCfg.launcherX;
-    const dy = targetY - canvasCfg.launcherY;
+    const dx = targetX - spec.x;
+    const dy = targetY - spec.y;
     let angle = Math.atan2(dy, dx);
-    if (angle > -canvasCfg.minAimAngleRad) {
-      angle = dx >= 0 ? -canvasCfg.minAimAngleRad : -canvasCfg.maxAimAngleRad;
+    if (angle > spec.maxAngle) {
+      angle = dx >= 0 ? spec.maxAngle : spec.minAngle;
     }
-    angle = Math.max(-canvasCfg.maxAimAngleRad, Math.min(-canvasCfg.minAimAngleRad, angle));
+    angle = Math.max(spec.minAngle, Math.min(spec.maxAngle, angle));
     this.updateAimFromAngle(angle);
   },
 
   updateAimFromAngle(angle) {
     this.aimAngle = angle;
     this.isAimPreviewStale = false;
-    const canvasCfg = this.gameConfig.canvas;
+    const spec = this.getLauncherSpec();
+    if (spec.posture === LAUNCHER_POSTURES.DROP_RAIL) {
+      this.aimPoints = [];
+      return;
+    }
     const bonuses = this.getLaserBonuses();
     this.aimPoints = this.physicsWorld.computeAimTrajectory(
-      canvasCfg.launcherX,
-      canvasCfg.launcherY,
+      spec.x,
+      spec.y,
       this.aimAngle,
       this.currentBall,
       bonuses.distanceBonus,
@@ -286,13 +388,14 @@ export const engineControlsMethods = {
     }
   },
 
-  /** True when the device tilt is ignored: Daily, Classic, Puzzle and shared-seed Flux share one physics. */
+  /** True when the device tilt is ignored: Daily, Classic, Puzzle, locked behavior modes, and shared-seed Flux. */
   isTiltLocked() {
     return (
       this.mode === GAME_MODES.DAILY
       || this.mode === GAME_MODES.CLASSIC
       || this.mode === GAME_MODES.PUZZLE
       || (this.mode === GAME_MODES.FLUX && this.isSharedFluxRun)
+      || this.getModeBehavior().isTiltLocked(this)
     );
   },
 

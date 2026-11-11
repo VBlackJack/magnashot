@@ -432,13 +432,13 @@ const migrateVolume = (storedVolume, extra = {}) => {
   return storage;
 };
 
-test('v7: a fresh profile starts at the current schema version and the stored version is written', () => {
-  assert.equal(CURRENT_SAVE_SCHEMA_VERSION, 7);
+test('v8: a fresh profile starts at the current schema version and the stored version is written', () => {
+  assert.equal(CURRENT_SAVE_SCHEMA_VERSION, 8);
   const storage = createFakeStorage();
   withStorage(storage, () => {
     initManager();
   });
-  assert.equal(storage.getItem(VERSION_KEY), '7');
+  assert.equal(storage.getItem(VERSION_KEY), '8');
   assert.equal(storage.getItem(VOLUME_KEY), null, 'a fresh profile gets no volume key written');
 });
 
@@ -447,7 +447,7 @@ test('v6: an off-step music volume snaps to the nearest step, ties going up', ()
   for (const [stored, expected] of cases) {
     const storage = migrateVolume(stored);
     assert.equal(storage.getItem(VOLUME_KEY), expected, `${stored} snaps to ${expected}`);
-    assert.equal(storage.getItem(VERSION_KEY), '7');
+    assert.equal(storage.getItem(VERSION_KEY), '8');
   }
 });
 
@@ -513,10 +513,10 @@ const migratePuzzle = (bestStage, existingStats = null, fromVersion = '6') => {
 
 const readStageStats = (storage) => JSON.parse(storage.getItem(STAGE_STATS_KEY));
 
-test('v7: the schema is 7 and every stage below the best stage is seeded as cleared', () => {
-  assert.equal(CURRENT_SAVE_SCHEMA_VERSION, 7);
+test('v7: every stage below the best stage is seeded as cleared and advances to current schema', () => {
+  assert.equal(CURRENT_SAVE_SCHEMA_VERSION, 8);
   const storage = migratePuzzle(4);
-  assert.equal(storage.getItem(VERSION_KEY), '7');
+  assert.equal(storage.getItem(VERSION_KEY), '8');
   assert.deepEqual(readStageStats(storage), { 1: SEEDED_ENTRY, 2: SEEDED_ENTRY, 3: SEEDED_ENTRY });
   assert.equal(storage.getItem(BEST_STAGE_KEY), '4', 'the best stage is never touched');
 });
@@ -524,7 +524,7 @@ test('v7: the schema is 7 and every stage below the best stage is seeded as clea
 test('v7: a fresh profile and a best stage of 1 seed nothing', () => {
   const fresh = migratePuzzle(null);
   assert.equal(fresh.getItem(STAGE_STATS_KEY), null);
-  assert.equal(fresh.getItem(VERSION_KEY), '7');
+  assert.equal(fresh.getItem(VERSION_KEY), '8');
   const first = migratePuzzle(1);
   assert.equal(first.getItem(STAGE_STATS_KEY), null);
 });
@@ -532,7 +532,21 @@ test('v7: a fresh profile and a best stage of 1 seed nothing', () => {
 test('v7: an unreadable best stage seeds nothing', () => {
   const storage = migratePuzzle('high');
   assert.equal(storage.getItem(STAGE_STATS_KEY), null);
-  assert.equal(storage.getItem(VERSION_KEY), '7');
+  assert.equal(storage.getItem(VERSION_KEY), '8');
+});
+
+test('v8: veterans past the new Arcade unlock levels get the introduced modes marked new', () => {
+  const storage = createFakeStorage();
+  storage.setItem(VERSION_KEY, '7');
+  storage.setItem(`${prefix}${keys.unlockedLevel}`, '20');
+  withStorage(storage, () => {
+    const manager = initManager();
+    const unlocks = manager.getModeUnlocks();
+    for (const mode of ['hex_grid', 'pinball', 'orbital', 'convoy', 'merge']) {
+      assert.equal(unlocks[mode], gameConfig.modeUnlocks.stateNew, `${mode} announced as new`);
+    }
+  });
+  assert.equal(storage.getItem(VERSION_KEY), '8');
 });
 
 test('v7: existing entries are never overwritten and missing ones are filled', () => {

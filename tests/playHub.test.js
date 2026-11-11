@@ -83,7 +83,12 @@ test('initial focus: a running mode focuses its own card', () => {
     [GAME_MODES.PUZZLE]: 'btnModePuzzle',
     [GAME_MODES.BLITZ]: 'btnModeBlitz',
     [GAME_MODES.BOSS_RUSH]: 'btnModeBossRush',
-    [GAME_MODES.CASCADE]: 'btnModeCascade'
+    [GAME_MODES.CASCADE]: 'btnModeCascade',
+    [GAME_MODES.HEX_GRID]: 'btnModeHexGrid',
+    [GAME_MODES.PINBALL]: 'btnModePinball',
+    [GAME_MODES.ORBITAL]: 'btnModeOrbital',
+    [GAME_MODES.CONVOY]: 'btnModeConvoy',
+    [GAME_MODES.MERGE]: 'btnModeMerge'
   };
   for (const [mode, key] of Object.entries(expected)) {
     assert.equal(

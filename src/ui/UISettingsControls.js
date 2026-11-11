@@ -502,7 +502,13 @@ export const uiSettingsControlMethods = {
         wave: engine.waveCount,
         score: engine.score,
         waveLog: engine.waveLog,
-        stage: engine.mode === GAME_MODES.CLASSIC ? engine.classicStage : engine.fluxStage,
+        stage:
+          engine.mode === GAME_MODES.CLASSIC
+            ? engine.classicStage
+            : engine.mode === GAME_MODES.PINBALL
+              ? engine.pinballStage
+              : engine.fluxStage,
+        tier: engine.mergeBestTier,
         drops: engine.classicRailDropsTotal ?? 0,
         puzzleStage: engine.currentPuzzleStage,
         seed: engine.fluxSeed,

@@ -400,6 +400,47 @@ function buildVersusShareText({ won, tier, score, neutralised, pulses, url }) {
   ].join(LINE_SEPARATOR);
 }
 
+function buildHexGridShareText({ wave, score, url }) {
+  return [
+    t('share.hexGrid.header'),
+    t('share.hexGrid.stats', { wave: formatNumber(wave), score: formatNumber(score) }),
+    url
+  ].join(LINE_SEPARATOR);
+}
+
+function buildOrbitalShareText({ wave, score, url }) {
+  return [
+    t('share.orbital.header'),
+    t('share.orbital.stats', { wave: formatNumber(wave), score: formatNumber(score) }),
+    url
+  ].join(LINE_SEPARATOR);
+}
+
+function buildPinballShareText({ stage, score, url }) {
+  return [
+    t('share.pinball.header'),
+    t('share.pinball.stats', { stage: formatNumber(stage ?? 1), score: formatNumber(score) }),
+    url
+  ].join(LINE_SEPARATOR);
+}
+
+function buildConvoyShareText({ wave, score, url }) {
+  return [
+    t('share.convoy.header'),
+    t('share.convoy.stats', { wave: formatNumber(wave), score: formatNumber(score) }),
+    url
+  ].join(LINE_SEPARATOR);
+}
+
+function buildMergeShareText({ tier, bestTier, score, url }) {
+  const resolvedTier = tier ?? bestTier ?? 1;
+  return [
+    t('share.merge.header'),
+    t('share.merge.stats', { tier: formatNumber(resolvedTier), score: formatNumber(score) }),
+    url
+  ].join(LINE_SEPARATOR);
+}
+
 /**
  * Builds the shareable result of a run in the mode it was played. The campaign never
  * shares, so it is rejected like any unknown mode.
@@ -429,6 +470,16 @@ export function buildShareText(run, shareConfig) {
       return buildClassicShareText(run);
     case GAME_MODES.VERSUS:
       return buildVersusShareText(run);
+    case GAME_MODES.HEX_GRID:
+      return buildHexGridShareText(run);
+    case GAME_MODES.ORBITAL:
+      return buildOrbitalShareText(run);
+    case GAME_MODES.PINBALL:
+      return buildPinballShareText(run);
+    case GAME_MODES.CONVOY:
+      return buildConvoyShareText(run);
+    case GAME_MODES.MERGE:
+      return buildMergeShareText(run);
     default:
       throw new RangeError(`No shareable result for game mode "${run.mode}"`);
   }

@@ -40,6 +40,7 @@ const STATS_EXTRA_MODE_NAME_KEYS = Object.freeze({
 const RECORD_KIND_STAGE = 'stage';
 const RECORD_KIND_WAVE = 'wave';
 const RECORD_KIND_CLASSIC_STAGE = 'classicStage';
+const RECORD_KIND_TIER = 'tier';
 
 const MS_PER_DAY = 86_400_000;
 const UTC_TIME_ZONE = 'UTC';
@@ -79,6 +80,9 @@ export function formatModeBest(record, translate, format) {
   }
   if (record.kind === RECORD_KIND_WAVE && record.wave > 0) {
     return translate('modals.stats.overview.bestWave', { score: format(score), wave: format(record.wave) });
+  }
+  if (record.kind === RECORD_KIND_TIER && record.tier > 0) {
+    return translate('modals.stats.overview.bestTier', { score: format(score), tier: format(record.tier) });
   }
   return translate('modals.stats.overview.bestScore', { score: format(score) });
 }
@@ -363,6 +367,31 @@ export const uiStatsMethods = {
           score: storage.getBossRushHighScore?.() ?? 0,
           kind: RECORD_KIND_WAVE,
           wave: storage.getBossRushBestWave?.() ?? 0
+        },
+        [GAME_MODES.HEX_GRID]: {
+          score: storage.getHexGridHighScore?.() ?? 0,
+          kind: RECORD_KIND_WAVE,
+          wave: storage.getHexGridBestWave?.() ?? 0
+        },
+        [GAME_MODES.PINBALL]: {
+          score: storage.getPinballHighScore?.() ?? 0,
+          kind: RECORD_KIND_CLASSIC_STAGE,
+          stage: storage.getPinballBestStage?.() ?? 0
+        },
+        [GAME_MODES.ORBITAL]: {
+          score: storage.getOrbitalHighScore?.() ?? 0,
+          kind: RECORD_KIND_WAVE,
+          wave: storage.getOrbitalBestWave?.() ?? 0
+        },
+        [GAME_MODES.CONVOY]: {
+          score: storage.getConvoyHighScore?.() ?? 0,
+          kind: RECORD_KIND_WAVE,
+          wave: storage.getConvoyBestWave?.() ?? 0
+        },
+        [GAME_MODES.MERGE]: {
+          score: storage.getMergeHighScore?.() ?? 0,
+          kind: RECORD_KIND_TIER,
+          tier: storage.getMergeBestTier?.() ?? 0
         }
       }
     };

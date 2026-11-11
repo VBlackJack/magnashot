@@ -106,7 +106,12 @@ export const MODE_BUTTON_KEYS = Object.freeze({
   [GAME_MODES.PUZZLE]: ['btnModePuzzle'],
   [GAME_MODES.BLITZ]: ['btnModeBlitz'],
   [GAME_MODES.BOSS_RUSH]: ['btnModeBossRush'],
-  [GAME_MODES.CASCADE]: ['btnModeCascade']
+  [GAME_MODES.CASCADE]: ['btnModeCascade'],
+  [GAME_MODES.HEX_GRID]: ['btnModeHexGrid'],
+  [GAME_MODES.PINBALL]: ['btnModePinball'],
+  [GAME_MODES.ORBITAL]: ['btnModeOrbital'],
+  [GAME_MODES.CONVOY]: ['btnModeConvoy'],
+  [GAME_MODES.MERGE]: ['btnModeMerge']
 });
 
 /** Modal texts (pause instructions, perk choice subtitle) that have one wording per input mode. */
@@ -605,6 +610,11 @@ export const MODE_NAME_KEYS = Object.freeze({
   [GAME_MODES.FLUX]: 'app.nav.button.flux',
   [GAME_MODES.CASCADE]: 'modals.levelSelect.arcade.cascade',
   [GAME_MODES.BOSS_RUSH]: 'modals.levelSelect.arcade.bossRush',
+  [GAME_MODES.HEX_GRID]: 'modals.levelSelect.arcade.hexGrid',
+  [GAME_MODES.PINBALL]: 'modals.levelSelect.arcade.pinball',
+  [GAME_MODES.ORBITAL]: 'modals.levelSelect.arcade.orbital',
+  [GAME_MODES.CONVOY]: 'modals.levelSelect.arcade.convoy',
+  [GAME_MODES.MERGE]: 'modals.levelSelect.arcade.merge',
   [GAME_MODES.VERSUS]: 'versus.mode.name',
   [WEEKLY_ACCESS_KEY]: 'app.nav.button.weekly'
 });
@@ -656,6 +666,36 @@ export const ARCADE_CARD_SPECS = Object.freeze({
     best: 'arcadeBestBossRush',
     titleKey: 'modals.levelSelect.arcade.bossRush',
     descKey: 'modals.levelSelect.arcade.bossRushDesc'
+  }),
+  [GAME_MODES.HEX_GRID]: Object.freeze({
+    card: 'btnModeHexGrid',
+    best: 'arcadeBestHexGrid',
+    titleKey: 'modals.levelSelect.arcade.hexGrid',
+    descKey: 'modals.levelSelect.arcade.hexGridDesc'
+  }),
+  [GAME_MODES.PINBALL]: Object.freeze({
+    card: 'btnModePinball',
+    best: 'arcadeBestPinball',
+    titleKey: 'modals.levelSelect.arcade.pinball',
+    descKey: 'modals.levelSelect.arcade.pinballDesc'
+  }),
+  [GAME_MODES.ORBITAL]: Object.freeze({
+    card: 'btnModeOrbital',
+    best: 'arcadeBestOrbital',
+    titleKey: 'modals.levelSelect.arcade.orbital',
+    descKey: 'modals.levelSelect.arcade.orbitalDesc'
+  }),
+  [GAME_MODES.CONVOY]: Object.freeze({
+    card: 'btnModeConvoy',
+    best: 'arcadeBestConvoy',
+    titleKey: 'modals.levelSelect.arcade.convoy',
+    descKey: 'modals.levelSelect.arcade.convoyDesc'
+  }),
+  [GAME_MODES.MERGE]: Object.freeze({
+    card: 'btnModeMerge',
+    best: 'arcadeBestMerge',
+    titleKey: 'modals.levelSelect.arcade.merge',
+    descKey: 'modals.levelSelect.arcade.mergeDesc'
   }),
   [GAME_MODES.VERSUS]: Object.freeze({
     card: 'btnModeVersus',

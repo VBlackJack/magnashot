@@ -18,6 +18,7 @@ import { CLUSTER_MODIFIERS, GAME_MODES, GAME_STATES, SPECIAL_TYPES_ORDER, WAVE_T
 import { Ball } from '../entities/Ball.js';
 import { normalizeShotTimeline } from './ShotTimeline.js';
 import { getSagSpec } from './SagMeter.js';
+import { getRegisteredModeBehavior } from './modes/index.js';
 
 /** Shape of a week key such as "2026-W45". */
 const WEEK_KEY_PATTERN = /^\d{4}-W\d{2}$/;
@@ -70,7 +71,10 @@ const ENGINE_SCALAR_FIELDS = [
   'blitzIdleFrames',
   'bossRushWave',
   'cascadeWave',
-  'cascadeTurnsUntilDrop'
+  'cascadeTurnsUntilDrop',
+  'pinballStage',
+  'mergeDropX',
+  'mergeBestTier'
 ];
 
 /** Ball fields copied verbatim; identity, bonds and the pivot link are handled separately. */
@@ -289,6 +293,7 @@ export function captureRunSnapshot(engine, version) {
     isDailyRematch: Boolean(engine.isDailyRematch),
     // Optional: the Magnetar schedule (a run saved before Magnetars, or with a Boss Core, holds none).
     magnetar: engine.getMagnetarSnapshot?.() ?? null,
+    modeState: engine.getModeBehavior().serializeModeState(engine),
     currentBall: { colorId: engine.currentBall.colorId, specialType: engine.currentBall.specialType },
     nextBall: { colorId: engine.nextBall.colorId, specialType: engine.nextBall.specialType },
     allowTensionBreak: world.allowTensionBreak,
@@ -327,9 +332,14 @@ export function isValidRunSnapshot(snapshot, version) {
   ) {
     return false;
   }
+  const behavior = getRegisteredModeBehavior(snapshot.mode);
+  const minBalls = behavior.allowsEmptyBoardSnapshot() ? 0 : 1;
+  if (!behavior.validateModeState(snapshot.modeState ?? null)) {
+    return false;
+  }
   return (
     Array.isArray(snapshot.balls) &&
-    snapshot.balls.length > 0 &&
+    snapshot.balls.length >= minBalls &&
     Array.isArray(snapshot.obstacles) &&
     Array.isArray(snapshot.pendingChainCandidateIds) &&
     Boolean(snapshot.engine && typeof snapshot.engine === 'object') &&
@@ -408,6 +418,16 @@ export function applyRunSnapshot(engine, snapshot) {
     engine.startCascadeMode();
   } else if (snapshot.mode === GAME_MODES.CLASSIC) {
     engine.startClassicMode(snapshot.engine.classicStage || 1);
+  } else if (snapshot.mode === GAME_MODES.HEX_GRID) {
+    engine.startHexGridMode();
+  } else if (snapshot.mode === GAME_MODES.ORBITAL) {
+    engine.startOrbitalMode();
+  } else if (snapshot.mode === GAME_MODES.PINBALL) {
+    engine.startPinballMode(snapshot.engine.pinballStage || 1);
+  } else if (snapshot.mode === GAME_MODES.CONVOY) {
+    engine.startConvoyMode();
+  } else if (snapshot.mode === GAME_MODES.MERGE) {
+    engine.startMergeMode();
   } else {
     engine.startEndlessMode();
   }
@@ -514,6 +534,7 @@ export function applyRunSnapshot(engine, snapshot) {
   }
   engine.currentBall = engine.createRandomLauncherBall(snapshot.currentBall.specialType, snapshot.currentBall.colorId);
   engine.nextBall = engine.createRandomLauncherBall(snapshot.nextBall.specialType, snapshot.nextBall.colorId);
+  engine.getModeBehavior().restoreModeState(engine, snapshot.modeState ?? null);
   // Runs saved before the queue existed, or with a damaged one, get a fresh queue.
   const savedQueue = snapshot.upcomingColorIds;
   const isValidQueue = Array.isArray(savedQueue) && savedQueue.every((color) => engine.activePalette.includes(color));

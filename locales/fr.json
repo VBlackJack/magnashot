@@ -153,13 +153,20 @@
         "coreRescueProgress": "💎 {{rescued}}/{{total}}",
         "switchHint": "Cliquer pour changer de mode ou de niveau",
         "switchHintTouch": "Touchez pour changer de mode ou de niveau",
-        "classic": "Puriste • Étape {{stage}}"
+        "classic": "Puriste • Étape {{stage}}",
+        "hexGrid": "Grille Hex • Vague {{wave}}",
+        "orbital": "Orbital 360 • Vague {{wave}}",
+        "pinball": "Pinball • Étape {{stage}} (⚡ {{cores}})",
+        "convoy": "Convoi • Vague {{wave}}",
+        "merge": "Fusion • Calibre {{tier}}"
       },
       "shots": {
         "label": "Tirs restants",
         "waveLabel": "Vague dans",
         "shieldsLabel": "Boucliers Boss",
-        "mooringsLabel": "Amarres"
+        "mooringsLabel": "Amarres",
+        "convoyLabel": "Sphères restantes",
+        "calibreLabel": "Calibre max"
       },
       "time": {
         "label": "Temps restant",
@@ -465,7 +472,27 @@
         "moorings": "AMARRE COUPÉE ! RESTE : {{left}}",
         "down": "MAGNETAR TERRASSÉ ! +{{points}}"
       },
-      "resonance": "Résonance !"
+      "resonance": "Résonance !",
+      "hexGrid": {
+        "pulse": "IMPULSION HEX ! +{{points}}",
+        "waveCleared": "GRILLE VIDÉE ! +{{points}}"
+      },
+      "orbital": {
+        "arcCatch": "ARC COLLECTEUR +{{points}}",
+        "waveCleared": "ORBITE VIDÉE ! +{{points}}"
+      },
+      "pinball": {
+        "freeBall": "BILLE BONUS ! +1 • +{{points}}",
+        "stageCleared": "ÉTAPE VIDÉE ! +{{points}}"
+      },
+      "convoy": {
+        "snapback": "RAPPEL MAGNÉTIQUE ! +{{points}}",
+        "waveCleared": "CONVOI DÉTRUIT ! +{{points}}"
+      },
+      "merge": {
+        "fused": "CALIBRE {{tier}} ! +{{points}}",
+        "supernova": "SUPERNOVA MAGNÉTIQUE ! +{{points}}"
+      }
     },
     "mutators": {
       "hyperGravity": "Hyper-Gravité",
@@ -684,7 +711,19 @@
         "classic": "Puriste",
         "classicDesc": "Règles pures : ni spéciaux, ni améliorations. Les ratés abaissent le plafond.",
         "classicBest": "Record : étape {{stage}}",
-        "puzzleStageAria": "Puzzle {{stage}}, {{stars}} étoiles sur {{maxStars}}"
+        "puzzleStageAria": "Puzzle {{stage}}, {{stars}} étoiles sur {{maxStars}}",
+        "hexGrid": "Grille Hex",
+        "hexGridDesc": "Grille rigide • Tir droit • Impulsion de polarité",
+        "pinball": "Pinball Magnétique",
+        "pinballDesc": "Canon haut • Plots coeurs • Polarité en vol et panier bonus",
+        "pinballRecord": "Étape {{stage}} • Record : {{score}}",
+        "orbital": "Orbital 360",
+        "orbitalDesc": "Rotor zéro-G • 4 arcs collecteurs • Anneau critique",
+        "convoy": "Convoi sur Rail",
+        "convoyDesc": "Tourelle 360° • Convoi mobile • Rappel magnétique",
+        "merge": "Fusion en Bassin",
+        "mergeDesc": "10 calibres • Rail de lâcher • Onde de choc de fusion",
+        "mergeRecord": "Calibre {{tier}} • Record : {{score}}"
       },
       "jumpCurrent": "Niveau en cours",
       "grid": {
@@ -751,6 +790,10 @@
         "unavailableHint": "Lancez une manche (Campagne, Survie, Défi du Jour, Flux, Blitz, Boss Rush ou Cascade) pour acheter des munitions.",
         "puzzleLocked": "Dotation fixe",
         "puzzleLockedHint": "Les niveaux Puzzle utilisent une dotation fixe de sphères spéciales.",
+        "puristLocked": "Règles pures",
+        "puristLockedHint": "Ce mode se joue sans sphères spéciales.",
+        "modeDisabled": "Inactif dans ce mode",
+        "modeDisabledHint": "Cette sphère spéciale n'est pas utilisée dans ce mode.",
         "blockedLabel": "Pas maintenant",
         "blocked": {
           "shotInFlight": "Attendez la fin du tir pour acheter des munitions spéciales.",
@@ -963,6 +1006,36 @@
               "description": "Tire des sphères chargées depuis la ligne de danger. Tirez la polarité opposée pour les neutraliser."
             }
           }
+        },
+        "behaviors": {
+          "title": "Comportements de Billes Arcade",
+          "items": {
+            "hexGrid": {
+              "icon": "⬡",
+              "name": "Grille Hex (Ancrage Rigide)",
+              "description": "Vos tirs filent droit sans courbure et s'ancrent sur une grille hexagonale fixe. Inversez la polarité (F) avant de tirer pour déclencher une impulsion d'une case à l'impact."
+            },
+            "pinball": {
+              "icon": "🎱",
+              "name": "Pinball Magnétique (Ricochets)",
+              "description": "Un canon supérieur tire sous gravité à travers des plots fixes. Inversez la polarité (F) en plein vol pour courber la bille, allumez les plots coeurs et visez le panier mobile (+1 tir)."
+            },
+            "orbital": {
+              "icon": "🪐",
+              "name": "Orbital 360 (Spin Zéro-G)",
+              "description": "L'impact de vos tirs fait tourner librement un noyau central sans gravité. Les sphères détachées dérivent à 360° vers 4 arcs collecteurs ; restez dans l'anneau de confinement."
+            },
+            "convoy": {
+              "icon": "🐍",
+              "name": "Convoi sur Rail (Rappel Magnétique)",
+              "description": "Une tourelle centrale à 360° tire dans un convoi continu avançant vers un vortex. Ouvrir une brèche entre couleurs identiques ou pôles opposés rappelle violemment l'avant en combo."
+            },
+            "merge": {
+              "icon": "🫧",
+              "name": "Fusion en Bassin (10 Calibres)",
+              "description": "Lâchez vos billes depuis un rail supérieur dans un bassin physique. Deux calibres identiques fusionnent au rang suivant (1 à 10) avec une onde de choc, et la polarité module l'aimantation."
+            }
+          }
         }
       },
       "achievements": {
@@ -1090,6 +1163,66 @@
           "magnetarLandslideGold": {
             "name": "Éboulement III",
             "description": "Terrasser un Magnetar dans une énorme avalanche (objectif : {{target}})."
+          },
+          "hexGridWaves": {
+            "name": "Tacticien de Grille",
+            "description": "Atteindre la Vague {{target}} en Grille Hex."
+          },
+          "hexGridWavesSilver": {
+            "name": "Tacticien de Grille II",
+            "description": "Atteindre la Vague {{target}} en Grille Hex."
+          },
+          "hexGridWavesGold": {
+            "name": "Tacticien de Grille III",
+            "description": "Atteindre la Vague {{target}} en Grille Hex."
+          },
+          "orbitalWaves": {
+            "name": "Pilote Orbital",
+            "description": "Atteindre la Vague {{target}} en Spin Orbital."
+          },
+          "orbitalWavesSilver": {
+            "name": "Pilote Orbital II",
+            "description": "Atteindre la Vague {{target}} en Spin Orbital."
+          },
+          "orbitalWavesGold": {
+            "name": "Pilote Orbital III",
+            "description": "Atteindre la Vague {{target}} en Spin Orbital."
+          },
+          "pinballStages": {
+            "name": "Maître du Pinball",
+            "description": "Atteindre l'Étape {{target}} en Pinball Magnétique."
+          },
+          "pinballStagesSilver": {
+            "name": "Maître du Pinball II",
+            "description": "Atteindre l'Étape {{target}} en Pinball Magnétique."
+          },
+          "pinballStagesGold": {
+            "name": "Maître du Pinball III",
+            "description": "Atteindre l'Étape {{target}} en Pinball Magnétique."
+          },
+          "convoyWaves": {
+            "name": "Intercepteur sur Rail",
+            "description": "Atteindre la Vague {{target}} en Convoi sur Rail."
+          },
+          "convoyWavesSilver": {
+            "name": "Intercepteur sur Rail II",
+            "description": "Atteindre la Vague {{target}} en Convoi sur Rail."
+          },
+          "convoyWavesGold": {
+            "name": "Intercepteur sur Rail III",
+            "description": "Atteindre la Vague {{target}} en Convoi sur Rail."
+          },
+          "mergeTiers": {
+            "name": "Alchimiste de Fusion",
+            "description": "Fusionner jusqu'au Calibre {{target}} en Fusion en Bassin."
+          },
+          "mergeTiersSilver": {
+            "name": "Alchimiste de Fusion II",
+            "description": "Fusionner jusqu'au Calibre {{target}} en Fusion en Bassin."
+          },
+          "mergeTiersGold": {
+            "name": "Alchimiste de Fusion III",
+            "description": "Fusionner jusqu'au Calibre {{target}} en Fusion en Bassin."
           }
         },
         "tier": {
@@ -1130,7 +1263,8 @@
           "name": "Aimant Collecteur",
           "description": "Ajoute +{{points}} points bonus et +{{overcharge}} % de Surcharge par sphère d'avalanche dans les collecteurs du bas par rang."
         },
-        "puzzleBaselineNote": "Les améliorations sont suspendues en Puzzle : chaque joueur affronte le même puzzle."
+        "puzzleBaselineNote": "Les améliorations sont suspendues en Puzzle : chaque joueur affronte le même puzzle.",
+        "puristBaselineNote": "Les améliorations sont suspendues dans ce mode puriste."
       },
       "feedback": {
         "upgradePurchased": "{{name}} amélioré au niveau {{level}} sur {{maxLevel}}.",
@@ -1173,7 +1307,10 @@
       "reason": {
         "lineCrossed": "L'amas magnétique a franchi la ligne critique.",
         "outOfShots": "Vous n'avez plus de sphères disponibles.",
-        "timeUp": "Temps écoulé ! Le chronomètre Blitz de 90 secondes a atteint zéro."
+        "timeUp": "Temps écoulé ! Le chronomètre Blitz de 90 secondes a atteint zéro.",
+        "ringBreached": "L'amas orbital a franchi l'anneau de confinement extérieur.",
+        "vortexReached": "Le convoi de sphères a atteint la singularité.",
+        "basinOverflow": "Les billes ont débordé au-dessus de la ligne critique du bassin."
       },
       "stats": {
         "score": "Score atteint : {{score}}",
@@ -1184,7 +1321,9 @@
         "bossRushSummary": "Vague Boss : {{wave}} (record : {{best}}) • Pièces : +{{coins}} ⬡",
         "waveSummary": "Vague atteinte : {{wave}} • Combo max : x{{combo}} • Pièces : +{{coins}} ⬡",
         "puzzleSummary": "Niveau Puzzle : {{stage}} / {{total}}",
-        "classicSummary": "Étape atteinte : {{stage}} (record : {{best}}) • Pièces : +{{coins}} ⬡"
+        "classicSummary": "Étape atteinte : {{stage}} (record : {{best}}) • Pièces : +{{coins}} ⬡",
+        "pinballSummary": "Étape Pinball : {{stage}} (record : {{best}}) • Pièces : +{{coins}} ⬡",
+        "mergeSummary": "Calibre atteint : {{tier}} (record : {{best}}) • Pièces : +{{coins}} ⬡"
       },
       "button": {
         "continueShots": "+{{shots}} tirs ({{cost}} ⬡)",
@@ -1342,7 +1481,8 @@
         "mostLeftLevel": "Le plus souvent quitté : niveau {{level}} ({{quits}} fois)",
         "empty": "Jouez une partie et vos statistiques apparaîtront ici.",
         "privacy": "Stocké uniquement sur cet appareil. Rien n'est envoyé nulle part.",
-        "bestClassicStage": "Record {{score}}, étape {{stage}}"
+        "bestClassicStage": "Record {{score}}, étape {{stage}}",
+        "bestTier": "Record {{score}}, calibre {{tier}}"
       },
       "button": {
         "copy": "Copier mes statistiques",
@@ -1425,6 +1565,11 @@
         "flux": "🌀",
         "cascade": "⬇",
         "bossRush": "👑",
+        "hexGrid": "⬡",
+        "pinball": "🎱",
+        "orbital": "🪐",
+        "convoy": "🐍",
+        "merge": "🫧",
         "versus": "⚔"
       }
     }
@@ -1614,6 +1759,26 @@
       "won": "gagné de {{gap}}",
       "lost": "perdu de {{gap}}",
       "tie": "égalité"
+    },
+    "hexGrid": {
+      "header": "MagnaShot - Grille Hex",
+      "stats": "Vague {{wave}} - {{score}} pts"
+    },
+    "orbital": {
+      "header": "MagnaShot - Orbital 360",
+      "stats": "Vague {{wave}} - {{score}} pts"
+    },
+    "pinball": {
+      "header": "MagnaShot - Pinball Magnétique",
+      "stats": "Étape {{stage}} - {{score}} pts"
+    },
+    "convoy": {
+      "header": "MagnaShot - Convoi sur Rail",
+      "stats": "Vague {{wave}} - {{score}} pts"
+    },
+    "merge": {
+      "header": "MagnaShot - Fusion en Bassin",
+      "stats": "Calibre {{tier}} - {{score}} pts"
     }
   },
   "stats": {

@@ -266,4 +266,43 @@ export function buildCodexPane() {
     patternsGrid.appendChild(card);
   }
   pane.appendChild(patternsGrid);
+
+  const behaviorsOrder = ['hexGrid', 'pinball', 'orbital', 'convoy', 'merge'];
+  const behaviorsHeading = document.createElement('h3');
+  behaviorsHeading.className = 'modal-subtitle';
+  behaviorsHeading.textContent = t('modals.shop.codex.behaviors.title');
+  pane.appendChild(behaviorsHeading);
+
+  const behaviorsGrid = document.createElement('div');
+  behaviorsGrid.className = 'codex-grid';
+  behaviorsGrid.dataset.codexSection = 'behaviors';
+  for (const behaviorId of behaviorsOrder) {
+    const card = document.createElement('div');
+    card.className = 'codex-card';
+    card.dataset.codexBehavior = behaviorId;
+
+    const badge = document.createElement('div');
+    badge.className = 'codex-badge';
+    const behaviorColor = this.gameConfig.theme.collectorLabelColor || this.gameConfig.theme.wavePopupColor;
+    badge.style.borderColor = behaviorColor;
+    badge.style.background = specialIconBackground({
+      highlight: behaviorColor,
+      fill: this.gameConfig.theme.launcherBaseColor
+    });
+    badge.textContent = t(`modals.shop.codex.behaviors.items.${behaviorId}.icon`);
+
+    const info = document.createElement('div');
+    info.className = 'codex-info';
+    const title = document.createElement('div');
+    title.className = 'codex-title';
+    title.textContent = t(`modals.shop.codex.behaviors.items.${behaviorId}.name`);
+    const desc = document.createElement('div');
+    desc.className = 'codex-desc';
+    desc.textContent = t(`modals.shop.codex.behaviors.items.${behaviorId}.description`);
+    info.append(title, desc);
+
+    card.append(badge, info);
+    behaviorsGrid.appendChild(card);
+  }
+  pane.appendChild(behaviorsGrid);
 }

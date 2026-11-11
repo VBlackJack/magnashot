@@ -36,6 +36,7 @@ const campaignConfig = loadJson('./configs/campaign.json');
 const campaignTuning = loadJson('./configs/campaignTuning.json');
 const audioConfig = loadJson('./configs/audio.json');
 const fluxConfig = loadJson('./configs/flux.json');
+const modesConfig = loadJson('./configs/modes.json');
 
 configRegistry.configs.set('game', gameConfig);
 configRegistry.configs.set('physics', physicsConfig);
@@ -45,6 +46,7 @@ configRegistry.configs.set('levels', levelsConfig);
 configRegistry.configs.set('campaign', campaignConfig);
 configRegistry.configs.set('audio', audioConfig);
 configRegistry.configs.set('flux', fluxConfig);
+configRegistry.configs.set('modes', modesConfig);
 
 /** Launcher and danger line of the 540 x 820 board before they were derived from its size. */
 const FORMER_FIXED_GEOMETRY = Object.freeze({ logicalHeight: 820, launcherX: 270, launcherY: 745, dangerLineY: 675 });
@@ -66,6 +68,7 @@ const createEngine = (config = gameConfig) => {
     campaignConfig,
     campaignTuning,
     fluxConfig,
+    modesConfig,
     audioManager: { playEffect: () => {}, stopAll: () => {}, isMuted: () => true, setMuted: () => {} },
     storageManager,
     onStateChange: () => {}
@@ -201,4 +204,24 @@ test('The Survival grid fits between the walls', () => {
   const engine = createEngine();
   engine.startEndlessMode();
   assertFitsWorld(engine.physicsWorld, 'Survival');
+});
+
+test('The Hex Grid, Orbital, Pinball and Convoy boards fit between the walls', () => {
+  const engine = createEngine();
+  engine.startHexGridMode();
+  assertFitsWorld(engine.physicsWorld, 'Hex Grid');
+
+  engine.startOrbitalMode();
+  assertFitsWorld(engine.physicsWorld, 'Orbital');
+
+  for (let stage = 1; stage <= 6; stage++) {
+    engine.startPinballMode(stage);
+    assertFitsWorld(engine.physicsWorld, `Pinball stage ${stage}`);
+  }
+
+  engine.startConvoyMode();
+  for (let i = 0; i < 60; i++) {
+    engine.update();
+  }
+  assertFitsWorld(engine.physicsWorld, 'Convoy');
 });

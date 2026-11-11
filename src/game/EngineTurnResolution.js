@@ -674,15 +674,19 @@ export const engineTurnResolutionMethods = {
 
   grantRandomSpecialBall() {
     const canvasCfg = this.gameConfig.canvas;
-    const types = Object.values(SPECIAL_TYPES);
+    const launcherSpec = this.getLauncherSpec();
+    const types = Object.values(SPECIAL_TYPES).filter((type) => this.isSpecialTypeAllowed(type));
+    if (types.length === 0) {
+      return;
+    }
     const granted = types[Math.floor(this.drawSeededRoll('special', this.specialGrantIndex++) * types.length)];
     const amount = this.gameConfig.scoring.specialChargePerMatch;
     this.specialInventory[granted] = (this.specialInventory[granted] || 0) + amount;
     this.audioManager.playEffect('overcharge');
     const specialName = t(`hud.powerups.${granted}.name`);
     this.particleSystem.spawnFloatingText(
-      canvasCfg.launcherX,
-      canvasCfg.launcherY + canvasCfg.launcherPopupOffsetY,
+      launcherSpec.x,
+      launcherSpec.y + canvasCfg.launcherPopupOffsetY,
       t('gameplay.feedback.overcharge.ready', { name: specialName }),
       this.gameConfig.theme.overchargePopupColor
     );
@@ -859,6 +863,7 @@ export const engineTurnResolutionMethods = {
     }
 
     this.advanceMagnetarTurn();
+    this.getModeBehavior().onTurnCleanedUp?.(this, { madeMatch, dropped, wasFrozen });
     this.evaluateRoundEnd();
     this.updateAimFromAngle(this.aimAngle);
     if (madeMatch) {

@@ -305,3 +305,41 @@ test('The Classic share text lists header, stage and score, then the rail drops,
   assert.ok(lines.every((line) => !line.includes(shareConfig.url)));
   assert.ok(lines[1].includes(formatFrench(12500)));
 });
+
+test('buildShareText formats shareable results for Hex Grid, Orbital, Pinball, Convoy and Merge in English and French', () => {
+  useLocale('en');
+  assert.deepEqual(
+    buildShareText({ mode: GAME_MODES.HEX_GRID, wave: 5, score: 8400, url: shareConfig.url }, shareConfig).split('\n'),
+    [locales.en.share.hexGrid.header, 'Wave 5 - 8,400 pts', shareConfig.url]
+  );
+  assert.deepEqual(
+    buildShareText({ mode: GAME_MODES.ORBITAL, wave: 4, score: 9100, url: shareConfig.url }, shareConfig).split('\n'),
+    [locales.en.share.orbital.header, 'Wave 4 - 9,100 pts', shareConfig.url]
+  );
+  assert.deepEqual(
+    buildShareText({ mode: GAME_MODES.PINBALL, stage: 3, score: 11200, url: shareConfig.url }, shareConfig).split('\n'),
+    [locales.en.share.pinball.header, 'Stage 3 - 11,200 pts', shareConfig.url]
+  );
+  assert.deepEqual(
+    buildShareText({ mode: GAME_MODES.CONVOY, wave: 6, score: 14500, url: shareConfig.url }, shareConfig).split('\n'),
+    [locales.en.share.convoy.header, 'Wave 6 - 14,500 pts', shareConfig.url]
+  );
+  assert.deepEqual(
+    buildShareText({ mode: GAME_MODES.MERGE, tier: 7, score: 6300, url: shareConfig.url }, shareConfig).split('\n'),
+    [locales.en.share.merge.header, 'Calibre 7 - 6,300 pts', shareConfig.url]
+  );
+
+  useLocale('fr');
+  assert.deepEqual(
+    buildShareText({ mode: GAME_MODES.HEX_GRID, wave: 5, score: 8400, url: shareConfig.url }, shareConfig).split('\n'),
+    [locales.fr.share.hexGrid.header, `Vague 5 - ${formatFrench(8400)} pts`, shareConfig.url]
+  );
+  assert.deepEqual(
+    buildShareText({ mode: GAME_MODES.PINBALL, stage: 3, score: 11200, url: shareConfig.url }, shareConfig).split('\n'),
+    [locales.fr.share.pinball.header, `Étape 3 - ${formatFrench(11200)} pts`, shareConfig.url]
+  );
+  assert.deepEqual(
+    buildShareText({ mode: GAME_MODES.MERGE, tier: 7, score: 6300, url: shareConfig.url }, shareConfig).split('\n'),
+    [locales.fr.share.merge.header, `Calibre 7 - ${formatFrench(6300)} pts`, shareConfig.url]
+  );
+});

@@ -43,7 +43,8 @@ export const SAVE_MIGRATIONS = Object.freeze([
   { toVersion: 4, run: (manager) => manager.announceIntroducedModes() },
   { toVersion: 5, run: (manager) => manager.announceIntroducedModes() },
   { toVersion: 6, run: (manager) => manager.migrateMusicVolumeSteps() },
-  { toVersion: 7, run: (manager) => manager.seedPuzzleStageStats() }
+  { toVersion: 7, run: (manager) => manager.seedPuzzleStageStats() },
+  { toVersion: 8, run: (manager) => manager.announceIntroducedModes() }
 ]);
 export const CURRENT_SAVE_SCHEMA_VERSION = SAVE_MIGRATIONS.at(-1).toVersion;
 
@@ -1073,6 +1074,121 @@ export class StorageManager {
     }
     if (stageKey && cleanStage > this.getClassicBestStage()) {
       this.safeSetItem(stageKey, cleanStage);
+    }
+  }
+
+  getHexGridHighScore() {
+    const key = this.storageConfig?.keys?.hexGridHighScore;
+    return key ? this.readNonNegativeInt(key) : 0;
+  }
+
+  getHexGridBestWave() {
+    const key = this.storageConfig?.keys?.hexGridBestWave;
+    return key ? this.readNonNegativeInt(key) : 0;
+  }
+
+  setHexGridRecord(score, wave) {
+    const scoreKey = this.storageConfig?.keys?.hexGridHighScore;
+    const waveKey = this.storageConfig?.keys?.hexGridBestWave;
+    const cleanScore = Math.max(0, Math.floor(Number(score) || 0));
+    const cleanWave = Math.max(0, Math.floor(Number(wave) || 0));
+    if (scoreKey && cleanScore > this.getHexGridHighScore()) {
+      this.safeSetItem(scoreKey, cleanScore);
+    }
+    if (waveKey && cleanWave > this.getHexGridBestWave()) {
+      this.safeSetItem(waveKey, cleanWave);
+    }
+  }
+
+  getOrbitalHighScore() {
+    const key = this.storageConfig?.keys?.orbitalHighScore;
+    return key ? this.readNonNegativeInt(key) : 0;
+  }
+
+  getOrbitalBestWave() {
+    const key = this.storageConfig?.keys?.orbitalBestWave;
+    return key ? this.readNonNegativeInt(key) : 0;
+  }
+
+  setOrbitalRecord(score, wave) {
+    const scoreKey = this.storageConfig?.keys?.orbitalHighScore;
+    const waveKey = this.storageConfig?.keys?.orbitalBestWave;
+    const cleanScore = Math.max(0, Math.floor(Number(score) || 0));
+    const cleanWave = Math.max(0, Math.floor(Number(wave) || 0));
+    if (scoreKey && cleanScore > this.getOrbitalHighScore()) {
+      this.safeSetItem(scoreKey, cleanScore);
+    }
+    if (waveKey && cleanWave > this.getOrbitalBestWave()) {
+      this.safeSetItem(waveKey, cleanWave);
+    }
+  }
+
+  getPinballHighScore() {
+    const key = this.storageConfig?.keys?.pinballHighScore;
+    return key ? this.readNonNegativeInt(key) : 0;
+  }
+
+  getPinballBestStage() {
+    const key = this.storageConfig?.keys?.pinballBestStage;
+    return key ? this.readNonNegativeInt(key) : 0;
+  }
+
+  setPinballRecord(score, stage) {
+    const scoreKey = this.storageConfig?.keys?.pinballHighScore;
+    const stageKey = this.storageConfig?.keys?.pinballBestStage;
+    const cleanScore = Math.max(0, Math.floor(Number(score) || 0));
+    const cleanStage = Math.max(0, Math.floor(Number(stage) || 0));
+    if (scoreKey && cleanScore > this.getPinballHighScore()) {
+      this.safeSetItem(scoreKey, cleanScore);
+    }
+    if (stageKey && cleanStage > this.getPinballBestStage()) {
+      this.safeSetItem(stageKey, cleanStage);
+    }
+  }
+
+  getConvoyHighScore() {
+    const key = this.storageConfig?.keys?.convoyHighScore;
+    return key ? this.readNonNegativeInt(key) : 0;
+  }
+
+  getConvoyBestWave() {
+    const key = this.storageConfig?.keys?.convoyBestWave;
+    return key ? this.readNonNegativeInt(key) : 0;
+  }
+
+  setConvoyRecord(score, wave) {
+    const scoreKey = this.storageConfig?.keys?.convoyHighScore;
+    const waveKey = this.storageConfig?.keys?.convoyBestWave;
+    const cleanScore = Math.max(0, Math.floor(Number(score) || 0));
+    const cleanWave = Math.max(0, Math.floor(Number(wave) || 0));
+    if (scoreKey && cleanScore > this.getConvoyHighScore()) {
+      this.safeSetItem(scoreKey, cleanScore);
+    }
+    if (waveKey && cleanWave > this.getConvoyBestWave()) {
+      this.safeSetItem(waveKey, cleanWave);
+    }
+  }
+
+  getMergeHighScore() {
+    const key = this.storageConfig?.keys?.mergeHighScore;
+    return key ? this.readNonNegativeInt(key) : 0;
+  }
+
+  getMergeBestTier() {
+    const key = this.storageConfig?.keys?.mergeBestTier;
+    return key ? this.readNonNegativeInt(key) : 0;
+  }
+
+  setMergeRecord(score, tier) {
+    const scoreKey = this.storageConfig?.keys?.mergeHighScore;
+    const tierKey = this.storageConfig?.keys?.mergeBestTier;
+    const cleanScore = Math.max(0, Math.floor(Number(score) || 0));
+    const cleanTier = Math.max(0, Math.floor(Number(tier) || 0));
+    if (scoreKey && cleanScore > this.getMergeHighScore()) {
+      this.safeSetItem(scoreKey, cleanScore);
+    }
+    if (tierKey && cleanTier > this.getMergeBestTier()) {
+      this.safeSetItem(tierKey, cleanTier);
     }
   }
 

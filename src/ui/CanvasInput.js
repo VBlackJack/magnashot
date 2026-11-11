@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 
+import { LAUNCHER_POSTURES } from '../core/Constants.js';
+
 const POINTER_OWNERSHIP_PRIMARY = 'primary';
 const POINTER_OWNERSHIP_PER_CANVAS = 'perCanvas';
 const MOUSE_POINTER_TYPE = 'mouse';
@@ -58,15 +60,35 @@ export function bindCanvasInput(canvas, getEngine, gameConfig, options = {}) {
     };
   };
 
-  const getAimAdjustedCoords = (e, pos) => {
+  const getLauncherSpec = (engine) => {
+    if (engine && typeof engine.getLauncherSpec === 'function') {
+      return engine.getLauncherSpec();
+    }
+    const canvasCfg = gameConfig.canvas;
+    return {
+      x: canvasCfg.launcherX,
+      y: canvasCfg.launcherY,
+      posture: LAUNCHER_POSTURES.UPWARD,
+      nextOffsetX: canvasCfg.nextBallOffsetX,
+      nextOffsetY: canvasCfg.nextBallOffsetY,
+      cancelOffset: canvasCfg.cancelAimOffsetY,
+      cancelRadius: 0
+    };
+  };
+
+  const getAimAdjustedCoords = (engine, e, pos) => {
     if (e.pointerType === 'touch') {
+      const spec = getLauncherSpec(engine);
+      if (spec.posture !== LAUNCHER_POSTURES.UPWARD) {
+        return pos;
+      }
       const canvasCfg = gameConfig.canvas;
-      const cancelThresholdY = canvasCfg.launcherY + canvasCfg.cancelAimOffsetY;
+      const cancelThresholdY = spec.y + canvasCfg.cancelAimOffsetY;
       if (pos.y > cancelThresholdY) {
         return pos;
       }
       const shiftedY = pos.y + canvasCfg.touchAimVerticalOffset;
-      const maxAnchorY = canvasCfg.launcherY + canvasCfg.touchMinAimAnchorOffsetY;
+      const maxAnchorY = spec.y + canvasCfg.touchMinAimAnchorOffsetY;
       return {
         x: pos.x,
         y: Math.min(shiftedY, maxAnchorY)
@@ -75,16 +97,21 @@ export function bindCanvasInput(canvas, getEngine, gameConfig, options = {}) {
     return pos;
   };
 
-  const isSwapClick = (x, y) => {
+  const isSwapClick = (engine, x, y) => {
     const canvasCfg = gameConfig.canvas;
-    const nx = canvasCfg.launcherX + canvasCfg.nextBallOffsetX;
-    const ny = canvasCfg.launcherY + canvasCfg.nextBallOffsetY;
+    const spec = getLauncherSpec(engine);
+    const nx = spec.x + spec.nextOffsetX;
+    const ny = spec.y + spec.nextOffsetY;
     return Math.hypot(x - nx, y - ny) <= canvasCfg.swapClickRadius;
   };
 
-  const isLauncherBaseTap = (x, y, startPos) => {
+  const isLauncherBaseTap = (engine, x, y, startPos) => {
+    const spec = getLauncherSpec(engine);
+    if (spec.posture === LAUNCHER_POSTURES.DROP_RAIL) {
+      return false;
+    }
     const canvasCfg = gameConfig.canvas;
-    const distToLauncher = Math.hypot(x - canvasCfg.launcherX, y - canvasCfg.launcherY);
+    const distToLauncher = Math.hypot(x - spec.x, y - spec.y);
     if (distToLauncher > canvasCfg.launcherTapSwapRadius) {
       return false;
     }
@@ -137,7 +164,7 @@ export function bindCanvasInput(canvas, getEngine, gameConfig, options = {}) {
       return;
     }
     const rawPos = toLogicalCoords(e.clientX, e.clientY);
-    const aimPos = getAimAdjustedCoords(e, rawPos);
+    const aimPos = getAimAdjustedCoords(engine, e, rawPos);
     if (aimsAtPointer(engine, e, aimPos)) {
       engine.updateAim(aimPos.x, aimPos.y);
     }
@@ -168,10 +195,10 @@ export function bindCanvasInput(canvas, getEngine, gameConfig, options = {}) {
     }
     const rawPos = toLogicalCoords(e.clientX, e.clientY);
     pointerDownPos = { x: rawPos.x, y: rawPos.y };
-    if (isSwapClick(rawPos.x, rawPos.y) || isLauncherBaseTap(rawPos.x, rawPos.y, null)) {
+    if (isSwapClick(engine, rawPos.x, rawPos.y) || isLauncherBaseTap(engine, rawPos.x, rawPos.y, null)) {
       return;
     }
-    const aimPos = getAimAdjustedCoords(e, rawPos);
+    const aimPos = getAimAdjustedCoords(engine, e, rawPos);
     if (aimsAtPointer(engine, e, aimPos)) {
       engine.updateAim(aimPos.x, aimPos.y);
     }
@@ -204,13 +231,13 @@ export function bindCanvasInput(canvas, getEngine, gameConfig, options = {}) {
       return;
     }
     const rawPos = toLogicalCoords(e.clientX, e.clientY);
-    if (isSwapClick(rawPos.x, rawPos.y) || isLauncherBaseTap(rawPos.x, rawPos.y, startPos)) {
+    if (isSwapClick(engine, rawPos.x, rawPos.y) || isLauncherBaseTap(engine, rawPos.x, rawPos.y, startPos)) {
       engine.isAimCancelled = false;
       engine.swapLauncherBalls();
       onAimChanged(engine);
       return;
     }
-    const aimPos = getAimAdjustedCoords(e, rawPos);
+    const aimPos = getAimAdjustedCoords(engine, e, rawPos);
     // A click within the lock shoots along the keyboard-adjusted angle.
     if (aimsAtPointer(engine, e, aimPos)) {
       engine.updateAim(aimPos.x, aimPos.y);

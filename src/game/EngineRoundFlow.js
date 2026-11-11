@@ -282,6 +282,9 @@ export const engineRoundFlowMethods = {
     if (!this.isRunPlaying()) {
       return;
     }
+    if (this.getModeBehavior().evaluateBoardState(this)) {
+      return;
+    }
     const dangerY = this.gameConfig.canvas.dangerLineY;
     for (const b of this.physicsWorld.balls) {
       if (!b.isDropping && b.y + b.radius >= dangerY) {
@@ -304,6 +307,9 @@ export const engineRoundFlowMethods = {
     // A cleared Flux shape is paid once: later checks in the same frame see the empty
     // board of the transition, not a second clear.
     if (!this.isRunPlaying() || this.stageTransitionFrames > 0) {
+      return;
+    }
+    if (this.getModeBehavior().evaluateBoardState(this)) {
       return;
     }
     if (this.mode === GAME_MODES.CAMPAIGN) {
@@ -535,6 +541,16 @@ export const engineRoundFlowMethods = {
       previousBestScore = this.storageManager.getPuzzleHighScore?.() || 0;
     } else if (this.mode === GAME_MODES.CLASSIC) {
       previousBestScore = this.storageManager.getClassicHighScore?.() || 0;
+    } else if (this.mode === GAME_MODES.HEX_GRID) {
+      previousBestScore = this.storageManager.getHexGridHighScore?.() || 0;
+    } else if (this.mode === GAME_MODES.ORBITAL) {
+      previousBestScore = this.storageManager.getOrbitalHighScore?.() || 0;
+    } else if (this.mode === GAME_MODES.PINBALL) {
+      previousBestScore = this.storageManager.getPinballHighScore?.() || 0;
+    } else if (this.mode === GAME_MODES.CONVOY) {
+      previousBestScore = this.storageManager.getConvoyHighScore?.() || 0;
+    } else if (this.mode === GAME_MODES.MERGE) {
+      previousBestScore = this.storageManager.getMergeHighScore?.() || 0;
     }
     // A Daily rematch persists nothing, so it never sets a record.
     const isNewRecord = this.mode !== GAME_MODES.CAMPAIGN && this.mode !== GAME_MODES.PUZZLE && !this.isDailyRematch && previousBestScore > 0 && this.score > previousBestScore;

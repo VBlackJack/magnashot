@@ -32,8 +32,11 @@ import { SpecialBallController } from './SpecialBallController.js';
 import { captureRunSnapshot, isValidRunSnapshot, applyRunSnapshot, isRunSnapshotable } from './RunSnapshot.js';
 import { LevelCatalog } from './LevelCatalog.js';
 import { DISCOVERY_INTERACTIONS } from './Discovery.js';
+import { getRegisteredModeBehavior, resolveModesConfig } from './modes/index.js';
 
 const ACHIEVEMENT_TIER_ORDER = Object.freeze(['bronze', 'silver', 'gold']);
+const MS_PER_SECOND = 1000;
+const FALLBACK_FIXED_STEP_MS = 16.6667;
 
 import { installMethods } from '../core/installMethods.js';
 import { engineModeMethods, FLUX_PERK_IDS } from './EngineModes.js';
@@ -79,6 +82,7 @@ export class GameEngine {
     campaignTuning = null,
     fluxShapeTuning = null,
     fluxConfig,
+    modesConfig = null,
     audioManager,
     storageManager,
     onStateChange,
@@ -91,6 +95,7 @@ export class GameEngine {
     this.obstaclesConfig = obstaclesConfig;
     this.levelsConfig = levelsConfig;
     this.fluxConfig = fluxConfig;
+    this.modesConfig = resolveModesConfig(modesConfig);
     /** Idle settle margins of the generated Flux shapes (configs/fluxShapeTuning.json); null draws every shape. */
     this.fluxShapeTuning = fluxShapeTuning;
     this.levelCatalog = new LevelCatalog({
@@ -114,7 +119,7 @@ export class GameEngine {
     this.versus = null;
     /** Magnetar boss state (Boss Rush, Flux boss stages); null elsewhere (see EngineMagnetar.js). */
     this.magnetar = null;
-    this.physicsWorld = new PhysicsWorld(physicsConfig, gameConfig, ballsConfig);
+    this.physicsWorld = new PhysicsWorld(physicsConfig, gameConfig, ballsConfig, this.modesConfig);
     // Daily runs draw avalanche drift from the seeded stream so scores stay reproducible
     this.physicsWorld.setRandomSource(() => this.random());
     this.particleSystem = new ParticleSystem(gameConfig.juice);
@@ -256,6 +261,10 @@ export class GameEngine {
     this.bossRushWave = 1;
     this.cascadeWave = 1;
     this.cascadeTurnsUntilDrop = 0;
+    this.modeState = null;
+    this.pinballStage = 1;
+    this.mergeDropX = gameConfig.canvas.logicalWidth * MATH_CONSTANTS.HALF;
+    this.mergeBestTier = 1;
 
     this.activePalette = [];
     this.specialInventory = {};
@@ -305,12 +314,34 @@ export class GameEngine {
     return this.mode === GAME_MODES.ENDLESS || this.mode === GAME_MODES.DAILY;
   }
 
-  /** True for modes where every shot spends a limited reserve (Campaign, Flux and Puzzle). */
+  getModeBehavior() {
+    return getRegisteredModeBehavior(this.mode);
+  }
+
+  getLauncherSpec() {
+    return this.getModeBehavior().getLauncherSpec(this);
+  }
+
+  isSpecialTypeAllowed(specialType) {
+    if (!specialType || !Object.values(SPECIAL_TYPES).includes(specialType)) {
+      return false;
+    }
+    if (this.mode === GAME_MODES.CLASSIC && !this.versus) {
+      return false;
+    }
+    if (this.getModeBehavior().offersSpecialBalls(this) === false) {
+      return false;
+    }
+    return this.getModeBehavior().isSpecialTypeAllowed(specialType, this);
+  }
+
+  /** True for modes where every shot spends a limited reserve (Campaign, Flux, Puzzle and Pinball). */
   usesShotBudget() {
     return (
       this.mode === GAME_MODES.CAMPAIGN
       || this.mode === GAME_MODES.FLUX
       || this.mode === GAME_MODES.PUZZLE
+      || this.mode === GAME_MODES.PINBALL
     );
   }
 
@@ -416,12 +447,19 @@ export class GameEngine {
         return { metric: RUN_BEST_METRICS.STAGE, current: this.fluxStage };
       case GAME_MODES.CLASSIC:
         return { metric: RUN_BEST_METRICS.STAGE, current: this.classicStage };
+      case GAME_MODES.PINBALL:
+        return { metric: RUN_BEST_METRICS.STAGE, current: this.pinballStage };
       case GAME_MODES.BOSS_RUSH:
         return { metric: RUN_BEST_METRICS.WAVE, current: this.bossRushWave };
+      case GAME_MODES.HEX_GRID:
+      case GAME_MODES.ORBITAL:
+      case GAME_MODES.CONVOY:
+        return { metric: RUN_BEST_METRICS.WAVE, current: this.waveCount };
       case GAME_MODES.ENDLESS:
       case GAME_MODES.DAILY:
       case GAME_MODES.CASCADE:
       case GAME_MODES.BLITZ:
+      case GAME_MODES.MERGE:
         return { metric: RUN_BEST_METRICS.SCORE, current: this.score };
       default:
         return null;
@@ -459,6 +497,16 @@ export class GameEngine {
       best = storage.getCascadeHighScore?.() || 0;
     } else if (this.mode === GAME_MODES.BLITZ) {
       best = storage.getBlitzHighScore?.() || 0;
+    } else if (this.mode === GAME_MODES.HEX_GRID) {
+      best = storage.getHexGridBestWave?.() || 0;
+    } else if (this.mode === GAME_MODES.ORBITAL) {
+      best = storage.getOrbitalBestWave?.() || 0;
+    } else if (this.mode === GAME_MODES.PINBALL) {
+      best = storage.getPinballBestStage?.() || 0;
+    } else if (this.mode === GAME_MODES.CONVOY) {
+      best = storage.getConvoyBestWave?.() || 0;
+    } else if (this.mode === GAME_MODES.MERGE) {
+      best = storage.getMergeHighScore?.() || 0;
     }
     this.runBestBaseline = { metric: measured.metric, best };
     return this.runBestBaseline;
@@ -566,6 +614,21 @@ export class GameEngine {
         ? this.currentPuzzleStage + 1
         : this.currentPuzzleStage;
       this.storageManager.setPuzzleRecord?.(this.score, reachedStage);
+    } else if (this.mode === GAME_MODES.HEX_GRID) {
+      this.storageManager.setHexGridRecord?.(this.score, this.waveCount);
+      this.unlockAchievementTiers('hexGridWaves', this.waveCount);
+    } else if (this.mode === GAME_MODES.ORBITAL) {
+      this.storageManager.setOrbitalRecord?.(this.score, this.waveCount);
+      this.unlockAchievementTiers('orbitalWaves', this.waveCount);
+    } else if (this.mode === GAME_MODES.PINBALL) {
+      this.storageManager.setPinballRecord?.(this.score, this.pinballStage);
+      this.unlockAchievementTiers('pinballStages', this.pinballStage);
+    } else if (this.mode === GAME_MODES.CONVOY) {
+      this.storageManager.setConvoyRecord?.(this.score, this.waveCount);
+      this.unlockAchievementTiers('convoyWaves', this.waveCount);
+    } else if (this.mode === GAME_MODES.MERGE) {
+      this.storageManager.setMergeRecord?.(this.score, this.mergeBestTier);
+      this.unlockAchievementTiers('mergeTiers', this.mergeBestTier);
     }
   }
 
@@ -759,6 +822,10 @@ export class GameEngine {
     this.bossRushWave = 1;
     this.cascadeWave = 1;
     this.cascadeTurnsUntilDrop = 0;
+    this.modeState = null;
+    this.pinballStage = 1;
+    this.mergeDropX = this.gameConfig.canvas.logicalWidth * MATH_CONSTANTS.HALF;
+    this.mergeBestTier = 1;
     this.physicsWorld.gravityMultiplier = 1.0;
     this.physicsWorld.magnetismMultiplier = 1.0;
     this.physicsWorld.rotorSpeedMultiplier = 1.0;
@@ -842,8 +909,8 @@ export class GameEngine {
    * @returns {number}
    */
   getEffectiveUpgradeLevel(upgradeKey) {
-    // Classic is the pure ruleset: the Workshop does not count.
-    if (this.mode === GAME_MODES.CLASSIC) {
+    // Classic and purist Arcade behavior modes keep Workshop upgrades neutralised.
+    if (this.mode === GAME_MODES.CLASSIC || this.getModeBehavior().neutralizesWorkshopUpgrades(this)) {
       return 0;
     }
     if (this.mode === GAME_MODES.DAILY) {
@@ -862,8 +929,12 @@ export class GameEngine {
   }
 
   getOverchargeMultiplier() {
-    // Classic and Puzzle have no earned specials, so nothing may charge toward one; a duel board still charges its pulse.
-    if ((this.mode === GAME_MODES.CLASSIC && !this.versus) || this.mode === GAME_MODES.PUZZLE) {
+    // Classic, Puzzle and purist Arcade behavior modes have no earned specials; a duel board still charges its pulse.
+    if (
+      (this.mode === GAME_MODES.CLASSIC && !this.versus)
+      || this.mode === GAME_MODES.PUZZLE
+      || this.getModeBehavior().hidesOvercharge(this)
+    ) {
       return 0;
     }
     const lvl = this.getEffectiveUpgradeLevel('overchargeRate');
@@ -1038,7 +1109,11 @@ export class GameEngine {
   }
 
   equipSpecialBall(specialType) {
-    if (this.state !== GAME_STATES.PLAYING || this.physicsWorld.projectile) {
+    if (
+      this.state !== GAME_STATES.PLAYING
+      || this.physicsWorld.projectile
+      || !this.isSpecialTypeAllowed(specialType)
+    ) {
       return;
     }
     if (this.currentBall && this.currentBall.specialType === specialType) {
@@ -1179,9 +1254,10 @@ export class GameEngine {
       onAnvilComplete: () => {
         const anvilSpecs = this.ballsConfig.specialTypes.anvil;
         const canvasCfg = this.gameConfig.canvas;
+        const launcherSpec = this.getLauncherSpec();
         this.particleSystem.spawnFloatingText(
-          canvasCfg.launcherX,
-          canvasCfg.launcherY + canvasCfg.anvilPopupOffsetY,
+          launcherSpec.x,
+          launcherSpec.y + canvasCfg.anvilPopupOffsetY,
           t('gameplay.feedback.special.anvil'),
           anvilSpecs.highlight
         );
@@ -1195,9 +1271,17 @@ export class GameEngine {
         } else {
           this.combo = 0;
         }
-        this.handlePostTurnCleanup(madeMatch);
+        const behavior = this.getModeBehavior();
+        if (typeof behavior.onAnvilSettled === 'function') {
+          behavior.onAnvilSettled(this, madeMatch);
+        } else {
+          this.handlePostTurnCleanup(madeMatch);
+        }
       },
-      onProjectileSnapped: (snappedBall, hitTarget) => {
+      onProjectileSnapped: (snappedBall, hitTarget, impactVx, impactVy) => {
+        if (this.getModeBehavior().onProjectileSettled(this, { snappedBall, hitTarget, impactVx, impactVy })) {
+          return;
+        }
         this.handleProjectileSnapped(snappedBall, hitTarget);
       },
       onProjectileMissed: () => {
@@ -1244,12 +1328,20 @@ export class GameEngine {
     if (this.isAwaitingPerk() || this.isStageChanging() || (this.usesShotBudget() && this.shotsRemaining <= 0)) {
       return;
     }
+    const behavior = this.getModeBehavior();
+    if (behavior.canFire(this) === false) {
+      return;
+    }
+    if (behavior.fire(this)) {
+      return;
+    }
     // The previous shot has settled: this is the state it left behind.
     this.sampleShotTimeline();
     this.evaluateGhostShot();
     this.countShotForStats();
     this.beginVersusTurn(this.currentBall);
     const ballCfg = this.physicsConfig.ball;
+    const launcherSpec = this.getLauncherSpec();
     const projectile = this.currentBall;
     this.levelIntro = null;
     this.isHintShownThisTurn = false;
@@ -1260,13 +1352,16 @@ export class GameEngine {
     projectile.isProjectile = true;
     projectile.isPolarityFlipped = this.isPolarityFlipped;
     this.markResonantShot(projectile);
-    projectile.x = this.gameConfig.canvas.launcherX;
-    projectile.y = this.gameConfig.canvas.launcherY;
+    projectile.x = launcherSpec.x;
+    projectile.y = launcherSpec.y;
     projectile.savePreviousPosition();
 
+    const baseSpeed = this.physicsWorld.projectileLaunchSpeedOverride > 0
+      ? this.physicsWorld.projectileLaunchSpeedOverride
+      : ballCfg.projectileSpeed;
     const speed = projectile.specialType === SPECIAL_TYPES.ANVIL
       ? ballCfg.anvilSpeed
-      : ballCfg.projectileSpeed;
+      : baseSpeed;
 
     projectile.vx = Math.cos(this.aimAngle) * speed;
     projectile.vy = Math.sin(this.aimAngle) * speed;
@@ -1360,7 +1455,10 @@ export class GameEngine {
         const p = this.physicsWorld.projectile;
         const palette = p.specialType
           ? this.ballsConfig.specialTypes[p.specialType]
-          : this.ballsConfig.standardColors.find((c) => c.id === p.colorId);
+          : (
+            this.ballsConfig.standardColors.find((c) => c.id === p.colorId)
+            || this.modesConfig.merge.tiers.find((c) => c.id === p.colorId)
+          );
         this.particleSystem.spawnTrail(
           p.x,
           p.y,
@@ -1368,6 +1466,14 @@ export class GameEngine {
           palette ? palette.highlight : theme.defaultTrailColor
         );
       }
+    }
+
+    const dtSec = (this.physicsConfig.simulation?.fixedStepMs || FALLBACK_FIXED_STEP_MS) / MS_PER_SECOND;
+    const behavior = this.getModeBehavior();
+    behavior.onBeforePhysicsStep(this, dtSec);
+    if (!this.isRunPlaying()) {
+      this.particleSystem.update(juice.shakeDecay);
+      return;
     }
 
     // Step callbacks must not tear the world down mid-step: a round end they trigger
@@ -1382,6 +1488,7 @@ export class GameEngine {
     } finally {
       this.isSteppingPhysics = false;
     }
+    behavior.onAfterPhysicsStep(this, dtSec);
     if (this.versus) {
       this.stepVersusAfter(flyingProjectile);
     }
@@ -1553,6 +1660,16 @@ export class GameEngine {
       this.startCascadeMode();
     } else if (this.mode === GAME_MODES.CLASSIC) {
       this.startClassicMode(1);
+    } else if (this.mode === GAME_MODES.HEX_GRID) {
+      this.startHexGridMode();
+    } else if (this.mode === GAME_MODES.ORBITAL) {
+      this.startOrbitalMode();
+    } else if (this.mode === GAME_MODES.PINBALL) {
+      this.startPinballMode(1);
+    } else if (this.mode === GAME_MODES.CONVOY) {
+      this.startConvoyMode();
+    } else if (this.mode === GAME_MODES.MERGE) {
+      this.startMergeMode();
     } else {
       this.startEndlessMode();
     }

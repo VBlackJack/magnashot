@@ -293,6 +293,16 @@ export const uiHudRefreshMethods = {
       bestScore = this.storageManager.getCascadeHighScore();
     } else if (engine.mode === GAME_MODES.CLASSIC) {
       bestScore = this.storageManager.getClassicHighScore();
+    } else if (engine.mode === GAME_MODES.HEX_GRID) {
+      bestScore = this.storageManager.getHexGridHighScore?.() || 0;
+    } else if (engine.mode === GAME_MODES.ORBITAL) {
+      bestScore = this.storageManager.getOrbitalHighScore?.() || 0;
+    } else if (engine.mode === GAME_MODES.PINBALL) {
+      bestScore = this.storageManager.getPinballHighScore?.() || 0;
+    } else if (engine.mode === GAME_MODES.CONVOY) {
+      bestScore = this.storageManager.getConvoyHighScore?.() || 0;
+    } else if (engine.mode === GAME_MODES.MERGE) {
+      bestScore = this.storageManager.getMergeHighScore?.() || 0;
     } else {
       bestScore = this.storageManager.getEndlessHighScore();
     }
@@ -438,6 +448,23 @@ export const uiHudRefreshMethods = {
       if (this.elements.starProgress) {
         this.elements.starProgress.classList.add('hidden');
       }
+    } else if (engine.mode === GAME_MODES.PINBALL) {
+      const remainingCores = engine.modeState?.corePegsRemaining ?? 0;
+      setTextIfChanged(
+        this.elements.modeBanner,
+        t('hud.stats.mode.pinball', {
+          stage: formatNumber(engine.pinballStage || 1),
+          cores: formatNumber(remainingCores)
+        })
+      );
+      if (this.elements.shotsLabel) {
+        setTextIfChanged(this.elements.shotsLabel, t('hud.stats.shots.label'));
+      }
+      setTextIfChanged(this.elements.shotsValue, formatNumber(engine.shotsRemaining));
+      this.elements.shotsValue.classList.toggle('warning', engine.shotsRemaining <= warningShotsThreshold);
+      if (this.elements.starProgress) {
+        this.elements.starProgress.classList.add('hidden');
+      }
     } else {
       if (engine.mode === GAME_MODES.DAILY) {
         const mutatorLabel = engine.activeMutatorKey
@@ -478,6 +505,34 @@ export const uiHudRefreshMethods = {
             stage: formatNumber(engine.classicStage)
           })
         );
+      } else if (engine.mode === GAME_MODES.HEX_GRID) {
+        setTextIfChanged(
+          this.elements.modeBanner,
+          t('hud.stats.mode.hexGrid', {
+            wave: formatNumber(engine.waveCount)
+          })
+        );
+      } else if (engine.mode === GAME_MODES.ORBITAL) {
+        setTextIfChanged(
+          this.elements.modeBanner,
+          t('hud.stats.mode.orbital', {
+            wave: formatNumber(engine.waveCount)
+          })
+        );
+      } else if (engine.mode === GAME_MODES.CONVOY) {
+        setTextIfChanged(
+          this.elements.modeBanner,
+          t('hud.stats.mode.convoy', {
+            wave: formatNumber(engine.waveCount)
+          })
+        );
+      } else if (engine.mode === GAME_MODES.MERGE) {
+        setTextIfChanged(
+          this.elements.modeBanner,
+          t('hud.stats.mode.merge', {
+            tier: formatNumber(engine.mergeBestTier || 1)
+          })
+        );
       } else {
         setTextIfChanged(
           this.elements.modeBanner,
@@ -491,22 +546,39 @@ export const uiHudRefreshMethods = {
         this.refreshSagMeter(engine, sag);
       } else {
         if (this.elements.shotsLabel) {
-          const shotsLabelKey = engine.mode === GAME_MODES.BOSS_RUSH
-            ? 'hud.stats.shots.shieldsLabel'
-            : 'hud.stats.shots.waveLabel';
+          let shotsLabelKey = 'hud.stats.shots.waveLabel';
+          if (engine.mode === GAME_MODES.BOSS_RUSH) {
+            shotsLabelKey = 'hud.stats.shots.shieldsLabel';
+          } else if (engine.mode === GAME_MODES.CONVOY) {
+            shotsLabelKey = 'hud.stats.shots.convoyLabel';
+          } else if (engine.mode === GAME_MODES.MERGE) {
+            shotsLabelKey = 'hud.stats.shots.calibreLabel';
+          }
           setTextIfChanged(this.elements.shotsLabel, t(shotsLabelKey));
         }
-        const waveCountdown =
-          engine.mode === GAME_MODES.CASCADE
-            ? engine.cascadeTurnsUntilDrop
-            : engine.mode === GAME_MODES.BOSS_RUSH
-              ? engine.getBossBall()?.armorHits || 0
-              : 0;
+        let waveCountdown = 0;
+        let isShotsWarning = false;
+        if (engine.mode === GAME_MODES.CASCADE) {
+          waveCountdown = engine.cascadeTurnsUntilDrop;
+          isShotsWarning = waveCountdown <= warningShotsThreshold;
+        } else if (engine.mode === GAME_MODES.BOSS_RUSH) {
+          waveCountdown = engine.getBossBall()?.armorHits || 0;
+          isShotsWarning = waveCountdown <= warningShotsThreshold;
+        } else if (engine.mode === GAME_MODES.HEX_GRID) {
+          waveCountdown = engine.modeState?.shotsUntilDescent ?? 0;
+          isShotsWarning = waveCountdown <= warningShotsThreshold;
+        } else if (engine.mode === GAME_MODES.ORBITAL) {
+          waveCountdown = engine.modeState?.turnsUntilWave ?? 0;
+          isShotsWarning = waveCountdown <= warningShotsThreshold;
+        } else if (engine.mode === GAME_MODES.CONVOY) {
+          waveCountdown = engine.physicsWorld.balls.length + (engine.modeState?.spawnRemaining ?? 0);
+        } else if (engine.mode === GAME_MODES.MERGE) {
+          waveCountdown = engine.mergeBestTier || 1;
+        } else {
+          isShotsWarning = waveCountdown <= warningShotsThreshold;
+        }
         setTextIfChanged(this.elements.shotsValue, formatNumber(waveCountdown));
-        this.elements.shotsValue.classList.toggle(
-          'warning',
-          waveCountdown <= warningShotsThreshold
-        );
+        this.elements.shotsValue.classList.toggle('warning', isShotsWarning);
       }
       if (this.elements.starProgress) {
         this.elements.starProgress.classList.add('hidden');
@@ -533,10 +605,14 @@ export const uiHudRefreshMethods = {
       this.elements.comboBadge.classList.add('hidden');
     }
 
-    if (engine.freezeTurnsRemaining > 0) {
+    const convoyFrozenSec = engine.mode === GAME_MODES.CONVOY
+      ? Math.ceil(engine.modeState?.freezeTimerSec || 0)
+      : 0;
+    const freezeDisplayCount = engine.freezeTurnsRemaining > 0 ? engine.freezeTurnsRemaining : convoyFrozenSec;
+    if (freezeDisplayCount > 0) {
       setTextIfChanged(
         this.elements.frozenBadge,
-        t('hud.stats.frozen.label', { turns: engine.freezeTurnsRemaining })
+        t('hud.stats.frozen.label', { turns: freezeDisplayCount })
       );
       this.elements.frozenBadge.classList.remove('hidden');
     } else {
@@ -592,8 +668,9 @@ export const uiHudRefreshMethods = {
     this.elements.powerupsContainer.classList.toggle('hidden', !offersSpecialBalls);
     this.elements.powerupsHeader?.classList.toggle('hidden', !offersSpecialBalls);
     // The panel keeps its place in the layout, so it says why it is empty.
-    // Classic has no specials at all: no empty-panel message and no overcharge bar either.
-    const isPurist = engine.mode === GAME_MODES.CLASSIC;
+    // Purist modes (Classic, Hex Grid, Merge) have no specials at all: no empty-panel message and no overcharge bar.
+    const behaviorHidesOvercharge = Boolean(engine.getModeBehavior?.()?.hidesOvercharge?.(engine));
+    const isPurist = engine.mode === GAME_MODES.CLASSIC || behaviorHidesOvercharge;
     this.elements.powerupsEmpty?.classList.toggle('hidden', offersSpecialBalls || isPurist);
     // Puzzle runs carry no Overcharge either: the bar would never move.
     const hidesOvercharge = isPurist || engine.mode === GAME_MODES.PUZZLE;
