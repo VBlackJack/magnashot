@@ -4,6 +4,10 @@ All notable changes to **MagnaShot** are documented in this file.
 
 ## [Unreleased]
 
+### Fixed
+- On phones, when the browser drops fullscreen by itself (back gesture, app switch, share sheet), the next tap on the game now brings it back, until the player turns it off with the fullscreen button. On desktop, Escape still leaves fullscreen for good.
+- On tablets such as an 11-inch 2560x1600 tablet held in portrait, the board now fills the screen instead of stopping at a fixed width.
+
 ## [1.27.0] - 2026-11-12
 
 ### Added
