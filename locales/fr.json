@@ -548,6 +548,8 @@
         },
         "shapeStart": "Bassin : {{name}}",
         "shapeAnnounce": "Bassin : {{name}}. {{description}}",
+        "specialAnnounce": "{{name}} à venir : {{description}}",
+        "bombBoom": "Boum ! +{{points}}",
         "pressureStep": "LA LIGNE EST DESCENDUE",
         "pressureStepAnnounce": "La ligne de débordement est descendue.",
         "pressureWarning": {
@@ -557,6 +559,23 @@
       }
     },
     "merge": {
+      "specials": {
+        "joker": {
+          "name": "Joker",
+          "description": "Fusionne avec la première sphère ordinaire qu'il touche, comme si deux sphères de ce calibre se rencontraient.",
+          "icon": "★︎"
+        },
+        "ice": {
+          "name": "Sphère gelée",
+          "description": "Ne fusionne pas tant qu'une onde de fusion ne l'atteint pas ou qu'elle n'a pas dégelé.",
+          "icon": "❄︎"
+        },
+        "bomb": {
+          "name": "Bombe",
+          "description": "Explose peu après avoir touché le fond et détruit les petites sphères autour d'elle.",
+          "icon": "✸︎"
+        }
+      },
       "shapes": {
         "classic": {
           "name": "Classique",

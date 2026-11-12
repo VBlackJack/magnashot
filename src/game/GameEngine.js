@@ -469,6 +469,15 @@ export class GameEngine {
   }
 
   /**
+   * Latest special sphere announcement of the Merge Basin for the HUD.
+   * @returns {{kind: string|null, announceSerial: number|null}|null} Null outside a live Basin run.
+   */
+  getMergeSpecialState() {
+    const live = this.state === GAME_STATES.PLAYING || this.state === GAME_STATES.PAUSED;
+    return this.mode === GAME_MODES.MERGE && live ? this.getModeBehavior().getSpecialView(this) : null;
+  }
+
+  /**
    * Walls, floor and pegs of the Merge Basin run's shape.
    * @returns {{left: number, right: number, floor: number, pegs: Array<{x: number, y: number, radius: number}>}|null} Null outside the Basin.
    */

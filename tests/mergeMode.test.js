@@ -2254,3 +2254,571 @@ test('The contract plural key follows the plural rules of the current locale and
     i18n.currentLocale = locale;
   }
 });
+
+// ---- Special spheres: Joker, Ice and Bomb ----
+
+const SPECIALS = modesConfig.merge.specials;
+const TIERS = modesConfig.merge.tiers;
+const FLOOR_Y = modesConfig.merge.basinFloorY;
+const ROLL_ALWAYS_SPAWN = 0;
+const ROLL_NEVER_SPAWN = 0.999;
+const KIND_ROLL_FIRST = 0;
+const KIND_ROLL_SECOND = 0.4;
+const KIND_ROLL_THIRD = 0.99;
+const MAX_DROPS_TO_FIND = 40;
+const FUSION_TOUCH_GAP_PX = 0.5;
+const AIRBORNE_MARGIN_PX = 4;
+
+/** Engine whose special spawn rolls are pinned, so a test decides when and which special queues. */
+const createSpecialEngine = ({ spawnRoll = ROLL_ALWAYS_SPAWN, kindRoll = KIND_ROLL_FIRST } = {}) => {
+  const engine = createEventEngine('merge-specials');
+  const drawSeededRoll = engine.drawSeededRoll.bind(engine);
+  engine.specialRolls = { spawnRoll, kindRoll };
+  engine.drawSeededRoll = (stream, index) => {
+    if (stream === 'mergeSpecial') {
+      return engine.specialRolls.spawnRoll;
+    }
+    return stream === 'mergeSpecialKind' ? engine.specialRolls.kindRoll : drawSeededRoll(stream, index);
+  };
+  return engine;
+};
+
+const specialsInView = (engine) => [
+  engine.currentBall.mergeKind,
+  engine.nextBall.mergeKind,
+  ...engine.modeState.upcomingKinds
+].filter(Boolean);
+
+const floorY = (radius) => FLOOR_Y - radius;
+
+/** Places a special sphere resting on the floor, built the way a drop of that kind is. */
+const placeSpecial = (engine, kind, x, tier = SPECIALS.kinds[kind]?.sizeTierIndex ?? 0, extra = {}) => {
+  const ball = placeBall(engine, tier, x, floorY(TIERS[tier].radius), { mergeKind: kind, ...extra });
+  if (kind !== 'ice') {
+    ball.mergeTier = null;
+  }
+  return ball;
+};
+
+const placeTouching = (engine, anchor, tier, extra = {}) => {
+  const radius = TIERS[tier].radius;
+  return placeBall(
+    engine,
+    tier,
+    anchor.x + anchor.radius + radius - FUSION_TOUCH_GAP_PX,
+    floorY(radius),
+    extra
+  );
+};
+
+test('The default Merge config carries the same specials as configs/modes.json, and a partial one keeps defaults', () => {
+  const defaults = resolveModesConfig(null).merge;
+  assert.deepEqual(defaults.specials, SPECIALS);
+  const partial = resolveModesConfig({ merge: { specials: { kinds: { bomb: { radiusPx: 50 } } } } }).merge;
+  assert.equal(partial.specials.kinds.bomb.radiusPx, 50);
+  assert.equal(partial.specials.kinds.bomb.fuseSec, SPECIALS.kinds.bomb.fuseSec);
+  assert.equal(partial.specials.kinds.joker.sizeTierIndex, SPECIALS.kinds.joker.sizeTierIndex);
+  assert.equal(partial.specials.fromDrop, SPECIALS.fromDrop);
+  assert.equal(resolveModesConfig({ merge: { specials: null } }).merge.specials.chance, SPECIALS.chance);
+});
+
+test('No special queues before the configured drop, and a failed roll never queues one', () => {
+  const engine = createSpecialEngine();
+  for (let drop = 1; drop < SPECIALS.fromDrop; drop += 1) {
+    dropOnce(engine);
+    assert.deepEqual(specialsInView(engine), [], `no special after drop ${drop}`);
+  }
+  dropOnce(engine);
+  assert.deepEqual(specialsInView(engine), ['joker'], 'the first eligible drop queues one');
+
+  const unlucky = createSpecialEngine({ spawnRoll: ROLL_NEVER_SPAWN });
+  for (let drop = 0; drop < SPECIALS.fromDrop * 3; drop += 1) {
+    dropOnce(unlucky);
+  }
+  assert.deepEqual(specialsInView(unlucky), []);
+  assert.equal(unlucky.physicsWorld.balls.some((ball) => ball.mergeKind), false);
+});
+
+test('The kind follows the weights of its own roll, and never more than one special is in view', () => {
+  const picks = [[KIND_ROLL_FIRST, 'joker'], [KIND_ROLL_SECOND, 'ice'], [KIND_ROLL_THIRD, 'bomb']];
+  for (const [kindRoll, expected] of picks) {
+    const engine = createSpecialEngine({ kindRoll });
+    for (let drop = 0; drop < SPECIALS.fromDrop; drop += 1) {
+      dropOnce(engine);
+    }
+    assert.deepEqual(specialsInView(engine), [expected]);
+  }
+
+  const engine = createSpecialEngine();
+  for (let drop = 0; drop < MAX_DROPS_TO_FIND; drop += 1) {
+    dropOnce(engine);
+    assert.ok(specialsInView(engine).length <= 1, `drop ${drop + 1} keeps at most one special in view`);
+  }
+  assert.ok(engine.physicsWorld.balls.some((ball) => ball.mergeKind), 'a special did reach the board');
+});
+
+test('A special drops as its own kind: a Joker and a Bomb take the configured size and carry no calibre', () => {
+  const engine = createSpecialEngine();
+  let dropped = null;
+  for (let drop = 0; drop < MAX_DROPS_TO_FIND && !dropped; drop += 1) {
+    dropOnce(engine);
+    dropped = engine.physicsWorld.balls.find((ball) => ball.mergeKind === 'joker') ?? null;
+  }
+  assert.ok(dropped);
+  assert.equal(dropped.mergeTier, null);
+  assert.equal(dropped.radius, TIERS[SPECIALS.kinds.joker.sizeTierIndex].radius);
+  assert.equal(dropped.specialType, null, 'the generic special paths never see it');
+
+  const bombs = createSpecialEngine({ kindRoll: KIND_ROLL_THIRD });
+  let bomb = null;
+  for (let drop = 0; drop < MAX_DROPS_TO_FIND && !bomb; drop += 1) {
+    dropOnce(bombs);
+    bomb = bombs.physicsWorld.balls.find((ball) => ball.mergeKind === 'bomb') ?? null;
+  }
+  assert.ok(bomb);
+  assert.equal(bomb.mergeTier, null);
+  assert.equal(bomb.radius, TIERS[SPECIALS.kinds.bomb.sizeTierIndex].radius);
+});
+
+test('A queued Ice sphere is held to its highest calibre when it is loaded', () => {
+  const engine = createSpecialEngine();
+  engine.nextBall.mergeKind = 'ice';
+  engine.nextBall.colorId = TIERS[SPECIALS.kinds.ice.maxTierIndex + 2].id;
+  mergeBehavior.syncLauncherBallTier(engine, engine.nextBall);
+  assert.equal(engine.nextBall.mergeTier, SPECIALS.kinds.ice.maxTierIndex);
+  assert.equal(engine.nextBall.colorId, TIERS[SPECIALS.kinds.ice.maxTierIndex].id);
+});
+
+test('A Joker fuses with the first plain sphere it touches into the next calibre, through the normal fusion path', () => {
+  const engine = createSpecialEngine();
+  const calibre = 3;
+  forceContract(engine, { type: 'fusionCount', target: 6 });
+  const joker = placeSpecial(engine, 'joker', 200);
+  const partner = placeTouching(engine, joker, calibre);
+  const jokerX = joker.x;
+  const jokerRadius = joker.radius;
+
+  stepFusions(engine);
+
+  const { balls } = engine.physicsWorld;
+  assert.equal(balls.length, 1);
+  assert.equal(balls[0].mergeTier, calibre + 1);
+  assert.equal(balls[0].colorId, TIERS[calibre + 1].id);
+  assert.equal(balls[0].mergeKind, null);
+  assert.ok(engine.combo >= 1, 'the fusion counts for the combo');
+  assert.equal(engine.score, TIERS[calibre + 1].points * Math.max(1, engine.combo));
+  assert.equal(engine.mergeBestTier, calibre + 2);
+  assert.equal(engine.modeState.mergesCount, 1);
+  assert.equal(engine.modeState.contract.progress, 1, 'it counts for a fusion count contract');
+  assert.ok(Math.abs(balls[0].x - (jokerX + jokerRadius)) < partner.radius, 'created near the contact point');
+});
+
+test('A Joker fusion also counts for a fuse-calibre contract with the calibre it creates', () => {
+  const engine = createSpecialEngine();
+  const calibre = 3;
+  forceContract(engine, { type: 'fuseCalibre', target: calibre + 3 });
+  const joker = placeSpecial(engine, 'joker', 200);
+  placeTouching(engine, joker, calibre);
+  stepFusions(engine);
+  assert.equal(engine.modeState.contract.progress, calibre + 2);
+});
+
+test('A Joker never fuses with a Joker, an Ice sphere, a Bomb or the top calibre', () => {
+  const top = TIERS.length - 1;
+  const partners = {
+    joker: (engine, joker) => placeSpecial(engine, 'joker', joker.x + joker.radius * 2 - FUSION_TOUCH_GAP_PX),
+    ice: (engine, joker) => placeTouching(engine, joker, 3, { mergeKind: 'ice' }),
+    bomb: (engine, joker) => placeSpecial(engine, 'bomb', joker.x + joker.radius * 2 - FUSION_TOUCH_GAP_PX),
+    top: (engine, joker) => placeTouching(engine, joker, top)
+  };
+  for (const [name, place] of Object.entries(partners)) {
+    const engine = createSpecialEngine();
+    const joker = placeSpecial(engine, 'joker', 200);
+    place(engine, joker);
+    stepFusions(engine);
+    assert.equal(engine.physicsWorld.balls.length, 2, `a Joker and ${name} stay apart`);
+    assert.equal(engine.modeState.supernovas, 0);
+    assert.equal(engine.score, 0);
+  }
+});
+
+test('A sphere without a calibre never matches another one: no fusion, no attraction, no pull from a shockwave', () => {
+  for (const kind of ['joker', 'bomb']) {
+    const engine = createSpecialEngine();
+    const first = placeSpecial(engine, kind, 200);
+    placeSpecial(engine, kind, 200 + first.radius * 2 - FUSION_TOUCH_GAP_PX);
+    stepFusions(engine);
+    assert.equal(engine.physicsWorld.balls.length, 2, `two ${kind} spheres do not fuse`);
+  }
+
+  const engine = createSpecialEngine();
+  const jokers = [placeSpecial(engine, 'joker', 200), placeSpecial(engine, 'joker', 260)];
+  jokers.forEach((ball) => { ball.mergePolaritySec = 1; });
+  mergeBehavior.applyPolarityBiasForces(engine, jokers, PHYSICS_DT);
+  assert.ok(jokers[0].vx < 0 && jokers[1].vx > 0, 'two spheres without a calibre push apart');
+
+  const pair = [placeBall(engine, 3, 200, 300, { mergePolaritySec: 1 }), placeBall(engine, 3, 260, 300, { mergePolaritySec: 1 })];
+  mergeBehavior.applyPolarityBiasForces(engine, pair, PHYSICS_DT);
+  assert.ok(pair[0].vx > 0 && pair[1].vx < 0, 'the same calibre still attracts');
+
+  const wave = createSpecialEngine();
+  const source = { x: 200, y: 400, radius: 30 };
+  const bomb = placeSpecial(wave, 'bomb', 250);
+  bomb.y = source.y;
+  mergeBehavior.emitMergeShockwave(wave, source.x, source.y, source.radius, modesConfig.merge.supernovaShockwaveImpulse, -1);
+  assert.ok(bomb.vx > 0, 'a supernova wave pushes a sphere without calibre away');
+  bomb.vx = 0;
+  const matching = placeBall(wave, 3, 250, source.y);
+  mergeBehavior.emitMergeShockwave(wave, source.x, source.y, source.radius, modesConfig.merge.shockwaveImpulse, 3);
+  assert.ok(bomb.vx > 0, 'a calibre wave pushes it away too');
+  assert.ok(matching.vx < 0, 'a matching calibre is pulled, unlike one without calibre');
+});
+
+test('An Ice sphere cannot fuse until a fusion shockwave thaws it', () => {
+  const engine = createSpecialEngine();
+  const ice = placeSpecial(engine, 'ice', 200, 3);
+  const partner = placeTouching(engine, ice, 3);
+  stepFusions(engine);
+  assert.equal(engine.physicsWorld.balls.length, 2, 'frozen: no fusion');
+  assert.equal(ice.mergeKind, 'ice');
+
+  mergeBehavior.emitMergeShockwave(engine, ice.x + 10, ice.y - 50, TIERS[2].radius, modesConfig.merge.shockwaveImpulse, 7);
+  assert.equal(ice.mergeKind, null, 'the wave thawed it');
+  for (const ball of [ice, partner]) {
+    ball.vx = 0;
+    ball.vy = 0;
+    ball.y = floorY(ball.radius);
+  }
+  ice.x = 200;
+  partner.x = ice.x + ice.radius + partner.radius - FUSION_TOUCH_GAP_PX;
+  stepFusions(engine);
+  assert.equal(engine.physicsWorld.balls.length, 1);
+  assert.equal(engine.physicsWorld.balls[0].mergeTier, 4);
+});
+
+test('An Ice sphere thaws by itself after the configured delay from landing, then fuses', () => {
+  const engine = createSpecialEngine();
+  const ice = placeSpecial(engine, 'ice', 200, 3);
+  placeTouching(engine, ice, 3);
+  const steps = Math.ceil(SPECIALS.kinds.ice.thawTimeoutSec / PHYSICS_DT);
+
+  stepFusions(engine);
+  assert.equal(ice.mergeSpecialSec, SPECIALS.kinds.ice.thawTimeoutSec, 'the delay starts at landing');
+  for (let i = 0; i < steps / 2; i += 1) {
+    stepFusions(engine);
+  }
+  assert.equal(engine.physicsWorld.balls.length, 2);
+  assert.equal(ice.mergeKind, 'ice');
+
+  for (let i = 0; i < steps && engine.physicsWorld.balls.length > 1; i += 1) {
+    stepFusions(engine);
+  }
+  assert.equal(engine.physicsWorld.balls.length, 1, 'thawed, then fused');
+  assert.equal(engine.physicsWorld.balls[0].mergeTier, 4);
+});
+
+test('A Bomb removes only small calibres within its radius, in id order, for a flat award outside the combo and golden', () => {
+  const engine = createSpecialEngine();
+  const config = SPECIALS.kinds.bomb;
+  const y = 600;
+  const bomb = placeSpecial(engine, 'bomb', 200);
+  bomb.y = y;
+  const plain = (tier, dx, dy) => {
+    const ball = placeBall(engine, tier, bomb.x + dx, y + dy);
+    return ball;
+  };
+  const special = (kind, tier, dx, dy) => {
+    const ball = placeSpecial(engine, kind, bomb.x + dx, tier);
+    ball.y = y + dy;
+    return ball;
+  };
+  const victims = [
+    plain(0, 30, 0),
+    plain(config.maxTierIndex, -60, 20),
+    special('joker', undefined, 0, -60),
+    special('ice', 2, 60, 40),
+    plain(1, 0, config.radiusPx - 1)
+  ];
+  const survivors = [
+    plain(config.maxTierIndex + 1, 40, 0),
+    special('ice', config.maxTierIndex + 1, -40, 40),
+    plain(0, config.radiusPx + 1, 0),
+    special('bomb', undefined, 20, 20)
+  ];
+  const removedOrder = [];
+  const removeBall = engine.physicsWorld.removeBall.bind(engine.physicsWorld);
+  engine.physicsWorld.removeBall = (ball) => {
+    removedOrder.push(ball.id);
+    removeBall(ball);
+  };
+  engine.combo = 4;
+  engine.modeState.event = { id: 'golden', direction: 1, dropsLeft: 3 };
+
+  mergeBehavior.explodeBomb(engine, bomb);
+
+  assert.equal(engine.score, victims.length * config.pointsPerSphere);
+  const left = engine.physicsWorld.balls;
+  assert.equal(left.includes(bomb), false, 'the bomb is gone');
+  for (const victim of victims) {
+    assert.equal(left.includes(victim), false);
+  }
+  for (const survivor of survivors) {
+    assert.equal(left.includes(survivor), true);
+  }
+  const victimIds = removedOrder.filter((id) => id !== bomb.id);
+  assert.equal(victimIds.length, victims.length);
+  assert.deepEqual(victimIds, [...victimIds].sort((a, b) => a - b));
+  assert.equal(engine.combo, 4, 'the combo is untouched');
+  for (const ball of left) {
+    assert.equal(engine.physicsWorld.ballMap.has(ball.id), true);
+  }
+});
+
+test('A Bomb goes off a fuse after landing, shows a floating text and leaves the physics step working', () => {
+  const engine = createSpecialEngine();
+  const texts = [];
+  engine.particleSystem.spawnFloatingText = (x, y, text) => texts.push(text);
+  const bomb = placeSpecial(engine, 'bomb', 200);
+  const prey = placeBall(engine, 0, bomb.x + 40, floorY(TIERS[0].radius));
+  const fuseSteps = Math.ceil(SPECIALS.kinds.bomb.fuseSec / PHYSICS_DT);
+
+  stepFusions(engine);
+  assert.equal(bomb.mergeSpecialSec, SPECIALS.kinds.bomb.fuseSec, 'the fuse is lit at landing');
+  for (let i = 0; i < fuseSteps / 2; i += 1) {
+    stepFusions(engine);
+  }
+  assert.equal(engine.physicsWorld.balls.includes(bomb), true, 'still burning');
+  for (let i = 0; i < fuseSteps && engine.physicsWorld.balls.includes(bomb); i += 1) {
+    stepFusions(engine);
+  }
+  assert.equal(engine.physicsWorld.balls.length, 0);
+  assert.equal(engine.physicsWorld.balls.includes(prey), false);
+  assert.equal(engine.score, SPECIALS.kinds.bomb.pointsPerSphere);
+  assert.ok(texts.includes(t('gameplay.feedback.merge.bombBoom', { points: SPECIALS.kinds.bomb.pointsPerSphere })));
+  stepFusions(engine);
+  assert.equal(engine.state, GAME_STATES.PLAYING);
+});
+
+test('A Bomb that never settles still lights its fuse at its first contact', () => {
+  const engine = createSpecialEngine();
+  const bomb = placeSpecial(engine, 'bomb', 200);
+  bomb.y = 300;
+  bomb.vy = 400;
+  mergeBehavior.updateSpecials(engine, PHYSICS_DT);
+  assert.equal(bomb.mergeSpecialSec, null, 'falling free: not lit');
+  placeBall(engine, 5, 200, 300 + bomb.radius + TIERS[5].radius);
+  mergeBehavior.updateSpecials(engine, PHYSICS_DT);
+  assert.equal(bomb.mergeSpecialSec, SPECIALS.kinds.bomb.fuseSec);
+});
+
+test('A snapshot round trip keeps every kind on the board, their timers and the launcher specials', () => {
+  const engine = createSpecialEngine();
+  placeSpecial(engine, 'joker', 80);
+  placeSpecial(engine, 'ice', 160, 3, { mergeSpecialSec: 3.5 });
+  placeSpecial(engine, 'bomb', 260, undefined, { mergeSpecialSec: 0.4 });
+  placeBall(engine, 6, 380, floorY(TIERS[6].radius));
+  engine.nextBall.mergeKind = 'ice';
+  engine.modeState.upcomingKinds = [];
+  engine.modeState.specialsSeen = ['ice'];
+  engine.modeState.dropCount = 12;
+  engine.saveRunSnapshot({ force: true });
+
+  const restored = createEngine();
+  restored.storageManager = engine.storageManager;
+  assert.equal(restored.restoreSavedRun(), true);
+  const balls = restored.physicsWorld.balls;
+  assert.deepEqual(balls.map((ball) => ball.mergeKind), ['joker', 'ice', 'bomb', null]);
+  assert.deepEqual(balls.map((ball) => ball.mergeTier), [null, 3, null, 6]);
+  assert.deepEqual(balls.map((ball) => ball.radius), [
+    TIERS[SPECIALS.kinds.joker.sizeTierIndex].radius,
+    TIERS[3].radius,
+    TIERS[SPECIALS.kinds.bomb.sizeTierIndex].radius,
+    TIERS[6].radius
+  ]);
+  assert.equal(balls[1].mergeSpecialSec, 3.5);
+  assert.equal(balls[2].mergeSpecialSec, 0.4);
+  assert.equal(balls[0].mergeSpecialSec, null);
+  assert.equal(restored.nextBall.mergeKind, 'ice');
+  assert.equal(restored.currentBall.mergeKind, null);
+  assert.equal(restored.modeState.dropCount, 12);
+  assert.deepEqual(restored.modeState.specialsSeen, ['ice']);
+  assert.equal(restored.getMergeSpecialState().announceSerial, null, 'a restored run announces nothing');
+});
+
+test('A queued special survives a restore, and only one special is kept in view', () => {
+  const engine = createSpecialEngine();
+  engine.modeState.upcomingKinds = [null, 'bomb'];
+  engine.saveRunSnapshot({ force: true });
+  const restored = createEngine();
+  restored.storageManager = engine.storageManager;
+  assert.equal(restored.restoreSavedRun(), true);
+  assert.deepEqual(restored.modeState.upcomingKinds, [null, 'bomb']);
+
+  const snapshot = engine.storageManager.loadRunSnapshot();
+  snapshot.modeState.launcherKinds = { current: 'joker', next: 'bomb', queue: ['ice', 'bogus'] };
+  engine.storageManager.saveRunSnapshot(snapshot);
+  const crowded = createEngine();
+  crowded.storageManager = engine.storageManager;
+  assert.equal(crowded.restoreSavedRun(), true);
+  assert.equal(crowded.currentBall.mergeKind, 'joker');
+  assert.equal(crowded.nextBall.mergeKind, null);
+  assert.deepEqual(crowded.modeState.upcomingKinds.filter(Boolean), []);
+});
+
+test('A legacy snapshot without kinds restores every sphere as a plain one, and a damaged one is sanitized', () => {
+  const source = createSpecialEngine();
+  placeBall(source, 2, 100, floorY(TIERS[2].radius));
+  placeBall(source, 4, 300, floorY(TIERS[4].radius));
+  source.saveRunSnapshot({ force: true });
+  const snapshot = source.storageManager.loadRunSnapshot();
+  for (const field of ['ballKinds', 'ballSpecial', 'launcherKinds', 'specialsSeen', 'dropCount']) {
+    delete snapshot.modeState[field];
+  }
+  source.storageManager.saveRunSnapshot(snapshot);
+  const legacy = createEngine();
+  legacy.storageManager = source.storageManager;
+  assert.equal(legacy.restoreSavedRun(), true);
+  assert.deepEqual(legacy.physicsWorld.balls.map((ball) => ball.mergeKind), [null, null]);
+  assert.deepEqual(legacy.physicsWorld.balls.map((ball) => ball.mergeTier), [2, 4]);
+  assert.equal(legacy.modeState.dropCount, 0);
+  assert.equal(legacy.currentBall.mergeKind, null);
+
+  snapshot.modeState.ballKinds = ['wizard', 7];
+  snapshot.modeState.ballSpecial = [Number.NaN, -3];
+  snapshot.modeState.specialsSeen = ['bomb', 'bomb', 'wizard'];
+  source.storageManager.saveRunSnapshot(snapshot);
+  const damaged = createEngine();
+  damaged.storageManager = source.storageManager;
+  assert.equal(damaged.restoreSavedRun(), true);
+  assert.deepEqual(damaged.physicsWorld.balls.map((ball) => ball.mergeKind), [null, null]);
+  assert.deepEqual(damaged.physicsWorld.balls.map((ball) => ball.mergeSpecialSec), [null, null]);
+  assert.deepEqual(damaged.modeState.specialsSeen, ['bomb']);
+});
+
+test('The first appearance of each special kind is announced once per run, and a restored run stays silent', () => {
+  const engine = createSpecialEngine();
+  const spoken = [];
+  const hud = { announce: (text) => spoken.push(text) };
+  const announce = () => uiHudRefreshMethods.announceMergeSpecial.call(hud, engine.getMergeSpecialState());
+  for (let drop = 0; drop < SPECIALS.fromDrop + 6; drop += 1) {
+    dropOnce(engine);
+    announce();
+  }
+  assert.deepEqual(spoken, [t('gameplay.feedback.merge.specialAnnounce', {
+    name: t('gameplay.merge.specials.joker.name'),
+    description: t('gameplay.merge.specials.joker.description')
+  })], 'a Joker again says nothing');
+
+  engine.specialRolls.kindRoll = KIND_ROLL_THIRD;
+  for (let drop = 0; drop < MAX_DROPS_TO_FIND && spoken.length < 2; drop += 1) {
+    dropOnce(engine);
+    announce();
+  }
+  assert.equal(spoken.length, 2);
+  assert.ok(spoken[1].startsWith(t('gameplay.merge.specials.bomb.name')), 'the name comes first');
+  announce();
+  assert.equal(spoken.length, 2);
+  uiHudRefreshMethods.announceMergeSpecial.call(hud, null);
+  assert.equal(spoken.length, 2);
+  uiHudRefreshMethods.announceMergeSpecial.call(hud, { kind: 'joker', announceSerial: null });
+  assert.equal(spoken.length, 2);
+});
+
+test('Every special text exists in English and French, name first in the announcement', () => {
+  const kinds = Object.keys(SPECIALS.kinds);
+  const keys = ['gameplay.feedback.merge.specialAnnounce', 'gameplay.feedback.merge.bombBoom'];
+  for (const kind of kinds) {
+    keys.push(...['name', 'description', 'icon'].map((part) => `gameplay.merge.specials.${kind}.${part}`));
+  }
+  const read = (dictionary, key) => key.split('.').reduce((node, part) => node?.[part], dictionary);
+  for (const locale of ['en', 'fr']) {
+    const dictionary = loadJson(`./locales/${locale}.json`);
+    for (const key of keys) {
+      assert.equal(typeof read(dictionary, key), 'string', `${locale} has ${key}`);
+      assert.ok(read(dictionary, key).length > 0);
+    }
+    assert.ok(read(dictionary, 'gameplay.feedback.merge.specialAnnounce').startsWith('{{name}}'));
+    assert.ok(read(dictionary, 'gameplay.feedback.merge.bombBoom').includes('{{points}}'));
+  }
+});
+
+test('A Bomb dropped flush against a wall keeps its fuse unlit until it touches the floor or the pile', () => {
+  const geometry = mergeBehavior.getBasinGeometry(createSpecialEngine());
+  for (const side of ['left', 'right']) {
+    const engine = createSpecialEngine();
+    const radius = TIERS[SPECIALS.kinds.bomb.sizeTierIndex].radius;
+    const x = side === 'left' ? geometry.left + radius : geometry.right - radius;
+    const bomb = placeSpecial(engine, 'bomb', x);
+    bomb.y = 300;
+    bomb.mergeEntering = true;
+    const fuseSteps = Math.ceil(SPECIALS.kinds.bomb.fuseSec / PHYSICS_DT) * 2;
+    let steps = 0;
+    const airborne = () => bomb.y + bomb.radius < geometry.floor - AIRBORNE_MARGIN_PX;
+    while (airborne() && steps < 600) {
+      stepFusions(engine);
+      steps += 1;
+      assert.equal(engine.physicsWorld.balls.includes(bomb), true, `${side}: no explosion in mid-air`);
+      if (airborne()) {
+        assert.equal(bomb.mergeSpecialSec, null, `${side}: fuse unlit while falling`);
+      }
+    }
+    assert.ok(steps > 0 && steps < 600, `${side}: it reached the floor`);
+    for (let i = 0; i < fuseSteps && engine.physicsWorld.balls.includes(bomb); i += 1) {
+      stepFusions(engine);
+    }
+    assert.equal(engine.physicsWorld.balls.includes(bomb), false, `${side}: it goes off after landing`);
+  }
+});
+
+test('The Space swap keeps each special with its own ball and the queued kinds aligned', () => {
+  const engine = createSpecialEngine();
+  engine.nextBall.mergeKind = 'bomb';
+  engine.modeState.upcomingKinds = [null, 'joker'];
+  const current = engine.currentBall;
+  const next = engine.nextBall;
+  engine.swapLauncherBalls();
+  assert.equal(engine.currentBall, next);
+  assert.equal(engine.currentBall.mergeKind, 'bomb');
+  assert.equal(engine.nextBall, current);
+  assert.equal(engine.nextBall.mergeKind, null);
+  assert.equal(engine.currentBall.radius, TIERS[SPECIALS.kinds.bomb.sizeTierIndex].radius);
+  assert.equal(engine.currentBall.mergeTier, null);
+  assert.deepEqual(engine.modeState.upcomingKinds, [null, 'joker']);
+});
+
+test('An event recolor keeps every special in its slot and holds Ice to its highest calibre', () => {
+  for (const [slot, kind] of [['current', 'ice'], ['next', 'bomb'], ['queue', 'joker']]) {
+    const engine = createSpecialEngine();
+    if (slot === 'current') {
+      engine.currentBall.mergeKind = kind;
+    } else if (slot === 'next') {
+      engine.nextBall.mergeKind = kind;
+    } else {
+      engine.modeState.upcomingKinds = [null, kind];
+    }
+    const queueBefore = engine.upcomingColorIds.length;
+    const roll = 0.999;
+    engine.drawSeededRoll = () => roll;
+    mergeBehavior.recolorLauncher(engine, 'start');
+    assert.equal(engine.currentBall.mergeKind, slot === 'current' ? kind : null);
+    assert.equal(engine.nextBall.mergeKind, slot === 'next' ? kind : null);
+    assert.deepEqual(engine.modeState.upcomingKinds, slot === 'queue' ? [null, kind] : []);
+    assert.equal(engine.upcomingColorIds.length, queueBefore);
+    if (slot === 'current') {
+      assert.ok(engine.currentBall.mergeTier <= SPECIALS.kinds.ice.maxTierIndex, 'ice is capped');
+    }
+  }
+});
+
+test('A shockwave thaws a large Ice sphere as soon as the wave reaches its edge', () => {
+  const engine = createSpecialEngine();
+  const source = { x: 200, y: 400, radius: 20 };
+  const reach = source.radius * modesConfig.merge.shockwaveRadiusFactor;
+  const ice = placeBall(engine, SPECIALS.kinds.ice.maxTierIndex, source.x + reach + 10, source.y, { mergeKind: 'ice' });
+  assert.ok(ice.x - source.x > reach && ice.x - source.x - ice.radius <= reach, 'centre out of reach, edge inside');
+  mergeBehavior.emitMergeShockwave(engine, source.x, source.y, source.radius, modesConfig.merge.shockwaveImpulse, 0);
+  assert.equal(ice.mergeKind, null);
+  const far = placeBall(engine, 4, source.x + reach + 200, source.y, { mergeKind: 'ice' });
+  mergeBehavior.emitMergeShockwave(engine, source.x, source.y, source.radius, modesConfig.merge.shockwaveImpulse, 0);
+  assert.equal(far.mergeKind, 'ice');
+});

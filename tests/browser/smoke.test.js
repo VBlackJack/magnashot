@@ -4034,6 +4034,38 @@ describe('Merge shake', () => {
       await context.close();
     }
   });
+
+  test('special spheres in the launcher and on the board draw without errors and keep the layout', async () => {
+    const viewport = VIEWPORTS[0];
+    const { context, page, errors } = await openGame(viewport, { initStorage, path });
+    const nextFrame = () => page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+    try {
+      await startBasin(page, viewport);
+      await page.evaluate(() => {
+        const engine = window.__fluxEngine;
+        engine.currentBall.mergeKind = 'joker';
+        engine.nextBall.mergeKind = 'bomb';
+        engine.notifyUI();
+      });
+      await nextFrame();
+      for (const nextKind of ['ice', 'joker']) {
+        await page.evaluate((kind) => {
+          const engine = window.__fluxEngine;
+          engine.modeState.dropCooldownSec = 0;
+          engine.shoot();
+          engine.nextBall.mergeKind = kind;
+          engine.notifyUI();
+        }, nextKind);
+        await nextFrame();
+      }
+      const kinds = await page.evaluate(() => window.__fluxEngine.physicsWorld.balls.map((ball) => ball.mergeKind));
+      assert.ok(kinds.includes('joker') || kinds.includes('bomb'), 'a special sphere is on the board');
+      await assertLayoutFits(page, 'Merge specials');
+      assert.deepEqual(errors, []);
+    } finally {
+      await context.close();
+    }
+  });
 });
 
 describe('Progress transfer', () => {

@@ -684,6 +684,7 @@ export class Renderer {
     }
 
     this.drawLauncher(ctx, engineState, theme, now);
+    behavior?.drawLauncherOverlay?.(ctx, engineState, this, theme, now);
     this.drawSagGauge(ctx, engineState, theme);
     if (!this.lite) {
       this.drawParticles(ctx, engineState.particleSystem, alpha);

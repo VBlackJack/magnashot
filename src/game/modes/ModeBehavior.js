@@ -146,6 +146,8 @@ export class ModeBehavior {
   drawUnderlay() {}
 
   drawOverlay() {}
+
+  drawLauncherOverlay() {}
 }
 
 export const DEFAULT_MODE_BEHAVIOR = Object.freeze(new ModeBehavior('default'));
