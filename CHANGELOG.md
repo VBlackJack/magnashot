@@ -7,6 +7,10 @@ All notable changes to **MagnaShot** are documented in this file.
 ### Added
 - Merge Basin calibres 11 and 12: the basin now fuses up to calibre 12, and the Supernova needs two calibre 12 spheres (it was two calibre 10 spheres) and is worth 4000 (it was 1500) times the combo. The overflow line now starts its stepped descent once calibre 11 is fused, every 35 drops (it was every 25 drops after calibre 10). Basin scores are not comparable with earlier versions.
 
+### Fixed
+- On phones, when the browser drops fullscreen by itself (back gesture, app switch, share sheet), the next tap on the game now brings it back, until the player turns it off with the fullscreen button. On desktop, Escape still leaves fullscreen for good.
+- On tablets such as an 11-inch 2560x1600 tablet held in portrait, the board now fills the screen instead of stopping at a fixed width.
+
 ## [1.27.0] - 2026-11-12
 
 ### Added

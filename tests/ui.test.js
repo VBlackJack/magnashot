@@ -1897,6 +1897,170 @@ test('fullscreen controls: hidden when unsupported or already fullscreen, synced
   }
 });
 
+test('sticky fullscreen: touch devices re-enter on the next tap after the browser drops fullscreen', async () => {
+  await i18n.init('fr', ['fr', 'en']);
+  const makeBtn = (id) => ({
+    id,
+    attributes: {},
+    classList: makeClassList(),
+    setAttribute(k, v) {
+      this.attributes[k] = v;
+    },
+    getAttribute(k) {
+      return this.attributes[k];
+    },
+    addEventListener() {},
+    closest: () => null
+  });
+  const makeEnv = ({ coarse = true, displayMode = false, rejectRequests = false } = {}) => {
+    const env = { current: null, requests: 0, listeners: {}, fire: null };
+    env.doc = {
+      fullscreenEnabled: true,
+      get fullscreenElement() {
+        return env.current;
+      },
+      listeners: env.listeners,
+      addEventListener(type, fn) {
+        (env.listeners[type] ||= []).push(fn);
+      },
+      removeEventListener(type, fn) {
+        env.listeners[type] = (env.listeners[type] || []).filter((f) => f !== fn);
+      },
+      documentElement: {
+        requestFullscreen() {
+          env.requests++;
+          if (rejectRequests) {
+            return Promise.reject(new Error('denied'));
+          }
+          env.current = {};
+          return Promise.resolve();
+        }
+      },
+      exitFullscreen() {
+        env.current = null;
+        env.fire('fullscreenchange');
+        return Promise.resolve();
+      },
+      querySelector: () => null
+    };
+    env.fire = (type, event = {}) => [...(env.listeners[type] || [])].forEach((fn) => fn(event));
+    env.window = {
+      matchMedia: (query) => ({
+        matches:
+          query === gameConfig.defaults.coarsePointerMediaQuery
+            ? coarse
+            : query === gameConfig.defaults.fullscreenDisplayModeMediaQuery && displayMode
+      })
+    };
+    return env;
+  };
+  const makeUi = () => {
+    const ui = Object.create(UIManager.prototype);
+    ui.gameConfig = gameConfig;
+    ui.elements = { btnFullscreen: makeBtn('btn-fullscreen'), btnFullscreenHud: makeBtn('btn-fullscreen-hud') };
+    return ui;
+  };
+  const browserDrops = (env) => {
+    env.current = null;
+    env.fire('fullscreenchange');
+  };
+  const tap = async (env, type = 'pointerup', event = {}) => {
+    env.fire(type, event);
+    await new Promise((resolve) => setImmediate(resolve));
+  };
+  const prevDoc = globalThis.document;
+  const prevWindow = globalThis.window;
+  try {
+    const setup = async (options) => {
+      const env = makeEnv(options);
+      globalThis.document = env.doc;
+      globalThis.window = env.window;
+      const ui = makeUi();
+      ui.setupFullscreenControl();
+      return { env, ui };
+    };
+
+    // Button on, browser drop, next pointerup re-requests; listeners are removed once granted.
+    let { env, ui } = await setup();
+    await ui.toggleFullscreen();
+    assert.equal(env.requests, 1);
+    browserDrops(env);
+    assert.equal(env.listeners.pointerup.length, 1, 'armed after the drop');
+    assert.equal(env.listeners.keydown.length, 1);
+    await tap(env);
+    assert.equal(env.requests, 2, 'pointerup re-requests fullscreen');
+    assert.equal(env.listeners.pointerup.length, 0, 'disarmed after success');
+    assert.equal(ui.elements.btnFullscreen.getAttribute('aria-pressed'), 'true');
+
+    // keydown also re-enters.
+    ({ env, ui } = await setup());
+    await ui.toggleFullscreen();
+    browserDrops(env);
+    await tap(env, 'keydown');
+    assert.equal(env.requests, 2, 'keydown re-requests fullscreen');
+
+    // Button off: its own exit and a later browser exit never arm anything.
+    ({ env, ui } = await setup());
+    await ui.toggleFullscreen();
+    await ui.toggleFullscreen();
+    assert.equal(env.current, null);
+    assert.equal((env.listeners.pointerup || []).length, 0, 'the button exit does not arm');
+    env.fire('fullscreenchange');
+    assert.equal((env.listeners.pointerup || []).length, 0);
+    await tap(env);
+    assert.equal(env.requests, 1, 'no re-entry after the player turned it off');
+
+    // Desktop (fine pointer): Escape stays final.
+    ({ env, ui } = await setup({ coarse: false }));
+    await ui.toggleFullscreen();
+    browserDrops(env);
+    assert.equal((env.listeners.pointerup || []).length, 0);
+    await tap(env);
+    assert.equal(env.requests, 1);
+
+    // Fullscreen display mode: nothing is wired or armed.
+    ({ env, ui } = await setup({ displayMode: true }));
+    await ui.toggleFullscreen();
+    browserDrops(env);
+    assert.equal((env.listeners.pointerup || []).length, 0);
+    assert.equal(env.requests, 1);
+
+    // A rejected request keeps the listener so the next tap retries.
+    ({ env, ui } = await setup({ rejectRequests: true }));
+    await ui.toggleFullscreen();
+    browserDrops(env);
+    await tap(env);
+    assert.equal(env.requests, 2);
+    assert.equal(env.listeners.pointerup.length, 1, 'still armed after a rejection');
+    await tap(env);
+    assert.equal(env.requests, 3, 'second tap retries');
+
+    // Taps on a fullscreen button, Escape and auto-repeat never request, and stay armed.
+    ({ env, ui } = await setup());
+    await ui.toggleFullscreen();
+    browserDrops(env);
+    const hudTarget = {};
+    ui.elements.btnFullscreenHud.contains = (node) => node === hudTarget;
+    await tap(env, 'pointerup', { target: hudTarget });
+    await tap(env, 'keydown', { key: 'Escape' });
+    await tap(env, 'keydown', { key: 'a', repeat: true });
+    assert.equal(env.requests, 1, 'ignored gestures do not request');
+    assert.equal(env.listeners.pointerup.length, 1, 'still armed');
+    assert.equal(env.listeners.keydown.length, 1);
+
+    // fullscreenchange firing twice never registers duplicate listeners.
+    ({ env, ui } = await setup());
+    await ui.toggleFullscreen();
+    browserDrops(env);
+    env.fire('fullscreenchange');
+    assert.equal(env.listeners.pointerup.length, 1);
+    assert.equal(env.listeners.keydown.length, 1);
+  } finally {
+    globalThis.document = prevDoc;
+    globalThis.window = prevWindow;
+  }
+});
+
 test('Flux perk digits pick the matching card and never equip a special ball', () => {
   const ui = Object.create(UIManager.prototype);
   const chosen = [];
