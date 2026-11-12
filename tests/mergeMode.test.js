@@ -25,6 +25,7 @@ import { createShakeDetector } from '../src/ui/UISettingsControls.js';
 import { StorageManager } from '../src/core/StorageManager.js';
 import { applyWorldGeometry } from '../src/core/WorldGeometry.js';
 import {
+  BOARD_MECHANICS,
   GAME_MODES,
   GAME_OVER_REASONS,
   GAME_STATES,
@@ -353,4 +354,16 @@ test('Shake motion rejects slow tilt and isolated spikes, then latches until qui
   assert.equal(read(1200 + cfg.quietWindowMs, 0), false);
   assert.equal(read(1500, peak), false);
   assert.equal(read(1550, -peak), true);
+});
+
+test('A Basin run never shows the colour-match basics hint', () => {
+  const engine = createEngine();
+  engine.startMergeMode();
+  assert.equal(engine.storageManager.getDiscoveries()[BOARD_MECHANICS.BASICS], undefined, 'the hint is still unlearned');
+  assert.equal(engine.listPresentMechanics().has(BOARD_MECHANICS.BASICS), false);
+  assert.notEqual(engine.activeDiscoveryId, BOARD_MECHANICS.BASICS);
+
+  engine.shoot();
+  engine.refreshDiscovery();
+  assert.notEqual(engine.activeDiscoveryId, BOARD_MECHANICS.BASICS);
 });
