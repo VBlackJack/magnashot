@@ -45,6 +45,7 @@ const EXPECTED_PROTOTYPE_NAMES = [
   'refreshMagnetarHud',
   'refreshMergeEventBadge',
   'announceMergeEventChanges',
+  'announceMergePressureChanges',
   'announceMagnetarEvent',
   'bindStatsEvents',
   'buildStatsRecords',

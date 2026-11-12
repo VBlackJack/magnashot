@@ -516,7 +516,13 @@
         "eventStart": "ÉVÉNEMENT : {{name}}",
         "eventStartAnnounce": "Événement : {{name}}. {{description}}",
         "eventEnd": "Fin de l'événement : {{name}}.",
-        "eventUpcoming": "Bientôt : {{name}}."
+        "eventUpcoming": "Bientôt : {{name}}.",
+        "pressureStep": "LA LIGNE EST DESCENDUE",
+        "pressureStepAnnounce": "La ligne de débordement est descendue.",
+        "pressureWarning": {
+          "one": "La ligne de débordement descend dans {{count}} lâcher.",
+          "other": "La ligne de débordement descend dans {{count}} lâchers."
+        }
       }
     },
     "merge": {

@@ -441,6 +441,15 @@ export class GameEngine {
     return this.mode === GAME_MODES.MERGE && live ? this.getModeBehavior().getEventView(this) : null;
   }
 
+  /**
+   * Overflow line pressure of the Merge Basin for the HUD.
+   * @returns {{lineOffsetPx: number, pendingOffsetPx: number|null, pendingDropsLeft: number}|null} Null outside a live Basin run.
+   */
+  getMergePressureState() {
+    const live = this.state === GAME_STATES.PLAYING || this.state === GAME_STATES.PAUSED;
+    return this.mode === GAME_MODES.MERGE && live ? this.getModeBehavior().getPressureView(this) : null;
+  }
+
   tryMergeShake() {
     if (this.getMergeShakeRemaining() !== 0 || !this.isRunPlaying()) {
       return false;

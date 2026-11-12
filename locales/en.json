@@ -516,7 +516,13 @@
         "eventStart": "EVENT: {{name}}",
         "eventStartAnnounce": "Event: {{name}}. {{description}}",
         "eventEnd": "Event over: {{name}}.",
-        "eventUpcoming": "Coming up: {{name}}."
+        "eventUpcoming": "Coming up: {{name}}.",
+        "pressureStep": "THE LINE CAME DOWN",
+        "pressureStepAnnounce": "The overflow line came down.",
+        "pressureWarning": {
+          "one": "The overflow line comes down in {{count}} drop.",
+          "other": "The overflow line comes down in {{count}} drops."
+        }
       }
     },
     "merge": {
