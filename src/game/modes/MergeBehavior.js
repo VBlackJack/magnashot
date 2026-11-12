@@ -42,6 +42,18 @@ const DROP_GUIDE_DASH = Object.freeze([5, 6]);
 const OVERFLOW_LINE_ALPHA = 0.72;
 const DROP_GUIDE_ALPHA = 0.36;
 const BASIN_GLOW_ALPHA = 0.14;
+/** Danger line reaction of a sphere above the line while its grace pauses the overflow timer. */
+const GRACED_OVERFLOW_RATIO = 0.2;
+/** The step text sits this many text lines below the event text so they never overlap. */
+const PRESSURE_TEXT_LINES_BELOW_EVENT = 1;
+/** Danger band between the base overflow line and the lowered one. */
+const PRESSURE_ZONE_ALPHA = 0.1;
+/** Static telegraph of the next line position: dashed line plus tick marks on both walls. */
+const TELEGRAPH_DASH = Object.freeze([3, 5]);
+const TELEGRAPH_ALPHA = 0.85;
+const TELEGRAPH_LINE_WIDTH = 2;
+const TELEGRAPH_TICK_LENGTH = 14;
+const TELEGRAPH_TICK_WIDTH = 3;
 /** Static ring around a pulsing sphere: the polarity pulse cue that survives reduced motion. */
 const PULSE_RING_GAP = 4;
 const PULSE_RING_WIDTH = 2;
@@ -311,6 +323,179 @@ export class MergeBehavior extends ModeBehavior {
     return { id: raw.id, direction, dropsLeft: Math.min(events.durationDrops, Math.max(1, raw.dropsLeft)) };
   }
 
+  /** Fresh pressure fields of a mode state: the line at its base position, nothing pending. */
+  createPressureState() {
+    return {
+      lineOffsetPx: 0,
+      pendingOffsetPx: null,
+      pendingDropsLeft: 0,
+      holdDrops: 0,
+      topTierDrops: null
+    };
+  }
+
+  /** Current overflow line: the base line lowered by the applied pressure offset. Never mutates the config. */
+  getOverflowLineY(engine) {
+    return engine.modesConfig.merge.overflowLineY + (engine.modeState?.lineOffsetPx ?? 0);
+  }
+
+  /** Read-only view of the pressure for the HUD, or null when the config defines none. */
+  getPressureView(engine) {
+    const state = engine.modeState;
+    if (!state || !engine.modesConfig.merge.pressure) {
+      return null;
+    }
+    return {
+      lineOffsetPx: state.lineOffsetPx,
+      pendingOffsetPx: state.pendingOffsetPx,
+      pendingDropsLeft: state.pendingDropsLeft
+    };
+  }
+
+  /** Offset the line should have for a best fused calibre and a count of drops since the top calibre. */
+  computeTargetOffset(pressure, bestCalibre, topTierDrops) {
+    const calibrePart = Math.max(0, bestCalibre - pressure.fromFusedTier) * pressure.pxPerTier;
+    const stepPart = topTierDrops === null
+      ? 0
+      : Math.floor(topTierDrops / pressure.topTierStepDrops) * pressure.pxPerStep;
+    return Math.min(pressure.maxOffsetPx, calibrePart + stepPart);
+  }
+
+  /**
+   * Raises the best calibre from a fusion. Drops never raise it. The first time the top
+   * pressure calibre is fused starts the count of drops that adds steps.
+   */
+  recordFusedCalibre(engine, calibre) {
+    engine.mergeBestTier = Math.max(engine.mergeBestTier || 1, calibre);
+    const pressure = engine.modesConfig.merge.pressure;
+    const state = engine.modeState;
+    if (pressure && state && state.topTierDrops === null && engine.mergeBestTier >= pressure.topTier) {
+      state.topTierDrops = 0;
+    }
+  }
+
+  /**
+   * Moves the pressure on by one successful drop: counts drops since the top calibre, starts
+   * a telegraphed step when the target rose, and applies it once the telegraph has run out.
+   */
+  advancePressure(engine) {
+    const pressure = engine.modesConfig.merge.pressure;
+    const state = engine.modeState;
+    if (!pressure) {
+      return;
+    }
+    if (state.topTierDrops !== null) {
+      state.topTierDrops += 1;
+    }
+    const target = this.computeTargetOffset(pressure, engine.mergeBestTier || 1, state.topTierDrops);
+    if (state.pendingOffsetPx !== null) {
+      // A higher target moves the preview but never restarts the countdown.
+      state.pendingOffsetPx = Math.max(state.pendingOffsetPx, target);
+      state.pendingDropsLeft = Math.max(0, state.pendingDropsLeft - 1);
+      if (state.pendingDropsLeft === 0) {
+        this.tryApplyPendingStep(engine);
+      }
+      return;
+    }
+    if (target > state.lineOffsetPx) {
+      state.pendingOffsetPx = target;
+      state.pendingDropsLeft = pressure.warnDrops;
+      state.holdDrops = 0;
+    }
+  }
+
+  /** True when a settled sphere has its top between the current line and the pending one. */
+  isStepBlocked(engine) {
+    const state = engine.modeState;
+    const currentLine = this.getOverflowLineY(engine);
+    const newLine = engine.modesConfig.merge.overflowLineY + state.pendingOffsetPx;
+    return engine.physicsWorld.balls.some((ball) => {
+      const top = ball.y - ball.radius;
+      return Math.abs(ball.vy) < engine.modesConfig.merge.pressure.settledSpeedPxPerSec && top > currentLine && top < newLine;
+    });
+  }
+
+  /** Applies the pending step unless a settled sphere is in its way, for at most `holdMaxDrops` drops. */
+  tryApplyPendingStep(engine) {
+    const pressure = engine.modesConfig.merge.pressure;
+    const state = engine.modeState;
+    if (this.isStepBlocked(engine)) {
+      if (state.holdDrops < pressure.holdMaxDrops) {
+        state.holdDrops += 1;
+        return;
+      }
+    }
+    this.applyPendingStep(engine);
+  }
+
+  /** The instant jump: lowers the line, resets every overflow timer, and gives spheres above the new line extra grace. */
+  applyPendingStep(engine) {
+    const cfg = engine.modesConfig.merge;
+    const state = engine.modeState;
+    if (state.pendingOffsetPx <= state.lineOffsetPx) {
+      // A step that would not lower the line is dropped, never applied.
+      state.pendingOffsetPx = null;
+      state.pendingDropsLeft = 0;
+      state.holdDrops = 0;
+      return;
+    }
+    state.lineOffsetPx = state.pendingOffsetPx;
+    state.pendingOffsetPx = null;
+    state.pendingDropsLeft = 0;
+    state.holdDrops = 0;
+    const lineY = this.getOverflowLineY(engine);
+    for (const ball of engine.physicsWorld.balls) {
+      ball.mergeOverflowSec = 0;
+      ball.mergeGraceSec = this.getStepGraceSec(engine, ball, lineY, ball.mergeGraceSec);
+    }
+    engine.particleSystem.spawnFloatingText(
+      engine.gameConfig.canvas.logicalWidth * MATH_CONSTANTS.HALF,
+      cfg.overflowLineY + cfg.eventTextOffsetY
+        - engine.gameConfig.canvas.floatingTextOffsetY * PRESSURE_TEXT_LINES_BELOW_EVENT,
+      t('gameplay.feedback.merge.pressureStep'),
+      engine.gameConfig.theme.dangerLineColor
+    );
+  }
+
+  /** Grace of a sphere after a step or a restore: extended when its top is above the line, else unchanged. */
+  getStepGraceSec(engine, ball, lineY, currentGraceSec) {
+    const cfg = engine.modesConfig.merge;
+    const current = currentGraceSec || 0;
+    if (!cfg.pressure || ball.y - ball.radius >= lineY) {
+      return current;
+    }
+    return Math.max(current, cfg.overflowGraceSec * cfg.pressure.stepGraceFactor);
+  }
+
+  /** Restores the pressure from a snapshot; a legacy snapshot derives the line from its best calibre. */
+  restorePressure(engine, rawState) {
+    const pressure = engine.modesConfig.merge.pressure;
+    const state = engine.modeState;
+    if (!pressure) {
+      return;
+    }
+    const clampCount = (value, max) => Math.min(max, Math.max(0, value));
+    if (Number.isFinite(rawState.lineOffsetPx)) {
+      state.lineOffsetPx = clampCount(rawState.lineOffsetPx, pressure.maxOffsetPx);
+      state.topTierDrops = Number.isInteger(rawState.topTierDrops) ? Math.max(0, rawState.topTierDrops) : null;
+      const pending = Number.isFinite(rawState.pendingOffsetPx)
+        ? clampCount(rawState.pendingOffsetPx, pressure.maxOffsetPx)
+        : null;
+      if (pending !== null && pending > state.lineOffsetPx) {
+        state.pendingOffsetPx = pending;
+        state.pendingDropsLeft = Number.isInteger(rawState.pendingDropsLeft)
+          ? clampCount(rawState.pendingDropsLeft, pressure.warnDrops)
+          : pressure.warnDrops;
+        state.holdDrops = Number.isInteger(rawState.holdDrops)
+          ? clampCount(rawState.holdDrops, pressure.holdMaxDrops)
+          : 0;
+      }
+      return;
+    }
+    state.lineOffsetPx = this.computeTargetOffset(pressure, rawState.bestTier, null);
+    state.topTierDrops = rawState.bestTier >= pressure.topTier ? 0 : null;
+  }
+
   syncLauncherBallTier(engine, ball) {
     if (!ball || ball.specialType) {
       return;
@@ -350,7 +535,8 @@ export class MergeBehavior extends ModeBehavior {
       upcomingEvent: null,
       lastEventId: null,
       eventCount: 0,
-      dropsUntilEvent: 0
+      dropsUntilEvent: 0,
+      ...this.createPressureState()
     };
     if (cfg.events) {
       engine.modeState.dropsUntilEvent = this.drawEventGap(engine, 0);
@@ -385,6 +571,8 @@ export class MergeBehavior extends ModeBehavior {
     });
     dropped.mergeTier = tierSpec.tier;
     dropped.mergeGraceSec = ENTRY_GRACE_SEC;
+    dropped.mergeEntering = true;
+    dropped.mergeEntrySec = 0;
     dropped.mergeOverflowSec = 0;
     dropped.mergePolaritySec = engine.isPolarityFlipped ? cfg.polarityWindowSec : 0;
     engine.physicsWorld.addBall(dropped);
@@ -392,7 +580,6 @@ export class MergeBehavior extends ModeBehavior {
       engine.modeState.shakeRemaining -= 1;
     }
 
-    engine.mergeBestTier = Math.max(engine.mergeBestTier || 1, tierSpec.tier + 1);
     engine.modeState.dropCooldownSec = cfg.dropCooldownSec;
     engine.combo = 0;
     engine.modeState.chainRewardGranted = false;
@@ -405,6 +592,7 @@ export class MergeBehavior extends ModeBehavior {
     engine.mergeDropX = this.clampDropX(engine, engine.mergeDropX, engine.currentBall.radius);
 
     this.advanceEventCycle(engine);
+    this.advancePressure(engine);
 
     engine.hasFiredInRound = true;
     engine.audioManager.playEffect('shoot');
@@ -426,7 +614,10 @@ export class MergeBehavior extends ModeBehavior {
     const midpoint = (cfg.basinLeftX + cfg.basinRightX) * MATH_CONSTANTS.HALF;
     const averageX = balls.reduce((sum, ball) => sum + ball.x, 0) / balls.length;
     const direction = averageX > midpoint ? -1 : 1;
+    const shakeGraceSec = cfg.pressure?.shakeGraceSec ?? 0;
     for (const ball of balls) {
+      // A hop can lift a settled sphere over the line for a moment: it must not lose the run.
+      ball.mergeGraceSec = Math.max(ball.mergeGraceSec || 0, shakeGraceSec);
       const sizeFactor = cfg.tiers[0].radius / ball.radius;
       ball.vx += direction * cfg.shake.maxImpulsePxPerSec * sizeFactor;
       ball.vy -= cfg.shake.liftImpulsePxPerSec * sizeFactor;
@@ -539,9 +730,17 @@ export class MergeBehavior extends ModeBehavior {
     const floorRestitution = bouncy?.restitution ?? cfg.floorRestitution;
     const ballRestitution = bouncy?.restitution ?? cfg.ballRestitution;
 
+    const lineY = this.getOverflowLineY(engine);
     for (const b of balls) {
+      if (b.mergeEntering) {
+        // A fresh sphere keeps its grace until it first passes below the current line, capped.
+        b.mergeEntrySec = (b.mergeEntrySec || 0) + dtSec;
+        if (b.y - b.radius >= lineY || b.mergeEntrySec >= (cfg.pressure?.entryGraceMaxSec ?? 0)) {
+          b.mergeEntering = false;
+        }
+      }
       if (b.mergeGraceSec > 0) {
-        b.mergeGraceSec = Math.max(0, b.mergeGraceSec - dtSec);
+        b.mergeGraceSec = Math.max(b.mergeEntering ? dtSec : 0, b.mergeGraceSec - dtSec);
       }
       if (b.mergePolaritySec > 0) {
         b.mergePolaritySec = Math.max(0, b.mergePolaritySec - dtSec);
@@ -661,12 +860,17 @@ export class MergeBehavior extends ModeBehavior {
     }
 
     // Check top overflow danger line with grace timer
+    const overflowLineY = this.getOverflowLineY(engine);
     let worstRatio = 0;
     for (const b of world.balls) {
       if ((b.mergeGraceSec || 0) > 0) {
+        // Grace only pauses the timer: the danger line still reacts to a settled sphere above it.
+        if (!b.mergeEntering && b.y - b.radius < overflowLineY) {
+          worstRatio = Math.max(worstRatio, GRACED_OVERFLOW_RATIO);
+        }
         continue;
       }
-      if (b.y - b.radius < cfg.overflowLineY) {
+      if (b.y - b.radius < overflowLineY) {
         b.mergeOverflowSec = (b.mergeOverflowSec || 0) + dtSec;
         worstRatio = Math.max(worstRatio, b.mergeOverflowSec / cfg.overflowGraceSec);
         if (b.mergeOverflowSec >= cfg.overflowGraceSec) {
@@ -709,7 +913,7 @@ export class MergeBehavior extends ModeBehavior {
         const pts = cfg.supernovaBonus * Math.max(1, engine.combo);
         engine.addScore(pts);
         engine.modeState.supernovas = (engine.modeState.supernovas || 0) + 1;
-        engine.mergeBestTier = Math.max(engine.mergeBestTier || 1, cfg.tiers.length);
+        this.recordFusedCalibre(engine, cfg.tiers.length);
         engine.audioManager.playEffect('victory');
         engine.particleSystem.spawnShockwave(
           mx,
@@ -761,7 +965,7 @@ export class MergeBehavior extends ModeBehavior {
       const golden = this.getActiveEventParams(engine, MERGE_EVENT_IDS.GOLDEN);
       const pts = Math.round(nextSpec.points * Math.max(1, engine.combo) * (golden?.pointsFactor ?? 1));
       engine.addScore(pts);
-      engine.mergeBestTier = Math.max(engine.mergeBestTier || 1, nextSpec.tier + 1);
+      this.recordFusedCalibre(engine, nextSpec.tier + 1);
       engine.waveCount = engine.mergeBestTier;
 
       engine.audioManager.playEffect('match', engine.combo);
@@ -815,6 +1019,11 @@ export class MergeBehavior extends ModeBehavior {
       lastEventId: state.lastEventId ?? null,
       dropsUntilEvent: state.dropsUntilEvent ?? 0,
       eventCount: state.eventCount ?? 0,
+      lineOffsetPx: state.lineOffsetPx ?? 0,
+      pendingOffsetPx: state.pendingOffsetPx ?? null,
+      pendingDropsLeft: state.pendingDropsLeft ?? 0,
+      holdDrops: state.holdDrops ?? 0,
+      topTierDrops: state.topTierDrops ?? null,
       ballTiers: engine.physicsWorld.balls.map((b) => (Number.isInteger(b.mergeTier) ? b.mergeTier : 0))
     };
   }
@@ -851,20 +1060,24 @@ export class MergeBehavior extends ModeBehavior {
       upcomingEvent: null,
       lastEventId: null,
       eventCount: 0,
-      dropsUntilEvent: 0
+      dropsUntilEvent: 0,
+      ...this.createPressureState()
     };
     if (cfg.events) {
       this.restoreEventCycle(engine, rawState);
     }
+    this.restorePressure(engine, rawState);
 
     const balls = engine.physicsWorld.balls;
+    const restoredLineY = this.getOverflowLineY(engine);
     for (let i = 0; i < balls.length; i++) {
       const savedTier = Number.isInteger(rawState.ballTiers[i]) ? rawState.ballTiers[i] : 0;
       const spec = this.getTierSpecByIndex(engine, savedTier);
       balls[i].mergeTier = spec.tier;
       balls[i].colorId = spec.id;
       balls[i].radius = spec.radius;
-      balls[i].mergeGraceSec = 0;
+      balls[i].mergeGraceSec = this.getStepGraceSec(engine, balls[i], restoredLineY, 0);
+      balls[i].mergeEntering = false;
       balls[i].mergeOverflowSec = 0;
       balls[i].mergePolaritySec = 0;
       balls[i].mergePulseSec = 0;
@@ -891,13 +1104,21 @@ export class MergeBehavior extends ModeBehavior {
   drawUnderlay(ctx, engine, renderer, theme) {
     const cfg = engine.modesConfig.merge;
     const basinW = cfg.basinRightX - cfg.basinLeftX;
-    const basinH = cfg.basinFloorY - cfg.overflowLineY;
+    const lineY = this.getOverflowLineY(engine);
+    const basinH = cfg.basinFloorY - lineY;
 
     ctx.save();
     // Subtle magnetic containment chamber fill
     ctx.fillStyle = theme.aimLineColor;
     ctx.globalAlpha = BASIN_GLOW_ALPHA * 0.35;
-    ctx.fillRect(cfg.basinLeftX, cfg.overflowLineY, basinW, basinH);
+    ctx.fillRect(cfg.basinLeftX, lineY, basinW, basinH);
+
+    // Danger band that pressure took from the basin
+    if (lineY > cfg.overflowLineY) {
+      ctx.fillStyle = theme.dangerLineColor;
+      ctx.globalAlpha = PRESSURE_ZONE_ALPHA;
+      ctx.fillRect(cfg.basinLeftX, cfg.overflowLineY, basinW, lineY - cfg.overflowLineY);
+    }
 
     // Basin walls & floor
     ctx.strokeStyle = theme.aimLineColor;
@@ -914,15 +1135,17 @@ export class MergeBehavior extends ModeBehavior {
 
     // Top overflow danger line
     const overflowRatio = engine.modeState?.maxOverflowRatio ?? 0;
-    ctx.strokeStyle = theme.dangerZoneColor;
+    ctx.strokeStyle = theme.dangerLineColor;
     ctx.globalAlpha = OVERFLOW_LINE_ALPHA + overflowRatio * 0.25;
     ctx.lineWidth = overflowRatio > 0 ? 2.5 : 1.5;
     ctx.setLineDash(OVERFLOW_DASH);
     ctx.beginPath();
-    ctx.moveTo(cfg.basinLeftX + 4, cfg.overflowLineY);
-    ctx.lineTo(cfg.basinRightX - 4, cfg.overflowLineY);
+    ctx.moveTo(cfg.basinLeftX + 4, lineY);
+    ctx.lineTo(cfg.basinRightX - 4, lineY);
     ctx.stroke();
     ctx.setLineDash([]);
+
+    this.drawPressureTelegraph(ctx, engine, theme);
 
     // Vertical drop guide from top rail cursor
     if (engine.isRunPlaying() && engine.currentBall && !engine.isAimCancelled) {
@@ -938,6 +1161,32 @@ export class MergeBehavior extends ModeBehavior {
       ctx.setLineDash([]);
     }
     ctx.restore();
+  }
+
+  /** Static preview of the pending line: a dashed line plus tick marks on both walls, so it is not colour-only. */
+  drawPressureTelegraph(ctx, engine, theme) {
+    const cfg = engine.modesConfig.merge;
+    const pending = engine.modeState?.pendingOffsetPx ?? null;
+    if (pending === null) {
+      return;
+    }
+    const y = cfg.overflowLineY + pending;
+    ctx.strokeStyle = theme.dangerLineColor;
+    ctx.globalAlpha = TELEGRAPH_ALPHA;
+    ctx.lineWidth = TELEGRAPH_LINE_WIDTH;
+    ctx.setLineDash(TELEGRAPH_DASH);
+    ctx.beginPath();
+    ctx.moveTo(cfg.basinLeftX + 4, y);
+    ctx.lineTo(cfg.basinRightX - 4, y);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.lineWidth = TELEGRAPH_TICK_WIDTH;
+    ctx.beginPath();
+    ctx.moveTo(cfg.basinLeftX, y);
+    ctx.lineTo(cfg.basinLeftX + TELEGRAPH_TICK_LENGTH, y);
+    ctx.moveTo(cfg.basinRightX, y);
+    ctx.lineTo(cfg.basinRightX - TELEGRAPH_TICK_LENGTH, y);
+    ctx.stroke();
   }
 
   /** Rings every sphere still under a polarity pulse. Nothing moves, so reduced motion keeps it. */

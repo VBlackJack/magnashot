@@ -179,6 +179,34 @@ export const uiHudRefreshMethods = {
     }
   },
 
+  /**
+   * Polite announcements for the Basin overflow line: once when a step is telegraphed and
+   * once when the line comes down, never per drop. The first refresh of a run only records.
+   * @param {{lineOffsetPx: number, pendingOffsetPx: number|null, pendingDropsLeft: number}|null} view - Pressure view.
+   */
+  announceMergePressureChanges(view) {
+    if (!view) {
+      this.mergePressureAnnouncerState = null;
+      return;
+    }
+    // A lower offset means a new run took over: record its state, announce nothing.
+    const previous = this.mergePressureAnnouncerState;
+    const seen = previous && view.lineOffsetPx >= previous.lineOffsetPx ? previous : null;
+    this.mergePressureAnnouncerState = {
+      lineOffsetPx: view.lineOffsetPx,
+      pending: view.pendingOffsetPx !== null
+    };
+    if (!seen) {
+      return;
+    }
+    if (view.lineOffsetPx > seen.lineOffsetPx) {
+      this.announce(t('gameplay.feedback.merge.pressureStepAnnounce'));
+    } else if (view.pendingOffsetPx !== null && !seen.pending) {
+      const count = view.pendingDropsLeft;
+      this.announce(t(`gameplay.feedback.merge.pressureWarning.${count === 1 ? 'one' : 'other'}`, { count }));
+    }
+  },
+
   /** Hides the meter and forgets what the announcer saw, outside the Sag modes. */
   hideSagMeter() {
     this.elements.sagMeter?.classList.add('hidden');
@@ -680,6 +708,7 @@ export const uiHudRefreshMethods = {
     }
 
     this.refreshMergeEventBadge(engine);
+    this.announceMergePressureChanges(engine.getMergePressureState?.() ?? null);
 
     const convoyFrozenSec = engine.mode === GAME_MODES.CONVOY
       ? Math.ceil(engine.modeState?.freezeTimerSec || 0)

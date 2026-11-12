@@ -170,6 +170,20 @@ export const DEFAULT_MODES_CONFIG = Object.freeze({
     supernovaBonus: 1500,
     supernovaShockwaveImpulse: 340,
     chain: Object.freeze({ shakeAdvanceAt: 3 }),
+    pressure: Object.freeze({
+      fromFusedTier: 6,
+      pxPerTier: 15,
+      topTier: 10,
+      topTierStepDrops: 25,
+      pxPerStep: 15,
+      maxOffsetPx: 240,
+      warnDrops: 3,
+      holdMaxDrops: 3,
+      stepGraceFactor: 2,
+      entryGraceMaxSec: 2.5,
+      shakeGraceSec: 2,
+      settledSpeedPxPerSec: 30
+    }),
     eventTextOffsetY: 56,
     events: Object.freeze({
       gapMinDrops: 9,
@@ -346,6 +360,7 @@ export function resolveModesConfig(modesConfig) {
       ...DEFAULT_MODES_CONFIG.merge,
       ...(modesConfig.merge ?? {}),
       chain: { ...DEFAULT_MODES_CONFIG.merge.chain, ...(modesConfig.merge?.chain ?? {}) },
+      pressure: { ...DEFAULT_MODES_CONFIG.merge.pressure, ...(modesConfig.merge?.pressure ?? {}) },
       events: resolveMergeEvents(modesConfig.merge?.events),
       tiers: Array.isArray(modesConfig.merge?.tiers) && modesConfig.merge.tiers.length > 0
         ? modesConfig.merge.tiers

@@ -5,10 +5,12 @@ All notable changes to **MagnaShot** are documented in this file.
 ## [Unreleased]
 
 ### Added
+- Merge Basin rising pressure: the overflow line comes down by 15 px per calibre fused above calibre 6, then by 15 px every 25 drops once calibre 10 is fused (up to 240 px). A step is telegraphed three drops ahead by a dashed line with marks on both walls, is announced politely, waits up to three drops for a settled sphere in its way, and a new sphere keeps its entry grace until it passes the lowered line. A shake now also gives every sphere two seconds of grace. Basin runs can now end by overflow in long sessions, and scores change accordingly.
 - Merge Basin events: every nine to fourteen drops a six-drop event (wind that blows left or right, low gravity, bouncy spheres, big drops that widen the spawn pool, or golden fusions worth 1.5 times the points) changes the physics or the scoring, is telegraphed on the badge one drop ahead and announced politely. Event draws are seeded and saved with the run. Scores change: events and golden fusions affect Basin records.
 - Merge Basin chains: the second and later fusions of one drop show a "Chain" text, and the third fusion of a drop advances a charging Shake by one (once per drop). Chains raise the combo as before, so Basin scores can differ from earlier versions.
 
 ### Changed
+- The Merge Basin best calibre (records, achievements and the HUD) now counts fusions only: dropping a big sphere no longer raises it.
 - The Merge Basin shake is now part of every Basin run: the `?mergeShake=1` URL is no longer needed, records set with the shake prototype now count as Merge Basin records, and shake runs unlock achievements.
 - The Merge Basin shake is about seven times stronger: a sideways shove (`maxImpulsePxPerSec` 120 to 500) plus a small hop (`liftImpulsePxPerSec` 400) frees the pile from floor friction, so it visibly reshuffles the basin instead of moving it a few pixels.
 - Merge Basin Polarity now visibly acts: every press, in either direction, pulls identical calibres together for 0.65 s and pushes the others apart (`polarityPulseAcceleration` 2500, against 210 before). Before, a flip barely moved the pile; now it fuses at least twice as many spheres in a settled pile. Playing without it is unchanged.

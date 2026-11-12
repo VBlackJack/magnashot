@@ -1044,3 +1044,415 @@ test('The HUD announces a telegraphed, started and ended event once each, and no
   refresh(active(1, 6));
   assert.equal(spoken.length, before, 'leaving the Basin forgets the old state');
 });
+
+const PRESSURE = modesConfig.merge.pressure;
+
+const createDrawContext = () => {
+  const calls = { moves: [], fills: [] };
+  const ctx = {
+    save() {}, restore() {}, beginPath() {}, stroke() {}, lineTo() {}, setLineDash() {},
+    moveTo: (x, y) => calls.moves.push({ x, y }),
+    fillRect: (x, y, w, h) => calls.fills.push({ x, y, w, h })
+  };
+  return { ctx, calls };
+};
+
+const dropUntilPressureApplied = (engine, limit = 40) => {
+  let drops = 0;
+  while (engine.modeState.lineOffsetPx === 0 && drops < limit) {
+    dropOnce(engine);
+    drops += 1;
+  }
+  return drops;
+};
+
+test('The default Merge config carries the same pressure as configs/modes.json, and a partial one keeps defaults', () => {
+  assert.deepEqual(resolveModesConfig(null).merge.pressure, PRESSURE);
+  const partial = resolveModesConfig({ merge: { pressure: { warnDrops: 5 } } }).merge;
+  assert.equal(partial.pressure.warnDrops, 5);
+  assert.equal(partial.pressure.maxOffsetPx, PRESSURE.maxOffsetPx);
+  assert.equal(resolveModesConfig({ merge: { pressure: null } }).merge.pressure.pxPerTier, PRESSURE.pxPerTier);
+});
+
+test('Only fusions raise the best calibre, a drop of a big calibre never does', () => {
+  const engine = createEngine();
+  engine.startMergeMode();
+  assert.equal(engine.mergeBestTier, 1);
+  const big = modesConfig.merge.tiers.at(-1);
+  engine.currentBall.colorId = big.id;
+  dropOnce(engine);
+  assert.equal(engine.physicsWorld.balls.at(-1).mergeTier, big.tier);
+  assert.equal(engine.mergeBestTier, 1, 'a drop leaves the best calibre alone');
+
+  engine.physicsWorld.balls.length = 0;
+  engine.physicsWorld.ballMap.clear();
+  placeTouchingPair(engine, 0, 200);
+  mergeBehavior.onBeforePhysicsStep(engine, PHYSICS_DT);
+  assert.equal(engine.mergeBestTier, 2, 'a fusion raises it');
+});
+
+test('The pressure offset grows per fused calibre, then by steps after the top calibre, up to the cap', () => {
+  const offset = (best, drops) => mergeBehavior.computeTargetOffset(PRESSURE, best, drops);
+  assert.equal(offset(1, null), 0);
+  assert.equal(offset(PRESSURE.fromFusedTier, null), 0);
+  assert.equal(offset(PRESSURE.fromFusedTier + 1, null), PRESSURE.pxPerTier);
+  assert.equal(offset(PRESSURE.topTier, null), (PRESSURE.topTier - PRESSURE.fromFusedTier) * PRESSURE.pxPerTier);
+  const top = offset(PRESSURE.topTier, 0);
+  assert.equal(offset(PRESSURE.topTier, PRESSURE.topTierStepDrops - 1), top);
+  assert.equal(offset(PRESSURE.topTier, PRESSURE.topTierStepDrops), top + PRESSURE.pxPerStep);
+  assert.equal(offset(PRESSURE.topTier, PRESSURE.topTierStepDrops * 3), top + PRESSURE.pxPerStep * 3);
+  assert.equal(offset(PRESSURE.topTier, PRESSURE.topTierStepDrops * 1000), PRESSURE.maxOffsetPx);
+
+  const engine = createEngine();
+  engine.startMergeMode();
+  mergeBehavior.recordFusedCalibre(engine, PRESSURE.topTier - 1);
+  assert.equal(engine.modeState.topTierDrops, null);
+  mergeBehavior.recordFusedCalibre(engine, PRESSURE.topTier);
+  assert.equal(engine.modeState.topTierDrops, 0, 'the first fusion of the top calibre starts the count');
+  dropOnce(engine);
+  assert.equal(engine.modeState.topTierDrops, 1);
+});
+
+test('A rising target is pending for exactly warnDrops drops, then the line comes down at once', () => {
+  const engine = createEngine();
+  engine.startMergeMode();
+  const texts = [];
+  engine.particleSystem.spawnFloatingText = (x, y, text) => texts.push({ y, text });
+  mergeBehavior.recordFusedCalibre(engine, PRESSURE.fromFusedTier + 2);
+  const target = 2 * PRESSURE.pxPerTier;
+  assert.equal(engine.modeState.lineOffsetPx, 0, 'a fusion alone never moves the line');
+
+  dropOnce(engine);
+  assert.equal(engine.modeState.pendingOffsetPx, target);
+  assert.equal(engine.modeState.pendingDropsLeft, PRESSURE.warnDrops);
+  for (let drop = 1; drop < PRESSURE.warnDrops; drop += 1) {
+    dropOnce(engine);
+    assert.equal(engine.modeState.lineOffsetPx, 0);
+    assert.equal(engine.modeState.pendingDropsLeft, PRESSURE.warnDrops - drop);
+  }
+  dropOnce(engine);
+  assert.equal(engine.modeState.lineOffsetPx, target);
+  assert.equal(engine.modeState.pendingOffsetPx, null);
+  assert.deepEqual(engine.getMergePressureState(), { lineOffsetPx: target, pendingOffsetPx: null, pendingDropsLeft: 0 });
+  const stepText = texts.find(({ text }) => text === t('gameplay.feedback.merge.pressureStep'));
+  assert.ok(stepText, 'a floating text marks the step');
+  assert.equal(
+    stepText.y,
+    modesConfig.merge.overflowLineY + modesConfig.merge.eventTextOffsetY - gameConfig.canvas.floatingTextOffsetY,
+    'it sits at the base line, one text line below the event text'
+  );
+  assert.equal(engine.modesConfig.merge.overflowLineY, modesConfig.merge.overflowLineY, 'the config is never mutated');
+});
+
+test('A fusion mid-cascade does not jump the line, it goes through the telegraph', () => {
+  const engine = createEngine();
+  engine.startMergeMode();
+  placeTouchingPair(engine, 0, 200);
+  mergeBehavior.recordFusedCalibre(engine, PRESSURE.topTier);
+  mergeBehavior.onBeforePhysicsStep(engine, PHYSICS_DT);
+  assert.equal(engine.modeState.lineOffsetPx, 0);
+  assert.equal(engine.modeState.pendingOffsetPx, null, 'nothing is pending before the next drop');
+});
+
+test('A settled sphere in the way holds the step for holdMaxDrops, then it applies with extra grace', () => {
+  const engine = createEngine();
+  engine.startMergeMode();
+  const cfg = modesConfig.merge;
+  const state = engine.modeState;
+  mergeBehavior.recordFusedCalibre(engine, PRESSURE.fromFusedTier + 1);
+  const target = PRESSURE.pxPerTier;
+  dropOnce(engine);
+  const spec = cfg.tiers[3];
+  const heldY = cfg.overflowLineY + 5 + spec.radius;
+  const held = placeBall(engine, 3, 235, heldY, { vy: 0 });
+  for (let drop = 0; drop < PRESSURE.warnDrops; drop += 1) {
+    dropOnce(engine);
+  }
+  assert.equal(state.lineOffsetPx, 0, 'held by the settled sphere');
+  assert.equal(state.holdDrops, 1);
+  for (let hold = 2; hold <= PRESSURE.holdMaxDrops; hold += 1) {
+    dropOnce(engine);
+    assert.equal(state.holdDrops, hold);
+    assert.equal(state.lineOffsetPx, 0);
+  }
+  held.mergeOverflowSec = 1;
+  dropOnce(engine);
+  assert.equal(state.lineOffsetPx, target, 'applied anyway once the hold is spent');
+  assert.equal(state.holdDrops, 0);
+  assert.equal(held.mergeOverflowSec, 0, 'overflow timers restart');
+  assert.ok(held.mergeGraceSec >= cfg.overflowGraceSec * PRESSURE.stepGraceFactor);
+
+  for (const ball of [...engine.physicsWorld.balls]) {
+    if (ball !== held) {
+      engine.physicsWorld.removeBall(ball);
+    }
+  }
+  const stepDt = 0.1;
+  for (let elapsed = 0; elapsed < cfg.overflowGraceSec * PRESSURE.stepGraceFactor - stepDt * 2; elapsed += stepDt) {
+    held.y = heldY;
+    held.vy = 0;
+    mergeBehavior.onBeforePhysicsStep(engine, stepDt);
+    assert.equal(engine.state, GAME_STATES.PLAYING, 'no game over within the extended grace');
+  }
+});
+
+test('A clear path applies the step as soon as the telegraph ends, and graces spheres above the new line', () => {
+  const engine = createEngine();
+  engine.startMergeMode();
+  const cfg = modesConfig.merge;
+  mergeBehavior.recordFusedCalibre(engine, PRESSURE.fromFusedTier + 1);
+  dropOnce(engine);
+  const moving = placeBall(engine, 3, 235, cfg.overflowLineY + 5 + cfg.tiers[3].radius, { vy: 400 });
+  const drops = dropUntilPressureApplied(engine);
+  assert.equal(drops, PRESSURE.warnDrops, 'a moving sphere does not hold the step');
+  assert.ok(
+    moving.mergeGraceSec >= cfg.overflowGraceSec * PRESSURE.stepGraceFactor,
+    'every step graces the spheres above the new line'
+  );
+});
+
+test('A higher target replaces a pending step without restarting its countdown', () => {
+  const engine = createEngine();
+  engine.startMergeMode();
+  mergeBehavior.recordFusedCalibre(engine, PRESSURE.fromFusedTier + 1);
+  dropOnce(engine);
+  dropOnce(engine);
+  assert.equal(engine.modeState.pendingOffsetPx, PRESSURE.pxPerTier);
+  const left = engine.modeState.pendingDropsLeft;
+  mergeBehavior.recordFusedCalibre(engine, PRESSURE.fromFusedTier + 3);
+  dropOnce(engine);
+  assert.equal(engine.modeState.pendingOffsetPx, 3 * PRESSURE.pxPerTier);
+  assert.equal(engine.modeState.pendingDropsLeft, left - 1, 'the countdown keeps running');
+});
+
+test('A restore graces spheres above the restored line and drops a no-op pending step', () => {
+  const cfg = modesConfig.merge;
+  const source = createEngine();
+  source.startMergeMode();
+  source.shoot();
+  placeBall(source, 2, 235, cfg.overflowLineY + 30 + cfg.tiers[2].radius);
+  Object.assign(source.modeState, {
+    lineOffsetPx: 4 * PRESSURE.pxPerTier,
+    pendingOffsetPx: 2 * PRESSURE.pxPerTier,
+    pendingDropsLeft: 2
+  });
+  source.saveRunSnapshot({ force: true });
+  const restored = createEngine();
+  restored.storageManager = source.storageManager;
+  assert.equal(restored.restoreSavedRun(), true);
+  assert.equal(restored.modeState.pendingOffsetPx, null, 'a pending step that is not below the line is dropped');
+  const lineY = mergeBehavior.getOverflowLineY(restored);
+  const above = restored.physicsWorld.balls.filter((ball) => ball.y - ball.radius < lineY);
+  assert.ok(above.length > 0);
+  for (const ball of above) {
+    assert.ok(ball.mergeGraceSec >= cfg.overflowGraceSec * PRESSURE.stepGraceFactor);
+  }
+});
+
+test('Grace pauses the overflow timer but the danger line still reacts', () => {
+  const engine = createEngine();
+  engine.startMergeMode();
+  const cfg = modesConfig.merge;
+  const ball = placeBall(engine, 2, 235, cfg.overflowLineY + 10, { mergeGraceSec: PRESSURE.shakeGraceSec });
+  mergeBehavior.onBeforePhysicsStep(engine, 0.05);
+  assert.ok(engine.modeState.maxOverflowRatio > 0, 'the ratio is not hidden by grace');
+  assert.equal(ball.mergeOverflowSec || 0, 0, 'the timer itself stays paused');
+  assert.equal(engine.state, GAME_STATES.PLAYING);
+});
+
+test('A dropped sphere keeps its entry grace until it passes below the lowered line, capped', () => {
+  const engine = createEngine();
+  engine.startMergeMode();
+  const cfg = modesConfig.merge;
+  engine.modeState.lineOffsetPx = 4 * PRESSURE.pxPerTier;
+  const lineY = mergeBehavior.getOverflowLineY(engine);
+  assert.equal(lineY, cfg.overflowLineY + 4 * PRESSURE.pxPerTier);
+  dropOnce(engine);
+  const [first] = engine.physicsWorld.balls;
+  const holdAbove = (ball, seconds) => {
+    for (let elapsed = 0; elapsed < seconds; elapsed += 0.1) {
+      ball.y = cfg.launcherY + 20;
+      ball.vy = 0;
+      mergeBehavior.onBeforePhysicsStep(engine, 0.1);
+    }
+  };
+  holdAbove(first, 1.5);
+  assert.ok(first.mergeGraceSec > 0, 'still protected after the fixed 0.85 s while above the line');
+  first.y = lineY + first.radius + 10;
+  mergeBehavior.onBeforePhysicsStep(engine, 0.1);
+  mergeBehavior.onBeforePhysicsStep(engine, 0.1);
+  assert.equal(first.mergeEntering, false);
+  assert.equal(first.mergeGraceSec, 0, 'the grace ends once it is below the line');
+
+  engine.physicsWorld.removeBall(first);
+  dropOnce(engine);
+  const [capped] = engine.physicsWorld.balls;
+  holdAbove(capped, PRESSURE.entryGraceMaxSec + 0.5);
+  assert.equal(capped.mergeEntering, false, 'the entry grace is capped');
+  assert.equal(capped.mergeGraceSec, 0);
+});
+
+test('A shake gives every sphere grace, and never shortens a longer one', () => {
+  const engine = createEngine();
+  engine.startMergeMode();
+  const plain = placeBall(engine, 1, 100, 400);
+  const longer = placeBall(engine, 1, 200, 400, { mergeGraceSec: PRESSURE.shakeGraceSec + 3 });
+  assert.equal(mergeBehavior.shake(engine), true);
+  assert.equal(plain.mergeGraceSec, PRESSURE.shakeGraceSec);
+  assert.equal(longer.mergeGraceSec, PRESSURE.shakeGraceSec + 3);
+});
+
+test('Overflow detection uses the lowered line, while walls and event text keep the base line', () => {
+  const cfg = modesConfig.merge;
+  const lowered = 4 * PRESSURE.pxPerTier;
+  const run = (offset) => {
+    const engine = createEngine();
+    engine.startMergeMode();
+    engine.modeState.lineOffsetPx = offset;
+    const spec = cfg.tiers[2];
+    const ball = placeBall(engine, 2, 235, cfg.overflowLineY + 30 + spec.radius);
+    ball.mergeOverflowSec = cfg.overflowGraceSec - 0.05;
+    mergeBehavior.onBeforePhysicsStep(engine, 0.1);
+    return engine;
+  };
+  assert.equal(run(0).state, GAME_STATES.PLAYING, 'below the base line is safe on the base line');
+  const over = run(lowered);
+  assert.equal(over.state, GAME_STATES.GAME_OVER);
+  assert.equal(over.gameOverSummary?.reasonKey, GAME_OVER_REASONS.BASIN_OVERFLOW);
+
+  const engine = createEngine();
+  engine.startMergeMode();
+  engine.modeState.lineOffsetPx = lowered;
+  engine.modeState.pendingOffsetPx = lowered + PRESSURE.pxPerTier;
+  const { ctx, calls } = createDrawContext();
+  mergeBehavior.drawUnderlay(ctx, engine, null, gameConfig.theme);
+  const points = calls.moves.map(({ x, y }) => `${x}:${y}`);
+  const pendingY = cfg.overflowLineY + lowered + PRESSURE.pxPerTier;
+  assert.ok(points.includes(`${cfg.basinLeftX}:${cfg.overflowLineY - 24}`), 'the walls start at the base line');
+  assert.ok(points.includes(`${cfg.basinLeftX + 4}:${cfg.overflowLineY + lowered}`), 'the danger line is lowered');
+  assert.ok(points.includes(`${cfg.basinLeftX + 4}:${pendingY}`), 'the pending line is drawn dashed');
+  assert.ok(
+    points.includes(`${cfg.basinLeftX}:${pendingY}`) && points.includes(`${cfg.basinRightX}:${pendingY}`),
+    'tick marks sit on both walls'
+  );
+  assert.ok(
+    calls.fills.some(({ y, h }) => y === cfg.overflowLineY && h === lowered),
+    'the band between the base and the lowered line is shaded'
+  );
+
+  const texts = [];
+  engine.particleSystem.spawnFloatingText = (x, y) => texts.push(y);
+  mergeBehavior.startEvent(engine);
+  assert.equal(texts[0], cfg.overflowLineY + cfg.eventTextOffsetY, 'event text keeps the base line');
+});
+
+test('A snapshot keeps a pending step and the top calibre count, and a legacy snapshot derives the line', () => {
+  const source = createEngine();
+  source.startMergeMode();
+  source.shoot();
+  Object.assign(source.modeState, {
+    lineOffsetPx: 2 * PRESSURE.pxPerTier,
+    pendingOffsetPx: 3 * PRESSURE.pxPerTier,
+    pendingDropsLeft: 2,
+    holdDrops: 1,
+    topTierDrops: 7
+  });
+  source.saveRunSnapshot({ force: true });
+  const restored = createEngine();
+  restored.storageManager = source.storageManager;
+  assert.equal(restored.restoreSavedRun(), true);
+  assert.equal(restored.modeState.lineOffsetPx, 2 * PRESSURE.pxPerTier);
+  assert.equal(restored.modeState.pendingOffsetPx, 3 * PRESSURE.pxPerTier);
+  assert.equal(restored.modeState.pendingDropsLeft, 2);
+  assert.equal(restored.modeState.holdDrops, 1);
+  assert.equal(restored.modeState.topTierDrops, 7);
+
+  const legacyFrom = (bestTier) => {
+    const legacySource = createEngine();
+    legacySource.startMergeMode();
+    legacySource.shoot();
+    legacySource.mergeBestTier = bestTier;
+    legacySource.saveRunSnapshot({ force: true });
+    const snapshot = legacySource.storageManager.loadRunSnapshot();
+    for (const field of ['lineOffsetPx', 'pendingOffsetPx', 'pendingDropsLeft', 'holdDrops', 'topTierDrops']) {
+      delete snapshot.modeState[field];
+    }
+    snapshot.modeState.bestTier = bestTier;
+    legacySource.storageManager.saveRunSnapshot(snapshot);
+    const legacy = createEngine();
+    legacy.storageManager = legacySource.storageManager;
+    assert.equal(legacy.restoreSavedRun(), true);
+    return legacy;
+  };
+  const low = legacyFrom(PRESSURE.fromFusedTier);
+  assert.equal(low.modeState.lineOffsetPx, 0);
+  assert.equal(low.modeState.topTierDrops, null);
+  const high = legacyFrom(PRESSURE.topTier);
+  assert.equal(
+    high.modeState.lineOffsetPx,
+    (PRESSURE.topTier - PRESSURE.fromFusedTier) * PRESSURE.pxPerTier
+  );
+  assert.equal(high.modeState.topTierDrops, 0);
+  assert.equal(high.modeState.pendingOffsetPx, null);
+  assert.equal(high.mergeBestTier, PRESSURE.topTier, 'a legacy best calibre is kept as saved');
+});
+
+test('The pressure view is gone outside a live Basin run', () => {
+  const engine = createEngine();
+  assert.equal(engine.getMergePressureState(), null);
+  engine.startMergeMode();
+  assert.deepEqual(engine.getMergePressureState(), { lineOffsetPx: 0, pendingOffsetPx: null, pendingDropsLeft: 0 });
+  engine.triggerGameOver(GAME_OVER_REASONS.BASIN_OVERFLOW);
+  assert.equal(engine.getMergePressureState(), null);
+});
+
+test('The HUD announces a telegraphed step and the line coming down once each, and nothing after a restart', () => {
+  const spoken = [];
+  const hud = { announce: (text) => spoken.push(text) };
+  const refresh = (view) => uiHudRefreshMethods.announceMergePressureChanges.call(hud, view);
+  const view = (lineOffsetPx, pendingOffsetPx = null, pendingDropsLeft = 0) => ({
+    lineOffsetPx, pendingOffsetPx, pendingDropsLeft
+  });
+
+  for (let i = 0; i < 4; i += 1) {
+    refresh(view(0));
+  }
+  assert.deepEqual(spoken, [], 'the first refresh only records');
+  for (let i = 0; i < 4; i += 1) {
+    refresh(view(0, 15, PRESSURE.warnDrops));
+  }
+  refresh(view(0, 15, PRESSURE.warnDrops - 1));
+  assert.deepEqual(spoken, [t('gameplay.feedback.merge.pressureWarning.other', { count: PRESSURE.warnDrops })]);
+  refresh(view(15));
+  refresh(view(15));
+  assert.equal(spoken.length, 2);
+  assert.equal(spoken[1], t('gameplay.feedback.merge.pressureStepAnnounce'));
+
+  refresh(view(0, 15, 1));
+  refresh(view(0));
+  assert.equal(spoken.length, 2, 'a lower offset is a new run');
+  refresh(null);
+  refresh(view(30));
+  assert.equal(spoken.length, 2, 'leaving the Basin forgets the old state');
+  refresh(view(30, 45, 1));
+  assert.equal(spoken[2], t('gameplay.feedback.merge.pressureWarning.one', { count: 1 }));
+});
+
+test('Every pressure text exists in English and French', () => {
+  const keys = [
+    'gameplay.feedback.merge.pressureStep',
+    'gameplay.feedback.merge.pressureStepAnnounce',
+    'gameplay.feedback.merge.pressureWarning.one',
+    'gameplay.feedback.merge.pressureWarning.other'
+  ];
+  for (const locale of ['en', 'fr']) {
+    const dictionary = loadJson(`./locales/${locale}.json`);
+    for (const key of keys) {
+      const value = key.split('.').reduce((node, part) => node?.[part], dictionary);
+      assert.equal(typeof value, 'string', `${locale} has ${key}`);
+      assert.ok(value.length > 0, `${locale} ${key} is not empty`);
+    }
+  }
+  const fr = loadJson('./locales/fr.json').gameplay.feedback.merge.pressureWarning;
+  assert.ok(fr.one.includes('lâcher') && fr.other.includes('lâchers'));
+});

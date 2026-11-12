@@ -173,6 +173,20 @@
     "chain": {
       "shakeAdvanceAt": 3
     },
+    "pressure": {
+      "fromFusedTier": 6,
+      "pxPerTier": 15,
+      "topTier": 10,
+      "topTierStepDrops": 25,
+      "pxPerStep": 15,
+      "maxOffsetPx": 240,
+      "warnDrops": 3,
+      "holdMaxDrops": 3,
+      "stepGraceFactor": 2,
+      "entryGraceMaxSec": 2.5,
+      "shakeGraceSec": 2,
+      "settledSpeedPxPerSec": 30
+    },
     "eventTextOffsetY": 56,
     "events": {
       "gapMinDrops": 9,
