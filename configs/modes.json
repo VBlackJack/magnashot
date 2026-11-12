@@ -131,7 +131,8 @@
     "shake": {
       "keyCode": "KeyG",
       "rechargeDrops": 4,
-      "maxImpulsePxPerSec": 120,
+      "maxImpulsePxPerSec": 500,
+      "liftImpulsePxPerSec": 400,
       "gesture": {
         "peakAcceleration": 10,
         "quietAcceleration": 4,

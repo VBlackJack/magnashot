@@ -209,7 +209,10 @@ export class MergeBehavior extends ModeBehavior {
     return true;
   }
 
-  /** Nudge the pile towards the emptier side, with smaller spheres moving more. */
+  /**
+   * Throws the pile towards the emptier side with a small hop that frees it from floor
+   * friction, smaller spheres moving more.
+   */
   shake(engine) {
     const { balls } = engine.physicsWorld;
     if (balls.length === 0) {
@@ -220,7 +223,9 @@ export class MergeBehavior extends ModeBehavior {
     const averageX = balls.reduce((sum, ball) => sum + ball.x, 0) / balls.length;
     const direction = averageX > midpoint ? -1 : 1;
     for (const ball of balls) {
-      ball.vx += direction * cfg.shake.maxImpulsePxPerSec * (cfg.tiers[0].radius / ball.radius);
+      const sizeFactor = cfg.tiers[0].radius / ball.radius;
+      ball.vx += direction * cfg.shake.maxImpulsePxPerSec * sizeFactor;
+      ball.vy -= cfg.shake.liftImpulsePxPerSec * sizeFactor;
     }
     engine.modeState.shakeRemaining = cfg.shake.rechargeDrops;
     engine.saveRunSnapshot();
