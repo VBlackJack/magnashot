@@ -185,6 +185,22 @@
         },
         "upcomingAria": "Coming up: {{name}}"
       },
+      "mergeContract": {
+        "fuseCalibre": "★ {{target}} · {{count}}",
+        "fusionCount": "★ {{progress}}/{{target}} · {{count}}",
+        "aria": {
+          "fuseCalibre": {
+            "last": "Contract: fuse a calibre {{target}}, last drop in play",
+          "one": "Contract: fuse a calibre {{target}}, {{count}} drop left",
+            "other": "Contract: fuse a calibre {{target}}, {{count}} drops left"
+          },
+          "fusionCount": {
+            "last": "Contract: fusions {{progress}} of {{target}}, last drop in play",
+          "one": "Contract: fusions {{progress}} of {{target}}, {{count}} drop left",
+            "other": "Contract: fusions {{progress}} of {{target}}, {{count}} drops left"
+          }
+        }
+      },
       "frozen": {
         "label": "Frozen ({{turns}})"
       },
@@ -517,6 +533,19 @@
         "eventStartAnnounce": "Event: {{name}}. {{description}}",
         "eventEnd": "Event over: {{name}}.",
         "eventUpcoming": "Coming up: {{name}}.",
+        "contractDone": "CONTRACT DONE! +{{points}}",
+        "contractSuccess": "Contract complete: +{{points}} points, and the Shake charges faster.",
+        "contractFailure": "Contract failed. No penalty.",
+        "contractStart": {
+          "fuseCalibre": {
+            "one": "Contract: fuse a calibre {{target}} within {{count}} drop.",
+            "other": "Contract: fuse a calibre {{target}} within {{count}} drops."
+          },
+          "fusionCount": {
+            "one": "Contract: make {{target}} fusions within {{count}} drop.",
+            "other": "Contract: make {{target}} fusions within {{count}} drops."
+          }
+        },
         "shapeStart": "Basin: {{name}}",
         "shapeAnnounce": "Basin: {{name}}. {{description}}",
         "pressureStep": "THE LINE CAME DOWN",

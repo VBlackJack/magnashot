@@ -215,6 +215,18 @@
         "golden": { "pointsFactor": 1.5 }
       }
     },
+    "contracts": {
+      "firstAfterDrops": 15,
+      "gapMinDrops": 6,
+      "gapMaxDrops": 10,
+      "durationDrops": 8,
+      "rewardShakeDrops": 2,
+      "lastDropGraceSec": 2.5,
+      "types": {
+        "fuseCalibre": { "offsetBelowBest": 2, "minCalibre": 7, "maxCalibre": 10, "pointsPerCalibre": 300 },
+        "fusionCount": { "count": 6, "points": 1500 }
+      }
+    },
     "tiers": [
       {
         "id": "merge_t0",

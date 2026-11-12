@@ -3816,6 +3816,86 @@ describe('Merge shake', () => {
     }
   });
 
+  async function forceContract(page, contract) {
+    await page.evaluate((forced) => {
+      const engine = window.__fluxEngine;
+      engine.modeState.contract = forced;
+      engine.modeState.contractCount = 1;
+      engine.notifyUI();
+    }, contract);
+  }
+
+  test('a Basin contract shows a chip with its goal and the drops left, and hides when it ends', async () => {
+    const viewport = VIEWPORTS[0];
+    const { context, page, errors } = await openGame(viewport, { initStorage, path });
+    const chip = '#hud-merge-contract';
+    try {
+      await startBasin(page, viewport);
+      assert.equal(await page.locator(chip).isHidden(), true, 'no chip between contracts');
+
+      const dropsLeft = modes.merge.contracts.durationDrops;
+      await forceContract(page, { type: 'fuseCalibre', target: 9, progress: 0, dropsLeft });
+      await waitShown(page, chip);
+      assert.equal(
+        await page.locator(chip).getAttribute('aria-label'),
+        localeText('en', 'hud.stats.mergeContract.aria.fuseCalibre.other', { target: 9, count: dropsLeft })
+      );
+      assert.equal(await page.locator(chip).getAttribute('title'), await page.locator(chip).getAttribute('aria-label'));
+      assert.equal(
+        await page.locator(chip).innerText(),
+        localeText('en', 'hud.stats.mergeContract.fuseCalibre', { target: 9, count: dropsLeft })
+      );
+
+      await forceContract(page, { type: 'fusionCount', target: 6, progress: 2, dropsLeft: 1 });
+      await page.waitForFunction(
+        (expected) => document.getElementById('hud-merge-contract').getAttribute('aria-label') === expected,
+        localeText('en', 'hud.stats.mergeContract.aria.fusionCount.one', { target: 6, progress: 2, count: 1 })
+      );
+
+      await page.evaluate(() => {
+        const engine = window.__fluxEngine;
+        engine.modeState.contract = null;
+        engine.notifyUI();
+      });
+      await page.waitForFunction(() => document.getElementById('hud-merge-contract').classList.contains('hidden'));
+      assert.deepEqual(errors, []);
+    } finally {
+      await context.close();
+    }
+  });
+
+  for (const viewport of VIEWPORTS.filter(({ isTouch }) => isTouch)) {
+    test(`the French contract chip and event badge fit together on ${viewport.name}`, async () => {
+      const { context, page } = await openGame(viewport, {
+        initStorage: { ...initStorage, ...languageStorage('fr') },
+        path
+      });
+      try {
+        await startBasin(page, viewport);
+        await startEventOnNextDrop(page, 'wind');
+        await forceContract(page, {
+          type: 'fusionCount',
+          target: 6,
+          progress: 2,
+          dropsLeft: modes.merge.contracts.durationDrops
+        });
+        await waitShown(page, '#hud-merge-event');
+        await waitShown(page, '#hud-merge-contract');
+        await assertLayoutFits(page, 'Merge contract chip');
+        assert.equal(
+          await page.locator('#hud-merge-contract').getAttribute('aria-label'),
+          localeText('fr', 'hud.stats.mergeContract.aria.fusionCount.other', {
+            target: 6,
+            progress: 2,
+            count: modes.merge.contracts.durationDrops
+          })
+        );
+      } finally {
+        await context.close();
+      }
+    });
+  }
+
   for (const viewport of VIEWPORTS.filter(({ isTouch }) => isTouch)) {
     test(`the French event badge fits on ${viewport.name}`, async () => {
       const { context, page } = await openGame(viewport, {

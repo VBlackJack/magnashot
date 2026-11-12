@@ -618,6 +618,17 @@ body {
   border: 1px solid var(--accent-amber);
 }
 
+/* Merge Basin contract: the star and the numbers carry it, the dashed border backs them up. */
+.hud-badge.merge-contract {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  background: var(--accent-amber-alpha-20);
+  color: var(--text-gold-soft);
+  border: 2px dashed var(--accent-amber);
+}
+
 /* Merge Basin event: the icon and the count carry it, the double border backs them up. */
 .hud-badge.merge-event {
   max-width: 100%;
@@ -3529,6 +3540,7 @@ body {
   .achievement-tier-badge,
   .hud-badge.ghost,
   .hud-badge.merge-event,
+  .hud-badge.merge-contract,
   .hud-badge.magnetar,
   .level-card.unlocked {
     border: 1px solid ButtonText;

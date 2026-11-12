@@ -185,6 +185,22 @@
         },
         "upcomingAria": "Bientôt : {{name}}"
       },
+      "mergeContract": {
+        "fuseCalibre": "★ {{target}} · {{count}}",
+        "fusionCount": "★ {{progress}}/{{target}} · {{count}}",
+        "aria": {
+          "fuseCalibre": {
+            "last": "Contrat : fusionner un calibre {{target}}, dernier lâcher en cours",
+          "one": "Contrat : fusionner un calibre {{target}}, {{count}} lâcher restant",
+            "other": "Contrat : fusionner un calibre {{target}}, {{count}} lâchers restants"
+          },
+          "fusionCount": {
+            "last": "Contrat, fusions : {{progress}} sur {{target}}, dernier lâcher en cours",
+          "one": "Contrat, fusions : {{progress}} sur {{target}}, {{count}} lâcher restant",
+            "other": "Contrat, fusions : {{progress}} sur {{target}}, {{count}} lâchers restants"
+          }
+        }
+      },
       "frozen": {
         "label": "Gel actif ({{turns}})"
       },
@@ -517,6 +533,19 @@
         "eventStartAnnounce": "Événement : {{name}}. {{description}}",
         "eventEnd": "Fin de l'événement : {{name}}.",
         "eventUpcoming": "Bientôt : {{name}}.",
+        "contractDone": "CONTRAT REMPLI ! +{{points}}",
+        "contractSuccess": "Contrat rempli : +{{points}} points, et la Secousse se recharge plus vite.",
+        "contractFailure": "Contrat échoué. Aucune pénalité.",
+        "contractStart": {
+          "fuseCalibre": {
+            "one": "Contrat : fusionner un calibre {{target}} en {{count}} lâcher.",
+            "other": "Contrat : fusionner un calibre {{target}} en {{count}} lâchers."
+          },
+          "fusionCount": {
+            "one": "Contrat : réussir {{target}} fusions en {{count}} lâcher.",
+            "other": "Contrat : réussir {{target}} fusions en {{count}} lâchers."
+          }
+        },
         "shapeStart": "Bassin : {{name}}",
         "shapeAnnounce": "Bassin : {{name}}. {{description}}",
         "pressureStep": "LA LIGNE EST DESCENDUE",

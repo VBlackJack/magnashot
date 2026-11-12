@@ -20,6 +20,7 @@ import { SeededRandom } from '../core/SeededRandom.js';
 import { resolveHintText } from '../game/Discovery.js';
 import { MAGNETAR_PHASES } from '../game/MagnetarRules.js';
 import { getMergeEventTextKey } from '../game/modes/MergeEvents.js';
+import { MERGE_CONTRACT_OUTCOMES, getMergeContractPluralKey } from '../game/modes/MergeContracts.js';
 import { SAG_PHASES } from '../game/SagMeter.js';
 import { getUtcIsoWeekKey } from '../game/WeeklyFlux.js';
 import { FULL_PERCENT } from './WorkshopView.js';
@@ -139,6 +140,69 @@ export const uiHudRefreshMethods = {
       setAttributeIfChanged(badge, 'title', label);
     }
     badge.classList.remove('hidden');
+  },
+
+  /**
+   * Merge Basin contract chip: the goal with its progress and the drops left. Hidden outside
+   * the Basin and between contracts.
+   * @param {object} engine - Game engine.
+   */
+  refreshMergeContractBadge(engine) {
+    const badge = this.elements.mergeContractBadge;
+    const view = engine.getMergeContractState?.() ?? null;
+    this.announceMergeContractChanges(view);
+    if (!badge) {
+      return;
+    }
+    const contract = view?.active ?? null;
+    if (!contract) {
+      badge.classList.add('hidden');
+      return;
+    }
+    const params = {
+      target: contract.target,
+      progress: contract.progress,
+      count: contract.dropsLeft
+    };
+    const label = t(`hud.stats.mergeContract.aria.${contract.type}.${getMergeContractPluralKey(contract.dropsLeft)}`, params);
+    setTextIfChanged(badge, t(`hud.stats.mergeContract.${contract.type}`, params));
+    setAttributeIfChanged(badge, 'aria-label', label);
+    setAttributeIfChanged(badge, 'title', label);
+    badge.classList.remove('hidden');
+  },
+
+  /**
+   * Polite announcements for the Basin contracts: once when one starts and once when it ends
+   * (success or failure, never both), never per drop. The first refresh of a run only records.
+   * @param {{contractCount: number, active: object|null, result: object|null}|null} view - Contract view.
+   */
+  announceMergeContractChanges(view) {
+    if (!view) {
+      this.mergeContractAnnouncerState = null;
+      return;
+    }
+    // A lower contract count means a new run took over: record its state, announce nothing.
+    const previous = this.mergeContractAnnouncerState;
+    const seen = previous && view.contractCount >= previous.contractCount ? previous : null;
+    this.mergeContractAnnouncerState = {
+      contractCount: view.contractCount,
+      resultId: view.result?.id ?? null
+    };
+    if (!seen) {
+      return;
+    }
+    if (view.result && view.result.id !== seen.resultId) {
+      const key = view.result.outcome === MERGE_CONTRACT_OUTCOMES.SUCCESS
+        ? 'gameplay.feedback.merge.contractSuccess'
+        : 'gameplay.feedback.merge.contractFailure';
+      this.announce(t(key, { points: view.result.points }));
+    } else if (view.active && view.contractCount > seen.contractCount) {
+      const { type, target, dropsLeft } = view.active;
+      this.announce(t(
+        `gameplay.feedback.merge.contractStart.${type}.${getMergeContractPluralKey(dropsLeft)}`,
+        { target, count: dropsLeft }
+      ));
+    }
   },
 
   /**
@@ -728,6 +792,7 @@ export const uiHudRefreshMethods = {
     }
 
     this.refreshMergeEventBadge(engine);
+    this.refreshMergeContractBadge(engine);
     this.announceMergePressureChanges(engine.getMergePressureState?.() ?? null);
 
     const convoyFrozenSec = engine.mode === GAME_MODES.CONVOY

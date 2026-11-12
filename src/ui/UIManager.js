@@ -148,6 +148,7 @@ export class UIManager {
       shotsValue: document.getElementById('hud-shots-value'),
       comboBadge: document.getElementById('hud-combo-badge'),
       mergeEventBadge: document.getElementById('hud-merge-event'),
+      mergeContractBadge: document.getElementById('hud-merge-contract'),
       frozenBadge: document.getElementById('hud-frozen-badge'),
       magnetarTelegraph: document.getElementById('hud-magnetar-telegraph'),
       bestRunBadge: document.getElementById('hud-best-run'),
