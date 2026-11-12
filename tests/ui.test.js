@@ -2688,8 +2688,8 @@ test('the Play hub lists the Arcade cards in campaign unlock order, then the Due
     .map(([mode]) => mode);
   assert.deepEqual(
     cardIds(arcade),
-    [...unlockModes.map((mode) => toId(ARCADE_CARD_SPECS[mode].card)), 'btn-mode-billiard'],
-    'The gated Arcade cards keep their campaign order, followed by the ungated prototype'
+    unlockModes.map((mode) => toId(ARCADE_CARD_SPECS[mode].card)),
+    'Arcade cards follow modeUnlocks.campaignLevelCleared'
   );
   assert.deepEqual(Object.keys(ARCADE_CARD_SPECS).slice(0, unlockModes.length), unlockModes, 'ARCADE_CARD_SPECS keeps the same order');
   assert.deepEqual(cardIds(duel), ['btn-mode-versus']);

@@ -655,48 +655,6 @@
     }
   },
   "modals": {
-    "billiard": {
-      "icon": "🎱",
-      "title": "Billiards (prototype)",
-      "card": "Three solo tables for direct shots, cushions and cue-ball position.",
-      "tables": "Solo tables",
-      "table": {
-        "direct": {
-          "name": "Direct shot",
-          "objective": "Pot ball 1 in two shots."
-        },
-        "bank": {
-          "name": "One cushion",
-          "objective": "Send the cue ball around the blocker with one cushion to pot ball 1."
-        },
-        "position": {
-          "name": "Position play",
-          "objective": "Pot ball 1, then ball 2. Choose a speed that leaves a good second shot."
-        }
-      },
-      "board": "Billiards table, aim here",
-      "power": "Power",
-      "percent": "{{value}}%",
-      "shoot": "Shoot",
-      "replay": "Replay",
-      "close": "Back to Play",
-      "shots": "Shots {{used}} / {{limit}}",
-      "hint": "Point or drag to aim. On the table, use left and right to aim, up and down for power, and Enter to shoot. Hold Shift for finer aim.",
-      "padHint": "Stick to aim. Shoulder buttons adjust power. Bottom face shoots, left face replays, Start selects tables, right face goes back.",
-      "ball": {
-        "one": "1",
-        "two": "2"
-      },
-      "status": {
-        "aiming": "Ready to shoot",
-        "moving": "Balls in motion",
-        "won": "Table cleared",
-        "lost": "Table incomplete",
-        "scratch": "Cue ball potted",
-        "wrongTarget": "Target potted out of order",
-        "shotsExhausted": "Out of shots"
-      }
-    },
     "levelSelect": {
       "title": {
         "main": "Campaign map"

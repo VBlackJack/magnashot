@@ -655,48 +655,6 @@
     }
   },
   "modals": {
-    "billiard": {
-      "icon": "🎱",
-      "title": "Billard (prototype)",
-      "card": "Trois tables solo pour le tir direct, la bande et le placement de la blanche.",
-      "tables": "Tables solo",
-      "table": {
-        "direct": {
-          "name": "Tir direct",
-          "objective": "Empoche la bille 1 en deux coups."
-        },
-        "bank": {
-          "name": "Une bande",
-          "objective": "Fais rebondir la blanche sur une bande pour contourner l'obstacle et empocher la bille 1."
-        },
-        "position": {
-          "name": "Placement",
-          "objective": "Empoche la bille 1, puis la bille 2. Dose la puissance pour préparer le deuxième coup."
-        }
-      },
-      "board": "Table de billard, zone de visée",
-      "power": "Puissance",
-      "percent": "{{value}} %",
-      "shoot": "Tirer",
-      "replay": "Rejouer",
-      "close": "Retour à Jouer",
-      "shots": "Coups {{used}} / {{limit}}",
-      "hint": "Pointe ou fais glisser pour viser. Sur la table, utilise Gauche et Droite pour viser, Haut et Bas pour la puissance, et Entrée pour tirer. Maj affine la visée.",
-      "padHint": "Vise au stick et dose avec les boutons d'épaule. Le bouton du bas tire, celui de gauche rejoue, Start ouvre la sélection et celui de droite revient.",
-      "ball": {
-        "one": "1",
-        "two": "2"
-      },
-      "status": {
-        "aiming": "Prêt à tirer",
-        "moving": "Billes en mouvement",
-        "won": "Table réussie",
-        "lost": "Table incomplète",
-        "scratch": "Blanche empochée",
-        "wrongTarget": "Bille empochée dans le mauvais ordre",
-        "shotsExhausted": "Plus de coups"
-      }
-    },
     "levelSelect": {
       "title": {
         "main": "Carte de campagne"

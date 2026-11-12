@@ -15,7 +15,6 @@
  */
 
 export const CONFIG_PATHS = Object.freeze({
-  BILLIARD: './configs/billiard.json',
   GAME: './configs/game.json',
   PHYSICS: './configs/physics.json',
   BALLS: './configs/balls.json',

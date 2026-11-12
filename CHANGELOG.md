@@ -4,6 +4,11 @@ All notable changes to **MagnaShot** are documented in this file.
 
 ## [Unreleased]
 
+## [1.26.1] - 2026-11-12
+
+### Removed
+- The Billiards prototype and its three tables are no longer available in Play.
+
 ## [1.26.0] - 2026-11-11
 
 ### Added

@@ -278,11 +278,6 @@
                 <span class="arcade-card-desc" data-i18n="modals.levelSelect.arcade.mergeDesc"></span>
                 <span id="arcade-best-merge" class="arcade-card-best gold-text"></span>
               </button>
-            <button id="btn-mode-billiard" type="button" class="arcade-mode-card" aria-haspopup="dialog">
-              <span class="arcade-card-icon" aria-hidden="true" data-i18n="modals.billiard.icon"></span>
-              <span class="arcade-card-title" data-i18n="modals.billiard.title"></span>
-              <span class="arcade-card-desc" data-i18n="modals.billiard.card"></span>
-            </button>
           </div>
           <div id="puzzle-stages-strip" class="puzzle-stages-strip play-disclosure hidden" role="group" data-i18n-aria-label="modals.play.puzzle.stagesToggle"></div>
           <div id="flux-seed-entry" class="flux-seed-entry play-disclosure hidden">
@@ -483,35 +478,6 @@
   </div>
 
   <!-- Pause Modal -->
-  <div id="modal-billiard" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="billiard-title">
-    <div class="modal-card wide billiard-card">
-      <h2 id="billiard-title" class="modal-title" data-i18n="modals.billiard.title"></h2>
-      <div id="billiard-tables" class="billiard-tables" role="group" data-i18n-aria-label="modals.billiard.tables">
-        <button type="button" class="modal-btn" data-i18n="modals.billiard.table.direct.name"></button>
-        <button type="button" class="modal-btn" data-i18n="modals.billiard.table.bank.name"></button>
-        <button type="button" class="modal-btn" data-i18n="modals.billiard.table.position.name"></button>
-      </div>
-      <p id="billiard-objective" class="modal-subtext"></p>
-      <canvas id="billiard-canvas" tabindex="0" data-i18n-aria-label="modals.billiard.board" aria-describedby="billiard-hint billiard-pad-hint"></canvas>
-      <div class="billiard-readout">
-        <p id="billiard-status" role="status"></p>
-        <p id="billiard-shots"></p>
-      </div>
-      <label class="billiard-power" for="billiard-power">
-        <span data-i18n="modals.billiard.power"></span>
-        <input id="billiard-power" type="range" min="0" max="1">
-        <span id="billiard-power-value"></span>
-      </label>
-      <div class="modal-actions">
-        <button id="btn-billiard-shoot" type="button" class="modal-btn primary" data-i18n="modals.billiard.shoot"></button>
-        <button id="btn-billiard-replay" type="button" class="modal-btn" data-i18n="modals.billiard.replay"></button>
-        <button id="btn-billiard-close" type="button" class="modal-btn" data-i18n="modals.billiard.close"></button>
-      </div>
-      <p id="billiard-hint" class="modal-subtext billiard-input-hint" data-i18n="modals.billiard.hint"></p>
-      <p id="billiard-pad-hint" class="modal-subtext billiard-pad-hint" data-i18n="modals.billiard.padHint"></p>
-    </div>
-  </div>
-
   <div id="modal-pause" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="modal-pause-title">
     <div class="modal-card">
       <h2 id="modal-pause-title" class="modal-title" data-i18n="modals.pause.title.main"></h2>

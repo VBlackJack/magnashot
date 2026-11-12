@@ -111,7 +111,6 @@ class Application {
         audioManager,
         gameConfig,
         ballsConfig,
-        billiardConfig: configRegistry.get('billiard'),
         versusConfigs: {
           gameConfig,
           physicsConfig,
