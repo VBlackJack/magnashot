@@ -787,7 +787,7 @@
         "convoy": "Magnetic Convoy",
         "convoyDesc": "360° turret • Moving rail train • Polarity snap-back",
         "merge": "Merge Basin",
-        "mergeDesc": "10 calibre tiers • Top drop rail • Shockwave fusion • Shake",
+        "mergeDesc": "12 calibre tiers • Top drop rail • Shockwave fusion • Shake",
         "mergeRecord": "Calibre {{tier}} • Best: {{score}}"
       },
       "jumpCurrent": "Current level",
@@ -1097,8 +1097,8 @@
             },
             "merge": {
               "icon": "🫧",
-              "name": "Merge Basin (10 Calibre Tiers)",
-              "description": "Drop spheres from a top rail into a rigid basin. Identical calibres fuse into the next tier (1 to 10) with a magnetic shockwave. Each Polarity press pulls identical calibres together for a moment and pushes the others apart. The Shake recharges after a few drops and nudges the whole basin sideways."
+              "name": "Merge Basin (12 Calibre Tiers)",
+              "description": "Drop spheres from a top rail into a rigid basin. Identical calibres fuse into the next tier (1 to 12) with a magnetic shockwave. Each Polarity press pulls identical calibres together for a moment and pushes the others apart. The Shake recharges after a few drops and nudges the whole basin sideways."
             }
           }
         }
