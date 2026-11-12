@@ -2306,7 +2306,16 @@ describe('Polarity Duel, two players (desktop)', () => {
           });
         }
       }
-      await waitShown(page, '#modal-duel-result');
+      // The guard lasts only resultInputGuardMs: read it in the same poll that sees the card,
+      // before the slower checks below, so a busy machine cannot outlast it.
+      const guardWhenShown = await page.waitForFunction(() => {
+        const card = document.querySelector('#modal-duel-result');
+        if (!card || card.classList.contains('hidden') || !card.checkVisibility()) {
+          return false;
+        }
+        return { ariaDisabled: document.querySelector('#btn-versus-rematch').getAttribute('aria-disabled') };
+      }).then((handle) => handle.jsonValue());
+      assert.equal(guardWhenShown.ariaDisabled, 'true', 'the main button waits out its guard time');
       assert.equal(await page.evaluate(() => document.querySelector('#modal-duel-result-title').textContent), 'Player 1 wins');
       assert.equal(
         await page.evaluate(() => document.querySelector('#versus-result-score').textContent),
@@ -2315,11 +2324,6 @@ describe('Polarity Duel, two players (desktop)', () => {
       assert.equal(await isShown(page, '#btn-versus-share'), false, 'no Share for a match on one device');
       assert.equal(await isShown(page, '#versus-result-tier'), false, 'no CPU tier line');
       assert.equal(await isShown(page, '#btn-versus-change-players'), true);
-      assert.equal(
-        await page.evaluate(() => document.querySelector('#btn-versus-rematch').getAttribute('aria-disabled')),
-        'true',
-        'the main button waits out its guard time'
-      );
       await page.waitForFunction(() => document.querySelector('#btn-versus-rematch').getAttribute('aria-disabled') === null, null, {
         timeout: LOCAL_RESULT_GUARD_WAIT_MS
       });
