@@ -84,6 +84,11 @@ export class MergeBehavior extends ModeBehavior {
     return true;
   }
 
+  /** Spheres fuse by calibre and nothing hangs from anchors, so the basics hint does not apply. */
+  teachesMatchBasics() {
+    return false;
+  }
+
   neutralizesWorkshopUpgrades() {
     return true;
   }

@@ -68,6 +68,11 @@ export class ModeBehavior {
     return false;
   }
 
+  /** False for a mode without colour matches or anchors, where the basics hint would mislead. */
+  teachesMatchBasics() {
+    return true;
+  }
+
   neutralizesWorkshopUpgrades() {
     return false;
   }
