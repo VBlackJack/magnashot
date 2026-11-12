@@ -323,6 +323,7 @@ export class UIManager {
       drawerPerks: document.getElementById('drawer-perks'),
       drawerPerksStat: document.getElementById('drawer-perks-stat'),
       pauseLevelTip: document.getElementById('pause-level-tip'),
+      pauseInstructionTip: document.getElementById('pause-instruction-tip'),
       btnResume: document.getElementById('btn-resume'),
       btnRestartPause: document.getElementById('btn-restart-pause'),
       btnLevelsPause: document.getElementById('btn-levels-pause'),

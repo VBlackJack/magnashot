@@ -398,3 +398,19 @@ test('A shake moves a settled pile by more than the smallest sphere radius', () 
   };
   assert.ok(drift(true) - drift(false) > cfg.tiers[0].radius);
 });
+
+test('Pause shows a Basin tip instead of the anchors and rotors tip', () => {
+  const engine = createEngine();
+  engine.startMergeMode();
+  const key = engine.getModeBehavior().getPauseTipKey();
+  assert.notEqual(key, 'modals.pause.instructions.physics');
+  for (const locale of ['en', 'fr']) {
+    i18n.currentLocale = locale;
+    assert.notEqual(i18n.t(key), key, `${locale} has the Basin tip`);
+  }
+  i18n.currentLocale = 'en';
+
+  const campaign = createEngine();
+  campaign.mode = GAME_MODES.CAMPAIGN;
+  assert.equal(campaign.getModeBehavior().getPauseTipKey(), 'modals.pause.instructions.physics');
+});

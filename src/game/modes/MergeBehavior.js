@@ -84,6 +84,11 @@ export class MergeBehavior extends ModeBehavior {
     return true;
   }
 
+  /** The generic tip speaks of anchors and rotors, which the basin does not have. */
+  getPauseTipKey() {
+    return 'modals.pause.instructions.mergeTip';
+  }
+
   /** Spheres fuse by calibre and nothing hangs from anchors, so the basics hint does not apply. */
   teachesMatchBasics() {
     return false;
