@@ -5,7 +5,11 @@ All notable changes to **MagnaShot** are documented in this file.
 ## [Unreleased]
 
 ### Added
+- Merge Basin shapes: every run draws one of three basin shapes at random, the classic basin, a narrow one (walls 30 px closer on each side) or one with two static pegs in the lower half, and announces it with a floating text and a polite announcement. Records and achievements are shared by all shapes, and the narrow and pegs shapes use gentler overflow line pressure. The shapes live in `merge.shapes` (with an optional per-shape `pressure` override), the shape is saved with the run, and a run saved before shapes existed resumes as the classic basin.
 - Merge Basin calibres 11 and 12: the basin now fuses up to calibre 12, and the Supernova needs two calibre 12 spheres (it was two calibre 10 spheres) and is worth 4000 (it was 1500) times the combo. The overflow line now starts its stepped descent once calibre 11 is fused, every 35 drops (it was every 25 drops after calibre 10). Basin scores are not comparable with earlier versions.
+
+### Changed
+- Merge Basin spheres can no longer sink a pixel or two into the basin walls and floor: each physics step now ends with every sphere inside the basin.
 
 ## [1.27.0] - 2026-11-12
 

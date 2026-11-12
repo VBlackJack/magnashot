@@ -2483,14 +2483,14 @@ export class Renderer {
     const angle = engineState.aimAngle;
 
     if (isDropRail) {
-      const mergeCfg = engineState.modesConfig?.merge;
-      if (mergeCfg) {
+      const basin = engineState.getMergeBasinGeometry?.() ?? null;
+      if (basin) {
         ctx.save();
         ctx.strokeStyle = theme.launcherAccentColor;
         ctx.lineWidth = launcherGeom.baseBorderWidth;
         ctx.beginPath();
-        ctx.moveTo(mergeCfg.basinLeftX, ly);
-        ctx.lineTo(mergeCfg.basinRightX, ly);
+        ctx.moveTo(basin.left, ly);
+        ctx.lineTo(basin.right, ly);
         ctx.stroke();
         ctx.restore();
       }

@@ -517,6 +517,8 @@
         "eventStartAnnounce": "Événement : {{name}}. {{description}}",
         "eventEnd": "Fin de l'événement : {{name}}.",
         "eventUpcoming": "Bientôt : {{name}}.",
+        "shapeStart": "Bassin : {{name}}",
+        "shapeAnnounce": "Bassin : {{name}}. {{description}}",
         "pressureStep": "LA LIGNE EST DESCENDUE",
         "pressureStepAnnounce": "La ligne de débordement est descendue.",
         "pressureWarning": {
@@ -526,6 +528,20 @@
       }
     },
     "merge": {
+      "shapes": {
+        "classic": {
+          "name": "Classique",
+          "description": "Le bassin habituel."
+        },
+        "narrow": {
+          "name": "Étroit",
+          "description": "Les parois sont plus rapprochées."
+        },
+        "pegs": {
+          "name": "Plots",
+          "description": "Des plots fixes se dressent dans la moitié basse."
+        }
+      },
       "events": {
         "windLeft": {
           "name": "Vent vers la gauche",
