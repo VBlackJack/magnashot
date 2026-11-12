@@ -19,7 +19,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 
 import { configRegistry } from '../src/core/ConfigRegistry.js';
-import { i18n } from '../src/core/I18n.js';
+import { i18n, t } from '../src/core/I18n.js';
 import { SeededRandom } from '../src/core/SeededRandom.js';
 import { createShakeDetector } from '../src/ui/UISettingsControls.js';
 import { StorageManager } from '../src/core/StorageManager.js';
@@ -36,6 +36,9 @@ import {
 import { Ball } from '../src/entities/Ball.js';
 import { GameEngine } from '../src/game/GameEngine.js';
 import { mergeBehavior } from '../src/game/modes/MergeBehavior.js';
+import { getMergeEventLocaleId } from '../src/game/modes/MergeEvents.js';
+import { resolveModesConfig } from '../src/game/modes/ModeConfig.js';
+import { uiHudRefreshMethods } from '../src/ui/UIHudRefresh.js';
 
 const loadJson = (p) => JSON.parse(fs.readFileSync(p, 'utf8'));
 
@@ -550,4 +553,494 @@ test('A polarity pulse rings each pulsing sphere, with reduced motion too', () =
   ball.mergePulseSec = 0;
   mergeBehavior.drawOverlay(ctx, engine, null, theme);
   assert.equal(arcs.length, 0, 'the ring goes when the pulse ends');
+});
+
+const MERGE_EVENTS = modesConfig.merge.events;
+const MERGE_EVENT_IDS_LIST = Object.keys(MERGE_EVENTS.pool);
+const PHYSICS_DT = 1 / 60;
+
+const dropOnce = (engine) => {
+  engine.modeState.dropCooldownSec = 0;
+  engine.shoot();
+};
+
+const createEventEngine = (seed = 'merge-events') => {
+  const engine = createEngine();
+  const random = new SeededRandom(seed);
+  engine.random = () => random.next();
+  engine.startMergeMode();
+  return engine;
+};
+
+const placeBall = (engine, tier, x, y, extra = {}) => {
+  const spec = modesConfig.merge.tiers[tier];
+  const ball = new Ball({ x, y, radius: spec.radius, colorId: spec.id });
+  ball.mergeTier = tier;
+  ball.mergeGraceSec = 0;
+  Object.assign(ball, extra);
+  engine.physicsWorld.addBall(ball);
+  return ball;
+};
+
+const placeTouchingPair = (engine, tier, x) => {
+  const spec = modesConfig.merge.tiers[tier];
+  const y = modesConfig.merge.basinFloorY - spec.radius;
+  placeBall(engine, tier, x, y);
+  placeBall(engine, tier, x + spec.radius * 2 - 0.5, y);
+};
+
+const withEvent = (engine, id, direction = 1) => {
+  engine.modeState.event = { id, direction, dropsLeft: MERGE_EVENTS.durationDrops };
+};
+
+test('The default Merge config carries the same events and chain as configs/modes.json', () => {
+  const defaults = resolveModesConfig(null).merge;
+  assert.deepEqual(defaults.events, MERGE_EVENTS);
+  assert.deepEqual(defaults.chain, modesConfig.merge.chain);
+});
+
+test('A Basin event is telegraphed one drop ahead, runs its drops, never repeats, then a new gap follows', () => {
+  const engine = createEventEngine();
+  const state = engine.modeState;
+  const seen = new Set();
+  let previous = null;
+
+  for (let cycle = 0; cycle < 30; cycle += 1) {
+    const gap = state.dropsUntilEvent;
+    assert.ok(gap >= MERGE_EVENTS.gapMinDrops && gap <= MERGE_EVENTS.gapMaxDrops, `gap ${gap} is in range`);
+    assert.equal(state.event, null);
+    let drops = 0;
+    let telegraphedAt = null;
+    while (!state.event) {
+      dropOnce(engine);
+      drops += 1;
+      if (state.upcomingEvent && telegraphedAt === null) {
+        telegraphedAt = drops;
+      }
+    }
+    assert.equal(drops, gap, 'the event starts after exactly the drawn gap');
+    assert.equal(telegraphedAt, drops - 1, 'telegraphed exactly one drop before it starts');
+    assert.equal(state.upcomingEvent, null);
+    assert.equal(state.event.dropsLeft, MERGE_EVENTS.durationDrops);
+    assert.notEqual(state.event.id, previous, 'never the same event twice in a row');
+    assert.ok(MERGE_EVENT_IDS_LIST.includes(state.event.id));
+    seen.add(state.event.id);
+    previous = state.event.id;
+
+    for (let i = 1; i < MERGE_EVENTS.durationDrops; i += 1) {
+      dropOnce(engine);
+      assert.equal(state.event.dropsLeft, MERGE_EVENTS.durationDrops - i);
+    }
+    dropOnce(engine);
+    assert.equal(state.event, null, 'the event ends after its last drop');
+    assert.ok(
+      state.dropsUntilEvent >= MERGE_EVENTS.gapMinDrops && state.dropsUntilEvent <= MERGE_EVENTS.gapMaxDrops,
+      'a new gap follows'
+    );
+  }
+  assert.equal(seen.size, MERGE_EVENT_IDS_LIST.length, 'every event of the pool comes up');
+  assert.equal(engine.getMergeEventState().active, null);
+});
+
+test('The event cycle is a pure function of the random source', () => {
+  const play = () => {
+    const engine = createEventEngine('merge-events-replay');
+    const timeline = [];
+    for (let i = 0; i < 40; i += 1) {
+      dropOnce(engine);
+      timeline.push(JSON.stringify([engine.modeState.event, engine.modeState.upcomingEvent]));
+    }
+    return timeline;
+  };
+  assert.deepEqual(play(), play());
+});
+
+test('Wind pushes spheres along its direction on top of the tilt, low gravity slows the fall', () => {
+  const stepWith = (id, direction) => {
+    const engine = createEngine();
+    engine.startMergeMode();
+    if (id) {
+      withEvent(engine, id, direction);
+    }
+    const ball = placeBall(engine, 0, 200, 400);
+    mergeBehavior.onBeforePhysicsStep(engine, PHYSICS_DT);
+    return ball;
+  };
+  const calm = stepWith(null);
+  const left = stepWith('wind', -1);
+  const right = stepWith('wind', 1);
+  const acceleration = MERGE_EVENTS.pool.wind.acceleration;
+  const expected = acceleration * PHYSICS_DT * modesConfig.merge.linearDamping;
+  assert.ok(Math.abs(right.vx - calm.vx - expected) < 1e-9);
+  assert.ok(Math.abs(calm.vx - left.vx - expected) < 1e-9);
+  assert.ok(left.vx < 0 && right.vx > 0);
+
+  const light = stepWith('lowGravity');
+  assert.ok(light.vy < calm.vy);
+  assert.ok(Math.abs(light.vy / calm.vy - MERGE_EVENTS.pool.lowGravity.gravityFactor) < 1e-9);
+  assert.equal(light.vx, calm.vx, 'only the wind pushes sideways');
+});
+
+test('Bouncy spheres rebound from the floor, the walls and each other with the event restitution', () => {
+  const reboundOffFloor = (bouncy) => {
+    const engine = createEngine();
+    engine.startMergeMode();
+    if (bouncy) {
+      withEvent(engine, 'bouncy');
+    }
+    const ball = placeBall(engine, 0, 200, modesConfig.merge.basinFloorY - modesConfig.merge.tiers[0].radius - 1, {
+      vy: 300
+    });
+    mergeBehavior.onBeforePhysicsStep(engine, PHYSICS_DT);
+    return ball.vy;
+  };
+  const calm = reboundOffFloor(false);
+  const bouncy = reboundOffFloor(true);
+  assert.ok(calm < 0 && bouncy < calm);
+  assert.ok(Math.abs(bouncy / calm - MERGE_EVENTS.pool.bouncy.restitution / modesConfig.merge.floorRestitution) < 1e-9);
+
+  const reboundOffWall = (isBouncy) => {
+    const engine = createEngine();
+    engine.startMergeMode();
+    if (isBouncy) {
+      withEvent(engine, 'bouncy');
+    }
+    const ball = placeBall(engine, 0, modesConfig.merge.basinLeftX + 14, 300, { vx: -400 });
+    mergeBehavior.onBeforePhysicsStep(engine, PHYSICS_DT);
+    return ball.vx;
+  };
+  assert.ok(reboundOffWall(true) > reboundOffWall(false) && reboundOffWall(false) > 0);
+
+  const separation = (isBouncy) => {
+    const engine = createEngine();
+    engine.startMergeMode();
+    if (isBouncy) {
+      withEvent(engine, 'bouncy');
+    }
+    const a = placeBall(engine, 0, 200, 400, { vx: 200 });
+    const b = placeBall(engine, 1, 200 + 14 + 18 - 2, 400);
+    mergeBehavior.onBeforePhysicsStep(engine, PHYSICS_DT);
+    return b.vx - a.vx;
+  };
+  assert.ok(separation(true) > separation(false));
+});
+
+test('Golden multiplies fusion points but leaves the Supernova bonus alone', () => {
+  const fusionPoints = (id, tier) => {
+    const engine = createEngine();
+    engine.startMergeMode();
+    if (id) {
+      withEvent(engine, id);
+    }
+    const spec = modesConfig.merge.tiers[tier];
+    const y = tier === modesConfig.merge.tiers.length - 1 ? 500 : modesConfig.merge.basinFloorY - spec.radius;
+    placeBall(engine, tier, 200, y);
+    placeBall(engine, tier, 200 + spec.radius * 2 - 0.5, y);
+    const before = engine.score;
+    mergeBehavior.onBeforePhysicsStep(engine, PHYSICS_DT);
+    return engine.score - before;
+  };
+  const calm = fusionPoints(null, 0);
+  const golden = fusionPoints('golden', 0);
+  assert.equal(calm, modesConfig.merge.tiers[1].points);
+  assert.equal(golden, Math.round(calm * MERGE_EVENTS.pool.golden.pointsFactor));
+  assert.equal(Number.isInteger(golden), true);
+  assert.equal(
+    fusionPoints('golden', 5),
+    Math.round(modesConfig.merge.tiers[6].points * MERGE_EVENTS.pool.golden.pointsFactor)
+  );
+
+  const last = modesConfig.merge.tiers.length - 1;
+  assert.equal(fusionPoints('golden', last), fusionPoints(null, last), 'the Supernova bonus is not multiplied');
+  assert.equal(fusionPoints(null, last), modesConfig.merge.supernovaBonus);
+});
+
+test('Big drops recolor the launcher into the bigger pool, and back at the end, without a queue draw', () => {
+  const engine = createEventEngine();
+  const state = engine.modeState;
+  const { tiers } = modesConfig.merge;
+  const bigMax = MERGE_EVENTS.pool.bigDrops.spawnMaxTierIndex;
+  const normalMax = modesConfig.merge.spawnMaxTierIndex;
+  const tierOf = (colorId) => tiers.findIndex((spec) => spec.id === colorId);
+  const launcherTiers = () => [
+    tierOf(engine.currentBall.colorId),
+    tierOf(engine.nextBall.colorId),
+    ...engine.upcomingColorIds.map(tierOf)
+  ];
+  engine.drawSeededRoll = () => 0.999;
+
+  state.upcomingEvent = { id: 'bigDrops', direction: 1 };
+  state.dropsUntilEvent = 1;
+  const drawIndex = engine.launcherDrawIndex;
+  mergeBehavior.advanceEventCycle(engine);
+  assert.equal(state.event.id, 'bigDrops');
+  assert.equal(engine.launcherDrawIndex, drawIndex, 'a recolor never advances the draw counter');
+  assert.deepEqual(launcherTiers(), launcherTiers().map(() => bigMax));
+  assert.equal(engine.currentBall.radius, tiers[bigMax].radius);
+  assert.equal(engine.nextBall.mergeTier, bigMax);
+  assert.equal(engine.upcomingColorIds.length, gameConfig.canvas.launcherPreviewCount);
+
+  // New draws under the event come from the bigger pool, and a real drop keeps the preview honest.
+  assert.ok(tierOf(engine.drawLauncherColor()) <= bigMax);
+  dropOnce(engine);
+  assert.deepEqual(launcherTiers(), launcherTiers().map(() => bigMax));
+
+  state.event.dropsLeft = 1;
+  const endIndex = engine.launcherDrawIndex;
+  mergeBehavior.advanceEventCycle(engine);
+  assert.equal(state.event, null);
+  assert.equal(engine.launcherDrawIndex, endIndex);
+  assert.deepEqual(launcherTiers(), launcherTiers().map(() => normalMax));
+  assert.equal(engine.currentBall.radius, tiers[normalMax].radius);
+  assert.equal(modesConfig.merge.spawnMaxTierIndex, normalMax, 'the config is never mutated');
+});
+
+test('A snapshot keeps a running event, a telegraphed one, and restores a legacy snapshot with defaults', () => {
+  const restoreFrom = (mutate) => {
+    const source = createEngine();
+    source.startMergeMode();
+    source.shoot();
+    mutate(source.modeState);
+    source.saveRunSnapshot({ force: true });
+    const restored = createEngine();
+    restored.storageManager = source.storageManager;
+    assert.equal(restored.restoreSavedRun(), true);
+    return { source, restored };
+  };
+
+  const running = restoreFrom((state) => {
+    state.event = { id: 'wind', direction: -1, dropsLeft: 4 };
+    state.eventCount = 3;
+    state.dropsUntilEvent = 0;
+    state.lastEventId = 'golden';
+  });
+  assert.deepEqual(running.restored.modeState.event, { id: 'wind', direction: -1, dropsLeft: 4 });
+  assert.equal(running.restored.modeState.eventCount, 3);
+  assert.equal(running.restored.modeState.lastEventId, 'golden');
+  assert.deepEqual(running.restored.getMergeEventState(), {
+    eventCount: 3,
+    active: { id: 'wind', direction: -1, dropsLeft: 4 },
+    upcoming: null
+  });
+
+  const telegraphed = restoreFrom((state) => {
+    state.upcomingEvent = { id: 'bouncy', direction: 1 };
+    state.dropsUntilEvent = 1;
+    state.eventCount = 2;
+  });
+  assert.deepEqual(telegraphed.restored.modeState.upcomingEvent, { id: 'bouncy', direction: 1 });
+  assert.equal(telegraphed.restored.modeState.dropsUntilEvent, 1);
+  assert.equal(telegraphed.restored.modeState.event, null);
+
+  const hostile = restoreFrom((state) => {
+    state.event = { id: 'meteor', direction: 7, dropsLeft: 4 };
+    state.upcomingEvent = { id: 'wind', direction: 7 };
+    state.dropsUntilEvent = 9999;
+    state.eventCount = -4;
+  });
+  assert.equal(hostile.restored.modeState.event, null);
+  assert.deepEqual(hostile.restored.modeState.upcomingEvent, { id: 'wind', direction: 1 });
+  assert.equal(hostile.restored.modeState.dropsUntilEvent, MERGE_EVENTS.gapMaxDrops);
+  assert.equal(hostile.restored.modeState.eventCount, 0);
+
+  const legacySource = createEngine();
+  legacySource.startMergeMode();
+  legacySource.shoot();
+  legacySource.saveRunSnapshot({ force: true });
+  const snapshot = legacySource.storageManager.loadRunSnapshot();
+  for (const field of ['event', 'upcomingEvent', 'dropsUntilEvent', 'eventCount', 'lastEventId']) {
+    delete snapshot.modeState[field];
+  }
+  legacySource.storageManager.saveRunSnapshot(snapshot);
+  const legacy = createEngine();
+  legacy.storageManager = legacySource.storageManager;
+  assert.equal(legacy.restoreSavedRun(), true);
+  assert.equal(legacy.modeState.event, null);
+  assert.equal(legacy.modeState.upcomingEvent, null);
+  assert.equal(legacy.modeState.eventCount, 0);
+  assert.ok(
+    legacy.modeState.dropsUntilEvent >= MERGE_EVENTS.gapMinDrops
+      && legacy.modeState.dropsUntilEvent <= MERGE_EVENTS.gapMaxDrops
+  );
+});
+
+test('The second fusion of a drop speaks of a chain, and the third advances a charging shake once', () => {
+  const engine = createEngine();
+  engine.startMergeMode();
+  const texts = [];
+  engine.particleSystem.spawnFloatingText = (x, y, text) => texts.push(text);
+  const cfg = modesConfig.merge;
+  engine.modeState.shakeRemaining = 3;
+
+  [60, 160, 260].forEach((x) => placeTouchingPair(engine, 0, x));
+  mergeBehavior.onBeforePhysicsStep(engine, PHYSICS_DT);
+  assert.equal(engine.combo, 3);
+  assert.equal(texts[0], t('gameplay.feedback.merge.fused', { tier: 2, points: cfg.tiers[1].points }));
+  assert.equal(texts[1], t('gameplay.feedback.merge.chain', { chain: 2, points: cfg.tiers[1].points * 2 }));
+  assert.ok(texts.includes(t('gameplay.feedback.merge.chain', { chain: 3, points: cfg.tiers[1].points * 3 })));
+  assert.equal(texts.filter((text) => text === t('gameplay.feedback.merge.chainShake')).length, 1);
+  assert.equal(engine.getMergeShakeRemaining(), 2, 'advanced by exactly one');
+
+  placeTouchingPair(engine, 0, 360);
+  mergeBehavior.onBeforePhysicsStep(engine, PHYSICS_DT);
+  assert.equal(engine.combo, 4);
+  assert.equal(engine.getMergeShakeRemaining(), 2, 'a drop rewards its chain once');
+
+  // The next drop is eligible again (the drop itself charges the shake by one).
+  dropOnce(engine);
+  assert.equal(engine.modeState.chainRewardGranted, false);
+  assert.equal(engine.getMergeShakeRemaining(), 1);
+  engine.physicsWorld.balls.length = 0;
+  engine.physicsWorld.ballMap.clear();
+  [60, 160, 260].forEach((x) => placeTouchingPair(engine, 0, x));
+  mergeBehavior.onBeforePhysicsStep(engine, PHYSICS_DT);
+  assert.equal(engine.getMergeShakeRemaining(), 0);
+});
+
+test('A chain does not touch a shake that is already ready', () => {
+  const engine = createEngine();
+  engine.startMergeMode();
+  const texts = [];
+  engine.particleSystem.spawnFloatingText = (x, y, text) => texts.push(text);
+  engine.modeState.shakeRemaining = 0;
+
+  [60, 160, 260].forEach((x) => placeTouchingPair(engine, 0, x));
+  mergeBehavior.onBeforePhysicsStep(engine, PHYSICS_DT);
+  assert.equal(engine.combo, 3);
+  assert.equal(engine.getMergeShakeRemaining(), 0);
+  assert.equal(engine.modeState.chainRewardGranted, false);
+  assert.equal(texts.includes(t('gameplay.feedback.merge.chainShake')), false);
+});
+
+test('Every Basin event and chain text exists in English and French', () => {
+  const keys = [
+    'gameplay.feedback.merge.chain',
+    'gameplay.feedback.merge.chainShake',
+    'gameplay.feedback.merge.eventStart',
+    'gameplay.feedback.merge.eventStartAnnounce',
+    'gameplay.feedback.merge.eventEnd',
+    'gameplay.feedback.merge.eventUpcoming',
+    'hud.stats.mergeEvent.active',
+    'hud.stats.mergeEvent.upcoming',
+    'hud.stats.mergeEvent.next',
+    'hud.stats.mergeEvent.aria.one',
+    'hud.stats.mergeEvent.aria.other',
+    'hud.stats.mergeEvent.upcomingAria'
+  ];
+  for (const id of ['windLeft', 'windRight', ...MERGE_EVENT_IDS_LIST.filter((eventId) => eventId !== 'wind')]) {
+    for (const field of ['name', 'description', 'icon']) {
+      keys.push(`gameplay.merge.events.${id}.${field}`);
+    }
+  }
+  for (const locale of ['en', 'fr']) {
+    const dictionary = loadJson(`./locales/${locale}.json`);
+    for (const key of keys) {
+      const value = key.split('.').reduce((node, part) => node?.[part], dictionary);
+      assert.equal(typeof value, 'string', `${locale} has ${key}`);
+      assert.ok(value.length > 0, `${locale} ${key} is not empty`);
+    }
+  }
+  for (const id of MERGE_EVENT_IDS_LIST) {
+    const localeIds = id === 'wind' ? ['windLeft', 'windRight'] : [id];
+    for (const localeId of localeIds) {
+      const event = { id, direction: localeId === 'windLeft' ? -1 : 1 };
+      assert.equal(getMergeEventLocaleId(event), localeId);
+    }
+  }
+});
+
+test('A partial Merge config keeps the default events and chain numbers', () => {
+  const partial = resolveModesConfig({ merge: { events: { pool: { wind: {} } }, chain: {} } }).merge;
+  const defaults = resolveModesConfig(null).merge;
+  assert.deepEqual(partial.chain, defaults.chain);
+  assert.deepEqual(partial.events.pool.wind, defaults.events.pool.wind);
+  assert.equal(partial.events.gapMinDrops, defaults.events.gapMinDrops);
+  assert.equal(partial.events.durationDrops, defaults.events.durationDrops);
+  assert.equal(partial.eventTextOffsetY, defaults.eventTextOffsetY);
+
+  const noPool = resolveModesConfig({ merge: { events: { gapMinDrops: 3, gapMaxDrops: 4 } } }).merge;
+  assert.deepEqual(Object.keys(noPool.events.pool), Object.keys(defaults.events.pool));
+  assert.equal(noPool.events.gapMinDrops, 3);
+  assert.equal(resolveModesConfig({ merge: { events: null } }).merge.events.durationDrops, defaults.events.durationDrops);
+
+  const engine = createEngine();
+  engine.modesConfig = resolveModesConfig({
+    merge: { ...modesConfig.merge, events: { pool: { wind: {} } }, chain: {} }
+  });
+  engine.startMergeMode();
+  withEvent(engine, 'wind', 1);
+  const ball = placeBall(engine, 0, 200, 400);
+  mergeBehavior.onBeforePhysicsStep(engine, PHYSICS_DT);
+  assert.ok(Number.isFinite(ball.vx) && ball.vx > 0, 'the wind falls back to its default strength');
+});
+
+test('The event view is gone once the run is over', () => {
+  const engine = createEngine();
+  engine.startMergeMode();
+  withEvent(engine, 'bouncy');
+  assert.equal(engine.getMergeEventState().active.id, 'bouncy');
+  engine.triggerGameOver(GAME_OVER_REASONS.BASIN_OVERFLOW);
+  assert.equal(engine.getMergeEventState(), null);
+});
+
+test('A restored telegraphed event never repeats the last one', () => {
+  const source = createEngine();
+  source.startMergeMode();
+  source.shoot();
+  source.modeState.lastEventId = 'golden';
+  source.modeState.upcomingEvent = { id: 'golden', direction: 1 };
+  source.modeState.dropsUntilEvent = 1;
+  source.saveRunSnapshot({ force: true });
+  const restored = createEngine();
+  restored.storageManager = source.storageManager;
+  assert.equal(restored.restoreSavedRun(), true);
+  assert.equal(restored.modeState.upcomingEvent, null);
+  assert.equal(restored.modeState.lastEventId, 'golden');
+});
+
+test('The HUD announces a telegraphed, started and ended event once each, and nothing after a restart', () => {
+  const spoken = [];
+  const hud = { announce: (text) => spoken.push(text) };
+  const refresh = (view) => uiHudRefreshMethods.announceMergeEventChanges.call(hud, view);
+  const idle = (eventCount) => ({ eventCount, active: null, upcoming: null });
+  const upcoming = (eventCount) => ({ eventCount, active: null, upcoming: { id: 'bouncy', direction: 1 } });
+  const active = (eventCount, dropsLeft) => ({
+    eventCount,
+    active: { id: 'bouncy', direction: 1, dropsLeft },
+    upcoming: null
+  });
+  const name = t('gameplay.merge.events.bouncy.name');
+
+  for (let i = 0; i < 5; i += 1) {
+    refresh(idle(0));
+  }
+  assert.deepEqual(spoken, [], 'the first refresh only records');
+  for (let i = 0; i < 4; i += 1) {
+    refresh(upcoming(0));
+  }
+  assert.deepEqual(spoken, [t('gameplay.feedback.merge.eventUpcoming', { name })]);
+  for (let dropsLeft = 6; dropsLeft >= 1; dropsLeft -= 1) {
+    refresh(active(1, dropsLeft));
+    refresh(active(1, dropsLeft));
+  }
+  assert.equal(spoken.length, 2);
+  assert.equal(spoken[1], t('gameplay.feedback.merge.eventStartAnnounce', {
+    name,
+    description: t('gameplay.merge.events.bouncy.description')
+  }));
+  for (let i = 0; i < 4; i += 1) {
+    refresh(idle(1));
+  }
+  assert.equal(spoken.length, 3);
+  assert.equal(spoken[2], t('gameplay.feedback.merge.eventEnd', { name }));
+
+  // A new run replaces the old one in the middle of an event: nothing is said for the swap.
+  refresh(active(2, 3));
+  const before = spoken.length;
+  refresh(idle(0));
+  refresh(idle(0));
+  assert.equal(spoken.length, before);
+  refresh(null);
+  refresh(active(1, 6));
+  assert.equal(spoken.length, before, 'leaving the Basin forgets the old state');
 });

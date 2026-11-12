@@ -170,6 +170,22 @@
     "spawnMaxTierIndex": 4,
     "supernovaBonus": 1500,
     "supernovaShockwaveImpulse": 340,
+    "chain": {
+      "shakeAdvanceAt": 3
+    },
+    "eventTextOffsetY": 56,
+    "events": {
+      "gapMinDrops": 9,
+      "gapMaxDrops": 14,
+      "durationDrops": 6,
+      "pool": {
+        "wind": { "acceleration": 260 },
+        "lowGravity": { "gravityFactor": 0.45 },
+        "bouncy": { "restitution": 0.6 },
+        "bigDrops": { "spawnMaxTierIndex": 6 },
+        "golden": { "pointsFactor": 1.5 }
+      }
+    },
     "tiers": [
       {
         "id": "merge_t0",

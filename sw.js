@@ -96,6 +96,7 @@ const PRECACHE_ASSETS = [
   './src/game/modes/ConvoyBehavior.js',
   './src/game/modes/HexGridBehavior.js',
   './src/game/modes/MergeBehavior.js',
+  './src/game/modes/MergeEvents.js',
   './src/game/modes/ModeBehavior.js',
   './src/game/modes/ModeConfig.js',
   './src/game/modes/OrbitalBehavior.js',

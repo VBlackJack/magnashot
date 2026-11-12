@@ -175,6 +175,16 @@
       "combo": {
         "label": "Combo x{{count}}"
       },
+      "mergeEvent": {
+        "active": "{{icon}} {{count}}",
+        "upcoming": "{{icon}} {{next}}",
+        "next": "bientôt",
+        "aria": {
+          "one": "{{name}} : {{count}} lâcher restant",
+          "other": "{{name}} : {{count}} lâchers restants"
+        },
+        "upcomingAria": "Bientôt : {{name}}"
+      },
       "frozen": {
         "label": "Gel actif ({{turns}})"
       },
@@ -500,7 +510,47 @@
       },
       "merge": {
         "fused": "CALIBRE {{tier}} ! +{{points}}",
-        "supernova": "SUPERNOVA MAGNÉTIQUE ! +{{points}}"
+        "supernova": "SUPERNOVA MAGNÉTIQUE ! +{{points}}",
+        "chain": "Chaîne x{{chain}} : +{{points}}",
+        "chainShake": "+1 Secousse",
+        "eventStart": "ÉVÉNEMENT : {{name}}",
+        "eventStartAnnounce": "Événement : {{name}}. {{description}}",
+        "eventEnd": "Fin de l'événement : {{name}}.",
+        "eventUpcoming": "Bientôt : {{name}}."
+      }
+    },
+    "merge": {
+      "events": {
+        "windLeft": {
+          "name": "Vent vers la gauche",
+          "description": "Les sphères dérivent sur le côté : lâchez du côté d'où vient le vent.",
+          "icon": "💨←"
+        },
+        "windRight": {
+          "name": "Vent vers la droite",
+          "description": "Les sphères dérivent sur le côté : lâchez du côté d'où vient le vent.",
+          "icon": "💨→"
+        },
+        "lowGravity": {
+          "name": "Gravité faible",
+          "description": "Les sphères tombent lentement et flottent plus longtemps.",
+          "icon": "🪶"
+        },
+        "bouncy": {
+          "name": "Sphères rebondissantes",
+          "description": "Les sphères rebondissent bien plus haut sur les parois, le sol et entre elles.",
+          "icon": "🏀"
+        },
+        "bigDrops": {
+          "name": "Gros calibres",
+          "description": "Des calibres plus gros peuvent tomber.",
+          "icon": "🟣"
+        },
+        "golden": {
+          "name": "Fusions dorées",
+          "description": "Chaque fusion rapporte des points en plus.",
+          "icon": "🌟"
+        }
       }
     },
     "mutators": {

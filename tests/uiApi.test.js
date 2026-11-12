@@ -43,6 +43,8 @@ const EXPECTED_PROTOTYPE_NAMES = [
   'hideSagMeter',
   'refreshSagMeter',
   'refreshMagnetarHud',
+  'refreshMergeEventBadge',
+  'announceMergeEventChanges',
   'announceMagnetarEvent',
   'bindStatsEvents',
   'buildStatsRecords',

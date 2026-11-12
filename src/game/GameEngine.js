@@ -432,6 +432,15 @@ export class GameEngine {
     return this.mode === GAME_MODES.MERGE ? this.modeState?.shakeRemaining ?? null : null;
   }
 
+  /**
+   * Event cycle of the Merge Basin for the HUD.
+   * @returns {{eventCount: number, active: object|null, upcoming: object|null}|null} Null outside a live Basin run.
+   */
+  getMergeEventState() {
+    const live = this.state === GAME_STATES.PLAYING || this.state === GAME_STATES.PAUSED;
+    return this.mode === GAME_MODES.MERGE && live ? this.getModeBehavior().getEventView(this) : null;
+  }
+
   tryMergeShake() {
     if (this.getMergeShakeRemaining() !== 0 || !this.isRunPlaying()) {
       return false;

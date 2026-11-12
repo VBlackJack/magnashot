@@ -4,6 +4,10 @@ All notable changes to **MagnaShot** are documented in this file.
 
 ## [Unreleased]
 
+### Added
+- Merge Basin events: every nine to fourteen drops a six-drop event (wind that blows left or right, low gravity, bouncy spheres, big drops that widen the spawn pool, or golden fusions worth 1.5 times the points) changes the physics or the scoring, is telegraphed on the badge one drop ahead and announced politely. Event draws are seeded and saved with the run. Scores change: events and golden fusions affect Basin records.
+- Merge Basin chains: the second and later fusions of one drop show a "Chain" text, and the third fusion of a drop advances a charging Shake by one (once per drop). Chains raise the combo as before, so Basin scores can differ from earlier versions.
+
 ### Changed
 - The Merge Basin shake is now part of every Basin run: the `?mergeShake=1` URL is no longer needed, records set with the shake prototype now count as Merge Basin records, and shake runs unlock achievements.
 - The Merge Basin shake is about seven times stronger: a sideways shove (`maxImpulsePxPerSec` 120 to 500) plus a small hop (`liftImpulsePxPerSec` 400) frees the pile from floor friction, so it visibly reshuffles the basin instead of moving it a few pixels.

@@ -19,6 +19,7 @@ import { t, formatNumber } from '../core/I18n.js';
 import { SeededRandom } from '../core/SeededRandom.js';
 import { resolveHintText } from '../game/Discovery.js';
 import { MAGNETAR_PHASES } from '../game/MagnetarRules.js';
+import { getMergeEventTextKey } from '../game/modes/MergeEvents.js';
 import { SAG_PHASES } from '../game/SagMeter.js';
 import { getUtcIsoWeekKey } from '../game/WeeklyFlux.js';
 import { FULL_PERCENT } from './WorkshopView.js';
@@ -103,6 +104,79 @@ export const uiHudRefreshMethods = {
       meter.classList.remove('hidden');
     }
     this.announceSagChanges(engine, sag);
+  },
+
+  /**
+   * Merge Basin event badge: the running event with the drops it has left, else the one
+   * telegraphed for the next drop. Hidden outside the Basin.
+   * @param {object} engine - Game engine.
+   */
+  refreshMergeEventBadge(engine) {
+    const badge = this.elements.mergeEventBadge;
+    const view = engine.getMergeEventState?.() ?? null;
+    if (!badge) {
+      return;
+    }
+    this.announceMergeEventChanges(view);
+    const shown = view?.active ?? view?.upcoming ?? null;
+    if (!shown) {
+      badge.classList.add('hidden');
+      return;
+    }
+    const icon = t(getMergeEventTextKey(shown, 'icon'));
+    const name = t(getMergeEventTextKey(shown, 'name'));
+    if (view.active) {
+      const count = view.active.dropsLeft;
+      const label = t(`hud.stats.mergeEvent.aria.${count === 1 ? 'one' : 'other'}`, { name, count });
+      setTextIfChanged(badge, t('hud.stats.mergeEvent.active', { icon, count }));
+      setAttributeIfChanged(badge, 'aria-label', label);
+      setAttributeIfChanged(badge, 'title', label);
+    } else {
+      const label = t('hud.stats.mergeEvent.upcomingAria', { name });
+      setTextIfChanged(badge, t('hud.stats.mergeEvent.upcoming', { icon, next: t('hud.stats.mergeEvent.next') }));
+      setAttributeIfChanged(badge, 'aria-label', label);
+      setAttributeIfChanged(badge, 'title', label);
+    }
+    badge.classList.remove('hidden');
+  },
+
+  /**
+   * Polite announcements for the Basin event cycle: once when an event is telegraphed, once
+   * when it starts and once when it ends, never per drop. The first refresh only records.
+   */
+  announceMergeEventChanges(view) {
+    if (!view) {
+      this.mergeEventAnnouncerState = null;
+      return;
+    }
+    const keyOf = (event) => (event ? `${event.id}:${event.direction}` : null);
+    // A lower event count means a new run took over: record its state, announce nothing.
+    const previous = this.mergeEventAnnouncerState;
+    const seen = previous && view.eventCount >= previous.eventCount ? previous : null;
+    this.mergeEventAnnouncerState = {
+      eventCount: view.eventCount,
+      activeKey: keyOf(view.active),
+      upcomingKey: keyOf(view.upcoming),
+      active: view.active
+    };
+    if (!seen) {
+      return;
+    }
+    const current = this.mergeEventAnnouncerState;
+    if (current.activeKey && current.activeKey !== seen.activeKey) {
+      this.announce(t('gameplay.feedback.merge.eventStartAnnounce', {
+        name: t(getMergeEventTextKey(view.active, 'name')),
+        description: t(getMergeEventTextKey(view.active, 'description'))
+      }));
+    } else if (!current.activeKey && seen.activeKey) {
+      this.announce(t('gameplay.feedback.merge.eventEnd', {
+        name: t(getMergeEventTextKey(seen.active, 'name'))
+      }));
+    } else if (current.upcomingKey && current.upcomingKey !== seen.upcomingKey) {
+      this.announce(t('gameplay.feedback.merge.eventUpcoming', {
+        name: t(getMergeEventTextKey(view.upcoming, 'name'))
+      }));
+    }
   },
 
   /** Hides the meter and forgets what the announcer saw, outside the Sag modes. */
@@ -604,6 +678,8 @@ export const uiHudRefreshMethods = {
     } else {
       this.elements.comboBadge.classList.add('hidden');
     }
+
+    this.refreshMergeEventBadge(engine);
 
     const convoyFrozenSec = engine.mode === GAME_MODES.CONVOY
       ? Math.ceil(engine.modeState?.freezeTimerSec || 0)

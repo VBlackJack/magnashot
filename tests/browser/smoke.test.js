@@ -3719,6 +3719,82 @@ describe('Merge shake', () => {
     assert.equal(await page.locator(selector).isEnabled(), true);
   }
 
+  /** Makes the next drop start the given event, without waiting for the random gap. */
+  async function startEventOnNextDrop(page, id) {
+    await page.evaluate((eventId) => {
+      const engine = window.__fluxEngine;
+      engine.modeState.upcomingEvent = { id: eventId, direction: -1 };
+      engine.modeState.dropsUntilEvent = 1;
+      engine.modeState.dropCooldownSec = 0;
+      engine.shoot();
+    }, id);
+  }
+
+  test('a Basin event shows a badge, telegraphed first and then counting its drops', async () => {
+    const viewport = VIEWPORTS[0];
+    const { context, page, errors } = await openGame(viewport, { initStorage, path });
+    const badge = '#hud-merge-event';
+    try {
+      await startBasin(page, viewport);
+      assert.equal(await page.locator(badge).isHidden(), true, 'no badge between events');
+
+      await page.evaluate(() => {
+        const engine = window.__fluxEngine;
+        engine.modeState.upcomingEvent = { id: 'lowGravity', direction: 1 };
+        engine.modeState.dropsUntilEvent = 2;
+        engine.notifyUI();
+      });
+      await waitShown(page, badge);
+      const lowGravity = localeText('en', 'gameplay.merge.events.lowGravity.name');
+      assert.equal(
+        await page.locator(badge).getAttribute('aria-label'),
+        localeText('en', 'hud.stats.mergeEvent.upcomingAria', { name: lowGravity })
+      );
+
+      await startEventOnNextDrop(page, 'lowGravity');
+      const count = modes.merge.events.durationDrops;
+      await page.waitForFunction(
+        (expected) => document.getElementById('hud-merge-event').getAttribute('aria-label') === expected,
+        localeText('en', 'hud.stats.mergeEvent.aria.other', { name: lowGravity, count })
+      );
+      assert.equal(await page.locator(badge).getAttribute('title'), await page.locator(badge).getAttribute('aria-label'));
+      assert.equal(
+        await page.locator(badge).innerText(),
+        localeText('en', 'hud.stats.mergeEvent.active', {
+          icon: localeText('en', 'gameplay.merge.events.lowGravity.icon'),
+          count
+        })
+      );
+      assert.deepEqual(errors, []);
+    } finally {
+      await context.close();
+    }
+  });
+
+  for (const viewport of VIEWPORTS.filter(({ isTouch }) => isTouch)) {
+    test(`the French event badge fits on ${viewport.name}`, async () => {
+      const { context, page } = await openGame(viewport, {
+        initStorage: { ...initStorage, ...languageStorage('fr') },
+        path
+      });
+      try {
+        await startBasin(page, viewport);
+        await startEventOnNextDrop(page, 'wind');
+        await waitShown(page, '#hud-merge-event');
+        await assertLayoutFits(page, 'Merge event badge');
+        assert.equal(
+          await page.locator('#hud-merge-event').getAttribute('aria-label'),
+          localeText('fr', 'hud.stats.mergeEvent.aria.other', {
+            name: localeText('fr', 'gameplay.merge.events.windLeft.name'),
+            count: modes.merge.events.durationDrops
+          })
+        );
+      } finally {
+        await context.close();
+      }
+    });
+  }
+
   test('Pause shows the Basin tip and keyboard line, not the generic ones', async () => {
     const viewport = VIEWPORTS[0];
     const { context, page, errors } = await openGame(viewport, { initStorage, path });
