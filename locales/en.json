@@ -517,6 +517,8 @@
         "eventStartAnnounce": "Event: {{name}}. {{description}}",
         "eventEnd": "Event over: {{name}}.",
         "eventUpcoming": "Coming up: {{name}}.",
+        "shapeStart": "Basin: {{name}}",
+        "shapeAnnounce": "Basin: {{name}}. {{description}}",
         "pressureStep": "THE LINE CAME DOWN",
         "pressureStepAnnounce": "The overflow line came down.",
         "pressureWarning": {
@@ -526,6 +528,20 @@
       }
     },
     "merge": {
+      "shapes": {
+        "classic": {
+          "name": "Classic",
+          "description": "The usual basin."
+        },
+        "narrow": {
+          "name": "Narrow",
+          "description": "The walls are closer together."
+        },
+        "pegs": {
+          "name": "Pegs",
+          "description": "Fixed pegs sit in the lower half."
+        }
+      },
       "events": {
         "windLeft": {
           "name": "Wind to the left",

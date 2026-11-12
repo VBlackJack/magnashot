@@ -112,6 +112,8 @@ const EXPECTED_PROTOTYPE_NAMES = [
   'getMergeShakeRemaining',
   'getMergeEventState',
   'getMergePressureState',
+  'getMergeShapeState',
+  'getMergeBasinGeometry',
   'tryMergeShake',
   'isStageChanging',
   'isSurvivalMode',

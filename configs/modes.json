@@ -187,6 +187,21 @@
       "shakeGraceSec": 2,
       "settledSpeedPxPerSec": 30
     },
+    "shapes": {
+      "ids": ["classic", "narrow", "pegs"],
+      "weights": { "classic": 1, "narrow": 1, "pegs": 1 },
+      "classic": { "pressure": {} },
+      "narrow": { "insetPx": 30, "pressure": { "topTierStepDrops": 50, "pxPerTier": 12, "maxOffsetPx": 180 } },
+      "pegs": {
+        "radius": 9,
+        "restitution": 0.4,
+        "positions": [
+          { "xFrac": 0.38, "yFromFloorPx": 158 },
+          { "xFrac": 0.62, "yFromFloorPx": 293 }
+        ],
+        "pressure": { "topTierStepDrops": 50, "maxOffsetPx": 180 }
+      }
+    },
     "eventTextOffsetY": 56,
     "events": {
       "gapMinDrops": 9,

@@ -114,6 +114,7 @@ export const uiHudRefreshMethods = {
   refreshMergeEventBadge(engine) {
     const badge = this.elements.mergeEventBadge;
     const view = engine.getMergeEventState?.() ?? null;
+    this.announceMergeShape(engine.getMergeShapeState?.() ?? null);
     if (!badge) {
       return;
     }
@@ -138,6 +139,25 @@ export const uiHudRefreshMethods = {
       setAttributeIfChanged(badge, 'title', label);
     }
     badge.classList.remove('hidden');
+  },
+
+  /**
+   * Polite announcement of the Basin shape, once per fresh run (a restored run has no serial).
+   * @param {{shapeId: string, announceSerial: number|null}|null} view - Shape view.
+   */
+  announceMergeShape(view) {
+    if (!view) {
+      this.mergeShapeAnnouncedSerial = null;
+      return;
+    }
+    if (view.announceSerial === null || view.announceSerial === this.mergeShapeAnnouncedSerial) {
+      return;
+    }
+    this.mergeShapeAnnouncedSerial = view.announceSerial;
+    this.announce(t('gameplay.feedback.merge.shapeAnnounce', {
+      name: t(`gameplay.merge.shapes.${view.shapeId}.name`),
+      description: t(`gameplay.merge.shapes.${view.shapeId}.description`)
+    }));
   },
 
   /**

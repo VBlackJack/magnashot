@@ -450,6 +450,23 @@ export class GameEngine {
     return this.mode === GAME_MODES.MERGE && live ? this.getModeBehavior().getPressureView(this) : null;
   }
 
+  /**
+   * Basin shape of the Merge Basin for the HUD.
+   * @returns {{shapeId: string, announceSerial: number|null}|null} Null outside a live Basin run.
+   */
+  getMergeShapeState() {
+    const live = this.state === GAME_STATES.PLAYING || this.state === GAME_STATES.PAUSED;
+    return this.mode === GAME_MODES.MERGE && live ? this.getModeBehavior().getShapeView(this) : null;
+  }
+
+  /**
+   * Walls, floor and pegs of the Merge Basin run's shape.
+   * @returns {{left: number, right: number, floor: number, pegs: Array<{x: number, y: number, radius: number}>}|null} Null outside the Basin.
+   */
+  getMergeBasinGeometry() {
+    return this.mode === GAME_MODES.MERGE ? this.getModeBehavior().getBasinGeometry(this) : null;
+  }
+
   tryMergeShake() {
     if (this.getMergeShakeRemaining() !== 0 || !this.isRunPlaying()) {
       return false;

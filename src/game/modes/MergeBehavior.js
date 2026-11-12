@@ -23,6 +23,7 @@ import {
   SPECIAL_TYPES
 } from '../../core/Constants.js';
 import { t } from '../../core/I18n.js';
+import { DEFAULT_MODES_CONFIG } from './ModeConfig.js';
 import { Ball } from '../../entities/Ball.js';
 import { ModeBehavior, registerModeBehavior } from './ModeBehavior.js';
 import {
@@ -70,6 +71,21 @@ const RECOLOR_PHASE_END = 'end';
 const CHAIN_TEXT_MIN_COMBO = 2;
 /** The Shake reward text sits one text line above the fusion text so they do not overlap. */
 const CHAIN_REWARD_TEXT_LINES = 2;
+
+/** Basin shapes: each one is drawn at the start of a run and changes the walls or adds static pegs. */
+export const MERGE_SHAPE_IDS = Object.freeze({
+  CLASSIC: 'classic',
+  NARROW: 'narrow',
+  PEGS: 'pegs'
+});
+/** Static pegs are drawn with a thin outline in the wall colour. */
+const PEG_OUTLINE_WIDTH = 2;
+const PEG_FILL_ALPHA = 0.55;
+const PEG_OUTLINE_ALPHA = 0.9;
+/** The shape announcement text sits this many text lines below the event text line. */
+const SHAPE_TEXT_LINES_BELOW_EVENT = 1;
+/** Restitution that, in a settling pass, only removes the velocity heading into a wall, floor or peg. */
+const SETTLE_RESTITUTION = -1;
 
 const MERGE_CHROME = Object.freeze({
   ambientLiquid: false,
@@ -157,6 +173,89 @@ export class MergeBehavior extends ModeBehavior {
     const tiers = engine.modesConfig.merge.tiers;
     const clamped = Math.max(0, Math.min(tiers.length - 1, tierIndex));
     return tiers[clamped];
+  }
+
+  /** Ids of the shapes this config can draw: listed, and known to the geometry. */
+  getShapeIds(engine) {
+    const shapes = engine.modesConfig.merge.shapes;
+    const known = Object.values(MERGE_SHAPE_IDS);
+    const listed = Array.isArray(shapes?.ids) ? shapes.ids.filter((id) => known.includes(id)) : [];
+    return listed.length > 0 ? listed : [MERGE_SHAPE_IDS.CLASSIC];
+  }
+
+  /** The run's shape id, falling back to the classic basin for a missing or unknown one. */
+  getShapeId(engine) {
+    const id = engine.modeState?.shapeId;
+    return this.getShapeIds(engine).includes(id) ? id : MERGE_SHAPE_IDS.CLASSIC;
+  }
+
+  /** Draws a shape id from a unit roll, by the configured weights. */
+  pickShapeId(engine, roll) {
+    const ids = this.getShapeIds(engine);
+    const weights = engine.modesConfig.merge.shapes?.weights ?? {};
+    const weightOf = (id) => Math.max(0, Number.isFinite(weights[id]) ? weights[id] : 1);
+    const total = ids.reduce((sum, id) => sum + weightOf(id), 0);
+    if (!(total > 0)) {
+      return ids[0];
+    }
+    let threshold = roll * total;
+    for (const id of ids) {
+      threshold -= weightOf(id);
+      if (threshold < 0) {
+        return id;
+      }
+    }
+    return ids[ids.length - 1];
+  }
+
+  /**
+   * Walls, floor and static pegs of the run's shape, derived from the config and the shape id.
+   * Every reader of the basin geometry goes through here. Never mutates the config.
+   * @returns {{left: number, right: number, floor: number, pegs: Array<{x: number, y: number, radius: number}>}}
+   */
+  getBasinGeometry(engine) {
+    const cfg = engine.modesConfig.merge;
+    const shapeId = this.getShapeId(engine);
+    const shape = cfg.shapes?.[shapeId] ?? {};
+    let left = cfg.basinLeftX;
+    let right = cfg.basinRightX;
+    const pegs = [];
+    if (shapeId === MERGE_SHAPE_IDS.NARROW) {
+      left += shape.insetPx;
+      right -= shape.insetPx;
+    } else if (shapeId === MERGE_SHAPE_IDS.PEGS) {
+      const defaults = DEFAULT_MODES_CONFIG.merge.shapes.pegs;
+      const radius = Number.isFinite(shape.radius) && shape.radius > 0 ? shape.radius : defaults.radius;
+      const isValid = (p) => Boolean(p) && Number.isFinite(p.xFrac) && Number.isFinite(p.yFromFloorPx);
+      const valid = Array.isArray(shape.positions) ? shape.positions.filter(isValid) : [];
+      for (const position of valid.length > 0 ? valid : defaults.positions) {
+        pegs.push({
+          x: left + position.xFrac * (right - left),
+          y: cfg.basinFloorY - position.yFromFloorPx,
+          radius
+        });
+      }
+    }
+    return { left, right, floor: cfg.basinFloorY, pegs };
+  }
+
+  /** Pressure numbers in force: the base ones with the run's shape overrides on top. Null when the config has none. */
+  getPressureConfig(engine) {
+    const cfg = engine.modesConfig.merge;
+    if (!cfg.pressure) {
+      return cfg.pressure;
+    }
+    const override = cfg.shapes?.[this.getShapeId(engine)]?.pressure;
+    return override && Object.keys(override).length > 0 ? { ...cfg.pressure, ...override } : cfg.pressure;
+  }
+
+  /** Read-only view of the shape for the HUD: its id and the serial of a freshly started run. */
+  getShapeView(engine) {
+    const state = engine.modeState;
+    if (!state) {
+      return null;
+    }
+    return { shapeId: this.getShapeId(engine), announceSerial: state.shapeAnnounceSerial ?? null };
   }
 
   pickLauncherColor(engine, roll = engine.random()) {
@@ -342,7 +441,7 @@ export class MergeBehavior extends ModeBehavior {
   /** Read-only view of the pressure for the HUD, or null when the config defines none. */
   getPressureView(engine) {
     const state = engine.modeState;
-    if (!state || !engine.modesConfig.merge.pressure) {
+    if (!state || !this.getPressureConfig(engine)) {
       return null;
     }
     return {
@@ -367,7 +466,7 @@ export class MergeBehavior extends ModeBehavior {
    */
   recordFusedCalibre(engine, calibre) {
     engine.mergeBestTier = Math.max(engine.mergeBestTier || 1, calibre);
-    const pressure = engine.modesConfig.merge.pressure;
+    const pressure = this.getPressureConfig(engine);
     const state = engine.modeState;
     if (pressure && state && state.topTierDrops === null && engine.mergeBestTier >= pressure.topTier) {
       state.topTierDrops = 0;
@@ -379,7 +478,7 @@ export class MergeBehavior extends ModeBehavior {
    * a telegraphed step when the target rose, and applies it once the telegraph has run out.
    */
   advancePressure(engine) {
-    const pressure = engine.modesConfig.merge.pressure;
+    const pressure = this.getPressureConfig(engine);
     const state = engine.modeState;
     if (!pressure) {
       return;
@@ -409,15 +508,16 @@ export class MergeBehavior extends ModeBehavior {
     const state = engine.modeState;
     const currentLine = this.getOverflowLineY(engine);
     const newLine = engine.modesConfig.merge.overflowLineY + state.pendingOffsetPx;
+    const { settledSpeedPxPerSec } = this.getPressureConfig(engine);
     return engine.physicsWorld.balls.some((ball) => {
       const top = ball.y - ball.radius;
-      return Math.abs(ball.vy) < engine.modesConfig.merge.pressure.settledSpeedPxPerSec && top > currentLine && top < newLine;
+      return Math.abs(ball.vy) < settledSpeedPxPerSec && top > currentLine && top < newLine;
     });
   }
 
   /** Applies the pending step unless a settled sphere is in its way, for at most `holdMaxDrops` drops. */
   tryApplyPendingStep(engine) {
-    const pressure = engine.modesConfig.merge.pressure;
+    const pressure = this.getPressureConfig(engine);
     const state = engine.modeState;
     if (this.isStepBlocked(engine)) {
       if (state.holdDrops < pressure.holdMaxDrops) {
@@ -461,15 +561,16 @@ export class MergeBehavior extends ModeBehavior {
   getStepGraceSec(engine, ball, lineY, currentGraceSec) {
     const cfg = engine.modesConfig.merge;
     const current = currentGraceSec || 0;
-    if (!cfg.pressure || ball.y - ball.radius >= lineY) {
+    const pressure = this.getPressureConfig(engine);
+    if (!pressure || ball.y - ball.radius >= lineY) {
       return current;
     }
-    return Math.max(current, cfg.overflowGraceSec * cfg.pressure.stepGraceFactor);
+    return Math.max(current, cfg.overflowGraceSec * pressure.stepGraceFactor);
   }
 
   /** Restores the pressure from a snapshot; a legacy snapshot derives the line from its best calibre. */
   restorePressure(engine, rawState) {
-    const pressure = engine.modesConfig.merge.pressure;
+    const pressure = this.getPressureConfig(engine);
     const state = engine.modeState;
     if (!pressure) {
       return;
@@ -507,8 +608,8 @@ export class MergeBehavior extends ModeBehavior {
   }
 
   clampDropX(engine, rawX, radius) {
-    const cfg = engine.modesConfig.merge;
-    return Math.max(cfg.basinLeftX + radius, Math.min(cfg.basinRightX - radius, rawX));
+    const { left, right } = this.getBasinGeometry(engine);
+    return Math.max(left + radius, Math.min(right - radius, rawX));
   }
 
   setupMode(engine) {
@@ -536,11 +637,29 @@ export class MergeBehavior extends ModeBehavior {
       lastEventId: null,
       eventCount: 0,
       dropsUntilEvent: 0,
+      shapeId: this.pickShapeId(engine, engine.drawSeededRoll('mergeShape', 0)),
+      shapeAnnounceSerial: engine.isRestoringRun ? null : (engine.mergeShapeSerial = (engine.mergeShapeSerial ?? 0) + 1),
       ...this.createPressureState()
     };
     if (cfg.events) {
       engine.modeState.dropsUntilEvent = this.drawEventGap(engine, 0);
     }
+    if (!engine.isRestoringRun) {
+      this.announceShape(engine);
+    }
+  }
+
+  /** Floating text naming the run's shape, one text line below the event text position (the HUD adds the polite announcement). */
+  announceShape(engine) {
+    const cfg = engine.modesConfig.merge;
+    const id = engine.modeState.shapeId;
+    engine.particleSystem.spawnFloatingText(
+      engine.gameConfig.canvas.logicalWidth * MATH_CONSTANTS.HALF,
+      cfg.overflowLineY + cfg.eventTextOffsetY
+        - engine.gameConfig.canvas.floatingTextOffsetY * SHAPE_TEXT_LINES_BELOW_EVENT,
+      t('gameplay.feedback.merge.shapeStart', { name: t(`gameplay.merge.shapes.${id}.name`) }),
+      engine.gameConfig.theme.overchargePopupColor
+    );
   }
 
   canFire(engine) {
@@ -611,10 +730,11 @@ export class MergeBehavior extends ModeBehavior {
       return false;
     }
     const cfg = engine.modesConfig.merge;
-    const midpoint = (cfg.basinLeftX + cfg.basinRightX) * MATH_CONSTANTS.HALF;
+    const geometry = this.getBasinGeometry(engine);
+    const midpoint = (geometry.left + geometry.right) * MATH_CONSTANTS.HALF;
     const averageX = balls.reduce((sum, ball) => sum + ball.x, 0) / balls.length;
     const direction = averageX > midpoint ? -1 : 1;
-    const shakeGraceSec = cfg.pressure?.shakeGraceSec ?? 0;
+    const shakeGraceSec = this.getPressureConfig(engine)?.shakeGraceSec ?? 0;
     for (const ball of balls) {
       // A hop can lift a settled sphere over the line for a moment: it must not lose the run.
       ball.mergeGraceSec = Math.max(ball.mergeGraceSec || 0, shakeGraceSec);
@@ -731,11 +851,12 @@ export class MergeBehavior extends ModeBehavior {
     const ballRestitution = bouncy?.restitution ?? cfg.ballRestitution;
 
     const lineY = this.getOverflowLineY(engine);
+    const entryGraceMaxSec = this.getPressureConfig(engine)?.entryGraceMaxSec ?? 0;
     for (const b of balls) {
       if (b.mergeEntering) {
         // A fresh sphere keeps its grace until it first passes below the current line, capped.
         b.mergeEntrySec = (b.mergeEntrySec || 0) + dtSec;
-        if (b.y - b.radius >= lineY || b.mergeEntrySec >= (cfg.pressure?.entryGraceMaxSec ?? 0)) {
+        if (b.y - b.radius >= lineY || b.mergeEntrySec >= entryGraceMaxSec) {
           b.mergeEntering = false;
         }
       }
@@ -767,29 +888,40 @@ export class MergeBehavior extends ModeBehavior {
     const mergePairs = [];
     const mergedIds = new Set();
 
-    for (let iter = 0; iter < cfg.solverIterations; iter++) {
-      for (const b of balls) {
-        const minX = cfg.basinLeftX + b.radius;
-        const maxX = cfg.basinRightX - b.radius;
-        const maxY = cfg.basinFloorY - b.radius;
-        if (b.x < minX) {
-          b.x = minX;
-          if (b.vx < 0) {
-            b.vx = -b.vx * wallRestitution;
-          }
-        } else if (b.x > maxX) {
-          b.x = maxX;
-          if (b.vx > 0) {
-            b.vx = -b.vx * wallRestitution;
-          }
+    const geometry = this.getBasinGeometry(engine);
+    const pegRestitution = cfg.shapes?.[MERGE_SHAPE_IDS.PEGS]?.restitution ?? 0;
+    const contain = (b, settling = false) => {
+      const minX = geometry.left + b.radius;
+      const maxX = geometry.right - b.radius;
+      const maxY = geometry.floor - b.radius;
+      if (b.x < minX) {
+        b.x = minX;
+        if (b.vx < 0) {
+          b.vx = settling ? 0 : -b.vx * wallRestitution;
         }
-        if (b.y > maxY) {
-          b.y = maxY;
-          if (b.vy > 0) {
-            b.vy = -b.vy * floorRestitution;
-          }
+      } else if (b.x > maxX) {
+        b.x = maxX;
+        if (b.vx > 0) {
+          b.vx = settling ? 0 : -b.vx * wallRestitution;
+        }
+      }
+      if (b.y > maxY) {
+        b.y = maxY;
+        if (b.vy > 0) {
+          b.vy = settling ? 0 : -b.vy * floorRestitution;
+        }
+        if (!settling) {
           b.vx *= cfg.floorFriction;
         }
+      }
+      for (const peg of geometry.pegs) {
+        this.collideWithPeg(b, peg, settling ? SETTLE_RESTITUTION : pegRestitution);
+      }
+    };
+
+    for (let iter = 0; iter < cfg.solverIterations; iter++) {
+      for (const b of balls) {
+        contain(b);
       }
 
       for (let i = 0; i < balls.length; i++) {
@@ -855,6 +987,11 @@ export class MergeBehavior extends ModeBehavior {
       }
     }
 
+    // The last pair pass can leave a sphere a sliver into a wall or a peg: the step ends contained.
+    for (const b of balls) {
+      contain(b, true);
+    }
+
     if (mergePairs.length > 0) {
       this.resolveMergePairs(engine, mergePairs);
     }
@@ -883,6 +1020,31 @@ export class MergeBehavior extends ModeBehavior {
       }
     }
     state.maxOverflowRatio = Math.min(1, worstRatio);
+  }
+
+  /** Pushes a sphere out of a static peg along the normal and bounces its normal velocity, keeping the tangent. */
+  collideWithPeg(ball, peg, restitution, positionTarget = ball) {
+    const dx = ball.x - peg.x;
+    const dy = ball.y - peg.y;
+    const minDist = ball.radius + peg.radius;
+    const distSq = dx * dx + dy * dy;
+    if (distSq >= minDist * minDist) {
+      return;
+    }
+    let nx = SEPARATION_FALLBACK_AXIS.X;
+    let ny = SEPARATION_FALLBACK_AXIS.Y;
+    if (distSq > MATH_CONSTANTS.EPSILON) {
+      const dist = Math.sqrt(distSq);
+      nx = dx / dist;
+      ny = dy / dist;
+    }
+    positionTarget.x = peg.x + nx * minDist;
+    positionTarget.y = peg.y + ny * minDist;
+    const normalSpeed = ball.vx * nx + ball.vy * ny;
+    if (normalSpeed < 0) {
+      ball.vx -= (1 + restitution) * normalSpeed * nx;
+      ball.vy -= (1 + restitution) * normalSpeed * ny;
+    }
   }
 
   resolveMergePairs(engine, mergePairs) {
@@ -940,11 +1102,19 @@ export class MergeBehavior extends ModeBehavior {
       }
 
       const nextSpec = this.getTierSpecByIndex(engine, tierIndex + 1);
-      const clampedX = Math.max(
-        cfg.basinLeftX + nextSpec.radius,
-        Math.min(cfg.basinRightX - nextSpec.radius, mx)
-      );
-      const clampedY = Math.min(cfg.basinFloorY - nextSpec.radius, my);
+      const geometry = this.getBasinGeometry(engine);
+      const spawn = { x: mx, y: my };
+      const clampToWalls = () => {
+        spawn.x = Math.max(geometry.left + nextSpec.radius, Math.min(geometry.right - nextSpec.radius, spawn.x));
+        spawn.y = Math.min(geometry.floor - nextSpec.radius, spawn.y);
+      };
+      clampToWalls();
+      for (const peg of geometry.pegs) {
+        this.collideWithPeg({ ...spawn, radius: nextSpec.radius, vx: 0, vy: 0 }, peg, 0, spawn);
+      }
+      clampToWalls();
+      const clampedX = spawn.x;
+      const clampedY = spawn.y;
 
       const merged = new Ball({
         x: clampedX,
@@ -1024,6 +1194,7 @@ export class MergeBehavior extends ModeBehavior {
       pendingDropsLeft: state.pendingDropsLeft ?? 0,
       holdDrops: state.holdDrops ?? 0,
       topTierDrops: state.topTierDrops ?? null,
+      shapeId: this.getShapeId(engine),
       ballTiers: engine.physicsWorld.balls.map((b) => (Number.isInteger(b.mergeTier) ? b.mergeTier : 0))
     };
   }
@@ -1061,6 +1232,8 @@ export class MergeBehavior extends ModeBehavior {
       lastEventId: null,
       eventCount: 0,
       dropsUntilEvent: 0,
+      shapeId: this.getShapeIds(engine).includes(rawState.shapeId) ? rawState.shapeId : MERGE_SHAPE_IDS.CLASSIC,
+      shapeAnnounceSerial: null,
       ...this.createPressureState()
     };
     if (cfg.events) {
@@ -1103,21 +1276,22 @@ export class MergeBehavior extends ModeBehavior {
 
   drawUnderlay(ctx, engine, renderer, theme) {
     const cfg = engine.modesConfig.merge;
-    const basinW = cfg.basinRightX - cfg.basinLeftX;
+    const geometry = this.getBasinGeometry(engine);
+    const basinW = geometry.right - geometry.left;
     const lineY = this.getOverflowLineY(engine);
-    const basinH = cfg.basinFloorY - lineY;
+    const basinH = geometry.floor - lineY;
 
     ctx.save();
     // Subtle magnetic containment chamber fill
     ctx.fillStyle = theme.aimLineColor;
     ctx.globalAlpha = BASIN_GLOW_ALPHA * 0.35;
-    ctx.fillRect(cfg.basinLeftX, lineY, basinW, basinH);
+    ctx.fillRect(geometry.left, lineY, basinW, basinH);
 
     // Danger band that pressure took from the basin
     if (lineY > cfg.overflowLineY) {
       ctx.fillStyle = theme.dangerLineColor;
       ctx.globalAlpha = PRESSURE_ZONE_ALPHA;
-      ctx.fillRect(cfg.basinLeftX, cfg.overflowLineY, basinW, lineY - cfg.overflowLineY);
+      ctx.fillRect(geometry.left, cfg.overflowLineY, basinW, lineY - cfg.overflowLineY);
     }
 
     // Basin walls & floor
@@ -1127,11 +1301,12 @@ export class MergeBehavior extends ModeBehavior {
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
     ctx.beginPath();
-    ctx.moveTo(cfg.basinLeftX, cfg.overflowLineY - 24);
-    ctx.lineTo(cfg.basinLeftX, cfg.basinFloorY);
-    ctx.lineTo(cfg.basinRightX, cfg.basinFloorY);
-    ctx.lineTo(cfg.basinRightX, cfg.overflowLineY - 24);
+    ctx.moveTo(geometry.left, cfg.overflowLineY - 24);
+    ctx.lineTo(geometry.left, geometry.floor);
+    ctx.lineTo(geometry.right, geometry.floor);
+    ctx.lineTo(geometry.right, cfg.overflowLineY - 24);
     ctx.stroke();
+    this.drawPegs(ctx, geometry, theme);
 
     // Top overflow danger line
     const overflowRatio = engine.modeState?.maxOverflowRatio ?? 0;
@@ -1140,12 +1315,12 @@ export class MergeBehavior extends ModeBehavior {
     ctx.lineWidth = overflowRatio > 0 ? 2.5 : 1.5;
     ctx.setLineDash(OVERFLOW_DASH);
     ctx.beginPath();
-    ctx.moveTo(cfg.basinLeftX + 4, lineY);
-    ctx.lineTo(cfg.basinRightX - 4, lineY);
+    ctx.moveTo(geometry.left + 4, lineY);
+    ctx.lineTo(geometry.right - 4, lineY);
     ctx.stroke();
     ctx.setLineDash([]);
 
-    this.drawPressureTelegraph(ctx, engine, theme);
+    this.drawPressureTelegraph(ctx, engine, theme, geometry);
 
     // Vertical drop guide from top rail cursor
     if (engine.isRunPlaying() && engine.currentBall && !engine.isAimCancelled) {
@@ -1156,7 +1331,7 @@ export class MergeBehavior extends ModeBehavior {
       ctx.setLineDash(DROP_GUIDE_DASH);
       ctx.beginPath();
       ctx.moveTo(dropX, cfg.launcherY + engine.currentBall.radius);
-      ctx.lineTo(dropX, cfg.basinFloorY - 4);
+      ctx.lineTo(dropX, geometry.floor - 4);
       ctx.stroke();
       ctx.setLineDash([]);
     }
@@ -1164,7 +1339,7 @@ export class MergeBehavior extends ModeBehavior {
   }
 
   /** Static preview of the pending line: a dashed line plus tick marks on both walls, so it is not colour-only. */
-  drawPressureTelegraph(ctx, engine, theme) {
+  drawPressureTelegraph(ctx, engine, theme, geometry) {
     const cfg = engine.modesConfig.merge;
     const pending = engine.modeState?.pendingOffsetPx ?? null;
     if (pending === null) {
@@ -1176,17 +1351,32 @@ export class MergeBehavior extends ModeBehavior {
     ctx.lineWidth = TELEGRAPH_LINE_WIDTH;
     ctx.setLineDash(TELEGRAPH_DASH);
     ctx.beginPath();
-    ctx.moveTo(cfg.basinLeftX + 4, y);
-    ctx.lineTo(cfg.basinRightX - 4, y);
+    ctx.moveTo(geometry.left + 4, y);
+    ctx.lineTo(geometry.right - 4, y);
     ctx.stroke();
     ctx.setLineDash([]);
     ctx.lineWidth = TELEGRAPH_TICK_WIDTH;
     ctx.beginPath();
-    ctx.moveTo(cfg.basinLeftX, y);
-    ctx.lineTo(cfg.basinLeftX + TELEGRAPH_TICK_LENGTH, y);
-    ctx.moveTo(cfg.basinRightX, y);
-    ctx.lineTo(cfg.basinRightX - TELEGRAPH_TICK_LENGTH, y);
+    ctx.moveTo(geometry.left, y);
+    ctx.lineTo(geometry.left + TELEGRAPH_TICK_LENGTH, y);
+    ctx.moveTo(geometry.right, y);
+    ctx.lineTo(geometry.right - TELEGRAPH_TICK_LENGTH, y);
     ctx.stroke();
+  }
+
+  /** Static pegs: a filled disc in the wall colour with an outline, so reduced motion keeps it. */
+  drawPegs(ctx, geometry, theme) {
+    ctx.fillStyle = theme.aimLineColor;
+    ctx.strokeStyle = theme.aimLineColor;
+    ctx.lineWidth = PEG_OUTLINE_WIDTH;
+    for (const peg of geometry.pegs) {
+      ctx.beginPath();
+      ctx.arc(peg.x, peg.y, peg.radius, 0, MATH_CONSTANTS.TWO_PI);
+      ctx.globalAlpha = PEG_FILL_ALPHA;
+      ctx.fill();
+      ctx.globalAlpha = PEG_OUTLINE_ALPHA;
+      ctx.stroke();
+    }
   }
 
   /** Rings every sphere still under a polarity pulse. Nothing moves, so reduced motion keeps it. */

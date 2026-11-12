@@ -67,10 +67,14 @@ i18n.dictionaries.set('en', loadJson('./locales/en.json'));
 i18n.dictionaries.set('fr', loadJson('./locales/fr.json'));
 i18n.currentLocale = 'en';
 
-const createEngine = () => {
+/** Roll that draws the classic basin: the first shape of the configured list. */
+const CLASSIC_SHAPE_ROLL = 0;
+
+/** Engine whose shape draw is pinned to a roll, so a test never depends on the ambient random source. */
+const createEngine = (shapeRoll = CLASSIC_SHAPE_ROLL) => {
   const storageManager = new StorageManager();
   storageManager.init();
-  return new GameEngine({
+  const engine = new GameEngine({
     gameConfig,
     physicsConfig,
     ballsConfig,
@@ -84,6 +88,9 @@ const createEngine = () => {
     storageManager,
     onStateChange: () => {}
   });
+  const drawSeededRoll = engine.drawSeededRoll.bind(engine);
+  engine.drawSeededRoll = (stream, index) => (stream === 'mergeShape' ? shapeRoll : drawSeededRoll(stream, index));
+  return engine;
 };
 
 test('Merge Basin uses a horizontal Drop Rail, purist fair-play rules, and enables device tilt', () => {
@@ -1513,4 +1520,341 @@ test('Two calibre 12 spheres trigger a Supernova worth the bonus times the combo
   assert.equal(engine.physicsWorld.balls.length, 0);
   assert.equal(engine.modeState.supernovas, 1);
   assert.equal(engine.score - before, modesConfig.merge.supernovaBonus * Math.max(1, engine.combo));
+});
+
+const SHAPES = modesConfig.merge.shapes;
+const SHAPE_IDS = SHAPES.ids;
+/** Roll that lands on a shape: the middle of its slice of the equally weighted list. */
+const rollFor = (id) => (SHAPE_IDS.indexOf(id) + MATH_CONSTANTS.HALF) / SHAPE_IDS.length;
+/** Overlap with a wall or a peg that stays unnoticeable: one solver pass can leave a sliver. */
+const SHAPE_OVERLAP_TOLERANCE_PX = 1.5;
+const SHAPE_DROP_COUNT = 24;
+const SHAPE_SETTLE_FRAMES = 40;
+/** Every this many drops, a top calibre sphere is thrown at a wall. */
+const SHAPE_WALL_THROW_EVERY = 8;
+const SHAPE_WALL_THROW_SPEED = 300;
+
+const startShape = (id) => {
+  const engine = createEngine(rollFor(id));
+  engine.startMergeMode();
+  return engine;
+};
+
+test('Every shape is drawn from its own slice of the shape roll, and the run keeps it', () => {
+  for (const id of SHAPE_IDS) {
+    const engine = startShape(id);
+    assert.equal(engine.modeState.shapeId, id);
+    assert.equal(engine.getMergeShapeState().shapeId, id);
+  }
+  assert.deepEqual(SHAPE_IDS, ['classic', 'narrow', 'pegs']);
+  assert.equal(mergeBehavior.pickShapeId(startShape('classic'), 0.999), 'pegs');
+});
+
+test('Unequal weights shift the draw, and an unknown id list falls back to the classic basin', () => {
+  const engine = startShape('classic');
+  engine.modesConfig = resolveModesConfig({ merge: { shapes: { weights: { classic: 0, narrow: 3, pegs: 1 } } } });
+  assert.equal(mergeBehavior.pickShapeId(engine, 0), 'narrow');
+  assert.equal(mergeBehavior.pickShapeId(engine, 0.9), 'pegs');
+  engine.modesConfig = resolveModesConfig({ merge: { shapes: { ids: ['bogus'] } } });
+  assert.equal(mergeBehavior.pickShapeId(engine, 0.5), 'classic');
+});
+
+test('The geometry of each shape is derived from the config and never mutates it', () => {
+  const cfg = modesConfig.merge;
+  const before = JSON.stringify(cfg);
+  const classic = mergeBehavior.getBasinGeometry(startShape('classic'));
+  assert.deepEqual(classic, { left: cfg.basinLeftX, right: cfg.basinRightX, floor: cfg.basinFloorY, pegs: [] });
+  const narrow = mergeBehavior.getBasinGeometry(startShape('narrow'));
+  assert.equal(narrow.left, cfg.basinLeftX + SHAPES.narrow.insetPx);
+  assert.equal(narrow.right, cfg.basinRightX - SHAPES.narrow.insetPx);
+  assert.equal(narrow.pegs.length, 0);
+  const pegged = mergeBehavior.getBasinGeometry(startShape('pegs'));
+  assert.equal(pegged.left, cfg.basinLeftX);
+  assert.equal(pegged.pegs.length, SHAPES.pegs.positions.length);
+  pegged.pegs.forEach((peg, index) => {
+    const spec = SHAPES.pegs.positions[index];
+    assert.equal(peg.x, cfg.basinLeftX + spec.xFrac * (cfg.basinRightX - cfg.basinLeftX));
+    assert.equal(peg.y, cfg.basinFloorY - spec.yFromFloorPx);
+    assert.equal(peg.radius, SHAPES.pegs.radius);
+  });
+  assert.equal(JSON.stringify(cfg), before);
+});
+
+test('Peg gaps never trap a sphere: each is at least the largest diameter, or under the smallest', () => {
+  const cfg = modesConfig.merge;
+  const diameters = cfg.tiers.map((spec) => spec.radius * 2);
+  const smallest = Math.min(...diameters);
+  const largest = Math.max(...diameters);
+  const { pegs } = mergeBehavior.getBasinGeometry(startShape('pegs'));
+  const { radius } = SHAPES.pegs;
+  const gaps = [];
+  for (const peg of pegs) {
+    gaps.push(peg.x - radius - cfg.basinLeftX, cfg.basinRightX - peg.x - radius, cfg.basinFloorY - peg.y - radius);
+  }
+  for (let i = 0; i < pegs.length; i += 1) {
+    for (let j = i + 1; j < pegs.length; j += 1) {
+      gaps.push(Math.hypot(pegs[i].x - pegs[j].x, pegs[i].y - pegs[j].y) - radius * 2);
+    }
+  }
+  assert.ok(gaps.length > 0);
+  for (const gap of gaps) {
+    assert.ok(gap >= largest || gap < smallest, `gap ${gap} must be >= ${largest} or < ${smallest}`);
+  }
+  const middleY = (cfg.overflowLineY + cfg.basinFloorY) * MATH_CONSTANTS.HALF;
+  for (const peg of pegs) {
+    assert.ok(peg.y >= middleY, 'pegs sit in the lower half');
+  }
+});
+
+test('The drop clamp follows the shape: the narrow walls hold the rail in', () => {
+  const engine = startShape('narrow');
+  const { left, right } = mergeBehavior.getBasinGeometry(engine);
+  engine.updateAim(-500, 300);
+  assert.equal(engine.mergeDropX, left + engine.currentBall.radius);
+  engine.updateAim(5000, 300);
+  assert.equal(engine.mergeDropX, right - engine.currentBall.radius);
+  assert.ok(left > modesConfig.merge.basinLeftX);
+});
+
+for (const id of SHAPE_IDS) {
+  test(`No sphere leaves the ${id} basin or sinks into a peg, calibre 12 at the walls included`, () => {
+    const cfg = modesConfig.merge;
+    const engine = startShape(id);
+    const geometry = mergeBehavior.getBasinGeometry(engine);
+    const random = new SeededRandom(`shape-containment-${id}`);
+    engine.random = () => random.next();
+    const check = () => {
+      for (const ball of engine.physicsWorld.balls) {
+        assert.ok(geometry.left <= ball.x - ball.radius + SHAPE_OVERLAP_TOLERANCE_PX, 'left wall');
+        assert.ok(ball.x + ball.radius <= geometry.right + SHAPE_OVERLAP_TOLERANCE_PX, 'right wall');
+        assert.ok(ball.y + ball.radius <= geometry.floor + SHAPE_OVERLAP_TOLERANCE_PX, `floor ${ball.y + ball.radius - geometry.floor} r${ball.radius}`);
+        for (const peg of geometry.pegs) {
+          const overlap = ball.radius + peg.radius - Math.hypot(ball.x - peg.x, ball.y - peg.y);
+          assert.ok(overlap <= SHAPE_OVERLAP_TOLERANCE_PX, `peg overlap ${overlap}`);
+        }
+      }
+    };
+    const biggest = cfg.tiers.length - 1;
+    for (let drop = 0; drop < SHAPE_DROP_COUNT; drop += 1) {
+      engine.updateAim(geometry.left + random.next() * (geometry.right - geometry.left), cfg.launcherY);
+      engine.modeState.dropCooldownSec = 0;
+      engine.shoot();
+      if (drop % SHAPE_WALL_THROW_EVERY === 0) {
+        const towardsLeft = drop % (SHAPE_WALL_THROW_EVERY * 2) === 0;
+        const edge = towardsLeft ? geometry.left : geometry.right;
+        placeBall(engine, biggest, edge, cfg.launcherY * 2, {
+          vx: towardsLeft ? -SHAPE_WALL_THROW_SPEED : SHAPE_WALL_THROW_SPEED,
+          vy: SHAPE_WALL_THROW_SPEED
+        });
+      }
+      for (let frame = 0; frame < SHAPE_SETTLE_FRAMES; frame += 1) {
+        engine.update();
+        if (!engine.isRunPlaying()) break;
+        check();
+      }
+      if (!engine.isRunPlaying()) break;
+    }
+    assert.ok(engine.physicsWorld.balls.length > 0);
+  });
+}
+
+test('A peg deflects a falling sphere and bounces it by the peg restitution', () => {
+  const engine = startShape('pegs');
+  const [peg] = mergeBehavior.getBasinGeometry(engine).pegs;
+  const spec = modesConfig.merge.tiers[0];
+  const speed = 300;
+  const ball = new Ball({ x: peg.x, y: peg.y - peg.radius - spec.radius + 1, vx: 0, vy: speed, radius: spec.radius, colorId: spec.id });
+  mergeBehavior.collideWithPeg(ball, peg, SHAPES.pegs.restitution);
+  assert.ok(ball.vy < 0, 'a head-on hit reverses the fall');
+  assert.ok(Math.abs(ball.vy + speed * SHAPES.pegs.restitution) < 1e-6);
+  assert.ok(Math.hypot(ball.x - peg.x, ball.y - peg.y) >= peg.radius + spec.radius - 1e-6, 'pushed out of the peg');
+
+  const free = startShape('classic');
+  const fall = (engineUnderTest) => {
+    const dropped = placeBall(engineUnderTest, 0, peg.x + peg.radius, peg.y - 140, { vy: 120 });
+    for (let frame = 0; frame < 60; frame += 1) engineUnderTest.update();
+    return dropped.x;
+  };
+  assert.ok(Math.abs(fall(engine) - fall(free)) > spec.radius, 'the peg sends the sphere sideways');
+});
+
+test('A snapshot keeps the shape, a legacy snapshot restores the classic basin, and an unknown id is sanitized', () => {
+  for (const id of SHAPE_IDS) {
+    const source = startShape(id);
+    source.shoot();
+    source.saveRunSnapshot({ force: true });
+    assert.equal(source.storageManager.loadRunSnapshot().modeState.shapeId, id);
+    const restored = createEngine(rollFor('classic'));
+    restored.storageManager = source.storageManager;
+    assert.equal(restored.restoreSavedRun(), true);
+    assert.equal(restored.modeState.shapeId, id);
+    assert.deepEqual(mergeBehavior.getBasinGeometry(restored), mergeBehavior.getBasinGeometry(source));
+    assert.equal(restored.getMergeShapeState().announceSerial, null, 'a restored run is not announced again');
+  }
+  const legacySource = startShape('pegs');
+  legacySource.shoot();
+  legacySource.saveRunSnapshot({ force: true });
+  const snapshot = legacySource.storageManager.loadRunSnapshot();
+  delete snapshot.modeState.shapeId;
+  legacySource.storageManager.saveRunSnapshot(snapshot);
+  const legacy = createEngine(rollFor('pegs'));
+  legacy.storageManager = legacySource.storageManager;
+  assert.equal(legacy.restoreSavedRun(), true);
+  assert.equal(legacy.modeState.shapeId, 'classic');
+  snapshot.modeState.shapeId = 'bogus';
+  legacySource.storageManager.saveRunSnapshot(snapshot);
+  const bogus = createEngine(rollFor('pegs'));
+  bogus.storageManager = legacySource.storageManager;
+  assert.equal(bogus.restoreSavedRun(), true);
+  assert.equal(bogus.modeState.shapeId, 'classic');
+});
+
+test('A per-shape pressure override is merged over the base pressure for that shape only', () => {
+  const engine = startShape('classic');
+  assert.deepEqual(mergeBehavior.getPressureConfig(engine), modesConfig.merge.pressure, 'no override keeps the base numbers');
+  engine.modeState.shapeId = 'narrow';
+  const override = { warnDrops: PRESSURE.warnDrops + 2 };
+  engine.modesConfig = resolveModesConfig({
+    merge: { shapes: { narrow: { pressure: override }, pegs: { pressure: { warnDrops: 1 } } } }
+  });
+  const merged = mergeBehavior.getPressureConfig(engine);
+  assert.equal(merged.warnDrops, override.warnDrops);
+  assert.equal(merged.pxPerStep, PRESSURE.pxPerStep);
+  engine.modeState.shapeId = 'classic';
+  assert.equal(mergeBehavior.getPressureConfig(engine).warnDrops, PRESSURE.warnDrops);
+  engine.modeState.shapeId = 'narrow';
+  engine.mergeBestTier = PRESSURE.fromFusedTier + 1;
+  mergeBehavior.advancePressure(engine);
+  assert.equal(engine.modeState.pendingDropsLeft, override.warnDrops, 'the telegraph uses the shape numbers');
+});
+
+test('The default Merge config carries the same shapes as configs/modes.json, and a partial config keeps the rest', () => {
+  assert.deepEqual(resolveModesConfig(null).merge.shapes, SHAPES);
+  const partial = resolveModesConfig({ merge: { shapes: { narrow: { insetPx: 10 } } } }).merge.shapes;
+  assert.equal(partial.narrow.insetPx, 10);
+  assert.deepEqual(partial.pegs, SHAPES.pegs);
+  assert.deepEqual(partial.ids, SHAPE_IDS);
+});
+
+test('A fresh run names its shape in a floating text, and the HUD announces it once', () => {
+  const texts = [];
+  const engine = createEngine(rollFor('narrow'));
+  engine.particleSystem.spawnFloatingText = (x, y, text) => texts.push(text);
+  engine.startMergeMode();
+  assert.ok(texts.includes(t('gameplay.feedback.merge.shapeStart', { name: t('gameplay.merge.shapes.narrow.name') })));
+
+  const spoken = [];
+  const hud = { announce: (text) => spoken.push(text) };
+  const announce = (view) => uiHudRefreshMethods.announceMergeShape.call(hud, view);
+  announce(engine.getMergeShapeState());
+  announce(engine.getMergeShapeState());
+  assert.deepEqual(spoken, [t('gameplay.feedback.merge.shapeAnnounce', {
+    name: t('gameplay.merge.shapes.narrow.name'),
+    description: t('gameplay.merge.shapes.narrow.description')
+  })]);
+  announce(null);
+  announce(engine.getMergeShapeState());
+  assert.equal(spoken.length, 2, 'leaving the Basin forgets what was announced');
+  announce({ shapeId: 'pegs', announceSerial: null });
+  assert.equal(spoken.length, 2, 'a restored run stays silent');
+});
+
+test('Every shape text exists in English and French, with the Basin vocabulary', () => {
+  const keys = ['gameplay.feedback.merge.shapeStart', 'gameplay.feedback.merge.shapeAnnounce'];
+  for (const id of SHAPE_IDS) {
+    keys.push(`gameplay.merge.shapes.${id}.name`, `gameplay.merge.shapes.${id}.description`);
+  }
+  const read = (dictionary, key) => key.split('.').reduce((node, part) => node?.[part], dictionary);
+  for (const locale of ['en', 'fr']) {
+    const dictionary = loadJson(`./locales/${locale}.json`);
+    for (const key of keys) {
+      const value = read(dictionary, key);
+      assert.equal(typeof value, 'string', `${locale} has ${key}`);
+      assert.ok(value.length > 0);
+    }
+  }
+  const fr = loadJson('./locales/fr.json');
+  assert.ok(read(fr, 'gameplay.feedback.merge.shapeStart').startsWith('Bassin'));
+  assert.ok(read(fr, 'gameplay.merge.shapes.narrow.name').length > 0);
+});
+
+test('Restoring a saved Basin run announces nothing and spawns no shape text, and keeps the saved shape', () => {
+  const source = startShape('pegs');
+  source.shoot();
+  source.saveRunSnapshot({ force: true });
+
+  const texts = [];
+  const spoken = [];
+  const hud = { announce: (text) => spoken.push(text) };
+  const restored = createEngine(rollFor('classic'));
+  restored.storageManager = source.storageManager;
+  restored.particleSystem.spawnFloatingText = (x, y, text) => texts.push(text);
+  restored.onStateChange = () => uiHudRefreshMethods.announceMergeShape.call(hud, restored.getMergeShapeState());
+  assert.equal(restored.restoreSavedRun(), true);
+  uiHudRefreshMethods.announceMergeShape.call(hud, restored.getMergeShapeState());
+  assert.equal(restored.modeState.shapeId, 'pegs');
+  assert.deepEqual(spoken, []);
+  assert.equal(texts.some((text) => text.includes(t('gameplay.merge.shapes.classic.name'))), false);
+  assert.equal(texts.some((text) => text === t('gameplay.feedback.merge.shapeStart', { name: t('gameplay.merge.shapes.pegs.name') })), false);
+});
+
+test('Two fresh runs of one engine get distinct announce serials', () => {
+  const engine = startShape('classic');
+  const first = engine.getMergeShapeState().announceSerial;
+  engine.startMergeMode();
+  assert.ok(engine.getMergeShapeState().announceSerial > first);
+});
+
+test('A step ends with every sphere inside the basin and no velocity heading into the floor', () => {
+  const engine = startShape('classic');
+  const { floor } = mergeBehavior.getBasinGeometry(engine);
+  const spec = modesConfig.merge.tiers[0];
+  const ball = placeBall(engine, 0, 200, floor - spec.radius, { vx: 50, vy: 400 });
+  mergeBehavior.onBeforePhysicsStep(engine, 1 / 60);
+  assert.ok(ball.y + ball.radius <= floor);
+  assert.ok(ball.vy <= 0);
+});
+
+test('A fused sphere born on a peg is pushed out of it and stays inside the basin', () => {
+  const engine = startShape('pegs');
+  const geometry = mergeBehavior.getBasinGeometry(engine);
+  const [peg] = geometry.pegs;
+  const spec = modesConfig.merge.tiers[0];
+  const a = placeBall(engine, 0, peg.x - spec.radius, peg.y, {});
+  const b = placeBall(engine, 0, peg.x + spec.radius, peg.y, {});
+  mergeBehavior.resolveMergePairs(engine, [[a, b]]);
+  const [merged] = engine.physicsWorld.balls;
+  assert.equal(merged.mergeTier, 1);
+  assert.ok(Math.hypot(merged.x - peg.x, merged.y - peg.y) >= merged.radius + peg.radius - 1e-6);
+  assert.ok(merged.x - merged.radius >= geometry.left && merged.y + merged.radius <= geometry.floor);
+});
+
+test('A malformed peg list falls back to the default positions or skips the bad entries', () => {
+  const engine = startShape('pegs');
+  const defaults = SHAPES.pegs.positions.length;
+  const geometryFor = (positions) => {
+    const { merge } = engine.modesConfig;
+    engine.modesConfig = {
+      ...engine.modesConfig,
+      merge: { ...merge, shapes: { ...merge.shapes, pegs: { ...SHAPES.pegs, positions } } }
+    };
+    return mergeBehavior.getBasinGeometry(engine);
+  };
+  assert.equal(geometryFor('nope').pegs.length, defaults);
+  assert.equal(geometryFor([null, { xFrac: 'a' }]).pegs.length, defaults);
+  const mixed = geometryFor([{ xFrac: 0.5, yFromFloorPx: 200 }, { xFrac: Number.NaN, yFromFloorPx: 1 }]);
+  assert.equal(mixed.pegs.length, 1);
+  assert.ok(mixed.pegs.every((peg) => Number.isFinite(peg.x) && Number.isFinite(peg.y)));
+});
+
+test('The narrow and pegs shapes carry gentler pressure, and the classic basin keeps the base numbers', () => {
+  assert.deepEqual(mergeBehavior.getPressureConfig(startShape('classic')), PRESSURE);
+  const narrow = mergeBehavior.getPressureConfig(startShape('narrow'));
+  assert.equal(narrow.topTierStepDrops, 50);
+  assert.equal(narrow.pxPerTier, 12);
+  assert.equal(narrow.maxOffsetPx, 180);
+  const pegs = mergeBehavior.getPressureConfig(startShape('pegs'));
+  assert.equal(pegs.topTierStepDrops, 50);
+  assert.equal(pegs.pxPerTier, PRESSURE.pxPerTier);
+  assert.equal(pegs.maxOffsetPx, 180);
 });

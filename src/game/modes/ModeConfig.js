@@ -184,6 +184,24 @@ export const DEFAULT_MODES_CONFIG = Object.freeze({
       shakeGraceSec: 2,
       settledSpeedPxPerSec: 30
     }),
+    shapes: Object.freeze({
+      ids: Object.freeze(['classic', 'narrow', 'pegs']),
+      weights: Object.freeze({ classic: 1, narrow: 1, pegs: 1 }),
+      classic: Object.freeze({ pressure: Object.freeze({}) }),
+      narrow: Object.freeze({
+        insetPx: 30,
+        pressure: Object.freeze({ topTierStepDrops: 50, pxPerTier: 12, maxOffsetPx: 180 })
+      }),
+      pegs: Object.freeze({
+        radius: 9,
+        restitution: 0.4,
+        positions: Object.freeze([
+          Object.freeze({ xFrac: 0.38, yFromFloorPx: 158 }),
+          Object.freeze({ xFrac: 0.62, yFromFloorPx: 293 })
+        ]),
+        pressure: Object.freeze({ topTierStepDrops: 50, maxOffsetPx: 180 })
+      })
+    }),
     eventTextOffsetY: 56,
     events: Object.freeze({
       gapMinDrops: 9,
@@ -373,6 +391,28 @@ function resolveMergeEvents(partial) {
   return { ...defaults, ...source, pool };
 }
 
+/**
+ * Merge Basin shapes over their defaults, shape by shape, so a partial config keeps every
+ * default number: the id list and the weights are replaced only when the config gives some.
+ */
+function resolveMergeShapes(partial) {
+  const defaults = DEFAULT_MODES_CONFIG.merge.shapes;
+  const source = partial && typeof partial === 'object' ? partial : {};
+  const isObject = (value) => Boolean(value) && typeof value === 'object';
+  const resolved = { ...defaults, ...source };
+  resolved.ids = Array.isArray(source.ids) && source.ids.length > 0 ? source.ids : defaults.ids;
+  resolved.weights = { ...defaults.weights, ...(isObject(source.weights) ? source.weights : {}) };
+  for (const id of defaults.ids) {
+    const entry = isObject(source[id]) ? source[id] : {};
+    resolved[id] = {
+      ...defaults[id],
+      ...entry,
+      pressure: { ...defaults[id].pressure, ...(isObject(entry.pressure) ? entry.pressure : {}) }
+    };
+  }
+  return resolved;
+}
+
 export function resolveModesConfig(modesConfig) {
   if (!modesConfig || typeof modesConfig !== 'object') {
     return DEFAULT_MODES_CONFIG;
@@ -387,6 +427,7 @@ export function resolveModesConfig(modesConfig) {
       ...(modesConfig.merge ?? {}),
       chain: { ...DEFAULT_MODES_CONFIG.merge.chain, ...(modesConfig.merge?.chain ?? {}) },
       pressure: { ...DEFAULT_MODES_CONFIG.merge.pressure, ...(modesConfig.merge?.pressure ?? {}) },
+      shapes: resolveMergeShapes(modesConfig.merge?.shapes),
       events: resolveMergeEvents(modesConfig.merge?.events),
       tiers: Array.isArray(modesConfig.merge?.tiers) && modesConfig.merge.tiers.length > 0
         ? modesConfig.merge.tiers
