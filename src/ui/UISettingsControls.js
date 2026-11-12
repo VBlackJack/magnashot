@@ -307,8 +307,7 @@ export const uiSettingsControlMethods = {
     if (!button) {
       return;
     }
-    const visible = this.mergeShakeGestureSupported && (this.engine.mergeShakePrototype
-      || this.engine.getMergeShakeRemaining?.() != null);
+    const visible = this.mergeShakeGestureSupported && this.engine.getMergeShakeRemaining?.() != null;
     button.closest('.pause-setting')?.classList.toggle('hidden', !visible);
     const key = 'modals.settings.shakeGesture';
     const enabled = Boolean(this.mergeShakeGestureEnabled);

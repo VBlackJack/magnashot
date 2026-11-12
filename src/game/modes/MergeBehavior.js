@@ -144,7 +144,7 @@ export class MergeBehavior extends ModeBehavior {
 
     engine.modeState = {
       dropCooldownSec: 0,
-      shakeRemaining: engine.mergeShakePrototype ? cfg.shake?.rechargeDrops ?? null : null,
+      shakeRemaining: cfg.shake.rechargeDrops,
       mergesCount: 0,
       supernovas: 0,
       maxOverflowRatio: 0
@@ -500,9 +500,7 @@ export class MergeBehavior extends ModeBehavior {
           engine.gameConfig.theme.victoryPopupColor
         );
         this.emitMergeShockwave(engine, mx, my, a.radius, cfg.supernovaShockwaveImpulse, -1);
-        if (engine.getMergeShakeRemaining() === null) {
-          engine.unlockAchievementTiers('mergeTiers', cfg.tiers.length);
-        }
+        engine.unlockAchievementTiers('mergeTiers', cfg.tiers.length);
         continue;
       }
 
@@ -556,11 +554,9 @@ export class MergeBehavior extends ModeBehavior {
       );
 
       this.emitMergeShockwave(engine, clampedX, clampedY, nextSpec.radius, cfg.shockwaveImpulse, nextSpec.tier);
-      if (engine.getMergeShakeRemaining() === null) {
-        engine.unlockAchievementTiers('mergeTiers', engine.mergeBestTier);
-        engine.storageManager?.recordAchievementProgress?.({ maxCombo: engine.combo });
-        engine.unlockAchievementTiers('comboMaster', engine.combo);
-      }
+      engine.unlockAchievementTiers('mergeTiers', engine.mergeBestTier);
+      engine.storageManager?.recordAchievementProgress?.({ maxCombo: engine.combo });
+      engine.unlockAchievementTiers('comboMaster', engine.combo);
     }
 
     engine.persistRunHighScore();
@@ -605,9 +601,9 @@ export class MergeBehavior extends ModeBehavior {
 
     engine.modeState = {
       dropCooldownSec: 0,
-      shakeRemaining: cfg.shake && Number.isInteger(rawState.shakeRemaining)
+      shakeRemaining: Number.isInteger(rawState.shakeRemaining)
         ? Math.min(cfg.shake.rechargeDrops, Math.max(0, rawState.shakeRemaining))
-        : null,
+        : cfg.shake.rechargeDrops,
       mergesCount: Math.max(0, rawState.mergesCount || 0),
       supernovas: Math.max(0, rawState.supernovas || 0),
       maxOverflowRatio: 0

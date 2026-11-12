@@ -1177,25 +1177,36 @@ export class StorageManager {
     }
   }
 
-  getMergeHighScore(prototype = false) {
-    const key = this.storageConfig?.keys?.[prototype ? 'mergeShakeHighScore' : 'mergeHighScore'];
-    return key ? this.readNonNegativeInt(key) : 0;
+  /*
+   * Legacy shake-prototype records are folded on read rather than migrated: a progress backup
+   * imported later can still carry those fields (schemaVersion is not part of the backup), and the
+   * main key may stay below the legacy one.
+   */
+  getMergeHighScore() {
+    const keys = this.storageConfig?.keys;
+    return Math.max(
+      keys?.mergeHighScore ? this.readNonNegativeInt(keys.mergeHighScore) : 0,
+      keys?.mergeShakeHighScore ? this.readNonNegativeInt(keys.mergeShakeHighScore) : 0
+    );
   }
 
-  getMergeBestTier(prototype = false) {
-    const key = this.storageConfig?.keys?.[prototype ? 'mergeShakeBestTier' : 'mergeBestTier'];
-    return key ? this.readNonNegativeInt(key) : 0;
+  getMergeBestTier() {
+    const keys = this.storageConfig?.keys;
+    return Math.max(
+      keys?.mergeBestTier ? this.readNonNegativeInt(keys.mergeBestTier) : 0,
+      keys?.mergeShakeBestTier ? this.readNonNegativeInt(keys.mergeShakeBestTier) : 0
+    );
   }
 
-  setMergeRecord(score, tier, prototype = false) {
-    const scoreKey = this.storageConfig?.keys?.[prototype ? 'mergeShakeHighScore' : 'mergeHighScore'];
-    const tierKey = this.storageConfig?.keys?.[prototype ? 'mergeShakeBestTier' : 'mergeBestTier'];
+  setMergeRecord(score, tier) {
+    const scoreKey = this.storageConfig?.keys?.mergeHighScore;
+    const tierKey = this.storageConfig?.keys?.mergeBestTier;
     const cleanScore = Math.max(0, Math.floor(Number(score) || 0));
     const cleanTier = Math.max(0, Math.floor(Number(tier) || 0));
-    if (scoreKey && cleanScore > this.getMergeHighScore(prototype)) {
+    if (scoreKey && cleanScore > this.getMergeHighScore()) {
       this.safeSetItem(scoreKey, cleanScore);
     }
-    if (tierKey && cleanTier > this.getMergeBestTier(prototype)) {
+    if (tierKey && cleanTier > this.getMergeBestTier()) {
       this.safeSetItem(tierKey, cleanTier);
     }
   }

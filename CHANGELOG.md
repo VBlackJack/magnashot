@@ -4,6 +4,9 @@ All notable changes to **MagnaShot** are documented in this file.
 
 ## [Unreleased]
 
+### Changed
+- The Merge Basin shake is now part of every Basin run: the `?mergeShake=1` URL is no longer needed, records set with the shake prototype now count as Merge Basin records, and shake runs unlock achievements.
+
 ## [1.26.1] - 2026-11-12
 
 ### Removed

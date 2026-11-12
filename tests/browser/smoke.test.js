@@ -3695,7 +3695,7 @@ describe('puzzle stage intro (desktop)', () => {
 describe('Merge shake', () => {
   const modes = JSON.parse(readFileSync(new URL('../../configs/modes.json', import.meta.url), 'utf8'));
   const { shake } = modes.merge;
-  const path = `/?${shake.queryParam}=${shake.queryValue}`;
+  const path = '/';
   const selector = '#btn-merge-shake';
   const initStorage = {
     ...languageStorage('en'),
@@ -3837,7 +3837,7 @@ describe('Progress transfer', () => {
     const source = await openGame(viewport, { initStorage: {
       [unlockedKey]: newLevel, [coinsKey]: '30', [contrastKey]: 'true', [foreignKey]: 'source'
     } });
-    const target = await openGame(viewport, { path: '/?mergeShake=1' });
+    const target = await openGame(viewport, { path: '/' });
     try {
       await openSettings(source.page);
       const [download] = await Promise.all([
