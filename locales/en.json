@@ -175,6 +175,16 @@
       "combo": {
         "label": "Combo x{{count}}"
       },
+      "mergeEvent": {
+        "active": "{{icon}} {{count}}",
+        "upcoming": "{{icon}} {{next}}",
+        "next": "soon",
+        "aria": {
+          "one": "{{name}}: {{count}} drop left",
+          "other": "{{name}}: {{count}} drops left"
+        },
+        "upcomingAria": "Coming up: {{name}}"
+      },
       "frozen": {
         "label": "Frozen ({{turns}})"
       },
@@ -500,7 +510,47 @@
       },
       "merge": {
         "fused": "CALIBRE {{tier}}! +{{points}}",
-        "supernova": "SUPERNOVA FUSION! +{{points}}"
+        "supernova": "SUPERNOVA FUSION! +{{points}}",
+        "chain": "Chain x{{chain}}: +{{points}}",
+        "chainShake": "+1 Shake",
+        "eventStart": "EVENT: {{name}}",
+        "eventStartAnnounce": "Event: {{name}}. {{description}}",
+        "eventEnd": "Event over: {{name}}.",
+        "eventUpcoming": "Coming up: {{name}}."
+      }
+    },
+    "merge": {
+      "events": {
+        "windLeft": {
+          "name": "Wind to the left",
+          "description": "Spheres drift sideways: drop on the windward side.",
+          "icon": "💨←"
+        },
+        "windRight": {
+          "name": "Wind to the right",
+          "description": "Spheres drift sideways: drop on the windward side.",
+          "icon": "💨→"
+        },
+        "lowGravity": {
+          "name": "Low gravity",
+          "description": "Spheres fall slowly and float for longer.",
+          "icon": "🪶"
+        },
+        "bouncy": {
+          "name": "Bouncy spheres",
+          "description": "Spheres bounce much higher off the walls, the floor and each other.",
+          "icon": "🏀"
+        },
+        "bigDrops": {
+          "name": "Big drops",
+          "description": "Larger calibres can drop.",
+          "icon": "🟣"
+        },
+        "golden": {
+          "name": "Golden fusions",
+          "description": "Every fusion scores extra points.",
+          "icon": "🌟"
+        }
       }
     },
     "mutators": {

@@ -110,6 +110,7 @@ const EXPECTED_PROTOTYPE_NAMES = [
   'isObjectiveCleared',
   'isRunPlaying',
   'getMergeShakeRemaining',
+  'getMergeEventState',
   'tryMergeShake',
   'isStageChanging',
   'isSurvivalMode',

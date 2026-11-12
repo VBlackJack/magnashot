@@ -25,6 +25,11 @@ import {
 import { t } from '../../core/I18n.js';
 import { Ball } from '../../entities/Ball.js';
 import { ModeBehavior, registerModeBehavior } from './ModeBehavior.js';
+import {
+  MERGE_EVENT_DIRECTIONS,
+  MERGE_EVENT_IDS,
+  getMergeEventTextKey
+} from './MergeEvents.js';
 
 const INITIAL_DROP_VY = 45;
 const ENTRY_GRACE_SEC = 0.85;
@@ -41,6 +46,18 @@ const BASIN_GLOW_ALPHA = 0.14;
 const PULSE_RING_GAP = 4;
 const PULSE_RING_WIDTH = 2;
 const PULSE_RING_ALPHA = 0.85;
+/** Roll threshold under which a wind blows to the left. */
+const WIND_LEFT_ROLL_BELOW = 0.5;
+/** Launcher slots of an event recolor: the current ball, the next ball, then the queue. */
+const RECOLOR_SLOT_CURRENT = 0;
+const RECOLOR_SLOT_NEXT = 1;
+const RECOLOR_SLOT_QUEUE_BASE = 2;
+const RECOLOR_PHASE_START = 'start';
+const RECOLOR_PHASE_END = 'end';
+/** Fusions of one drop from which the floating text speaks of a chain. */
+const CHAIN_TEXT_MIN_COMBO = 2;
+/** The Shake reward text sits one text line above the fusion text so they do not overlap. */
+const CHAIN_REWARD_TEXT_LINES = 2;
 
 const MERGE_CHROME = Object.freeze({
   ambientLiquid: false,
@@ -132,9 +149,166 @@ export class MergeBehavior extends ModeBehavior {
 
   pickLauncherColor(engine, roll = engine.random()) {
     const cfg = engine.modesConfig.merge;
-    const spawnCount = Math.min(cfg.tiers.length, cfg.spawnMaxTierIndex + 1);
+    const maxTierIndex = this.getActiveEventParams(engine, MERGE_EVENT_IDS.BIG_DROPS)?.spawnMaxTierIndex
+      ?? cfg.spawnMaxTierIndex;
+    const spawnCount = Math.min(cfg.tiers.length, maxTierIndex + 1);
     const idx = Math.min(spawnCount - 1, Math.floor(roll * spawnCount));
     return cfg.tiers[idx].id;
+  }
+
+  /** Parameters of the running event when it is `id`, else null. Never mutates the config. */
+  getActiveEventParams(engine, id) {
+    const event = engine.modeState?.event;
+    return event?.id === id ? engine.modesConfig.merge.events?.pool?.[id] ?? null : null;
+  }
+
+  /** Read-only view of the event cycle for the HUD, or null when the config defines no events. */
+  getEventView(engine) {
+    const state = engine.modeState;
+    if (!state || !engine.modesConfig.merge.events) {
+      return null;
+    }
+    return {
+      eventCount: state.eventCount,
+      active: state.event ? { ...state.event } : null,
+      upcoming: state.upcomingEvent ? { ...state.upcomingEvent } : null
+    };
+  }
+
+  drawEventGap(engine, eventCount) {
+    const { gapMinDrops, gapMaxDrops } = engine.modesConfig.merge.events;
+    const span = gapMaxDrops - gapMinDrops + 1;
+    return gapMinDrops + Math.floor(engine.drawSeededRoll('mergeEventGap', eventCount) * span);
+  }
+
+  /** Telegraphs the next event: any pool id but the previous one, one drop before it starts. */
+  pickUpcomingEvent(engine) {
+    const state = engine.modeState;
+    const ids = Object.keys(engine.modesConfig.merge.events.pool);
+    const candidates = ids.length > 1 ? ids.filter((id) => id !== state.lastEventId) : ids;
+    const pick = Math.floor(engine.drawSeededRoll('mergeEvent', state.eventCount) * candidates.length);
+    const id = candidates[Math.min(candidates.length - 1, pick)];
+    const dirRoll = engine.drawSeededRoll('mergeEventDir', state.eventCount);
+    const direction = id === MERGE_EVENT_IDS.WIND && dirRoll < WIND_LEFT_ROLL_BELOW
+      ? MERGE_EVENT_DIRECTIONS.LEFT
+      : MERGE_EVENT_DIRECTIONS.RIGHT;
+    state.upcomingEvent = { id, direction };
+  }
+
+  startEvent(engine) {
+    const cfg = engine.modesConfig.merge;
+    const state = engine.modeState;
+    if (!state.upcomingEvent) {
+      this.pickUpcomingEvent(engine);
+    }
+    state.event = { ...state.upcomingEvent, dropsLeft: cfg.events.durationDrops };
+    state.upcomingEvent = null;
+    state.eventCount += 1;
+    if (state.event.id === MERGE_EVENT_IDS.BIG_DROPS) {
+      this.recolorLauncher(engine, RECOLOR_PHASE_START);
+    }
+    engine.particleSystem.spawnFloatingText(
+      engine.gameConfig.canvas.logicalWidth * MATH_CONSTANTS.HALF,
+      cfg.overflowLineY + cfg.eventTextOffsetY,
+      t('gameplay.feedback.merge.eventStart', { name: t(getMergeEventTextKey(state.event, 'name')) }),
+      engine.gameConfig.theme.overchargePopupColor
+    );
+  }
+
+  endEvent(engine) {
+    const state = engine.modeState;
+    const wasBigDrops = state.event.id === MERGE_EVENT_IDS.BIG_DROPS;
+    state.lastEventId = state.event.id;
+    state.event = null;
+    state.dropsUntilEvent = this.drawEventGap(engine, state.eventCount);
+    if (wasBigDrops) {
+      this.recolorLauncher(engine, RECOLOR_PHASE_END);
+    }
+  }
+
+  /**
+   * Moves the event cycle on by one successful drop: counts down the running event, or the
+   * gap to the next one (telegraphed one drop ahead).
+   */
+  advanceEventCycle(engine) {
+    const state = engine.modeState;
+    if (!engine.modesConfig.merge.events) {
+      return;
+    }
+    if (state.event) {
+      state.event.dropsLeft -= 1;
+      if (state.event.dropsLeft <= 0) {
+        this.endEvent(engine);
+      }
+      return;
+    }
+    state.dropsUntilEvent -= 1;
+    if (state.dropsUntilEvent <= 0) {
+      this.startEvent(engine);
+    } else if (state.dropsUntilEvent === 1 && !state.upcomingEvent) {
+      this.pickUpcomingEvent(engine);
+    }
+  }
+
+  /**
+   * Redraws the current ball, the next ball and the whole queue under the spawn pool now in
+   * force, without touching launcherDrawIndex, so the preview never shows a stale calibre.
+   */
+  recolorLauncher(engine, phase) {
+    const stream = `mergeEventRecolor:${engine.modeState.eventCount}:${phase}`;
+    const draw = (slot) => this.pickLauncherColor(engine, engine.drawSeededRoll(stream, slot));
+    if (engine.currentBall && !engine.currentBall.specialType) {
+      engine.currentBall.colorId = draw(RECOLOR_SLOT_CURRENT);
+    }
+    if (engine.nextBall && !engine.nextBall.specialType) {
+      engine.nextBall.colorId = draw(RECOLOR_SLOT_NEXT);
+    }
+    engine.upcomingColorIds = engine.upcomingColorIds.map((_, idx) => draw(RECOLOR_SLOT_QUEUE_BASE + idx));
+    this.syncLauncherBallTier(engine, engine.currentBall);
+    this.syncLauncherBallTier(engine, engine.nextBall);
+    if (engine.currentBall) {
+      engine.mergeDropX = this.clampDropX(engine, engine.mergeDropX, engine.currentBall.radius);
+    }
+  }
+
+  /** Advances a charging Shake by one the first time a drop's chain reaches the configured length. */
+  grantChainReward(engine, x, y) {
+    const cfg = engine.modesConfig.merge;
+    const state = engine.modeState;
+    if (
+      !cfg.chain
+      || state.chainRewardGranted
+      || engine.combo < cfg.chain.shakeAdvanceAt
+      || !(state.shakeRemaining > 0)
+    ) {
+      return;
+    }
+    state.shakeRemaining -= 1;
+    state.chainRewardGranted = true;
+    engine.particleSystem.spawnFloatingText(
+      x,
+      y + engine.gameConfig.canvas.floatingTextOffsetY * CHAIN_REWARD_TEXT_LINES,
+      t('gameplay.feedback.merge.chainShake'),
+      engine.gameConfig.theme.overchargePopupColor
+    );
+  }
+
+  /** Keeps a saved event only when its id is still in the pool and its numbers fit the config. */
+  sanitizeSavedEvent(engine, raw, withDrops) {
+    const { events } = engine.modesConfig.merge;
+    if (!raw || typeof raw !== 'object' || !Object.hasOwn(events.pool, raw.id)) {
+      return null;
+    }
+    const direction = raw.direction === MERGE_EVENT_DIRECTIONS.LEFT
+      ? MERGE_EVENT_DIRECTIONS.LEFT
+      : MERGE_EVENT_DIRECTIONS.RIGHT;
+    if (!withDrops) {
+      return { id: raw.id, direction };
+    }
+    if (!Number.isInteger(raw.dropsLeft)) {
+      return null;
+    }
+    return { id: raw.id, direction, dropsLeft: Math.min(events.durationDrops, Math.max(1, raw.dropsLeft)) };
   }
 
   syncLauncherBallTier(engine, ball) {
@@ -170,8 +344,17 @@ export class MergeBehavior extends ModeBehavior {
       shakeRemaining: cfg.shake.rechargeDrops,
       mergesCount: 0,
       supernovas: 0,
-      maxOverflowRatio: 0
+      maxOverflowRatio: 0,
+      chainRewardGranted: false,
+      event: null,
+      upcomingEvent: null,
+      lastEventId: null,
+      eventCount: 0,
+      dropsUntilEvent: 0
     };
+    if (cfg.events) {
+      engine.modeState.dropsUntilEvent = this.drawEventGap(engine, 0);
+    }
   }
 
   canFire(engine) {
@@ -212,6 +395,7 @@ export class MergeBehavior extends ModeBehavior {
     engine.mergeBestTier = Math.max(engine.mergeBestTier || 1, tierSpec.tier + 1);
     engine.modeState.dropCooldownSec = cfg.dropCooldownSec;
     engine.combo = 0;
+    engine.modeState.chainRewardGranted = false;
 
     engine.currentBall = engine.nextBall;
     const upcoming = engine.takeUpcomingBall();
@@ -219,6 +403,8 @@ export class MergeBehavior extends ModeBehavior {
     this.syncLauncherBallTier(engine, engine.currentBall);
     this.syncLauncherBallTier(engine, engine.nextBall);
     engine.mergeDropX = this.clampDropX(engine, engine.mergeDropX, engine.currentBall.radius);
+
+    this.advanceEventCycle(engine);
 
     engine.hasFiredInRound = true;
     engine.audioManager.playEffect('shoot');
@@ -344,6 +530,15 @@ export class MergeBehavior extends ModeBehavior {
       return;
     }
 
+    const lowGravity = this.getActiveEventParams(engine, MERGE_EVENT_IDS.LOW_GRAVITY);
+    const gravity = cfg.gravity * (lowGravity?.gravityFactor ?? 1);
+    const wind = this.getActiveEventParams(engine, MERGE_EVENT_IDS.WIND);
+    const windAcceleration = wind ? state.event.direction * wind.acceleration : 0;
+    const bouncy = this.getActiveEventParams(engine, MERGE_EVENT_IDS.BOUNCY);
+    const wallRestitution = bouncy?.restitution ?? cfg.wallRestitution;
+    const floorRestitution = bouncy?.restitution ?? cfg.floorRestitution;
+    const ballRestitution = bouncy?.restitution ?? cfg.ballRestitution;
+
     for (const b of balls) {
       if (b.mergeGraceSec > 0) {
         b.mergeGraceSec = Math.max(0, b.mergeGraceSec - dtSec);
@@ -357,8 +552,8 @@ export class MergeBehavior extends ModeBehavior {
       if (b.impactScale > 1) {
         b.impactScale = Math.max(1, b.impactScale - POP_DECAY_PER_SEC * dtSec);
       }
-      b.vy += cfg.gravity * dtSec;
-      b.vx += cfg.tiltAcceleration * world.tiltFactor * dtSec;
+      b.vy += gravity * dtSec;
+      b.vx += (cfg.tiltAcceleration * world.tiltFactor + windAcceleration) * dtSec;
     }
 
     this.applyPolarityBiasForces(engine, balls, dtSec);
@@ -381,18 +576,18 @@ export class MergeBehavior extends ModeBehavior {
         if (b.x < minX) {
           b.x = minX;
           if (b.vx < 0) {
-            b.vx = -b.vx * cfg.wallRestitution;
+            b.vx = -b.vx * wallRestitution;
           }
         } else if (b.x > maxX) {
           b.x = maxX;
           if (b.vx > 0) {
-            b.vx = -b.vx * cfg.wallRestitution;
+            b.vx = -b.vx * wallRestitution;
           }
         }
         if (b.y > maxY) {
           b.y = maxY;
           if (b.vy > 0) {
-            b.vy = -b.vy * cfg.floorRestitution;
+            b.vy = -b.vy * floorRestitution;
           }
           b.vx *= cfg.floorFriction;
         }
@@ -451,7 +646,7 @@ export class MergeBehavior extends ModeBehavior {
           const rvy = b.vy - a.vy;
           const relNormal = rvx * nx + rvy * ny;
           if (relNormal < 0) {
-            const jImpulse = -(1 + cfg.ballRestitution) * relNormal / invMassSum;
+            const jImpulse = -(1 + ballRestitution) * relNormal / invMassSum;
             a.vx -= (jImpulse / massA) * nx;
             a.vy -= (jImpulse / massA) * ny;
             b.vx += (jImpulse / massB) * nx;
@@ -507,6 +702,7 @@ export class MergeBehavior extends ModeBehavior {
       engine.combo = Math.min(engine.combo + scoring.comboIncrement, scoring.maxComboMultiplier);
       engine.maxComboInRound = Math.max(engine.maxComboInRound, engine.combo);
       engine.modeState.mergesCount = (engine.modeState.mergesCount || 0) + 1;
+      this.grantChainReward(engine, mx, my);
 
       if (tierIndex >= cfg.tiers.length - 1) {
         // Two max-calibre spheres trigger a Supernova!
@@ -562,7 +758,8 @@ export class MergeBehavior extends ModeBehavior {
       merged.impactScale = MERGE_POP_SCALE;
       world.addBall(merged);
 
-      const pts = nextSpec.points * Math.max(1, engine.combo);
+      const golden = this.getActiveEventParams(engine, MERGE_EVENT_IDS.GOLDEN);
+      const pts = Math.round(nextSpec.points * Math.max(1, engine.combo) * (golden?.pointsFactor ?? 1));
       engine.addScore(pts);
       engine.mergeBestTier = Math.max(engine.mergeBestTier || 1, nextSpec.tier + 1);
       engine.waveCount = engine.mergeBestTier;
@@ -584,7 +781,9 @@ export class MergeBehavior extends ModeBehavior {
       engine.particleSystem.spawnFloatingText(
         clampedX,
         clampedY + engine.gameConfig.canvas.floatingTextOffsetY,
-        t('gameplay.feedback.merge.fused', { tier: nextSpec.tier + 1, points: pts }),
+        engine.combo >= CHAIN_TEXT_MIN_COMBO
+          ? t('gameplay.feedback.merge.chain', { chain: engine.combo, points: pts })
+          : t('gameplay.feedback.merge.fused', { tier: nextSpec.tier + 1, points: pts }),
         nextSpec.highlight
       );
 
@@ -611,6 +810,11 @@ export class MergeBehavior extends ModeBehavior {
       mergesCount: state.mergesCount ?? 0,
       supernovas: state.supernovas ?? 0,
       ...(Number.isInteger(state.shakeRemaining) ? { shakeRemaining: state.shakeRemaining } : {}),
+      event: state.event ?? null,
+      upcomingEvent: state.upcomingEvent ?? null,
+      lastEventId: state.lastEventId ?? null,
+      dropsUntilEvent: state.dropsUntilEvent ?? 0,
+      eventCount: state.eventCount ?? 0,
       ballTiers: engine.physicsWorld.balls.map((b) => (Number.isInteger(b.mergeTier) ? b.mergeTier : 0))
     };
   }
@@ -641,8 +845,17 @@ export class MergeBehavior extends ModeBehavior {
         : cfg.shake.rechargeDrops,
       mergesCount: Math.max(0, rawState.mergesCount || 0),
       supernovas: Math.max(0, rawState.supernovas || 0),
-      maxOverflowRatio: 0
+      maxOverflowRatio: 0,
+      chainRewardGranted: false,
+      event: null,
+      upcomingEvent: null,
+      lastEventId: null,
+      eventCount: 0,
+      dropsUntilEvent: 0
     };
+    if (cfg.events) {
+      this.restoreEventCycle(engine, rawState);
+    }
 
     const balls = engine.physicsWorld.balls;
     for (let i = 0; i < balls.length; i++) {
@@ -658,6 +871,21 @@ export class MergeBehavior extends ModeBehavior {
     }
     this.syncLauncherBallTier(engine, engine.currentBall);
     this.syncLauncherBallTier(engine, engine.nextBall);
+  }
+
+  /** Restores the event cycle from a snapshot; a legacy snapshot without it gets a fresh gap. */
+  restoreEventCycle(engine, rawState) {
+    const { events } = engine.modesConfig.merge;
+    const state = engine.modeState;
+    state.eventCount = Number.isInteger(rawState.eventCount) ? Math.max(0, rawState.eventCount) : 0;
+    state.lastEventId = Object.hasOwn(events.pool, rawState.lastEventId) ? rawState.lastEventId : null;
+    state.event = this.sanitizeSavedEvent(engine, rawState.event, true);
+    const upcoming = state.event ? null : this.sanitizeSavedEvent(engine, rawState.upcomingEvent, false);
+    // A telegraphed event equal to the last one would break the no-repeat rule: drop it, the next draw redoes it.
+    state.upcomingEvent = upcoming?.id === state.lastEventId ? null : upcoming;
+    state.dropsUntilEvent = Number.isInteger(rawState.dropsUntilEvent)
+      ? Math.min(events.gapMaxDrops, Math.max(1, rawState.dropsUntilEvent))
+      : this.drawEventGap(engine, state.eventCount);
   }
 
   drawUnderlay(ctx, engine, renderer, theme) {
