@@ -11,6 +11,7 @@ All notable changes to **MagnaShot** are documented in this file.
 ### Fixed
 - Merge Basin no longer shows the hint about matching three spheres or cutting anchors, which the mode does not have.
 - The Pause menu in Merge Basin now ends with a tip about calibre fusion and the Shake instead of the anchors and rotors tip.
+- The Pause keyboard line in Merge Basin now lists the rail, the drop, polarity and the Shake key instead of the special sphere keys the mode does not use.
 
 ## [1.26.1] - 2026-11-12
 

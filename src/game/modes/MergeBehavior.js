@@ -46,6 +46,11 @@ const MERGE_CHROME = Object.freeze({
   aimLine: false
 });
 
+/** Pause input hints that the basin words its own way. */
+const MERGE_INPUT_HINT_KEYS = Object.freeze({
+  'modals.pause.instructions.keyboard': 'modals.pause.instructions.mergeKeyboard'
+});
+
 export class MergeBehavior extends ModeBehavior {
   constructor() {
     super(GAME_MODES.MERGE);
@@ -82,6 +87,11 @@ export class MergeBehavior extends ModeBehavior {
 
   hidesOvercharge() {
     return true;
+  }
+
+  /** The basin has a drop rail and a Shake, and no special spheres to select. */
+  getInputHintKey(key) {
+    return MERGE_INPUT_HINT_KEYS[key] ?? key;
   }
 
   /** The generic tip speaks of anchors and rotors, which the basin does not have. */

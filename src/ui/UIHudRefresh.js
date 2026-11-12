@@ -727,6 +727,7 @@ export const uiHudRefreshMethods = {
 
     if (engine.state === GAME_STATES.PAUSED && !this.isRunHeldByUi() && !this.isAnyOverlayModalOpen()) {
       setTextIfChanged(this.elements.pauseInstructionTip, t(engine.getModeBehavior().getPauseTipKey()));
+      this.updateInputHints();
       if (this.elements.pauseLevelTip) {
         if (engine.levelTutorialKey) {
           setTextIfChanged(

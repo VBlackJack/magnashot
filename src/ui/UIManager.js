@@ -546,7 +546,8 @@ export class UIManager {
       'hud.launcher.swap.caption'
     );
     for (const { elementId, key } of MODAL_INPUT_HINTS) {
-      setTextIfChanged(document.getElementById(elementId), t(`${key}.${this.getHintInputMode(key)}`));
+      const modeKey = this.engine?.getModeBehavior?.().getInputHintKey(key) ?? key;
+      setTextIfChanged(document.getElementById(elementId), t(`${modeKey}.${this.getHintInputMode(key)}`));
     }
     setAttributeIfChanged(
       this.elements.modeBanner,
