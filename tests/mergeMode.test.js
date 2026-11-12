@@ -524,3 +524,30 @@ test('A polarity pulse on a nearly full basin does not overflow it', () => {
   assert.equal(fill(false), true, 'the full pile holds without a pulse');
   assert.equal(fill(true), true, 'a pulse does not push it over the line');
 });
+
+test('A polarity pulse rings each pulsing sphere, with reduced motion too', () => {
+  const engine = createEngine();
+  engine.startMergeMode();
+  engine.particleSystem.setReducedMotion?.(true);
+  engine.shoot();
+  const [ball] = engine.physicsWorld.balls;
+  const arcs = [];
+  const ctx = {
+    save() {}, restore() {}, beginPath() {}, stroke() {},
+    arc: (x, y, radius) => arcs.push({ x, y, radius })
+  };
+  const theme = gameConfig.theme;
+
+  mergeBehavior.drawOverlay(ctx, engine, null, theme);
+  assert.equal(arcs.length, 0, 'no ring without a pulse');
+
+  engine.togglePolarityFlip();
+  mergeBehavior.drawOverlay(ctx, engine, null, theme);
+  assert.deepEqual(arcs.map(({ x, y }) => [x, y]), [[ball.x, ball.y]]);
+  assert.ok(arcs[0].radius > ball.radius, 'the ring sits outside the sphere');
+
+  arcs.length = 0;
+  ball.mergePulseSec = 0;
+  mergeBehavior.drawOverlay(ctx, engine, null, theme);
+  assert.equal(arcs.length, 0, 'the ring goes when the pulse ends');
+});

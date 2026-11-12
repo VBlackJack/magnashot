@@ -37,6 +37,10 @@ const DROP_GUIDE_DASH = Object.freeze([5, 6]);
 const OVERFLOW_LINE_ALPHA = 0.72;
 const DROP_GUIDE_ALPHA = 0.36;
 const BASIN_GLOW_ALPHA = 0.14;
+/** Static ring around a pulsing sphere: the polarity pulse cue that survives reduced motion. */
+const PULSE_RING_GAP = 4;
+const PULSE_RING_WIDTH = 2;
+const PULSE_RING_ALPHA = 0.85;
 
 const MERGE_CHROME = Object.freeze({
   ambientLiquid: false,
@@ -704,6 +708,24 @@ export class MergeBehavior extends ModeBehavior {
       ctx.lineTo(dropX, cfg.basinFloorY - 4);
       ctx.stroke();
       ctx.setLineDash([]);
+    }
+    ctx.restore();
+  }
+
+  /** Rings every sphere still under a polarity pulse. Nothing moves, so reduced motion keeps it. */
+  drawOverlay(ctx, engine, renderer, theme) {
+    const pulsing = engine.physicsWorld.balls.filter((ball) => (ball.mergePulseSec || 0) > 0);
+    if (pulsing.length === 0) {
+      return;
+    }
+    ctx.save();
+    ctx.strokeStyle = theme.overchargePopupColor;
+    ctx.globalAlpha = PULSE_RING_ALPHA;
+    ctx.lineWidth = PULSE_RING_WIDTH;
+    for (const ball of pulsing) {
+      ctx.beginPath();
+      ctx.arc(ball.x, ball.y, ball.radius + PULSE_RING_GAP, 0, MATH_CONSTANTS.TWO_PI);
+      ctx.stroke();
     }
     ctx.restore();
   }
