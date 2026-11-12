@@ -167,7 +167,6 @@ export const uiGamepadMethods = {
   /** Frame hook (GameLoop beforeFrame): reads the pad and routes what it produced. */
   pollGamepad(now, elapsedMs) {
     this.dropStalePadFocus();
-    this.billiard?.frame(elapsedMs);
     // The scene's own per-frame upkeep (held keys of the two-player match) needs no controller.
     const sceneController = this.getSceneController();
     sceneController?.beforeFrame?.(now, elapsedMs);
@@ -180,8 +179,7 @@ export const uiGamepadMethods = {
       this.pollGamepadPerPad(reader, elapsedMs, sceneController, isLobby);
       return;
     }
-    const billiardAim = this.billiard?.hasAimFocus();
-    const isMenuOpen = !billiardAim && (this.isAnyModalOpen() || this.isDrawerOpen);
+    const isMenuOpen = this.isAnyModalOpen() || this.isDrawerOpen;
     const result = reader.poll(elapsedMs, { menuOpen: isMenuOpen });
     if (result.events.length === 0 && result.actions.length === 0 && !result.active && result.aimDelta === 0) {
       return;
@@ -192,9 +190,7 @@ export const uiGamepadMethods = {
     if (result.active) {
       this.setInputMode(INPUT_MODES.GAMEPAD);
     }
-    if (billiardAim) {
-      this.billiard.handlePad(result);
-    } else if (isMenuOpen) {
+    if (isMenuOpen) {
       this.routeGamepadMenuActions(result.actions);
     } else {
       this.routeGamepadGameplay(result);

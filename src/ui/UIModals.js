@@ -326,7 +326,6 @@ export const uiModalMethods = {
   getOverlayModals() {
     return [
       this.elements.modalProgressImport,
-      this.elements.modalBilliard,
       this.elements.modalCalibrate,
       this.elements.modalVersusLocal,
       this.elements.modalVersusTiers,

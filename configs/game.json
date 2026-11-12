@@ -2100,29 +2100,6 @@
       }
     }
   },
-  "billiardControls": {
-    "degreesPerTurn": 360,
-    "aimDegrees": 1,
-    "aimFineDegrees": 0.25,
-    "powerStep": 0.025,
-    "maxFrameMs": 70,
-    "guideWidth": 2,
-    "targetRingGap": 3,
-    "numberFont": "bold 11px system-ui",
-    "colors": {
-      "rail": "#39271d",
-      "cloth": "#145c47",
-      "pocket": "#070b14",
-      "guide": "#fef3c7",
-      "number": "#070b14",
-      "balls": {
-        "cue": "#f8fafc",
-        "one": "#fbbf24",
-        "two": "#38bdf8",
-        "screen": "#94a3b8"
-      }
-    }
-  },
   "storage": {
     "prefix": "magnashot_v1_",
     "progressBackup": {

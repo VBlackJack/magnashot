@@ -30,7 +30,6 @@ import {
   formatChapterName,
   uiLevelSelectMethods
 } from './LevelSelectView.js';
-import { BilliardView } from './BilliardView.js';
 import { ProgressBackupView } from './ProgressBackupView.js';
 import { uiPlayHubMethods } from './PlayHubView.js';
 import { installMethods } from '../core/installMethods.js';
@@ -117,7 +116,7 @@ export {
  * and keyboard/button event bindings.
  */
 export class UIManager {
-  constructor({ engine, renderer, storageManager, audioManager, gameConfig, ballsConfig, billiardConfig = null, versusConfigs = null }) {
+  constructor({ engine, renderer, storageManager, audioManager, gameConfig, ballsConfig, versusConfigs = null }) {
     this.engine = engine;
     this.renderer = renderer;
     this.storageManager = storageManager;
@@ -125,7 +124,6 @@ export class UIManager {
     this.gameConfig = gameConfig;
     this.ballsConfig = ballsConfig;
     this.versusConfigs = versusConfigs;
-    this.billiardConfig = billiardConfig;
 
     this.elements = {
       appShell: document.querySelector('.app-shell'),
@@ -214,8 +212,6 @@ export class UIManager {
       specialEquippedBanner: document.getElementById('special-equipped-banner'),
       cancelAimBanner: document.getElementById('cancel-aim-banner'),
       modalPlay: document.getElementById('modal-play'),
-      modalBilliard: document.getElementById('modal-billiard'),
-      btnModeBilliard: document.getElementById('btn-mode-billiard'),
       btnClosePlay: document.getElementById('btn-close-play'),
       playHubHint: document.getElementById('play-hub-hint'),
       btnCampaignContinue: document.getElementById('btn-campaign-continue'),
@@ -575,7 +571,6 @@ export class UIManager {
     this.updatePatternsButton();
     this.setupTiltControl();
     this.setupMergeShakeGesture();
-    if (this.billiardConfig) this.billiard = new BilliardView(this, this.billiardConfig);
     if (this.elements.modalProgressImport) this.progressBackup = new ProgressBackupView(this);
     this.updateMotionButton();
     this.updateAnimSpeedButton();
@@ -607,7 +602,6 @@ export class UIManager {
       this.updateResetHintsFeedback();
       this.updateShareButtonLabel();
       this.updateConfirmButtonLabel();
-      this.billiard?.refresh();
       this.progressBackup?.refresh();
       this.refreshVersusLanguage();
       this.refreshVersusLocalLanguage();

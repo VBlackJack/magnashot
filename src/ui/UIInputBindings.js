@@ -786,10 +786,6 @@ export const uiInputBindingMethods = {
       this.progressBackup.dismiss();
       return;
     }
-    if (this.billiard?.isActive()) {
-      this.billiard.close();
-      return;
-    }
     if (this.isCalibrationOpen()) {
       this.closeCalibration();
       return;
@@ -842,11 +838,6 @@ export const uiInputBindingMethods = {
 
     if (e.code === 'Escape') {
       this.handleBackAction();
-      return;
-    }
-
-    if (this.billiard?.isActive()) {
-      this.billiard.handleKey(e);
       return;
     }
 
