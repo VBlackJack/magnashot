@@ -289,8 +289,10 @@ test('Only successful drops charge the shake and only one input consumes it', ()
   assert.equal(engine.getMergeShakeRemaining(), cfg.rechargeDrops);
   balls.forEach((ball, i) => {
     const [x, y, vx, vy, overflow] = before[i];
-    assert.deepEqual([ball.x, ball.y, ball.vy, ball.mergeOverflowSec], [x, y, vy, overflow]);
-    assert.ok(Math.abs(Math.abs(ball.vx - vx) - cfg.maxImpulsePxPerSec * modesConfig.merge.tiers[0].radius / ball.radius) < 1e-9);
+    const sizeFactor = modesConfig.merge.tiers[0].radius / ball.radius;
+    assert.deepEqual([ball.x, ball.y, ball.mergeOverflowSec], [x, y, overflow]);
+    assert.ok(Math.abs(Math.abs(ball.vx - vx) - cfg.maxImpulsePxPerSec * sizeFactor) < 1e-9);
+    assert.ok(Math.abs((vy - ball.vy) - cfg.liftImpulsePxPerSec * sizeFactor) < 1e-9, 'the pile hops');
   });
 
   const restored = createEngine();
@@ -366,4 +368,33 @@ test('A Basin run never shows the colour-match basics hint', () => {
   engine.shoot();
   engine.refreshDiscovery();
   assert.notEqual(engine.activeDiscoveryId, BOARD_MECHANICS.BASICS);
+});
+
+test('A shake moves a settled pile by more than the smallest sphere radius', () => {
+  const cfg = modesConfig.merge;
+  const settleFrames = 45;
+  const watchFrames = 90;
+  const drift = (shake) => {
+    const engine = createEngine();
+    const random = new SeededRandom('merge-shake-strength');
+    engine.random = () => random.next();
+    engine.startMergeMode();
+    for (let drop = 0; drop < cfg.shake.rechargeDrops * 4; drop += 1) {
+      engine.updateAim(cfg.basinLeftX + random.next() * (cfg.basinRightX - cfg.basinLeftX), cfg.launcherY);
+      engine.modeState.dropCooldownSec = 0;
+      engine.shoot();
+      for (let frame = 0; frame < settleFrames; frame += 1) engine.update();
+    }
+    assert.ok(engine.isRunPlaying());
+    const before = new Map(engine.physicsWorld.balls.map((ball) => [ball, ball.x]));
+    if (shake) {
+      engine.modeState.shakeRemaining = 0;
+      assert.equal(engine.tryMergeShake(), true);
+    }
+    for (let frame = 0; frame < watchFrames; frame += 1) engine.update();
+    assert.ok(engine.isRunPlaying(), 'the hop never overflows the basin');
+    const kept = [...before].filter(([ball]) => engine.physicsWorld.balls.includes(ball));
+    return kept.reduce((sum, [ball, x]) => sum + Math.abs(ball.x - x), 0) / kept.length;
+  };
+  assert.ok(drift(true) - drift(false) > cfg.tiers[0].radius);
 });
