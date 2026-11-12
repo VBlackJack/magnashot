@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-const APP_VERSION = '1.26.1';
+const APP_VERSION = '1.27.0';
 const CACHE_NAME = `magnashot-cache-v${APP_VERSION}`;
 
 // The service worker cannot read configs/*.json before it has a cache, so its
