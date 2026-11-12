@@ -30,6 +30,7 @@ import {
   GAME_OVER_REASONS,
   GAME_STATES,
   LAUNCHER_POSTURES,
+  MATH_CONSTANTS,
   SPECIAL_TYPES
 } from '../src/core/Constants.js';
 import { Ball } from '../src/entities/Ball.js';
@@ -161,7 +162,7 @@ test('Merge Basin Polarity Bias pulls same-tier spheres together and sustained o
   engine.physicsWorld.addBall(right);
 
   engine.togglePolarityFlip();
-  assert.ok(left.mergePolaritySec > 0);
+  assert.ok(left.mergePulseSec > 0);
   mergeBehavior.applyPolarityBiasForces(engine, engine.physicsWorld.balls, 0.1);
   assert.ok(left.vx > 0 && right.vx < 0, 'same-tier spheres are magnetically pulled toward each other');
 
@@ -434,4 +435,92 @@ test('Pause words the keyboard line for the basin and leaves the other hints alo
   const campaign = createEngine();
   campaign.mode = GAME_MODES.CAMPAIGN;
   assert.equal(campaign.getModeBehavior().getInputHintKey(generic), generic);
+});
+
+/** Builds the same seeded pile twice, then runs it with and without a polarity flip. */
+const pulseComparison = (seed) => {
+  const cfg = modesConfig.merge;
+  const run = (flip) => {
+    const engine = createEngine();
+    const random = new SeededRandom(seed);
+    engine.random = () => random.next();
+    engine.startMergeMode();
+    for (let drop = 0; drop < cfg.shake.rechargeDrops * 4 && engine.isRunPlaying(); drop += 1) {
+      engine.updateAim(cfg.basinLeftX + random.next() * (cfg.basinRightX - cfg.basinLeftX), cfg.launcherY);
+      engine.modeState.dropCooldownSec = 0;
+      engine.shoot();
+      for (let frame = 0; frame < 45; frame += 1) engine.update();
+    }
+    assert.ok(engine.isRunPlaying());
+    const merges = engine.modeState.mergesCount;
+    if (flip) {
+      engine.togglePolarityFlip();
+    }
+    for (let frame = 0; frame < 90 && engine.isRunPlaying(); frame += 1) engine.update();
+    assert.ok(engine.isRunPlaying());
+    return engine.modeState.mergesCount - merges;
+  };
+  return { flipped: run(true), still: run(false) };
+};
+
+test('Every polarity press pulses the basin, in both directions', () => {
+  const engine = createEngine();
+  engine.startMergeMode();
+  engine.shoot();
+  const [ball] = engine.physicsWorld.balls;
+  for (let press = 0; press < 2; press += 1) {
+    ball.mergePulseSec = 0;
+    engine.togglePolarityFlip();
+    assert.equal(ball.mergePulseSec, modesConfig.merge.polarityPulseSec, `press ${press + 1} pulses`);
+  }
+  assert.equal(engine.isPolarityFlipped, false);
+});
+
+test('A polarity pulse fuses more of a settled pile than leaving it alone', () => {
+  let flipped = 0;
+  let still = 0;
+  for (const seed of ['pulse-a', 'pulse-b', 'pulse-c', 'pulse-d']) {
+    const result = pulseComparison(seed);
+    flipped += result.flipped;
+    still += result.still;
+  }
+  assert.ok(still > 0, 'the piles keep fusing on their own');
+  assert.ok(flipped >= still * 2, `${flipped} merges with a pulse against ${still} without`);
+});
+
+test('A polarity pulse on a nearly full basin does not overflow it', () => {
+  const cfg = modesConfig.merge;
+  // Calibres chosen so that no two neighbours, side by side, stacked or diagonal, share one.
+  const tierPattern = [2, 3, 4, 5];
+  const rowSettleFrames = 60;
+  const watchFrames = 120;
+  const fill = (flip) => {
+    const engine = createEngine();
+    engine.startMergeMode();
+    const cell = cfg.tiers[tierPattern.at(-1)].radius * 2;
+    const columns = Math.floor((cfg.basinRightX - cfg.basinLeftX) / cell);
+    const pileTop = () => Math.min(cfg.basinFloorY, ...engine.physicsWorld.balls.map((ball) => ball.y - ball.radius));
+    // Rows are stacked one at a time, each settling, until the pile is within one cell of the line.
+    for (let row = 0; pileTop() > cfg.overflowLineY + cell; row += 1) {
+      const rowY = pileTop() - cell * MATH_CONSTANTS.HALF;
+      for (let col = 0; col < columns; col += 1) {
+        const spec = cfg.tiers[tierPattern[(row * 2 + col) % tierPattern.length]];
+        const ball = new Ball({ x: cfg.basinLeftX + (col + MATH_CONSTANTS.HALF) * cell, y: rowY, radius: spec.radius, colorId: spec.id });
+        ball.mergeTier = spec.tier;
+        ball.mergeGraceSec = 0;
+        ball.mergeOverflowSec = 0;
+        engine.physicsWorld.addBall(ball);
+      }
+      for (let frame = 0; frame < rowSettleFrames; frame += 1) engine.update();
+      assert.ok(engine.isRunPlaying(), `row ${row + 1} settles below the line`);
+    }
+    assert.ok(pileTop() < cfg.overflowLineY + cell, 'the pile reaches within one cell of the overflow line');
+    if (flip) {
+      engine.togglePolarityFlip();
+    }
+    for (let frame = 0; frame < watchFrames && engine.isRunPlaying(); frame += 1) engine.update();
+    return engine.isRunPlaying();
+  };
+  assert.equal(fill(false), true, 'the full pile holds without a pulse');
+  assert.equal(fill(true), true, 'a pulse does not push it over the line');
 });

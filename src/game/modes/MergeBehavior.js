@@ -37,7 +37,6 @@ const DROP_GUIDE_DASH = Object.freeze([5, 6]);
 const OVERFLOW_LINE_ALPHA = 0.72;
 const DROP_GUIDE_ALPHA = 0.36;
 const BASIN_GLOW_ALPHA = 0.14;
-const ACTIVE_POLARITY_PULSE_SEC = 0.65;
 
 const MERGE_CHROME = Object.freeze({
   ambientLiquid: false,
@@ -253,9 +252,11 @@ export class MergeBehavior extends ModeBehavior {
       return;
     }
     const balls = engine.physicsWorld.balls;
-    if (balls.length > 0 && engine.isPolarityFlipped) {
+    if (balls.length > 0) {
+      // Every press pulses, in both directions: the pulse is the action the player sees.
+      const pulseSec = engine.modesConfig.merge.polarityPulseSec;
       for (const b of balls) {
-        b.mergePolaritySec = Math.max(b.mergePolaritySec || 0, ACTIVE_POLARITY_PULSE_SEC);
+        b.mergePulseSec = pulseSec;
       }
       const latest = balls[balls.length - 1];
       engine.particleSystem.spawnShockwave(
@@ -274,7 +275,8 @@ export class MergeBehavior extends ModeBehavior {
       const a = balls[i];
       for (let j = i + 1; j < balls.length; j++) {
         const b = balls[j];
-        if ((a.mergePolaritySec || 0) <= 0 && (b.mergePolaritySec || 0) <= 0) {
+        const pulsing = (a.mergePulseSec || 0) > 0 || (b.mergePulseSec || 0) > 0;
+        if (!pulsing && (a.mergePolaritySec || 0) <= 0 && (b.mergePolaritySec || 0) <= 0) {
           continue;
         }
         const dx = b.x - a.x;
@@ -287,7 +289,8 @@ export class MergeBehavior extends ModeBehavior {
         const falloff = 1 - dist / cfg.polarityBiasRange;
         // Same tier pulls together to complete merges; mismatched tiers nudge apart to clear blockers.
         const sign = a.mergeTier === b.mergeTier ? 1 : -0.55;
-        const accel = cfg.polarityBiasAcceleration * falloff * sign * dtSec;
+        const strength = pulsing ? cfg.polarityPulseAcceleration : cfg.polarityBiasAcceleration;
+        const accel = strength * falloff * sign * dtSec;
         const nx = dx / dist;
         const ny = dy / dist;
         a.vx += nx * accel;
@@ -343,6 +346,9 @@ export class MergeBehavior extends ModeBehavior {
       }
       if (b.mergePolaritySec > 0) {
         b.mergePolaritySec = Math.max(0, b.mergePolaritySec - dtSec);
+      }
+      if (b.mergePulseSec > 0) {
+        b.mergePulseSec = Math.max(0, b.mergePulseSec - dtSec);
       }
       if (b.impactScale > 1) {
         b.impactScale = Math.max(1, b.impactScale - POP_DECAY_PER_SEC * dtSec);
@@ -644,6 +650,7 @@ export class MergeBehavior extends ModeBehavior {
       balls[i].mergeGraceSec = 0;
       balls[i].mergeOverflowSec = 0;
       balls[i].mergePolaritySec = 0;
+      balls[i].mergePulseSec = 0;
     }
     this.syncLauncherBallTier(engine, engine.currentBall);
     this.syncLauncherBallTier(engine, engine.nextBall);

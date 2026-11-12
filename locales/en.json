@@ -1042,7 +1042,7 @@
             "merge": {
               "icon": "🫧",
               "name": "Merge Basin (10 Calibre Tiers)",
-              "description": "Drop spheres from a top rail into a rigid basin. Identical calibres fuse into the next tier (1 to 10) with a magnetic shockwave, while polarity biases attraction and repulsion. The Shake recharges after a few drops and nudges the whole basin sideways."
+              "description": "Drop spheres from a top rail into a rigid basin. Identical calibres fuse into the next tier (1 to 10) with a magnetic shockwave. Each Polarity press pulls identical calibres together for a moment and pushes the others apart. The Shake recharges after a few drops and nudges the whole basin sideways."
             }
           }
         }
@@ -1399,8 +1399,8 @@
         },
         "physics": "Tip: Sever anchor links or unbalance rotors to trigger chain reactions!",
         "mergeKeyboard": {
-          "pointer": "Keyboard: Left/Right to move the rail, Enter to drop, F (or 🧲) to invert polarity, G to shake the basin",
-          "touch": "Polarity & Shake: tap 🧲 to flip how spheres pull each other, or tap Shake when it is ready"
+          "pointer": "Keyboard: Left/Right to move the rail, Enter to drop, F (or 🧲) to pull identical calibres together, G to shake the basin",
+          "touch": "Polarity & Shake: tap 🧲 to pull identical calibres together, or tap Shake when it is ready"
         },
         "mergeTip": "Tip: Two identical calibres fuse into the next one. Use the Shake when it is ready to throw the pile towards the emptier side!",
         "pad": "Controller: left stick to aim (right stick for fine aim), bottom face button or right trigger to shoot, left face button to swap, top face button to flip polarity, bumpers for Special Spheres, Start to pause"

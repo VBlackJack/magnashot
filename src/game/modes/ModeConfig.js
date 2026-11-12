@@ -164,6 +164,8 @@ export const DEFAULT_MODES_CONFIG = Object.freeze({
     polarityBiasRange: 150,
     polarityBiasAcceleration: 210,
     polarityWindowSec: 1.4,
+    polarityPulseAcceleration: 2500,
+    polarityPulseSec: 0.65,
     spawnMaxTierIndex: 4,
     supernovaBonus: 1500,
     supernovaShockwaveImpulse: 340,
