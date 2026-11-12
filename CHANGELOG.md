@@ -20,6 +20,7 @@ All notable changes to **MagnaShot** are documented in this file.
 - Merge Basin no longer shows the hint about matching three spheres or cutting anchors, which the mode does not have.
 - The Pause menu in Merge Basin now ends with a tip about calibre fusion and the Shake instead of the anchors and rotors tip.
 - The Pause keyboard line in Merge Basin now lists the rail, the drop, polarity and the Shake key instead of the special sphere keys the mode does not use.
+- Merge Basin, Hex Grid, Magnetic Convoy and Orbital Spin drew their walls, aim guides and danger rings with two theme colours that did not exist (`aimLineColor`, `dangerZoneColor`), so they took whatever colour was drawn last. Both are now defined, and a test refuses any theme key the config lacks.
 
 ## [1.26.1] - 2026-11-12
 
