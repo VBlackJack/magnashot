@@ -414,3 +414,24 @@ test('Pause shows a Basin tip instead of the anchors and rotors tip', () => {
   campaign.mode = GAME_MODES.CAMPAIGN;
   assert.equal(campaign.getModeBehavior().getPauseTipKey(), 'modals.pause.instructions.physics');
 });
+
+test('Pause words the keyboard line for the basin and leaves the other hints alone', () => {
+  const engine = createEngine();
+  engine.startMergeMode();
+  const behavior = engine.getModeBehavior();
+  const generic = 'modals.pause.instructions.keyboard';
+  const key = behavior.getInputHintKey(generic);
+  assert.notEqual(key, generic);
+  for (const locale of ['en', 'fr']) {
+    i18n.currentLocale = locale;
+    for (const inputMode of ['pointer', 'touch']) {
+      assert.notEqual(i18n.t(`${key}.${inputMode}`), `${key}.${inputMode}`, `${locale} ${inputMode} wording exists`);
+    }
+  }
+  i18n.currentLocale = 'en';
+  assert.equal(behavior.getInputHintKey('modals.pause.instructions.aim'), 'modals.pause.instructions.aim');
+
+  const campaign = createEngine();
+  campaign.mode = GAME_MODES.CAMPAIGN;
+  assert.equal(campaign.getModeBehavior().getInputHintKey(generic), generic);
+});

@@ -3719,7 +3719,7 @@ describe('Merge shake', () => {
     assert.equal(await page.locator(selector).isEnabled(), true);
   }
 
-  test('Pause shows the Basin tip, not the anchors and rotors tip', async () => {
+  test('Pause shows the Basin tip and keyboard line, not the generic ones', async () => {
     const viewport = VIEWPORTS[0];
     const { context, page, errors } = await openGame(viewport, { initStorage, path });
     try {
@@ -3727,6 +3727,7 @@ describe('Merge shake', () => {
       await clickMenuButton(page, viewport, '#btn-pause');
       await waitShown(page, '#modal-pause');
       assert.equal(await page.locator('#pause-instruction-tip').innerText(), localeText('en', 'modals.pause.instructions.mergeTip'));
+      assert.equal(await page.locator('#pause-instruction-keyboard').innerText(), localeText('en', 'modals.pause.instructions.mergeKeyboard.pointer'));
       assert.deepEqual(errors, []);
     } finally {
       await context.close();

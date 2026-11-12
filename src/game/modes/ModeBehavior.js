@@ -68,6 +68,15 @@ export class ModeBehavior {
     return false;
   }
 
+  /**
+   * Locale key a Pause input hint reads in this mode.
+   * @param {string} key - Generic hint key from MODAL_INPUT_HINTS.
+   * @returns {string} The key to read, the generic one unless the mode words it its own way.
+   */
+  getInputHintKey(key) {
+    return key;
+  }
+
   /** Locale key of the tip shown at the foot of the Pause instructions. */
   getPauseTipKey() {
     return 'modals.pause.instructions.physics';

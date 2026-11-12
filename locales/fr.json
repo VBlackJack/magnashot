@@ -1398,6 +1398,10 @@
           "touch": "Polarité & Arsenal : touchez 🧲 pour inverser la façon dont les sphères attirent votre tir (il courbe de l'autre côté), ou sélectionnez une sphère spéciale chargée par la Surcharge"
         },
         "physics": "Astuce : Détachez les ancres ou déséquilibrez les rotors pour créer des réactions en chaîne !",
+        "mergeKeyboard": {
+          "pointer": "Clavier : Flèches gauche/droite pour déplacer le rail, Entrée pour lâcher, F (ou 🧲) pour inverser la polarité, G pour secouer le bassin",
+          "touch": "Polarité & Secousse : touchez 🧲 pour inverser l'attraction entre les sphères, ou touchez Secousse quand elle est prête"
+        },
         "mergeTip": "Astuce : deux calibres identiques fusionnent au rang suivant. Utilisez la Secousse quand elle est prête pour projeter la pile vers le côté le plus vide !",
         "pad": "Manette : stick gauche pour viser (stick droit pour affiner), bouton du bas ou gâchette droite pour tirer, bouton de gauche pour échanger, bouton du haut pour inverser la polarité, boutons de tranche pour les sphères spéciales, Start pour la pause"
       },
