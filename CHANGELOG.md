@@ -4,6 +4,8 @@ All notable changes to **MagnaShot** are documented in this file.
 
 ## [Unreleased]
 
+## [1.27.0] - 2026-11-12
+
 ### Added
 - Merge Basin rising pressure: the overflow line comes down by 15 px per calibre fused above calibre 6, then by 15 px every 25 drops once calibre 10 is fused (up to 240 px). A step is telegraphed three drops ahead by a dashed line with marks on both walls, is announced politely, waits up to three drops for a settled sphere in its way, and a new sphere keeps its entry grace until it passes the lowered line. A shake now also gives every sphere two seconds of grace. Basin runs can now end by overflow in long sessions, and scores change accordingly.
 - Merge Basin events: every nine to fourteen drops a six-drop event (wind that blows left or right, low gravity, bouncy spheres, big drops that widen the spawn pool, or golden fusions worth 1.5 times the points) changes the physics or the scoring, is telegraphed on the badge one drop ahead and announced politely. Event draws are seeded and saved with the run. Scores change: events and golden fusions affect Basin records.
