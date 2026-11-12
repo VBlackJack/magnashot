@@ -167,14 +167,14 @@ export const DEFAULT_MODES_CONFIG = Object.freeze({
     polarityPulseAcceleration: 2500,
     polarityPulseSec: 0.65,
     spawnMaxTierIndex: 4,
-    supernovaBonus: 1500,
+    supernovaBonus: 4000,
     supernovaShockwaveImpulse: 340,
     chain: Object.freeze({ shakeAdvanceAt: 3 }),
     pressure: Object.freeze({
       fromFusedTier: 6,
       pxPerTier: 15,
-      topTier: 10,
-      topTierStepDrops: 25,
+      topTier: 11,
+      topTierStepDrops: 35,
       pxPerStep: 15,
       maxOffsetPx: 240,
       warnDrops: 3,
@@ -327,6 +327,32 @@ export const DEFAULT_MODES_CONFIG = Object.freeze({
         symbol: '10',
         polarity: -1,
         points: 1200
+      }),
+      Object.freeze({
+        id: 'merge_t10',
+        tier: 10,
+        radius: 66,
+        fill: '#a3e635',
+        highlight: '#d9f99d',
+        shadow: '#4d7c0f',
+        glow: 'rgba(163, 230, 53, 0.55)',
+        pattern: 'stripesD',
+        symbol: '11',
+        polarity: 1,
+        points: 1700
+      }),
+      Object.freeze({
+        id: 'merge_t11',
+        tier: 11,
+        radius: 72,
+        fill: '#94a3b8',
+        highlight: '#cbd5e1',
+        shadow: '#334155',
+        glow: 'rgba(148, 163, 184, 0.55)',
+        pattern: 'stripesV',
+        symbol: '12',
+        polarity: -1,
+        points: 2400
       })
     ])
   })

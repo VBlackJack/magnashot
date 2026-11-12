@@ -105,7 +105,7 @@ test('Merge Basin uses a horizontal Drop Rail, purist fair-play rules, and enabl
   assert.equal(engine.mergeDropX, modesConfig.merge.basinRightX - engine.currentBall.radius);
 });
 
-test('Merge Basin fuses touching identical tiers into tier + 1 and triggers Supernova on tier 9 + tier 9', () => {
+test('Merge Basin fuses touching identical tiers into tier + 1 and triggers Supernova on the last tier pair', () => {
   const engine = createEngine();
   engine.startMergeMode();
   const cfg = modesConfig.merge;
@@ -129,7 +129,7 @@ test('Merge Basin fuses touching identical tiers into tier + 1 and triggers Supe
   assert.equal(world.balls[0].radius, cfg.tiers[1].radius);
   assert.equal(engine.mergeBestTier, 2);
 
-  // Now fuse two max-tier (tier 9) spheres -> Supernova!
+  // Now fuse two max-tier spheres -> Supernova!
   world.balls.length = 0;
   world.ballMap.clear();
   const maxTier = cfg.tiers[cfg.tiers.length - 1];
@@ -1455,4 +1455,62 @@ test('Every pressure text exists in English and French', () => {
   }
   const fr = loadJson('./locales/fr.json').gameplay.feedback.merge.pressureWarning;
   assert.ok(fr.one.includes('lâcher') && fr.other.includes('lâchers'));
+});
+
+test('Merge Basin has twelve calibres, each with a distinct fill and a symbol', () => {
+  const { tiers } = modesConfig.merge;
+  assert.equal(tiers.length, 12);
+  assert.equal(new Set(tiers.map((spec) => spec.fill.toLowerCase())).size, tiers.length, 'fills are all distinct');
+  assert.equal(new Set(tiers.map((spec) => spec.id)).size, tiers.length);
+  tiers.forEach((spec, index) => {
+    assert.equal(spec.tier, index);
+    assert.equal(spec.symbol, String(index + 1), 'the symbol is the non-colour cue');
+    assert.ok(spec.radius > 0 && spec.points > 0);
+    if (index > 0) {
+      assert.ok(spec.radius > tiers[index - 1].radius && spec.points > tiers[index - 1].points);
+      assert.equal(spec.polarity, -tiers[index - 1].polarity, 'polarity alternates');
+    }
+  });
+});
+
+test('The default Merge tiers and Supernova numbers match configs/modes.json', () => {
+  const defaults = resolveModesConfig(null).merge;
+  const { tiers } = modesConfig.merge;
+  assert.equal(defaults.tiers.length, tiers.length);
+  tiers.forEach((spec, index) => {
+    for (const field of ['id', 'tier', 'radius', 'points', 'symbol', 'polarity', 'fill', 'highlight', 'shadow', 'glow', 'pattern']) {
+      assert.equal(defaults.tiers[index][field], spec[field], `${spec.id}.${field}`);
+    }
+  });
+  assert.equal(defaults.supernovaBonus, modesConfig.merge.supernovaBonus);
+  assert.equal(defaults.pressure.topTier, modesConfig.merge.pressure.topTier);
+  assert.equal(modesConfig.merge.pressure.topTier, tiers.length - 1);
+});
+
+test('Two calibre 11 spheres fuse into calibre 12', () => {
+  const engine = createEngine();
+  engine.startMergeMode();
+  const eleven = modesConfig.merge.tiers.length - 2;
+  const spec = modesConfig.merge.tiers[eleven];
+  const y = modesConfig.merge.basinFloorY - spec.radius;
+  placeBall(engine, eleven, 200, y);
+  placeBall(engine, eleven, 200 + spec.radius * 2 - 0.5, y);
+  mergeBehavior.onBeforePhysicsStep(engine, PHYSICS_DT);
+  assert.equal(engine.physicsWorld.balls.length, 1);
+  assert.equal(engine.physicsWorld.balls[0].mergeTier, eleven + 1);
+  assert.equal(engine.mergeBestTier, eleven + 2);
+});
+
+test('Two calibre 12 spheres trigger a Supernova worth the bonus times the combo', () => {
+  const engine = createEngine();
+  engine.startMergeMode();
+  const last = modesConfig.merge.tiers.length - 1;
+  const spec = modesConfig.merge.tiers[last];
+  placeBall(engine, last, 200, 500);
+  placeBall(engine, last, 200 + spec.radius * 2 - 1, 500);
+  const before = engine.score;
+  mergeBehavior.onBeforePhysicsStep(engine, PHYSICS_DT);
+  assert.equal(engine.physicsWorld.balls.length, 0);
+  assert.equal(engine.modeState.supernovas, 1);
+  assert.equal(engine.score - before, modesConfig.merge.supernovaBonus * Math.max(1, engine.combo));
 });

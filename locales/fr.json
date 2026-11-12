@@ -787,7 +787,7 @@
         "convoy": "Convoi sur Rail",
         "convoyDesc": "Tourelle 360° • Convoi mobile • Rappel magnétique",
         "merge": "Fusion en Bassin",
-        "mergeDesc": "10 calibres • Rail de lâcher • Onde de choc de fusion • Secousse",
+        "mergeDesc": "12 calibres • Rail de lâcher • Onde de choc de fusion • Secousse",
         "mergeRecord": "Calibre {{tier}} • Record : {{score}}"
       },
       "jumpCurrent": "Niveau en cours",
@@ -1097,8 +1097,8 @@
             },
             "merge": {
               "icon": "🫧",
-              "name": "Fusion en Bassin (10 Calibres)",
-              "description": "Lâchez vos billes depuis un rail supérieur dans un bassin physique. Deux calibres identiques fusionnent au rang suivant (1 à 10) avec une onde de choc. Chaque appui sur Polarité rapproche un instant les calibres identiques et écarte les autres. La secousse se recharge après quelques lâchers et pousse tout le bassin sur le côté."
+              "name": "Fusion en Bassin (12 Calibres)",
+              "description": "Lâchez vos billes depuis un rail supérieur dans un bassin physique. Deux calibres identiques fusionnent au rang suivant (1 à 12) avec une onde de choc. Chaque appui sur Polarité rapproche un instant les calibres identiques et écarte les autres. La secousse se recharge après quelques lâchers et pousse tout le bassin sur le côté."
             }
           }
         }

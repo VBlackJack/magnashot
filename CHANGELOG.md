@@ -4,6 +4,9 @@ All notable changes to **MagnaShot** are documented in this file.
 
 ## [Unreleased]
 
+### Added
+- Merge Basin calibres 11 and 12: the basin now fuses up to calibre 12, and the Supernova needs two calibre 12 spheres (it was two calibre 10 spheres) and is worth 4000 (it was 1500) times the combo. The overflow line now starts its stepped descent once calibre 11 is fused, every 35 drops (it was every 25 drops after calibre 10). Basin scores are not comparable with earlier versions.
+
 ## [1.27.0] - 2026-11-12
 
 ### Added
