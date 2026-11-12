@@ -3719,6 +3719,20 @@ describe('Merge shake', () => {
     assert.equal(await page.locator(selector).isEnabled(), true);
   }
 
+  test('Pause shows the Basin tip, not the anchors and rotors tip', async () => {
+    const viewport = VIEWPORTS[0];
+    const { context, page, errors } = await openGame(viewport, { initStorage, path });
+    try {
+      await startBasin(page, viewport);
+      await clickMenuButton(page, viewport, '#btn-pause');
+      await waitShown(page, '#modal-pause');
+      assert.equal(await page.locator('#pause-instruction-tip').innerText(), localeText('en', 'modals.pause.instructions.mergeTip'));
+      assert.deepEqual(errors, []);
+    } finally {
+      await context.close();
+    }
+  });
+
   test('the desktop HUD, keyboard and right bumper each use one charge', async () => {
     const viewport = VIEWPORTS[0];
     const { context, page, errors } = await openGame(viewport, { initStorage, path, initScript: installPadStub });

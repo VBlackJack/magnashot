@@ -68,6 +68,11 @@ export class ModeBehavior {
     return false;
   }
 
+  /** Locale key of the tip shown at the foot of the Pause instructions. */
+  getPauseTipKey() {
+    return 'modals.pause.instructions.physics';
+  }
+
   /** False for a mode without colour matches or anchors, where the basics hint would mislead. */
   teachesMatchBasics() {
     return true;

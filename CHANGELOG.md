@@ -8,6 +8,10 @@ All notable changes to **MagnaShot** are documented in this file.
 - The Merge Basin shake is now part of every Basin run: the `?mergeShake=1` URL is no longer needed, records set with the shake prototype now count as Merge Basin records, and shake runs unlock achievements.
 - The Merge Basin shake is about seven times stronger: a sideways shove (`maxImpulsePxPerSec` 120 to 500) plus a small hop (`liftImpulsePxPerSec` 400) frees the pile from floor friction, so it visibly reshuffles the basin instead of moving it a few pixels.
 
+### Fixed
+- Merge Basin no longer shows the hint about matching three spheres or cutting anchors, which the mode does not have.
+- The Pause menu in Merge Basin now ends with a tip about calibre fusion and the Shake instead of the anchors and rotors tip.
+
 ## [1.26.1] - 2026-11-12
 
 ### Removed
