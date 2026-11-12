@@ -2284,6 +2284,7 @@
     "wallCornerLength": 16,
     "wallCornerLineWidth": 2.5,
     "dangerLineColor": "#ff4757",
+    "dangerZoneColor": "#ff4757",
     "dangerLineDash": [
       10,
       8
@@ -2328,6 +2329,7 @@
     "frozenOverlayColor": "rgba(125, 211, 252, 0.55)",
     "launcherBaseColor": "#1e293b",
     "launcherBarrelColor": "#64748b",
+    "aimLineColor": "#38bdf8",
     "launcherAccentColor": "#38bdf8",
     "cancelAimColor": "#ff4757",
     "targetHighlightColor": "#fef08a",
