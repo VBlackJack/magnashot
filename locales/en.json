@@ -548,6 +548,8 @@
         },
         "shapeStart": "Basin: {{name}}",
         "shapeAnnounce": "Basin: {{name}}. {{description}}",
+        "specialAnnounce": "{{name}} coming up: {{description}}",
+        "bombBoom": "Boom! +{{points}}",
         "pressureStep": "THE LINE CAME DOWN",
         "pressureStepAnnounce": "The overflow line came down.",
         "pressureWarning": {
@@ -557,6 +559,23 @@
       }
     },
     "merge": {
+      "specials": {
+        "joker": {
+          "name": "Joker",
+          "description": "Fuses with the first plain sphere it touches, as if two of that calibre met.",
+          "icon": "★︎"
+        },
+        "ice": {
+          "name": "Frozen sphere",
+          "description": "Cannot fuse until a fusion shockwave reaches it or it thaws.",
+          "icon": "❄︎"
+        },
+        "bomb": {
+          "name": "Bomb",
+          "description": "Goes off soon after landing and clears the small spheres around it.",
+          "icon": "✸︎"
+        }
+      },
       "shapes": {
         "classic": {
           "name": "Classic",

@@ -46,6 +46,7 @@ const EXPECTED_PROTOTYPE_NAMES = [
   'refreshMergeEventBadge',
   'refreshMergeContractBadge',
   'announceMergeShape',
+  'announceMergeSpecial',
   'announceMergeEventChanges',
   'announceMergeContractChanges',
   'announceMergePressureChanges',

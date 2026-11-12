@@ -116,6 +116,7 @@ export const uiHudRefreshMethods = {
     const badge = this.elements.mergeEventBadge;
     const view = engine.getMergeEventState?.() ?? null;
     this.announceMergeShape(engine.getMergeShapeState?.() ?? null);
+    this.announceMergeSpecial(engine.getMergeSpecialState?.() ?? null);
     if (!badge) {
       return;
     }
@@ -221,6 +222,26 @@ export const uiHudRefreshMethods = {
     this.announce(t('gameplay.feedback.merge.shapeAnnounce', {
       name: t(`gameplay.merge.shapes.${view.shapeId}.name`),
       description: t(`gameplay.merge.shapes.${view.shapeId}.description`)
+    }));
+  },
+
+  /**
+   * Polite announcement of a special sphere, once per kind and run (the engine only raises a
+   * new serial the first time a kind reaches the launcher).
+   * @param {{kind: string|null, announceSerial: number|null}|null} view - Special view.
+   */
+  announceMergeSpecial(view) {
+    if (!view) {
+      this.mergeSpecialAnnouncedSerial = null;
+      return;
+    }
+    if (view.announceSerial === null || view.announceSerial === this.mergeSpecialAnnouncedSerial) {
+      return;
+    }
+    this.mergeSpecialAnnouncedSerial = view.announceSerial;
+    this.announce(t('gameplay.feedback.merge.specialAnnounce', {
+      name: t(`gameplay.merge.specials.${view.kind}.name`),
+      description: t(`gameplay.merge.specials.${view.kind}.description`)
     }));
   },
 

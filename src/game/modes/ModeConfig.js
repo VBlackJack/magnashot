@@ -227,6 +227,37 @@ export const DEFAULT_MODES_CONFIG = Object.freeze({
         fusionCount: Object.freeze({ count: 6, points: 1500 })
       })
     }),
+    specials: Object.freeze({
+      fromDrop: 10,
+      chance: 0.05,
+      render: Object.freeze({
+        ringWidth: 3,
+        ringGap: 3,
+        glyphSizeFactor: 1.1,
+        glyphFill: '#ffffff',
+        glyphStroke: '#101018',
+        glyphStrokeWidth: 3,
+        fontFamily: 'sans-serif',
+        iceColor: '#d8f1ff',
+        iceAlpha: 0.62,
+        iceOutlineColor: '#ffffff',
+        iceOutlineDash: Object.freeze([4, 3]),
+        bombColor: '#14141c',
+        bombAlpha: 0.88
+      }),
+      kinds: Object.freeze({
+        joker: Object.freeze({ weight: 1, sizeTierIndex: 2 }),
+        ice: Object.freeze({ weight: 1, thawTimeoutSec: 8, maxTierIndex: 4 }),
+        bomb: Object.freeze({
+          weight: 1,
+          fuseSec: 1,
+          radiusPx: 90,
+          maxTierIndex: 3,
+          pointsPerSphere: 40,
+          sizeTierIndex: 2
+        })
+      })
+    }),
     tiers: Object.freeze([
       Object.freeze({
         id: 'merge_t0',
@@ -419,6 +450,23 @@ function resolveMergeContracts(partial) {
 }
 
 /**
+ * Merge Basin special spheres over their defaults, kind by kind, so a partial config keeps
+ * every default kind and number; a kind is switched off with a weight of zero.
+ */
+function resolveMergeSpecials(partial) {
+  const defaults = DEFAULT_MODES_CONFIG.merge.specials;
+  const source = partial && typeof partial === 'object' ? partial : {};
+  const kindsSource = source.kinds && typeof source.kinds === 'object' ? source.kinds : {};
+  const kinds = {};
+  for (const id of new Set([...Object.keys(defaults.kinds), ...Object.keys(kindsSource)])) {
+    const entry = kindsSource[id];
+    kinds[id] = { ...(defaults.kinds[id] ?? {}), ...(entry && typeof entry === 'object' ? entry : {}) };
+  }
+  const render = { ...defaults.render, ...(source.render && typeof source.render === 'object' ? source.render : {}) };
+  return { ...defaults, ...source, render, kinds };
+}
+
+/**
  * Merge Basin shapes over their defaults, shape by shape, so a partial config keeps every
  * default number: the id list and the weights are replaced only when the config gives some.
  */
@@ -457,6 +505,7 @@ export function resolveModesConfig(modesConfig) {
       shapes: resolveMergeShapes(modesConfig.merge?.shapes),
       events: resolveMergeEvents(modesConfig.merge?.events),
       contracts: resolveMergeContracts(modesConfig.merge?.contracts),
+      specials: resolveMergeSpecials(modesConfig.merge?.specials),
       tiers: Array.isArray(modesConfig.merge?.tiers) && modesConfig.merge.tiers.length > 0
         ? modesConfig.merge.tiers
         : DEFAULT_MODES_CONFIG.merge.tiers

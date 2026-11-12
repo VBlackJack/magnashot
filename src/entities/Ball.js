@@ -72,6 +72,10 @@ export class Ball {
     this.portalCooldown = 0;
     this.flightSteps = 0;
     this.pulsePhase = Math.random() * MATH_CONSTANTS.TWO_PI;
+    // Merge Basin special sphere ('joker' | 'ice' | 'bomb'), or null for a plain one, and the
+    // seconds left on its thaw delay or fuse (null until it has landed).
+    this.mergeKind = null;
+    this.mergeSpecialSec = null;
   }
 
   savePreviousPosition() {

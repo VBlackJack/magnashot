@@ -32,6 +32,16 @@ import {
   getMergeEventTextKey
 } from './MergeEvents.js';
 import { MERGE_CONTRACT_OUTCOMES, MERGE_CONTRACT_TYPES } from './MergeContracts.js';
+import {
+  MERGE_JOKER_RING_COLORS,
+  MERGE_SPECIAL_KINDS,
+  getMergeCalibre,
+  getMergeFusionCalibre,
+  haveSameMergeCalibre,
+  isMergeFrozen,
+  pickMergeSpecialKind,
+  sanitizeMergeSpecialKind
+} from './MergeSpecials.js';
 
 const INITIAL_DROP_VY = 45;
 const ENTRY_GRACE_SEC = 0.85;
@@ -89,6 +99,13 @@ const PEG_OUTLINE_ALPHA = 0.9;
 const SHAPE_TEXT_LINES_BELOW_EVENT = 1;
 /** Restitution that, in a settling pass, only removes the velocity heading into a wall, floor or peg. */
 const SETTLE_RESTITUTION = -1;
+
+const SPECIAL_ROLL_STREAM = 'mergeSpecial';
+const SPECIAL_KIND_ROLL_STREAM = 'mergeSpecialKind';
+const BOMB_EFFECT_COMBO = 1;
+const BOMB_BURST_SCALE = 2;
+const BOMB_TEXT_LINES_ABOVE = 1;
+const FUSION_PAIR_FIRST_ITERATION = 0;
 
 const MERGE_CHROME = Object.freeze({
   ambientLiquid: false,
@@ -790,10 +807,106 @@ export class MergeBehavior extends ModeBehavior {
     if (!ball || ball.specialType) {
       return;
     }
-    const spec = this.getTierSpecById(engine, ball.colorId);
+    const kind = sanitizeMergeSpecialKind(ball.mergeKind, this.getSpecialsConfig(engine)?.kinds);
+    ball.mergeKind = kind;
+    const spec = this.resolveKindSpec(engine, kind, this.getTierSpecById(engine, ball.colorId));
     ball.colorId = spec.id;
     ball.radius = spec.radius;
-    ball.mergeTier = spec.tier;
+    ball.mergeTier = this.hasOwnCalibre(kind) ? spec.tier : null;
+  }
+
+  /** Special spheres config of the Basin, or null when the config offers none. */
+  getSpecialsConfig(engine) {
+    return engine.modesConfig.merge.specials ?? null;
+  }
+
+  /** True for a sphere that matches by its calibre: every kind but the Joker and the Bomb. */
+  hasOwnCalibre(kind) {
+    return kind !== MERGE_SPECIAL_KINDS.JOKER && kind !== MERGE_SPECIAL_KINDS.BOMB;
+  }
+
+  /**
+   * Tier spec a sphere of `kind` is built from: a Joker and a Bomb have a fixed size, an Ice
+   * sphere is held to its highest calibre, a plain sphere keeps `baseSpec`.
+   */
+  resolveKindSpec(engine, kind, baseSpec) {
+    const kindConfig = kind ? this.getSpecialsConfig(engine)?.kinds?.[kind] : null;
+    if (!kindConfig) {
+      return baseSpec;
+    }
+    if (!this.hasOwnCalibre(kind)) {
+      return this.getTierSpecByIndex(engine, kindConfig.sizeTierIndex);
+    }
+    return baseSpec.tier > kindConfig.maxTierIndex ? this.getTierSpecByIndex(engine, kindConfig.maxTierIndex) : baseSpec;
+  }
+
+  /** Seconds a special sphere of `kind` waits once landed: the thaw delay or the fuse, else null. */
+  getSpecialTimerSec(engine, kind) {
+    const kindConfig = this.getSpecialsConfig(engine)?.kinds?.[kind];
+    if (kind === MERGE_SPECIAL_KINDS.ICE) {
+      return kindConfig?.thawTimeoutSec ?? null;
+    }
+    return kind === MERGE_SPECIAL_KINDS.BOMB ? kindConfig?.fuseSec ?? null : null;
+  }
+
+  /** Pads or trims the queued kinds so they line up with the queued colors. */
+  alignUpcomingKinds(engine) {
+    const kinds = engine.modeState.upcomingKinds;
+    kinds.length = Math.min(kinds.length, engine.upcomingColorIds.length);
+    while (kinds.length < engine.upcomingColorIds.length) {
+      kinds.push(null);
+    }
+  }
+
+  /** True when a special sphere is already loaded, next in line or queued. */
+  hasSpecialInView(engine) {
+    return Boolean(engine.currentBall?.mergeKind)
+      || Boolean(engine.nextBall?.mergeKind)
+      || engine.modeState.upcomingKinds.some(Boolean);
+  }
+
+  /**
+   * After a successful drop, maybe turns the ball just queued into a special sphere. Starts
+   * from the configured drop, never adds a second special to what the player can see, and
+   * draws from indexed streams so a seeded run repeats.
+   */
+  rollSpecialSpawn(engine) {
+    const specials = this.getSpecialsConfig(engine);
+    const state = engine.modeState;
+    this.alignUpcomingKinds(engine);
+    const queueLength = engine.upcomingColorIds.length;
+    if (!specials || queueLength === 0 || state.dropCount < specials.fromDrop || this.hasSpecialInView(engine)) {
+      return;
+    }
+    if (engine.drawSeededRoll(SPECIAL_ROLL_STREAM, state.dropCount) >= specials.chance) {
+      return;
+    }
+    const kind = pickMergeSpecialKind(specials.kinds, engine.drawSeededRoll(SPECIAL_KIND_ROLL_STREAM, state.dropCount));
+    if (kind) {
+      state.upcomingKinds[queueLength - 1] = kind;
+    }
+  }
+
+  /** Records, and flags for a polite announcement, the first appearance of each kind in the launcher. */
+  noteLauncherSpecials(engine) {
+    const state = engine.modeState;
+    for (const ball of [engine.currentBall, engine.nextBall]) {
+      const kind = ball?.mergeKind;
+      if (kind && !state.specialsSeen.includes(kind)) {
+        state.specialsSeen.push(kind);
+        engine.mergeSpecialSerial = (engine.mergeSpecialSerial ?? 0) + 1;
+        state.specialAnnounce = { kind, serial: engine.mergeSpecialSerial };
+      }
+    }
+  }
+
+  /** Read-only view of the latest special announcement for the HUD. */
+  getSpecialView(engine) {
+    const state = engine.modeState;
+    if (!state) {
+      return null;
+    }
+    return { kind: state.specialAnnounce?.kind ?? null, announceSerial: state.specialAnnounce?.serial ?? null };
   }
 
   clampDropX(engine, rawX, radius) {
@@ -829,6 +942,10 @@ export class MergeBehavior extends ModeBehavior {
       ...this.createContractState(engine),
       shapeId: this.pickShapeId(engine, engine.drawSeededRoll('mergeShape', 0)),
       shapeAnnounceSerial: engine.isRestoringRun ? null : (engine.mergeShapeSerial = (engine.mergeShapeSerial ?? 0) + 1),
+      dropCount: 0,
+      upcomingKinds: [],
+      specialsSeen: [],
+      specialAnnounce: null,
       ...this.createPressureState()
     };
     if (cfg.events) {
@@ -863,6 +980,7 @@ export class MergeBehavior extends ModeBehavior {
     const cfg = engine.modesConfig.merge;
     this.syncLauncherBallTier(engine, engine.currentBall);
     const tierSpec = this.getTierSpecById(engine, engine.currentBall.colorId);
+    const kind = engine.currentBall.mergeKind;
     const dropX = this.clampDropX(engine, engine.mergeDropX, tierSpec.radius);
 
     engine.sampleShotTimeline();
@@ -878,7 +996,9 @@ export class MergeBehavior extends ModeBehavior {
       colorId: tierSpec.id,
       isAnchor: false
     });
-    dropped.mergeTier = tierSpec.tier;
+    dropped.mergeTier = engine.currentBall.mergeTier;
+    dropped.mergeKind = kind;
+    dropped.mergeSpecialSec = null;
     dropped.mergeGraceSec = ENTRY_GRACE_SEC;
     dropped.mergeEntering = true;
     dropped.mergeEntrySec = 0;
@@ -893,11 +1013,17 @@ export class MergeBehavior extends ModeBehavior {
     engine.combo = 0;
     engine.modeState.chainRewardGranted = false;
 
+    engine.modeState.dropCount += 1;
+    this.alignUpcomingKinds(engine);
+    const carriedKind = engine.modeState.upcomingKinds.shift() ?? null;
     engine.currentBall = engine.nextBall;
     const upcoming = engine.takeUpcomingBall();
     engine.nextBall = engine.createRandomLauncherBall(null, upcoming.colorId);
+    engine.nextBall.mergeKind = carriedKind;
+    this.rollSpecialSpawn(engine);
     this.syncLauncherBallTier(engine, engine.currentBall);
     this.syncLauncherBallTier(engine, engine.nextBall);
+    this.noteLauncherSpecials(engine);
     engine.mergeDropX = this.clampDropX(engine, engine.mergeDropX, engine.currentBall.radius);
 
     this.advanceEventCycle(engine);
@@ -980,7 +1106,8 @@ export class MergeBehavior extends ModeBehavior {
         const dist = Math.sqrt(distSq);
         const falloff = 1 - dist / cfg.polarityBiasRange;
         // Same tier pulls together to complete merges; mismatched tiers nudge apart to clear blockers.
-        const sign = a.mergeTier === b.mergeTier ? 1 : -0.55;
+        // A sphere without a calibre (Joker, Bomb) never counts as the same tier as another one.
+        const sign = haveSameMergeCalibre(a, b) ? 1 : -0.55;
         const strength = pulsing ? cfg.polarityPulseAcceleration : cfg.polarityBiasAcceleration;
         const accel = strength * falloff * sign * dtSec;
         const nx = dx / dist;
@@ -1000,12 +1127,16 @@ export class MergeBehavior extends ModeBehavior {
       const dx = other.x - cx;
       const dy = other.y - cy;
       const dist = Math.hypot(dx, dy);
+      // The shockwave frees a frozen sphere when it reaches its edge, whatever its calibre.
+      if (isMergeFrozen(other) && dist - other.radius <= maxDist) {
+        this.thawBall(other);
+      }
       if (dist <= MATH_CONSTANTS.EPSILON || dist > maxDist) {
         continue;
       }
       const falloff = 1 - dist / maxDist;
       const massScale = (sourceRadius * sourceRadius) / Math.max(196, other.radius * other.radius);
-      const dirSign = other.mergeTier === targetTier ? -0.45 : 1;
+      const dirSign = getMergeCalibre(other) === targetTier ? -0.45 : 1;
       const push = impulse * falloff * Math.min(1.4, massScale) * dirSign;
       other.vx += (dx / dist) * push;
       other.vy += (dy / dist) * push;
@@ -1079,6 +1210,7 @@ export class MergeBehavior extends ModeBehavior {
 
     const mergePairs = [];
     const mergedIds = new Set();
+    const topCalibre = cfg.tiers.length - 1;
 
     const geometry = this.getBasinGeometry(engine);
     const pegRestitution = cfg.shapes?.[MERGE_SHAPE_IDS.PEGS]?.restitution ?? 0;
@@ -1132,9 +1264,9 @@ export class MergeBehavior extends ModeBehavior {
           const distSq = dx * dx + dy * dy;
 
           if (
-            iter === 0
-            && a.mergeTier === b.mergeTier
+            iter === FUSION_PAIR_FIRST_ITERATION
             && distSq <= (minDist + TOUCH_MERGE_TOLERANCE_PX) * (minDist + TOUCH_MERGE_TOLERANCE_PX)
+            && getMergeFusionCalibre(a, b, topCalibre) !== null
           ) {
             mergedIds.add(a.id);
             mergedIds.add(b.id);
@@ -1187,6 +1319,7 @@ export class MergeBehavior extends ModeBehavior {
     if (mergePairs.length > 0) {
       this.resolveMergePairs(engine, mergePairs);
     }
+    this.updateSpecials(engine, dtSec);
 
     // Check top overflow danger line with grace timer
     const overflowLineY = this.getOverflowLineY(engine);
@@ -1239,6 +1372,119 @@ export class MergeBehavior extends ModeBehavior {
     }
   }
 
+  /** Frees a frozen sphere: it becomes a plain sphere of its calibre. */
+  thawBall(ball) {
+    ball.mergeKind = null;
+    ball.mergeSpecialSec = null;
+  }
+
+  /**
+   * True once a sphere rests on the floor, on a peg or on a sphere below it. A wall alone is
+   * not a landing, and neither is a sphere still entering the basin.
+   */
+  hasLanded(engine, ball, geometry) {
+    if (ball.mergeEntering) {
+      return false;
+    }
+    if (ball.y + ball.radius >= geometry.floor - TOUCH_MERGE_TOLERANCE_PX) {
+      return true;
+    }
+    if (geometry.pegs.some((peg) => Math.hypot(peg.x - ball.x, peg.y - ball.y)
+      <= peg.radius + ball.radius + TOUCH_MERGE_TOLERANCE_PX)) {
+      return true;
+    }
+    return engine.physicsWorld.balls.some((other) => other !== ball
+      && other.y > ball.y
+      && Math.hypot(other.x - ball.x, other.y - ball.y) <= other.radius + ball.radius + TOUCH_MERGE_TOLERANCE_PX);
+  }
+
+  /**
+   * Runs the timers of the Ice and Bomb spheres on the board: a timer starts when the sphere
+   * lands, a thaw frees the Ice sphere and a burnt fuse sets the Bomb off. Ordered by id so
+   * two bombs always go off in the same order.
+   */
+  updateSpecials(engine, dtSec) {
+    const timed = engine.physicsWorld.balls
+      .filter((ball) => ball.mergeKind === MERGE_SPECIAL_KINDS.ICE || ball.mergeKind === MERGE_SPECIAL_KINDS.BOMB)
+      .sort((a, b) => a.id - b.id);
+    if (timed.length === 0) {
+      return;
+    }
+    const geometry = this.getBasinGeometry(engine);
+    for (const ball of timed) {
+      if (!engine.physicsWorld.ballMap.has(ball.id)) {
+        continue;
+      }
+      if (!Number.isFinite(ball.mergeSpecialSec)) {
+        if (this.hasLanded(engine, ball, geometry)) {
+          ball.mergeSpecialSec = this.getSpecialTimerSec(engine, ball.mergeKind);
+        }
+        continue;
+      }
+      ball.mergeSpecialSec -= dtSec;
+      if (ball.mergeSpecialSec > 0) {
+        continue;
+      }
+      if (ball.mergeKind === MERGE_SPECIAL_KINDS.ICE) {
+        this.thawBall(ball);
+      } else {
+        this.explodeBomb(engine, ball);
+      }
+    }
+  }
+
+  /** True when a Bomb takes `ball` with it: a calibre at or below the Bomb's limit, never another Bomb. */
+  isBombVictim(engine, ball) {
+    const kinds = this.getSpecialsConfig(engine).kinds;
+    if (ball.mergeKind === MERGE_SPECIAL_KINDS.BOMB) {
+      return false;
+    }
+    const calibre = ball.mergeKind === MERGE_SPECIAL_KINDS.JOKER
+      ? kinds[MERGE_SPECIAL_KINDS.JOKER]?.sizeTierIndex
+      : getMergeCalibre(ball);
+    return Number.isInteger(calibre) && calibre <= kinds[MERGE_SPECIAL_KINDS.BOMB].maxTierIndex;
+  }
+
+  /**
+   * Sets a Bomb off: every small sphere within its radius goes, in id order, for a flat award
+   * that skips the combo and the golden event; then the Bomb itself goes.
+   */
+  explodeBomb(engine, bomb) {
+    const world = engine.physicsWorld;
+    const config = this.getSpecialsConfig(engine).kinds[MERGE_SPECIAL_KINDS.BOMB];
+    const victims = world.balls
+      .filter((ball) => ball !== bomb
+        && this.isBombVictim(engine, ball)
+        && Math.hypot(ball.x - bomb.x, ball.y - bomb.y) <= config.radiusPx)
+      .sort((a, b) => a.id - b.id);
+    const points = victims.length * config.pointsPerSphere;
+    const { x, y } = bomb;
+    world.removeBall(bomb);
+    for (const victim of victims) {
+      world.removeBall(victim);
+    }
+    engine.addScore(points);
+    const color = engine.gameConfig.theme.dangerLineColor;
+    engine.audioManager.playEffect('match', BOMB_EFFECT_COMBO);
+    engine.particleSystem.spawnShockwave(x, y, color, config.radiusPx);
+    engine.particleSystem.spawnBurst(
+      x,
+      y,
+      color,
+      engine.gameConfig.juice.matchBurstCount * BOMB_BURST_SCALE,
+      engine.gameConfig.juice.matchBurstSpeed
+    );
+    engine.particleSystem.spawnFloatingText(
+      x,
+      y - engine.gameConfig.canvas.floatingTextOffsetY * BOMB_TEXT_LINES_ABOVE,
+      t('gameplay.feedback.merge.bombBoom', { points }),
+      color
+    );
+    engine.persistRunHighScore();
+    engine.saveRunSnapshot();
+    engine.notifyUI();
+  }
+
   resolveMergePairs(engine, mergePairs) {
     const cfg = engine.modesConfig.merge;
     const scoring = engine.gameConfig.scoring;
@@ -1248,11 +1494,21 @@ export class MergeBehavior extends ModeBehavior {
       if (!world.ballMap.has(a.id) || !world.ballMap.has(b.id)) {
         continue;
       }
-      const mx = (a.x + b.x) * MATH_CONSTANTS.HALF;
-      const my = (a.y + b.y) * MATH_CONSTANTS.HALF;
+      let mx = (a.x + b.x) * MATH_CONSTANTS.HALF;
+      let my = (a.y + b.y) * MATH_CONSTANTS.HALF;
       const avgVx = (a.vx + b.vx) * MATH_CONSTANTS.HALF * 0.5;
       const avgVy = (a.vy + b.vy) * MATH_CONSTANTS.HALF * 0.5;
-      const tierIndex = a.mergeTier ?? 0;
+      const tierIndex = getMergeFusionCalibre(a, b, cfg.tiers.length - 1) ?? getMergeCalibre(a) ?? 0;
+      const joker = [a, b].find((ball) => ball.mergeKind === MERGE_SPECIAL_KINDS.JOKER);
+      if (joker) {
+        // A Joker fuses at the point where it touches the other sphere.
+        const other = joker === a ? b : a;
+        const gap = Math.hypot(other.x - joker.x, other.y - joker.y);
+        if (gap > MATH_CONSTANTS.EPSILON) {
+          mx = joker.x + ((other.x - joker.x) / gap) * joker.radius;
+          my = joker.y + ((other.y - joker.y) / gap) * joker.radius;
+        }
+      }
 
       world.removeBall(a);
       world.removeBall(b);
@@ -1393,7 +1649,16 @@ export class MergeBehavior extends ModeBehavior {
       holdDrops: state.holdDrops ?? 0,
       topTierDrops: state.topTierDrops ?? null,
       shapeId: this.getShapeId(engine),
-      ballTiers: engine.physicsWorld.balls.map((b) => (Number.isInteger(b.mergeTier) ? b.mergeTier : 0))
+      dropCount: state.dropCount ?? 0,
+      specialsSeen: [...(state.specialsSeen ?? [])],
+      launcherKinds: {
+        current: engine.currentBall?.mergeKind ?? null,
+        next: engine.nextBall?.mergeKind ?? null,
+        queue: [...(state.upcomingKinds ?? [])]
+      },
+      ballTiers: engine.physicsWorld.balls.map((b) => (Number.isInteger(b.mergeTier) ? b.mergeTier : 0)),
+      ballKinds: engine.physicsWorld.balls.map((b) => b.mergeKind ?? null),
+      ballSpecial: engine.physicsWorld.balls.map((b) => (Number.isFinite(b.mergeSpecialSec) ? b.mergeSpecialSec : null))
     };
   }
 
@@ -1433,8 +1698,13 @@ export class MergeBehavior extends ModeBehavior {
       ...this.createContractState(engine),
       shapeId: this.getShapeIds(engine).includes(rawState.shapeId) ? rawState.shapeId : MERGE_SHAPE_IDS.CLASSIC,
       shapeAnnounceSerial: null,
+      dropCount: Number.isInteger(rawState.dropCount) ? Math.max(0, rawState.dropCount) : 0,
+      upcomingKinds: [],
+      specialsSeen: [],
+      specialAnnounce: null,
       ...this.createPressureState()
     };
+    this.restoreSpecialsState(engine, rawState);
     if (cfg.events) {
       this.restoreEventCycle(engine, rawState);
     }
@@ -1447,8 +1717,12 @@ export class MergeBehavior extends ModeBehavior {
     const restoredLineY = this.getOverflowLineY(engine);
     for (let i = 0; i < balls.length; i++) {
       const savedTier = Number.isInteger(rawState.ballTiers[i]) ? rawState.ballTiers[i] : 0;
-      const spec = this.getTierSpecByIndex(engine, savedTier);
-      balls[i].mergeTier = spec.tier;
+      // A legacy snapshot holds no kinds: every sphere is a plain one.
+      const kind = sanitizeMergeSpecialKind(rawState.ballKinds?.[i], cfg.specials?.kinds);
+      const spec = this.resolveKindSpec(engine, kind, this.getTierSpecByIndex(engine, savedTier));
+      balls[i].mergeTier = this.hasOwnCalibre(kind) ? spec.tier : null;
+      balls[i].mergeKind = kind;
+      balls[i].mergeSpecialSec = this.sanitizeSpecialTimer(engine, kind, rawState.ballSpecial?.[i]);
       balls[i].colorId = spec.id;
       balls[i].radius = spec.radius;
       balls[i].mergeGraceSec = this.getStepGraceSec(engine, balls[i], restoredLineY, 0);
@@ -1459,6 +1733,38 @@ export class MergeBehavior extends ModeBehavior {
     }
     this.syncLauncherBallTier(engine, engine.currentBall);
     this.syncLauncherBallTier(engine, engine.nextBall);
+  }
+
+  /** Timer kept from a snapshot: a finite number within the kind's own delay, else null (not started). */
+  sanitizeSpecialTimer(engine, kind, raw) {
+    const limit = this.getSpecialTimerSec(engine, kind);
+    return Number.isFinite(raw) && limit !== null ? Math.min(limit, Math.max(0, raw)) : null;
+  }
+
+  /**
+   * Restores the special spheres of the launcher and the announcements already made. At most
+   * one special is kept in view, the first found, whatever a damaged snapshot holds.
+   */
+  restoreSpecialsState(engine, rawState) {
+    const kindsConfig = this.getSpecialsConfig(engine)?.kinds;
+    const state = engine.modeState;
+    const saved = rawState.launcherKinds && typeof rawState.launcherKinds === 'object' ? rawState.launcherKinds : {};
+    state.specialsSeen = (Array.isArray(rawState.specialsSeen) ? rawState.specialsSeen : [])
+      .map((kind) => sanitizeMergeSpecialKind(kind, kindsConfig))
+      .filter((kind, idx, all) => kind !== null && all.indexOf(kind) === idx);
+    let kept = false;
+    const keepOne = (raw) => {
+      const kind = kept ? null : sanitizeMergeSpecialKind(raw, kindsConfig);
+      kept = kept || kind !== null;
+      return kind;
+    };
+    if (engine.currentBall) {
+      engine.currentBall.mergeKind = keepOne(saved.current);
+    }
+    if (engine.nextBall) {
+      engine.nextBall.mergeKind = keepOne(saved.next);
+    }
+    state.upcomingKinds = (Array.isArray(saved.queue) ? saved.queue : []).map(keepOne);
   }
 
   /** Restores the event cycle from a snapshot; a legacy snapshot without it gets a fresh gap. */
@@ -1581,8 +1887,90 @@ export class MergeBehavior extends ModeBehavior {
     }
   }
 
-  /** Rings every sphere still under a polarity pulse. Nothing moves, so reduced motion keeps it. */
+  /**
+   * Marks a special sphere with a symbol and a ring or body that a colour-blind player can
+   * tell apart: a star on a rainbow ring (Joker), a snowflake on a frosted body (Ice), a spark
+   * on a dark body with a fuse ring once lit (Bomb). Nothing here moves.
+   */
+  drawSpecialMark(ctx, engine, theme, ball, x, y) {
+    const kind = ball.mergeKind;
+    const radius = ball.radius;
+    const look = this.getSpecialsConfig(engine).render;
+    ctx.save();
+    if (kind === MERGE_SPECIAL_KINDS.BOMB) {
+      ctx.globalAlpha = look.bombAlpha;
+      ctx.fillStyle = look.bombColor;
+      ctx.beginPath();
+      ctx.arc(x, y, radius, 0, MATH_CONSTANTS.TWO_PI);
+      ctx.fill();
+      ctx.globalAlpha = 1;
+      const fuseSec = this.getSpecialTimerSec(engine, kind);
+      if (Number.isFinite(ball.mergeSpecialSec) && fuseSec > 0) {
+        const remaining = Math.max(0, Math.min(1, ball.mergeSpecialSec / fuseSec));
+        const start = -Math.PI * MATH_CONSTANTS.HALF;
+        ctx.strokeStyle = theme.dangerLineColor;
+        ctx.lineWidth = look.ringWidth;
+        ctx.beginPath();
+        ctx.arc(x, y, radius + look.ringGap, start, start + remaining * MATH_CONSTANTS.TWO_PI);
+        ctx.stroke();
+      }
+    } else if (kind === MERGE_SPECIAL_KINDS.ICE) {
+      ctx.globalAlpha = look.iceAlpha;
+      ctx.fillStyle = look.iceColor;
+      ctx.beginPath();
+      ctx.arc(x, y, radius, 0, MATH_CONSTANTS.TWO_PI);
+      ctx.fill();
+      ctx.globalAlpha = 1;
+      ctx.strokeStyle = look.iceOutlineColor;
+      ctx.lineWidth = look.ringWidth;
+      ctx.setLineDash(look.iceOutlineDash);
+      ctx.beginPath();
+      ctx.arc(x, y, radius, 0, MATH_CONSTANTS.TWO_PI);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    } else if (kind === MERGE_SPECIAL_KINDS.JOKER) {
+      const arc = MATH_CONSTANTS.TWO_PI / MERGE_JOKER_RING_COLORS.length;
+      ctx.lineWidth = look.ringWidth;
+      MERGE_JOKER_RING_COLORS.forEach((color, idx) => {
+        ctx.strokeStyle = color;
+        ctx.beginPath();
+        ctx.arc(x, y, radius + look.ringGap, idx * arc, (idx + 1) * arc);
+        ctx.stroke();
+      });
+    }
+    ctx.font = `${Math.round(radius * look.glyphSizeFactor)}px ${look.fontFamily}`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.lineWidth = look.glyphStrokeWidth;
+    ctx.strokeStyle = look.glyphStroke;
+    ctx.fillStyle = look.glyphFill;
+    const glyph = t(`gameplay.merge.specials.${kind}.icon`);
+    ctx.strokeText(glyph, x, y);
+    ctx.fillText(glyph, x, y);
+    ctx.restore();
+  }
+
+  /** Marks the loaded and the next sphere when they are special, above the launcher drawing. */
+  drawLauncherOverlay(ctx, engine, renderer, theme) {
+    const spec = this.getLauncherSpec(engine);
+    if (engine.currentBall?.mergeKind) {
+      this.drawSpecialMark(ctx, engine, theme, engine.currentBall, engine.mergeDropX ?? spec.x, spec.y);
+    }
+    if (engine.nextBall?.mergeKind) {
+      this.drawSpecialMark(ctx, engine, theme, engine.nextBall, spec.x + spec.nextOffsetX, spec.y + spec.nextOffsetY);
+    }
+  }
+
+  /**
+   * Marks the special spheres on the board, then rings every sphere still under a polarity
+   * pulse. Nothing moves, so reduced motion keeps it.
+   */
   drawOverlay(ctx, engine, renderer, theme) {
+    for (const ball of engine.physicsWorld.balls) {
+      if (ball.mergeKind) {
+        this.drawSpecialMark(ctx, engine, theme, ball, ball.x, ball.y);
+      }
+    }
     const pulsing = engine.physicsWorld.balls.filter((ball) => (ball.mergePulseSec || 0) > 0);
     if (pulsing.length === 0) {
       return;
