@@ -32,14 +32,17 @@ import { decodeGhost, encodeGhost } from '../../src/game/GhostCodec.js';
 import { startStaticServer } from './staticServer.js';
 
 /**
- * The layouts of styles/main.css: wide desktop, portrait tablet, landscape and portrait
- * phones, and a narrow portrait phone where the eight-button control row is the tightest.
+ * The layouts of styles/main.css: wide desktop, portrait tablets (768x1024 and the 800x1280
+ * of a Xiaomi Mi Pad 5), a landscape tablet, landscape and portrait phones, and a narrow
+ * portrait phone where the eight-button control row is the tightest.
  * hasDrawer / hasRestartButton: all viewports expose the slide-in burger menu and Restart.
  * Both flags stay explicit per viewport in the test matrix.
  */
 const VIEWPORTS = Object.freeze([
   { name: 'desktop', width: 1300, height: 850, isTouch: false, hasDrawer: true, hasRestartButton: true },
   { name: 'tablet', width: 768, height: 1024, isTouch: true, hasDrawer: true, hasRestartButton: true },
+  { name: 'tablet landscape', width: 1280, height: 800, isTouch: true, hasDrawer: true, hasRestartButton: true },
+  { name: 'tablet portrait', width: 800, height: 1280, isTouch: true, hasDrawer: true, hasRestartButton: true },
   { name: 'phone landscape', width: 844, height: 390, isTouch: true, hasDrawer: true, hasRestartButton: true },
   { name: 'phone portrait', width: 390, height: 844, isTouch: true, hasDrawer: true, hasRestartButton: true },
   { name: 'narrow phone portrait', width: 360, height: 800, isTouch: true, hasDrawer: true, hasRestartButton: true }
@@ -68,7 +71,7 @@ const SHORT_WIDE_VIEWPORT = Object.freeze({ width: 1000, height: 520, isTouch: f
 const WAIT_TIMEOUT_MS = 20000;
 
 /** Layouts with the side panel, where a level without special balls says so in the panel. */
-const EMPTY_SPECIALS_NOTE_VIEWPORTS = new Set(['desktop', 'tablet']);
+const EMPTY_SPECIALS_NOTE_VIEWPORTS = new Set(['desktop', 'tablet', 'tablet landscape', 'tablet portrait']);
 /** Layouts where the Settings install entry is exercised: in the header and in the slide-in menu. */
 const INSTALL_ENTRY_VIEWPORTS = new Set(['desktop', 'phone portrait']);
 /** Layout whose board overlays move off the board, into the column beside it. */
@@ -149,6 +152,8 @@ const VERSUS_PLAYER_STORAGE = Object.freeze({
 const VERSUS_LAYOUT_BY_VIEWPORT = Object.freeze({
   desktop: 'split',
   tablet: 'split',
+  'tablet landscape': 'split',
+  'tablet portrait': 'split',
   'phone landscape': 'mini',
   'phone portrait': 'mini',
   'narrow phone portrait': 'mini'
@@ -446,6 +451,45 @@ const LEVELS_WITHOUT_AND_WITH_SPECIALS = [
   { levelId: 2, showsSpecials: true }
 ];
 
+/** Tolerance when comparing the board width with the width its layout allows. */
+const BOARD_FILL_TOLERANCE_PX = 2;
+
+/**
+ * Fails when the board is narrower than the room its layout gives it (a fixed width cap
+ * leaves the stage half empty on tablets). The allowed width is measured with a probe
+ * that uses the stylesheet's own stage reserve variables, in the board's container.
+ */
+async function assertBoardFillsStage(page, label) {
+  const board = await page.evaluate(() => {
+    const canvas = document.querySelector('#game-canvas');
+    const stage = document.querySelector('.stage-container');
+    const stageStyle = getComputedStyle(stage);
+    const wide = stageStyle.display === 'contents';
+    // Only the stage layouts make the stage a size container; other layouts (landscape phone) size the board otherwise.
+    if (!wide && !stageStyle.containerType.includes('size')) {
+      return null;
+    }
+    // Same formula as the stylesheet, minus the --canvas-max-width term under test.
+    const stageFormula =
+      'min(calc(100cqw - var(--stage-reserve-x)), calc((100cqh - var(--stage-reserve-y)) * var(--canvas-aspect)))';
+    const wideFormula =
+      'min(calc((100dvh - max(var(--shell-pad-y), env(safe-area-inset-top)) - max(var(--shell-pad-y), env(safe-area-inset-bottom)) - var(--canvas-border)) * var(--canvas-aspect)), calc(100vw - 2 * var(--shell-pad-x) - 2 * var(--side-column-width) - 2 * var(--stage-gap) - var(--canvas-border)))';
+    const probe = document.createElement('div');
+    probe.style.cssText = `position:absolute;visibility:hidden;height:0;width:${wide ? wideFormula : stageFormula}`;
+    canvas.parentElement.appendChild(probe);
+    const allowed = probe.getBoundingClientRect().width;
+    probe.remove();
+    return { actual: canvas.getBoundingClientRect().width, allowed, wide };
+  });
+  if (board === null) {
+    return;
+  }
+  assert.ok(
+    board.actual >= board.allowed - BOARD_FILL_TOLERANCE_PX,
+    `${label}: the board is ${board.actual}px wide but its ${board.wide ? 'window' : 'stage'} allows ${board.allowed}px`
+  );
+}
+
 /** Fails when the page scrolls sideways or a visible control label is clipped. */
 async function assertLayoutFits(page, levelId) {
   const layout = await page.evaluate(
@@ -552,6 +596,7 @@ for (const viewport of VIEWPORTS) {
             assert.equal(await isShown(page, '#powerups-empty'), !showsSpecials, `level ${levelId} empty special balls note`);
           }
           await assertLayoutFits(page, levelId);
+          await assertBoardFillsStage(page, `level ${levelId}`);
         }
         assert.deepEqual(errors, []);
       } finally {
