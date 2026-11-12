@@ -76,7 +76,8 @@
   --shell-pad-y: 12px;
   --shell-pad-x: 16px;
   --shell-gap: 10px;
-  --canvas-max-width: 460px;
+  /* The board fills the stage on every layout; the stage and the shell max-width are what bound it. */
+  --canvas-max-width: 100cqw;
   /* Board shape until the UI sets it from canvas.logicalWidth / logicalHeight. */
   --canvas-aspect: 470 / 820;
   --canvas-border: 2px;
@@ -2764,7 +2765,6 @@ body {
     --shell-pad-y: 0px;
     --shell-gap: 0px;
     --stage-reserve-x: 0px;
-    --canvas-max-width: 100cqw;
     /* Room for a short name under each control icon. */
     --control-row-height: calc(var(--touch-target) + 14px);
     --overcharge-line-height: 4px;
