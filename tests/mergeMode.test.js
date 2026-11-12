@@ -62,7 +62,7 @@ i18n.dictionaries.set('en', loadJson('./locales/en.json'));
 i18n.dictionaries.set('fr', loadJson('./locales/fr.json'));
 i18n.currentLocale = 'en';
 
-const createEngine = (mergeShakePrototype = false) => {
+const createEngine = () => {
   const storageManager = new StorageManager();
   storageManager.init();
   return new GameEngine({
@@ -75,7 +75,6 @@ const createEngine = (mergeShakePrototype = false) => {
     campaignTuning,
     fluxConfig,
     modesConfig,
-    mergeShakePrototype,
     audioManager: { playEffect: () => {}, stopAll: () => {}, isMuted: () => true, setMuted: () => {} },
     storageManager,
     onStateChange: () => {}
@@ -223,11 +222,14 @@ test('Merge Basin drops spheres with initial velocity, scales fine vs coarse rai
 });
 
 test('An unused shake leaves a seeded game identical through overflow', () => {
-  const play = (prototype) => {
-    const engine = createEngine(prototype);
+  const play = (keepShake) => {
+    const engine = createEngine();
     const random = new SeededRandom('merge-shake-comparison');
     engine.random = () => random.next();
     engine.startMergeMode();
+    if (!keepShake) {
+      engine.modeState.shakeRemaining = null;
+    }
     const timeline = [];
 
     for (let drop = 0; drop < 24 && engine.isRunPlaying(); drop += 1) {
@@ -258,7 +260,7 @@ test('An unused shake leaves a seeded game identical through overflow', () => {
     }
     assert.equal(engine.gameOverSummary?.reasonKey, GAME_OVER_REASONS.BASIN_OVERFLOW);
     timeline.push({ overflowFrames });
-    assert.equal(engine.getMergeShakeRemaining(), prototype ? 0 : null);
+    assert.equal(engine.getMergeShakeRemaining(), keepShake ? 0 : null);
     return timeline;
   };
 
@@ -266,7 +268,7 @@ test('An unused shake leaves a seeded game identical through overflow', () => {
 });
 
 test('Only successful drops charge the shake and only one input consumes it', () => {
-  const engine = createEngine(true);
+  const engine = createEngine();
   engine.startMergeMode();
   const cfg = modesConfig.merge.shake;
 
@@ -298,28 +300,38 @@ test('Only successful drops charge the shake and only one input consumes it', ()
   assert.deepEqual(restored.physicsWorld.balls.map((b) => b.vx), balls.map((b) => b.vx));
 });
 
-test('A legacy save stays in the baseline and the two variants write independent records', () => {
-  const legacy = createEngine();
-  legacy.startMergeMode();
-  legacy.shoot();
-  legacy.score = 45;
-  legacy.mergeBestTier = 3;
-  legacy.saveRunSnapshot();
-  legacy.persistRunHighScore();
+test('A legacy snapshot restores uncharged and legacy prototype records fold into the main record', () => {
+  const cfg = modesConfig.merge.shake;
+  const source = createEngine();
+  source.startMergeMode();
+  source.shoot();
+  source.score = 45;
+  source.mergeBestTier = 3;
+  source.saveRunSnapshot();
+  const snapshot = source.storageManager.loadRunSnapshot();
+  assert.ok(Number.isInteger(snapshot.modeState.shakeRemaining));
+  delete snapshot.modeState.shakeRemaining;
+  source.storageManager.saveRunSnapshot(snapshot);
 
-  const prototype = createEngine(true);
-  prototype.storageManager = legacy.storageManager;
-  assert.equal(prototype.restoreSavedRun(), true);
-  assert.equal(prototype.getMergeShakeRemaining(), null);
-  prototype.startMergeMode();
-  prototype.score = 100;
-  prototype.mergeBestTier = 4;
-  prototype.persistRunHighScore();
+  const restored = createEngine();
+  restored.storageManager = source.storageManager;
+  assert.equal(restored.restoreSavedRun(), true);
+  assert.equal(restored.getMergeShakeRemaining(), cfg.rechargeDrops);
 
-  assert.equal(legacy.storageManager.getMergeHighScore(), 45);
-  assert.equal(legacy.storageManager.getMergeBestTier(), 3);
-  assert.equal(legacy.storageManager.getMergeHighScore(true), 100);
-  assert.equal(legacy.storageManager.getMergeBestTier(true), 4);
+  const storage = source.storageManager;
+  const keys = storage.storageConfig.keys;
+  storage.safeSetItem(keys.mergeShakeHighScore, 100);
+  storage.safeSetItem(keys.mergeShakeBestTier, 4);
+  assert.equal(storage.getMergeHighScore(), 100);
+  assert.equal(storage.getMergeBestTier(), 4);
+
+  storage.setMergeRecord(150, 5);
+  assert.equal(storage.getMergeHighScore(), 150);
+  assert.equal(storage.getMergeBestTier(), 5);
+  assert.equal(storage.readNonNegativeInt(keys.mergeHighScore), 150);
+  assert.equal(storage.readNonNegativeInt(keys.mergeBestTier), 5);
+  assert.equal(storage.readNonNegativeInt(keys.mergeShakeHighScore), 100);
+  assert.equal(storage.readNonNegativeInt(keys.mergeShakeBestTier), 4);
 });
 
 test('Shake motion rejects slow tilt and isolated spikes, then latches until quiet', () => {

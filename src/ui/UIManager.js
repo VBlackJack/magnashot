@@ -1312,7 +1312,7 @@ export class UIManager {
     if (engine.mode === GAME_MODES.MERGE) {
       return t('modals.gameOver.stats.mergeSummary', {
         tier: formatNumber(engine.mergeBestTier || 1),
-        best: formatNumber(Math.max(engine.mergeBestTier || 1, this.storageManager.getMergeBestTier?.(engine.getMergeShakeRemaining() !== null) || 1)),
+        best: formatNumber(Math.max(engine.mergeBestTier || 1, this.storageManager.getMergeBestTier?.() || 1)),
         coins: formatNumber(summary?.earnedCoins || 0)
       });
     }

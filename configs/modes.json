@@ -129,8 +129,6 @@
   },
   "merge": {
     "shake": {
-      "queryParam": "mergeShake",
-      "queryValue": "1",
       "keyCode": "KeyG",
       "rechargeDrops": 4,
       "maxImpulsePxPerSec": 120,
