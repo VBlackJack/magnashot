@@ -31,6 +31,7 @@ import {
   MERGE_EVENT_IDS,
   getMergeEventTextKey
 } from './MergeEvents.js';
+import { MERGE_CONTRACT_OUTCOMES, MERGE_CONTRACT_TYPES } from './MergeContracts.js';
 
 const INITIAL_DROP_VY = 45;
 const ENTRY_GRACE_SEC = 0.85;
@@ -71,6 +72,8 @@ const RECOLOR_PHASE_END = 'end';
 const CHAIN_TEXT_MIN_COMBO = 2;
 /** The Shake reward text sits one text line above the fusion text so they do not overlap. */
 const CHAIN_REWARD_TEXT_LINES = 2;
+/** The contract reward text sits one text line above the Shake reward text so they do not overlap. */
+const CONTRACT_REWARD_TEXT_LINES = 3;
 
 /** Basin shapes: each one is drawn at the start of a run and changes the walls or adds static pegs. */
 export const MERGE_SHAPE_IDS = Object.freeze({
@@ -404,6 +407,180 @@ export class MergeBehavior extends ModeBehavior {
     );
   }
 
+  /** Contract types the config offers and this behavior knows how to judge. */
+  getContractTypeIds(engine) {
+    const known = Object.values(MERGE_CONTRACT_TYPES);
+    return Object.keys(engine.modesConfig.merge.contracts.types).filter((id) => known.includes(id));
+  }
+
+  /** Read-only view of the contract for the HUD, or null when the config defines none. */
+  getContractView(engine) {
+    const state = engine.modeState;
+    if (!state || !engine.modesConfig.merge.contracts) {
+      return null;
+    }
+    return {
+      contractCount: state.contractCount,
+      active: state.contract ? { ...state.contract } : null,
+      result: state.contractResult ? { ...state.contractResult } : null
+    };
+  }
+
+  drawContractGap(engine, contractCount) {
+    const { gapMinDrops, gapMaxDrops } = engine.modesConfig.merge.contracts;
+    const span = gapMaxDrops - gapMinDrops + 1;
+    return gapMinDrops + Math.floor(engine.drawSeededRoll('mergeContractGap', contractCount) * span);
+  }
+
+  /** Target of a new contract: a calibre a little below the best one fused, or the fusion count. */
+  computeContractTarget(engine, type) {
+    const params = engine.modesConfig.merge.contracts.types[type];
+    if (type === MERGE_CONTRACT_TYPES.FUSE_CALIBRE) {
+      const wanted = (engine.mergeBestTier || 1) - params.offsetBelowBest;
+      return Math.min(params.maxCalibre, Math.max(params.minCalibre, wanted));
+    }
+    return params.count;
+  }
+
+  startContract(engine) {
+    const state = engine.modeState;
+    const ids = this.getContractTypeIds(engine);
+    if (ids.length === 0) {
+      state.dropsUntilContract = this.drawContractGap(engine, state.contractCount);
+      return;
+    }
+    const candidates = ids.length > 1 ? ids.filter((id) => id !== state.lastContractType) : ids;
+    const pick = Math.floor(engine.drawSeededRoll('mergeContract', state.contractCount) * candidates.length);
+    const type = candidates[Math.min(candidates.length - 1, pick)];
+    state.contract = {
+      type,
+      target: this.computeContractTarget(engine, type),
+      progress: 0,
+      dropsLeft: engine.modesConfig.merge.contracts.durationDrops
+    };
+    state.contractCount += 1;
+  }
+
+  /** Closes the running contract, remembers how it ended for the HUD and draws the next gap. */
+  endContract(engine, outcome, points) {
+    const state = engine.modeState;
+    state.contractResult = { id: state.contractCount, type: state.contract.type, outcome, points };
+    state.lastContractType = state.contract.type;
+    state.contract = null;
+    state.dropsUntilContract = this.drawContractGap(engine, state.contractCount);
+  }
+
+  /**
+   * Moves the contract cycle on by one successful drop: counts down the running contract, or
+   * the gap to the next one. A contract with no drop left stays open while the last sphere
+   * settles (fusions it causes still count); it fails without penalty at the next drop, or
+   * once the grace time of expireStalledContract has run out.
+   */
+  advanceContractCycle(engine) {
+    const state = engine.modeState;
+    const contracts = engine.modesConfig.merge.contracts;
+    if (!contracts) {
+      return;
+    }
+    if (state.contract?.dropsLeft <= 0) {
+      this.endContract(engine, MERGE_CONTRACT_OUTCOMES.FAILURE, 0);
+    }
+    if (state.contract) {
+      state.contract.dropsLeft -= 1;
+      if (state.contract.dropsLeft <= 0) {
+        state.contractGraceSec = contracts.lastDropGraceSec;
+      }
+      return;
+    }
+    state.dropsUntilContract -= 1;
+    if (state.dropsUntilContract <= 0) {
+      this.startContract(engine);
+    }
+  }
+
+  /**
+   * Fails a contract that has no drop left once its grace time has run out, so that neither
+   * Polarity nor the Shake can keep it open for ever. Called every physics step.
+   */
+  expireStalledContract(engine, dtSec) {
+    const state = engine.modeState;
+    if (!state.contract || state.contract.dropsLeft > 0) {
+      return;
+    }
+    state.contractGraceSec -= dtSec;
+    if (state.contractGraceSec <= 0) {
+      this.endContract(engine, MERGE_CONTRACT_OUTCOMES.FAILURE, 0);
+    }
+  }
+
+  /**
+   * Feeds one fusion (a Supernova is one) to the running contract: the fusion that reaches
+   * the goal pays at once, in points that ignore the combo and the golden event, and
+   * brings the Shake closer. This stacks with the chain reward (1): a drop that completes a
+   * contract and a chain of three can advance the Shake by 3, on purpose.
+   */
+  recordContractFusion(engine, calibre, x, y) {
+    const state = engine.modeState;
+    const contract = state.contract;
+    if (!contract) {
+      return;
+    }
+    const params = engine.modesConfig.merge.contracts.types[contract.type];
+    const isCalibreGoal = contract.type === MERGE_CONTRACT_TYPES.FUSE_CALIBRE;
+    contract.progress = isCalibreGoal ? Math.max(contract.progress, calibre) : contract.progress + 1;
+    const points = isCalibreGoal ? contract.target * params.pointsPerCalibre : params.points;
+    if (contract.progress < contract.target) {
+      return;
+    }
+    engine.addScore(points);
+    if (state.shakeRemaining > 0) {
+      state.shakeRemaining = Math.max(0, state.shakeRemaining - engine.modesConfig.merge.contracts.rewardShakeDrops);
+    }
+    this.endContract(engine, MERGE_CONTRACT_OUTCOMES.SUCCESS, points);
+    engine.particleSystem.spawnFloatingText(
+      x,
+      y + engine.gameConfig.canvas.floatingTextOffsetY * CONTRACT_REWARD_TEXT_LINES,
+      t('gameplay.feedback.merge.contractDone', { points }),
+      engine.gameConfig.theme.victoryPopupColor
+    );
+  }
+
+  /** Restores the contract cycle from a snapshot; a legacy snapshot starts the cycle afresh. */
+  restoreContractCycle(engine, rawState) {
+    const { contracts } = engine.modesConfig.merge;
+    const state = engine.modeState;
+    state.contractCount = Number.isInteger(rawState.contractCount) ? Math.max(0, rawState.contractCount) : 0;
+    state.lastContractType = this.getContractTypeIds(engine).includes(rawState.lastContractType)
+      ? rawState.lastContractType
+      : null;
+    state.contract = this.sanitizeSavedContract(engine, rawState.contract);
+    state.contractGraceSec = contracts.lastDropGraceSec;
+    state.dropsUntilContract = Number.isInteger(rawState.dropsUntilContract)
+      ? Math.min(Math.max(contracts.firstAfterDrops, contracts.gapMaxDrops), Math.max(1, rawState.dropsUntilContract))
+      : contracts.firstAfterDrops;
+  }
+
+  /** Keeps a saved contract only when its type is known and its numbers fit the config. */
+  sanitizeSavedContract(engine, raw) {
+    const { contracts } = engine.modesConfig.merge;
+    if (
+      !raw
+      || typeof raw !== 'object'
+      || !this.getContractTypeIds(engine).includes(raw.type)
+      || !Number.isInteger(raw.target)
+      || !Number.isInteger(raw.dropsLeft)
+    ) {
+      return null;
+    }
+    const params = contracts.types[raw.type];
+    const [minTarget, maxTarget] = raw.type === MERGE_CONTRACT_TYPES.FUSE_CALIBRE
+      ? [params.minCalibre, params.maxCalibre]
+      : [1, params.count];
+    const target = Math.min(maxTarget, Math.max(minTarget, raw.target));
+    const progress = Number.isInteger(raw.progress) ? Math.min(target - 1, Math.max(0, raw.progress)) : 0;
+    return { type: raw.type, target, progress, dropsLeft: Math.min(contracts.durationDrops, Math.max(0, raw.dropsLeft)) };
+  }
+
   /** Keeps a saved event only when its id is still in the pool and its numbers fit the config. */
   sanitizeSavedEvent(engine, raw, withDrops) {
     const { events } = engine.modesConfig.merge;
@@ -420,6 +597,18 @@ export class MergeBehavior extends ModeBehavior {
       return null;
     }
     return { id: raw.id, direction, dropsLeft: Math.min(events.durationDrops, Math.max(1, raw.dropsLeft)) };
+  }
+
+  /** Fresh contract fields of a mode state: none running, the first one due after the configured drops. */
+  createContractState(engine) {
+    return {
+      contract: null,
+      contractResult: null,
+      contractGraceSec: 0,
+      contractCount: 0,
+      lastContractType: null,
+      dropsUntilContract: engine.modesConfig.merge.contracts?.firstAfterDrops ?? 0
+    };
   }
 
   /** Fresh pressure fields of a mode state: the line at its base position, nothing pending. */
@@ -637,6 +826,7 @@ export class MergeBehavior extends ModeBehavior {
       lastEventId: null,
       eventCount: 0,
       dropsUntilEvent: 0,
+      ...this.createContractState(engine),
       shapeId: this.pickShapeId(engine, engine.drawSeededRoll('mergeShape', 0)),
       shapeAnnounceSerial: engine.isRestoringRun ? null : (engine.mergeShapeSerial = (engine.mergeShapeSerial ?? 0) + 1),
       ...this.createPressureState()
@@ -711,6 +901,7 @@ export class MergeBehavior extends ModeBehavior {
     engine.mergeDropX = this.clampDropX(engine, engine.mergeDropX, engine.currentBall.radius);
 
     this.advanceEventCycle(engine);
+    this.advanceContractCycle(engine);
     this.advancePressure(engine);
 
     engine.hasFiredInRound = true;
@@ -836,6 +1027,7 @@ export class MergeBehavior extends ModeBehavior {
     if (state.dropCooldownSec > 0) {
       state.dropCooldownSec = Math.max(0, state.dropCooldownSec - dtSec);
     }
+    this.expireStalledContract(engine, dtSec);
     if (balls.length === 0) {
       state.maxOverflowRatio = 0;
       return;
@@ -1076,6 +1268,7 @@ export class MergeBehavior extends ModeBehavior {
         engine.addScore(pts);
         engine.modeState.supernovas = (engine.modeState.supernovas || 0) + 1;
         this.recordFusedCalibre(engine, cfg.tiers.length);
+        this.recordContractFusion(engine, cfg.tiers.length, mx, my);
         engine.audioManager.playEffect('victory');
         engine.particleSystem.spawnShockwave(
           mx,
@@ -1136,6 +1329,7 @@ export class MergeBehavior extends ModeBehavior {
       const pts = Math.round(nextSpec.points * Math.max(1, engine.combo) * (golden?.pointsFactor ?? 1));
       engine.addScore(pts);
       this.recordFusedCalibre(engine, nextSpec.tier + 1);
+      this.recordContractFusion(engine, nextSpec.tier + 1, clampedX, clampedY);
       engine.waveCount = engine.mergeBestTier;
 
       engine.audioManager.playEffect('match', engine.combo);
@@ -1189,6 +1383,10 @@ export class MergeBehavior extends ModeBehavior {
       lastEventId: state.lastEventId ?? null,
       dropsUntilEvent: state.dropsUntilEvent ?? 0,
       eventCount: state.eventCount ?? 0,
+      contract: state.contract ?? null,
+      dropsUntilContract: state.dropsUntilContract ?? 0,
+      contractCount: state.contractCount ?? 0,
+      lastContractType: state.lastContractType ?? null,
       lineOffsetPx: state.lineOffsetPx ?? 0,
       pendingOffsetPx: state.pendingOffsetPx ?? null,
       pendingDropsLeft: state.pendingDropsLeft ?? 0,
@@ -1232,12 +1430,16 @@ export class MergeBehavior extends ModeBehavior {
       lastEventId: null,
       eventCount: 0,
       dropsUntilEvent: 0,
+      ...this.createContractState(engine),
       shapeId: this.getShapeIds(engine).includes(rawState.shapeId) ? rawState.shapeId : MERGE_SHAPE_IDS.CLASSIC,
       shapeAnnounceSerial: null,
       ...this.createPressureState()
     };
     if (cfg.events) {
       this.restoreEventCycle(engine, rawState);
+    }
+    if (cfg.contracts) {
+      this.restoreContractCycle(engine, rawState);
     }
     this.restorePressure(engine, rawState);
 

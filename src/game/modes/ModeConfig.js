@@ -215,6 +215,18 @@ export const DEFAULT_MODES_CONFIG = Object.freeze({
         golden: Object.freeze({ pointsFactor: 1.5 })
       })
     }),
+    contracts: Object.freeze({
+      firstAfterDrops: 15,
+      gapMinDrops: 6,
+      gapMaxDrops: 10,
+      durationDrops: 8,
+      rewardShakeDrops: 2,
+      lastDropGraceSec: 2.5,
+      types: Object.freeze({
+        fuseCalibre: Object.freeze({ offsetBelowBest: 2, minCalibre: 7, maxCalibre: 10, pointsPerCalibre: 300 }),
+        fusionCount: Object.freeze({ count: 6, points: 1500 })
+      })
+    }),
     tiers: Object.freeze([
       Object.freeze({
         id: 'merge_t0',
@@ -392,6 +404,21 @@ function resolveMergeEvents(partial) {
 }
 
 /**
+ * Merge Basin contracts over their defaults, type by type, so a partial config keeps every
+ * default number: the types are replaced only when the config gives some.
+ */
+function resolveMergeContracts(partial) {
+  const defaults = DEFAULT_MODES_CONFIG.merge.contracts;
+  const source = partial && typeof partial === 'object' ? partial : {};
+  const typesSource = source.types && typeof source.types === 'object' ? source.types : defaults.types;
+  const types = {};
+  for (const [id, entry] of Object.entries(typesSource)) {
+    types[id] = { ...(defaults.types[id] ?? {}), ...(entry && typeof entry === 'object' ? entry : {}) };
+  }
+  return { ...defaults, ...source, types };
+}
+
+/**
  * Merge Basin shapes over their defaults, shape by shape, so a partial config keeps every
  * default number: the id list and the weights are replaced only when the config gives some.
  */
@@ -429,6 +456,7 @@ export function resolveModesConfig(modesConfig) {
       pressure: { ...DEFAULT_MODES_CONFIG.merge.pressure, ...(modesConfig.merge?.pressure ?? {}) },
       shapes: resolveMergeShapes(modesConfig.merge?.shapes),
       events: resolveMergeEvents(modesConfig.merge?.events),
+      contracts: resolveMergeContracts(modesConfig.merge?.contracts),
       tiers: Array.isArray(modesConfig.merge?.tiers) && modesConfig.merge.tiers.length > 0
         ? modesConfig.merge.tiers
         : DEFAULT_MODES_CONFIG.merge.tiers

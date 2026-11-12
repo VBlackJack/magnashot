@@ -442,6 +442,15 @@ export class GameEngine {
   }
 
   /**
+   * Mini-contract of the Merge Basin for the HUD.
+   * @returns {{contractCount: number, active: object|null, result: object|null}|null} Null outside a live Basin run.
+   */
+  getMergeContractState() {
+    const live = this.state === GAME_STATES.PLAYING || this.state === GAME_STATES.PAUSED;
+    return this.mode === GAME_MODES.MERGE && live ? this.getModeBehavior().getContractView(this) : null;
+  }
+
+  /**
    * Overflow line pressure of the Merge Basin for the HUD.
    * @returns {{lineOffsetPx: number, pendingOffsetPx: number|null, pendingDropsLeft: number}|null} Null outside a live Basin run.
    */

@@ -37,6 +37,7 @@ import { Ball } from '../src/entities/Ball.js';
 import { GameEngine } from '../src/game/GameEngine.js';
 import { mergeBehavior } from '../src/game/modes/MergeBehavior.js';
 import { getMergeEventLocaleId } from '../src/game/modes/MergeEvents.js';
+import { getMergeContractPluralKey } from '../src/game/modes/MergeContracts.js';
 import { resolveModesConfig } from '../src/game/modes/ModeConfig.js';
 import { uiHudRefreshMethods } from '../src/ui/UIHudRefresh.js';
 
@@ -1857,4 +1858,399 @@ test('The narrow and pegs shapes carry gentler pressure, and the classic basin k
   assert.equal(pegs.topTierStepDrops, 50);
   assert.equal(pegs.pxPerTier, PRESSURE.pxPerTier);
   assert.equal(pegs.maxOffsetPx, 180);
+});
+
+const CONTRACTS = modesConfig.merge.contracts;
+const CONTRACT_TYPE_IDS = Object.keys(CONTRACTS.types);
+const SHAKE_FULL = modesConfig.merge.shake.rechargeDrops;
+const ROLL_FIRST_TYPE = 0;
+
+/** Engine whose contract type roll is forced, so a test picks the type of the next contract. */
+const createContractEngine = (typeRoll = ROLL_FIRST_TYPE, seed = 'merge-contracts') => {
+  const engine = createEventEngine(seed);
+  const drawSeededRoll = engine.drawSeededRoll.bind(engine);
+  engine.drawSeededRoll = (stream, index) => (
+    stream === 'mergeContract' ? typeRoll : drawSeededRoll(stream, index)
+  );
+  return engine;
+};
+
+const dropUntilContract = (engine, limit = 60) => {
+  let drops = 0;
+  while (!engine.modeState.contract && drops < limit) {
+    dropOnce(engine);
+    drops += 1;
+  }
+  return drops;
+};
+
+const forceContract = (engine, contract) => {
+  engine.modeState.contract = { progress: 0, dropsLeft: CONTRACTS.durationDrops, ...contract };
+  engine.modeState.contractCount = 1;
+};
+
+const stepFusions = (engine) => mergeBehavior.onBeforePhysicsStep(engine, PHYSICS_DT);
+
+test('The default Merge config carries the same contracts as configs/modes.json, and a partial one keeps defaults', () => {
+  const defaults = resolveModesConfig(null).merge;
+  assert.deepEqual(defaults.contracts, CONTRACTS);
+  const partial = resolveModesConfig({ merge: { contracts: { types: { fusionCount: { count: 3 } } } } }).merge;
+  assert.equal(partial.contracts.types.fusionCount.count, 3);
+  assert.equal(partial.contracts.types.fusionCount.points, CONTRACTS.types.fusionCount.points);
+  assert.equal(partial.contracts.durationDrops, CONTRACTS.durationDrops);
+  assert.equal(resolveModesConfig({ merge: { contracts: null } }).merge.contracts.firstAfterDrops, CONTRACTS.firstAfterDrops);
+});
+
+test('A contract comes after the configured drops, lasts its drops, fails without penalty and a gap follows', () => {
+  const engine = createContractEngine();
+  const state = engine.modeState;
+  assert.equal(engine.getMergeContractState().active, null);
+  assert.equal(state.dropsUntilContract, CONTRACTS.firstAfterDrops);
+
+  assert.equal(dropUntilContract(engine), CONTRACTS.firstAfterDrops, 'the first contract starts after the configured drops');
+  assert.equal(state.contract.dropsLeft, CONTRACTS.durationDrops);
+  assert.equal(state.contractCount, 1);
+  assert.equal(engine.getMergeContractState().active.type, state.contract.type);
+
+  const scoreBefore = engine.score;
+  for (let cycle = 0; cycle < 12; cycle += 1) {
+    for (let i = 1; i < CONTRACTS.durationDrops; i += 1) {
+      dropOnce(engine);
+      assert.equal(state.contract.dropsLeft, CONTRACTS.durationDrops - i);
+    }
+    dropOnce(engine);
+    assert.equal(state.contract.dropsLeft, 0, 'the last drop is still settling, the contract stays open');
+    mergeBehavior.expireStalledContract(engine, CONTRACTS.lastDropGraceSec - 0.1);
+    assert.ok(state.contract, 'still open inside the grace time');
+    mergeBehavior.expireStalledContract(engine, 0.2);
+    assert.equal(state.contract, null, 'the contract fails once the grace time of its last drop has run out');
+    assert.equal(state.contractResult.outcome, 'failure');
+    assert.equal(state.contractResult.points, 0);
+    assert.equal(engine.score, scoreBefore, 'a failed contract costs nothing');
+    const gap = state.dropsUntilContract;
+    assert.ok(gap >= CONTRACTS.gapMinDrops && gap <= CONTRACTS.gapMaxDrops, `gap ${gap} is in range`);
+    assert.equal(dropUntilContract(engine), gap, 'the next contract starts after exactly the drawn gap');
+  }
+  assert.equal(state.contractCount, 13);
+  engine.triggerGameOver(GAME_OVER_REASONS.BASIN_OVERFLOW);
+  assert.equal(engine.getMergeContractState(), null);
+});
+
+test('A contract never has the same type twice in a row and every type comes up', () => {
+  const engine = createEventEngine('merge-contract-types');
+  const seen = [];
+  for (let cycle = 0; cycle < 20; cycle += 1) {
+    dropUntilContract(engine);
+    seen.push(engine.modeState.contract.type);
+    for (let i = 0; i < CONTRACTS.durationDrops; i += 1) {
+      dropOnce(engine);
+    }
+    mergeBehavior.expireStalledContract(engine, CONTRACTS.lastDropGraceSec);
+  }
+  seen.forEach((type, index) => {
+    assert.ok(CONTRACT_TYPE_IDS.includes(type));
+    if (index > 0) {
+      assert.notEqual(type, seen[index - 1], 'never the same contract twice in a row');
+    }
+  });
+  assert.equal(new Set(seen).size, CONTRACT_TYPE_IDS.length);
+});
+
+test('The calibre target sits below the best fused calibre, clamped to the configured bounds', () => {
+  const targetFor = (best, config) => {
+    const engine = createContractEngine(ROLL_FIRST_TYPE);
+    if (config) {
+      engine.modesConfig = resolveModesConfig({ merge: { ...modesConfig.merge, contracts: config } });
+    }
+    engine.mergeBestTier = best;
+    engine.modeState.dropsUntilContract = 1;
+    dropOnce(engine);
+    assert.equal(engine.modeState.contract.type, 'fuseCalibre');
+    return engine.modeState.contract.target;
+  };
+  const { offsetBelowBest, minCalibre, maxCalibre } = CONTRACTS.types.fuseCalibre;
+  assert.equal(targetFor(1), minCalibre, 'a young run is held at the minimum');
+  assert.equal(targetFor(minCalibre), minCalibre);
+  assert.equal(targetFor(9), 9 - offsetBelowBest);
+  assert.equal(targetFor(12), Math.min(maxCalibre, 12 - offsetBelowBest));
+  assert.equal(targetFor(12, { types: { fuseCalibre: { offsetBelowBest: 0 } } }), maxCalibre, 'the maximum clamps a high best');
+});
+
+test('A fusion reaching the calibre target completes the contract, even in the middle of a chain', () => {
+  const engine = createContractEngine();
+  engine.modeState.shakeRemaining = SHAKE_FULL;
+  const calibre = 3;
+  forceContract(engine, { type: 'fuseCalibre', target: calibre });
+  const texts = [];
+  engine.particleSystem.spawnFloatingText = (x, y, text) => texts.push(text);
+
+  placeTouchingPair(engine, 0, 60);
+  stepFusions(engine);
+  assert.equal(engine.modeState.contract.progress, 2, 'a calibre 2 fusion is not enough');
+  assert.equal(engine.modeState.contractResult, null);
+
+  // Two calibre 2 spheres fuse into the calibre 3 target while the chain is still running.
+  placeTouchingPair(engine, 1, 200);
+  const scoreBefore = engine.score;
+  stepFusions(engine);
+  const reward = calibre * CONTRACTS.types.fuseCalibre.pointsPerCalibre;
+  assert.equal(engine.modeState.contract, null);
+  assert.deepEqual(engine.modeState.contractResult, {
+    id: 1, type: 'fuseCalibre', outcome: 'success', points: reward
+  });
+  assert.equal(
+    engine.score - scoreBefore,
+    Math.round(modesConfig.merge.tiers[2].points * engine.combo) + reward
+  );
+  assert.ok(texts.includes(t('gameplay.feedback.merge.contractDone', { points: reward })));
+  assert.equal(engine.getMergeShakeRemaining(), Math.max(0, SHAKE_FULL - CONTRACTS.rewardShakeDrops));
+});
+
+test('Fusions count towards a fusion contract, a Supernova counts as one, and the last one pays at once', () => {
+  const engine = createContractEngine();
+  const goal = CONTRACTS.types.fusionCount.count;
+  forceContract(engine, { type: 'fusionCount', target: goal });
+
+  placeTouchingPair(engine, 0, 60);
+  placeTouchingPair(engine, 0, 160);
+  stepFusions(engine);
+  assert.equal(engine.modeState.contract.progress, 2);
+
+  placeTouchingPair(engine, modesConfig.merge.tiers.length - 1, 120);
+  stepFusions(engine);
+  assert.equal(engine.modeState.contract.progress, 3, 'a Supernova is one fusion');
+  assert.equal(engine.modeState.supernovas, 1);
+
+  for (let remaining = goal - 3; remaining > 0; remaining -= 1) {
+    assert.ok(engine.modeState.contract, 'still running before the last fusion');
+    placeTouchingPair(engine, 0, 60);
+    stepFusions(engine);
+  }
+  assert.equal(engine.modeState.contract, null);
+  assert.equal(engine.modeState.contractResult.outcome, 'success');
+  assert.equal(engine.modeState.contractResult.points, CONTRACTS.types.fusionCount.points);
+});
+
+test('A Supernova satisfies a calibre contract', () => {
+  const engine = createContractEngine();
+  forceContract(engine, { type: 'fuseCalibre', target: CONTRACTS.types.fuseCalibre.maxCalibre });
+  placeTouchingPair(engine, modesConfig.merge.tiers.length - 1, 120);
+  stepFusions(engine);
+  assert.equal(engine.modeState.contractResult.outcome, 'success');
+});
+
+test('The contract reward ignores the combo and the golden event, and the Shake advance floors at zero', () => {
+  const run = (shake, golden) => {
+    const engine = createContractEngine();
+    engine.modeState.shakeRemaining = shake;
+    if (golden) {
+      withEvent(engine, 'golden');
+    }
+    forceContract(engine, { type: 'fusionCount', target: 2 });
+    [60, 160].forEach((x) => placeTouchingPair(engine, 0, x));
+    stepFusions(engine);
+    assert.equal(engine.combo, 2, 'a combo above one, below the chain that charges the Shake on its own');
+    assert.equal(engine.modeState.contractResult.outcome, 'success');
+    const factor = golden ? MERGE_EVENTS.pool.golden.pointsFactor : 1;
+    const fusions = [1, 2].reduce(
+      (sum, combo) => sum + Math.round(modesConfig.merge.tiers[1].points * combo * factor),
+      0
+    );
+    assert.equal(engine.score, fusions + CONTRACTS.types.fusionCount.points, 'the reward is a flat sum');
+    return engine;
+  };
+  assert.equal(run(SHAKE_FULL, false).getMergeShakeRemaining(), SHAKE_FULL - CONTRACTS.rewardShakeDrops);
+  assert.equal(run(SHAKE_FULL, true).getMergeShakeRemaining(), SHAKE_FULL - CONTRACTS.rewardShakeDrops);
+  assert.equal(run(1, false).getMergeShakeRemaining(), 0, 'the Shake never goes below zero');
+  assert.equal(run(0, false).getMergeShakeRemaining(), 0);
+  assert.equal(run(null, false).getMergeShakeRemaining(), null, 'a Shake that is not tracked stays so');
+});
+
+test('A snapshot keeps an active contract and restores a legacy or hostile one with safe defaults', () => {
+  const source = createContractEngine();
+  source.shoot();
+  source.modeState.contract = { type: 'fusionCount', target: 6, progress: 2, dropsLeft: 5 };
+  source.modeState.contractCount = 4;
+  source.modeState.lastContractType = 'fuseCalibre';
+  source.modeState.dropsUntilContract = 7;
+  source.saveRunSnapshot({ force: true });
+  const restored = createEngine();
+  restored.storageManager = source.storageManager;
+  assert.equal(restored.restoreSavedRun(), true);
+  assert.deepEqual(restored.modeState.contract, { type: 'fusionCount', target: 6, progress: 2, dropsLeft: 5 });
+  assert.equal(restored.modeState.contractCount, 4);
+  assert.equal(restored.modeState.lastContractType, 'fuseCalibre');
+  assert.equal(restored.modeState.dropsUntilContract, 7);
+  assert.equal(restored.modeState.contractResult, null);
+  assert.deepEqual(restored.getMergeContractState(), {
+    contractCount: 4,
+    active: { type: 'fusionCount', target: 6, progress: 2, dropsLeft: 5 },
+    result: null
+  });
+
+  const restoreRaw = (mutate) => {
+    const engine = createEngine();
+    engine.startMergeMode();
+    const raw = { ...mergeBehavior.serializeModeState(engine) };
+    mutate(raw);
+    assert.equal(mergeBehavior.validateModeState(raw), true);
+    mergeBehavior.restoreModeState(engine, raw);
+    return engine.modeState;
+  };
+  const legacy = restoreRaw((raw) => {
+    for (const key of ['contract', 'dropsUntilContract', 'contractCount', 'lastContractType']) {
+      delete raw[key];
+    }
+  });
+  assert.equal(legacy.contract, null);
+  assert.equal(legacy.contractCount, 0);
+  assert.equal(legacy.lastContractType, null);
+  assert.equal(legacy.dropsUntilContract, CONTRACTS.firstAfterDrops);
+
+  const hostile = restoreRaw((raw) => {
+    raw.contract = { type: 'fuseCalibre', target: 99, progress: 50, dropsLeft: 999 };
+    raw.contractCount = -3;
+    raw.lastContractType = 'nonsense';
+    raw.dropsUntilContract = 9999;
+  });
+  assert.deepEqual(hostile.contract, {
+    type: 'fuseCalibre',
+    target: CONTRACTS.types.fuseCalibre.maxCalibre,
+    progress: CONTRACTS.types.fuseCalibre.maxCalibre - 1,
+    dropsLeft: CONTRACTS.durationDrops
+  });
+  assert.equal(hostile.contractCount, 0);
+  assert.equal(hostile.lastContractType, null);
+  assert.equal(hostile.dropsUntilContract, Math.max(CONTRACTS.firstAfterDrops, CONTRACTS.gapMaxDrops));
+  assert.equal(restoreRaw((raw) => { raw.dropsUntilContract = CONTRACTS.firstAfterDrops; }).dropsUntilContract, CONTRACTS.firstAfterDrops);
+  assert.equal(
+    restoreRaw((raw) => { raw.contract = { type: 'fusionCount', target: 3, progress: 0, dropsLeft: -4 }; }).contract.dropsLeft,
+    0
+  );
+  assert.equal(restoreRaw((raw) => { raw.contract = { type: 'meteor', target: 3, dropsLeft: 3 }; }).contract, null);
+  assert.equal(restoreRaw((raw) => { raw.contract = { type: 'fusionCount', target: 3 }; }).contract, null);
+});
+
+test('The HUD announces a contract once when it starts and once when it ends, and nothing after a restart', () => {
+  const spoken = [];
+  const hud = { announce: (text) => spoken.push(text) };
+  const refresh = (view) => uiHudRefreshMethods.announceMergeContractChanges.call(hud, view);
+  const idle = (contractCount, result = null) => ({ contractCount, active: null, result });
+  const active = (contractCount, type, dropsLeft) => ({
+    contractCount,
+    active: { type, target: 9, progress: 0, dropsLeft },
+    result: null
+  });
+  const done = (id, outcome, points) => ({ id, type: 'fuseCalibre', outcome, points });
+
+  for (let i = 0; i < 4; i += 1) {
+    refresh(idle(0));
+  }
+  assert.deepEqual(spoken, [], 'the first refresh only records');
+  for (let dropsLeft = CONTRACTS.durationDrops; dropsLeft >= 3; dropsLeft -= 1) {
+    refresh(active(1, 'fuseCalibre', dropsLeft));
+    refresh(active(1, 'fuseCalibre', dropsLeft));
+  }
+  assert.deepEqual(spoken, [
+    t('gameplay.feedback.merge.contractStart.fuseCalibre.other', { target: 9, count: CONTRACTS.durationDrops })
+  ]);
+  for (let i = 0; i < 4; i += 1) {
+    refresh(idle(1, done(1, 'success', 2700)));
+  }
+  assert.equal(spoken.length, 2);
+  assert.equal(spoken[1], t('gameplay.feedback.merge.contractSuccess', { points: 2700 }));
+
+  refresh(active(2, 'fusionCount', CONTRACTS.durationDrops));
+  assert.equal(spoken.length, 3);
+  assert.equal(spoken[2], t('gameplay.feedback.merge.contractStart.fusionCount.other', {
+    target: 9, count: CONTRACTS.durationDrops
+  }));
+  for (let i = 0; i < 4; i += 1) {
+    refresh(idle(2, done(2, 'failure', 0)));
+  }
+  assert.equal(spoken.length, 4);
+  assert.equal(spoken[3], t('gameplay.feedback.merge.contractFailure', { points: 0 }));
+
+  // A new run replaces the old one in the middle of a contract: nothing is said for the swap.
+  refresh(active(3, 'fuseCalibre', 4));
+  const before = spoken.length;
+  refresh(idle(0));
+  refresh(idle(0));
+  assert.equal(spoken.length, before);
+  refresh(null);
+  refresh(active(1, 'fuseCalibre', CONTRACTS.durationDrops));
+  assert.equal(spoken.length, before, 'leaving the Basin forgets the old state');
+});
+
+test('Every Basin contract text exists in English and French, in both plural forms', () => {
+  const keys = [
+    'gameplay.feedback.merge.contractDone',
+    'gameplay.feedback.merge.contractSuccess',
+    'gameplay.feedback.merge.contractFailure'
+  ];
+  for (const type of CONTRACT_TYPE_IDS) {
+    keys.push(`hud.stats.mergeContract.${type}`);
+    keys.push(`hud.stats.mergeContract.aria.${type}.last`);
+    for (const plural of ['one', 'other']) {
+      keys.push(`hud.stats.mergeContract.aria.${type}.${plural}`, `gameplay.feedback.merge.contractStart.${type}.${plural}`);
+    }
+  }
+  const lookup = (dictionary, key) => key.split('.').reduce((node, part) => node?.[part], dictionary);
+  for (const locale of ['en', 'fr']) {
+    const dictionary = loadJson(`./locales/${locale}.json`);
+    for (const key of keys) {
+      const value = lookup(dictionary, key);
+      assert.equal(typeof value, 'string', `${locale} has ${key}`);
+      assert.ok(value.length > 0, `${locale} ${key} is not empty`);
+    }
+  }
+  const french = loadJson('./locales/fr.json');
+  assert.match(lookup(french, 'gameplay.feedback.merge.contractStart.fuseCalibre.other'), /lâchers/);
+  assert.match(lookup(french, 'gameplay.feedback.merge.contractStart.fuseCalibre.one'), /lâcher\./);
+  assert.match(lookup(french, 'hud.stats.mergeContract.aria.fuseCalibre.other'), /lâchers restants/);
+  assert.match(lookup(french, 'hud.stats.mergeContract.aria.fuseCalibre.one'), /lâcher restant/);
+});
+
+test('A fusion caused by the last drop still counts, and the next drop fails a contract left open', () => {
+  const engine = createContractEngine();
+  forceContract(engine, { type: 'fusionCount', target: 1, dropsLeft: 1 });
+  dropOnce(engine);
+  assert.equal(engine.modeState.contract.dropsLeft, 0);
+  placeTouchingPair(engine, 0, 60);
+  stepFusions(engine);
+  assert.equal(engine.modeState.contractResult.outcome, 'success');
+
+  const stalled = createContractEngine();
+  forceContract(stalled, { type: 'fusionCount', target: 6, dropsLeft: 1 });
+  dropOnce(stalled);
+  assert.equal(stalled.modeState.contract.dropsLeft, 0);
+  dropOnce(stalled);
+  assert.equal(stalled.modeState.contract, null);
+  assert.equal(stalled.modeState.contractResult.outcome, 'failure');
+  assert.equal(stalled.getMergeContractState().result.outcome, 'failure');
+});
+
+test('A stalled contract expires from the physics step, whatever the player does with Polarity or the Shake', () => {
+  const engine = createContractEngine();
+  forceContract(engine, { type: 'fusionCount', target: 6, dropsLeft: 1 });
+  dropOnce(engine);
+  const steps = Math.ceil(CONTRACTS.lastDropGraceSec / PHYSICS_DT) + 1;
+  for (let i = 0; i < steps && engine.modeState.contract; i += 1) {
+    mergeBehavior.onBeforePhysicsStep(engine, PHYSICS_DT);
+  }
+  assert.equal(engine.modeState.contract, null);
+  assert.equal(engine.modeState.contractResult.outcome, 'failure');
+});
+
+test('The contract plural key follows the plural rules of the current locale and says last drop at zero', () => {
+  const locale = i18n.getLocale();
+  try {
+    i18n.currentLocale = 'en';
+    assert.deepEqual([0, 1, 2].map(getMergeContractPluralKey), ['last', 'one', 'other']);
+    i18n.currentLocale = 'fr';
+    assert.deepEqual([0, 1, 2].map(getMergeContractPluralKey), ['last', 'one', 'other']);
+    assert.equal(new Intl.PluralRules('fr').select(0), 'one', 'French reads zero as singular');
+  } finally {
+    i18n.currentLocale = locale;
+  }
 });
