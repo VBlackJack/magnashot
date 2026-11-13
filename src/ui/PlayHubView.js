@@ -19,6 +19,7 @@ import { t, formatNumber } from '../core/I18n.js';
 import { SeededRandom } from '../core/SeededRandom.js';
 import { getUtcIsoWeekKey } from '../game/WeeklyFlux.js';
 import {
+  ARCADE_CARD_SPECS,
   MODE_BUTTON_KEYS,
   WEEKLY_ACCESS_KEY,
   isCurrentWeeklyRun,
@@ -253,6 +254,90 @@ export function writeRewardChip(chip, reward) {
   }
 }
 
+/**
+ * Renders the 3 daily session bounties inside #play-bounties-list without innerHTML.
+ * @param {HTMLElement|null|undefined} listEl - Container <ul> element.
+ * @param {{items?: Array<object>}|null|undefined} state - Storage bounties state.
+ */
+function renderDailyBounties(listEl, state) {
+  if (!listEl || typeof document === 'undefined') {
+    return;
+  }
+  const items = Array.isArray(state?.items) ? state.items : [];
+  listEl.replaceChildren();
+  for (const item of items) {
+    const li = document.createElement('li');
+    li.className = item.completed ? 'play-bounty-row is-done' : 'play-bounty-row';
+    const titleSpan = document.createElement('span');
+    titleSpan.className = 'play-bounty-title';
+    titleSpan.textContent = t(`modals.play.bounties.items.${item.id}.title`, {
+      target: formatNumber(item.target)
+    });
+    const progSpan = document.createElement('span');
+    progSpan.className = 'play-bounty-progress';
+    progSpan.textContent = item.completed
+      ? t('modals.play.bounties.done')
+      : t('modals.play.bounties.progress', {
+          progress: formatNumber(item.progress),
+          target: formatNumber(item.target)
+        });
+    const rewardSpan = document.createElement('span');
+    rewardSpan.className = 'play-bounty-reward';
+    rewardSpan.textContent = t('modals.play.bounties.reward', { coins: formatNumber(item.coins) });
+    li.append(titleSpan, progSpan, rewardSpan);
+    listEl.append(li);
+  }
+}
+
+const DEFAULT_MASTERY = Object.freeze({
+  endlessScore: 5000,
+  classicStage: 5,
+  blitzScore: 4000,
+  fluxStage: 5,
+  cascadeScore: 5000,
+  bossRushWave: 5,
+  hexGridWave: 5,
+  pinballStage: 3,
+  orbitalWave: 5,
+  convoyWave: 5,
+  mergeTier: 7,
+  versusHardWins: 1
+});
+const MASTERED_CLASS = 'is-mastered';
+
+/**
+ * Computes which Play Hub mode cards have reached their configured mastery milestone.
+ * Pure helper; missing storage getters evaluate to false.
+ * @param {object} storage - StorageManager or compatible mock.
+ * @param {object} [gameConfig] - Game config carrying `playHub.mastery`, `puzzles`, `scoring`.
+ * @returns {Record<string, boolean>} Map of mode key to mastered flag.
+ */
+export function resolveModeMastery(storage, gameConfig) {
+  if (!storage) {
+    return {};
+  }
+  const m = { ...DEFAULT_MASTERY, ...(gameConfig?.playHub?.mastery || {}) };
+  const totalPuzzles = Math.max(1, gameConfig?.puzzles?.length || 1);
+  const maxPuzzleStars = gameConfig?.scoring?.maxStars || 0;
+  const bestMergeTier = Math.max(storage.getMergeBestTier?.(false) || 0, storage.getMergeBestTier?.(true) || 0);
+  const versusStats = storage.getVersusStats?.() || {};
+  return {
+    [GAME_MODES.ENDLESS]: (storage.getEndlessHighScore?.() || 0) >= m.endlessScore,
+    [GAME_MODES.CLASSIC]: (storage.getClassicBestStage?.() || 0) >= m.classicStage,
+    [GAME_MODES.PUZZLE]: maxPuzzleStars > 0 && (storage.getPuzzleTotalStars?.() || 0) >= totalPuzzles * maxPuzzleStars,
+    [GAME_MODES.BLITZ]: (storage.getBlitzHighScore?.() || 0) >= m.blitzScore,
+    [GAME_MODES.FLUX]: (storage.getFluxBestStage?.() || 0) >= m.fluxStage,
+    [GAME_MODES.CASCADE]: (storage.getCascadeHighScore?.() || 0) >= m.cascadeScore,
+    [GAME_MODES.BOSS_RUSH]: (storage.getBossRushBestWave?.() || 0) >= m.bossRushWave,
+    [GAME_MODES.HEX_GRID]: (storage.getHexGridBestWave?.() || 0) >= m.hexGridWave,
+    [GAME_MODES.PINBALL]: (storage.getPinballBestStage?.() || 0) >= m.pinballStage,
+    [GAME_MODES.ORBITAL]: (storage.getOrbitalBestWave?.() || 0) >= m.orbitalWave,
+    [GAME_MODES.CONVOY]: (storage.getConvoyBestWave?.() || 0) >= m.convoyWave,
+    [GAME_MODES.MERGE]: bestMergeTier >= m.mergeTier,
+    [GAME_MODES.VERSUS]: (versusStats.hard?.won || 0) >= m.versusHardWins
+  };
+}
+
 /** Methods installed on UIManager (see installMethods). `this` is the UIManager. */
 export const uiPlayHubMethods = {
   /** True while the Play hub dialog is shown. */
@@ -373,15 +458,24 @@ export const uiPlayHubMethods = {
         score: formatNumber(storage.getConvoyHighScore?.() || 0)
       })
     );
+    const bestMergeTier = Math.max(storage.getMergeBestTier?.(false) || 0, storage.getMergeBestTier?.(true) || 0);
+    const bestMergeScore = Math.max(storage.getMergeHighScore?.(false) || 0, storage.getMergeHighScore?.(true) || 0);
     setTextIfChanged(
       els.arcadeBestMerge,
       t('modals.levelSelect.arcade.mergeRecord', {
-        tier: formatNumber(Math.max(DEFAULT_STAGE, storage.getMergeBestTier?.() || 1)),
-        score: formatNumber(storage.getMergeHighScore?.() || 0)
+        tier: formatNumber(Math.max(DEFAULT_STAGE, bestMergeTier || 1)),
+        score: formatNumber(bestMergeScore)
       })
     );
     writeRewardChip(els.dailyReward, this.describeDailyRewardChip());
     writeRewardChip(els.weeklyReward, this.describeWeeklyRewardChip());
+    renderDailyBounties(els.playBountiesList, storage.getDailyBountiesState?.());
+    const mastery = resolveModeMastery(storage, this.gameConfig);
+    for (const [mode, spec] of Object.entries(ARCADE_CARD_SPECS)) {
+      if (Object.hasOwn(mastery, mode)) {
+        els[spec.card]?.classList?.toggle(MASTERED_CLASS, Boolean(mastery[mode]));
+      }
+    }
   },
 
   /** What the primary Campaign button does right now (see resolveContinueTarget). */

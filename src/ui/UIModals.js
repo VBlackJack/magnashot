@@ -65,9 +65,13 @@ export const uiModalMethods = {
     const holdsStageProgress =
       (this.engine.mode === GAME_MODES.FLUX && this.engine.fluxStage > 1) ||
       (this.engine.mode === GAME_MODES.PINBALL && this.engine.pinballStage > 1) ||
+      (this.engine.mode === GAME_MODES.MERGE && (this.engine.mergeBestTier > 1 || this.engine.waveCount > 1)) ||
       ((this.engine.mode === GAME_MODES.CONVOY ||
         this.engine.mode === GAME_MODES.HEX_GRID ||
-        this.engine.mode === GAME_MODES.ORBITAL) &&
+        this.engine.mode === GAME_MODES.ORBITAL ||
+        this.engine.mode === GAME_MODES.BOSS_RUSH ||
+        this.engine.mode === GAME_MODES.CASCADE ||
+        this.engine.mode === GAME_MODES.ENDLESS) &&
         this.engine.waveCount > 1);
     const runHasBalls = this.isRunActive() && this.engine.physicsWorld.balls.length > 0;
     const isMidRound = runHasBalls && (always || holdsStageProgress || this.engine.hasFiredInRound);
@@ -354,6 +358,7 @@ export const uiModalMethods = {
     if (modal === this.elements.modalSettings) {
       this.refreshControllerFields();
       this.syncDuelNameField();
+      this.progressBackup?.refresh();
     }
     if (modal === this.elements.modalSettings && this.hintsResetConfirmed) {
       this.hintsResetConfirmed = false;

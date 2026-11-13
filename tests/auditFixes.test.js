@@ -53,8 +53,9 @@ const PAST_DAILY_SEED = '2025-01-01';
 const DAILY_SEARCH_MAX_DAYS = 60;
 const DAILY_SEARCH_SEED_PREFIX = '2026-12-';
 const EXPECTED_PAIR_OBSTACLE_COUNT = 2;
-const EXPECTED_PUZZLE_STAGE_COUNT = 10;
+const EXPECTED_PUZZLE_STAGE_COUNT = 20;
 const MIN_PUZZLE_CLUSTER_BALLS = 3;
+const STAGE_10_NUMBER = 10;
 const STAGE_10_ROTOR_ANCHORS = 3;
 const FALLING_BALL_Y = 400;
 const FALLING_BALL_X = 150;
@@ -438,7 +439,7 @@ test('Daily Challenge supports portalMatrix, bumperPinball, cryoSurge, and sessi
   assert.ok(foundBumper, 'a daily seed selects bumperPinball and spawns two bumpers');
 });
 
-test('All 10 Puzzle stages build valid anchored boards and Stage 10 attaches rotor anchors to the pivot obstacle', () => {
+test('All Puzzle stages build valid anchored boards and Stage 10 attaches rotor anchors to the pivot obstacle', () => {
   const engine = createTestEngine();
   assert.equal(gameConfig.puzzles.length, EXPECTED_PUZZLE_STAGE_COUNT);
   for (let stage = 1; stage <= gameConfig.puzzles.length; stage++) {
@@ -457,6 +458,7 @@ test('All 10 Puzzle stages build valid anchored boards and Stage 10 attaches rot
       );
     }
   }
+  engine.startPuzzleMode(STAGE_10_NUMBER);
   const stage10Pivots = engine.physicsWorld.obstacles.filter((o) => o.type === OBSTACLE_TYPES.PIVOT);
   assert.equal(stage10Pivots.length, 1);
   const rotorAnchors = engine.physicsWorld.balls.filter((b) => b.pivotRef === stage10Pivots[0]);

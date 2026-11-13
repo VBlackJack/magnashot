@@ -484,6 +484,19 @@ body {
   background: var(--accent-danger);
 }
 
+/* Continuous spatial pressure gauge for Convoy, Orbital, and Merge: reuses meter shell without segment ticks. */
+.pressure-meter {
+  --pressure-pct: 0;
+}
+
+.pressure-meter-fill {
+  width: calc(var(--pressure-pct, 0) * 1%);
+}
+
+.pressure-meter::after {
+  content: none;
+}
+
 @keyframes sag-meter-pulse {
   0%, 100% { box-shadow: 0 0 0 0 transparent; }
   50% { box-shadow: 0 0 6px 1px var(--accent-amber-alpha-45); }
@@ -676,6 +689,19 @@ body {
   background: var(--surface-raised);
   color: var(--text-gold-soft);
   border: 2px dashed var(--accent-amber);
+}
+
+/* Browser storage quota warning: clickable pill opening Settings for progress export. */
+.hud-badge.quota-warning {
+  font-family: inherit;
+  cursor: pointer;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  background: var(--accent-amber-alpha-20);
+  color: var(--text-gold-soft);
+  border: 1px dashed var(--accent-amber);
 }
 
 .hud-badge.ghost.is-ahead {
@@ -1483,6 +1509,36 @@ body {
   color: var(--text-main);
 }
 
+.stats-duels-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.stats-filter-btn {
+  padding: 5px 12px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 999px;
+  background: var(--surface-sunken);
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.stats-filter-btn:hover {
+  border-color: var(--accent-blue);
+  color: var(--text-main);
+}
+
+.stats-filter-btn.active {
+  border-color: var(--accent-blue);
+  background: var(--accent-blue-alpha-22);
+  color: var(--text-main);
+}
+
 .stats-table-wrap {
   overflow-x: auto;
 }
@@ -1747,6 +1803,7 @@ body {
 }
 
 #modal-play .arcade-mode-card {
+  position: relative;
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
   align-content: center;
@@ -1756,6 +1813,25 @@ body {
   overflow-wrap: anywhere;
   white-space: normal;
   transition: transform 0.12s ease, border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
+}
+
+#modal-play .arcade-mode-card.is-mastered:not(.is-locked) {
+  border-color: var(--accent-amber);
+  box-shadow: 0 0 8px var(--accent-amber-alpha-20);
+}
+
+#modal-play .arcade-mode-card.is-mastered:not(.is-locked) .arcade-card-title {
+  padding-inline-end: 16px;
+}
+
+#modal-play .arcade-mode-card.is-mastered:not(.is-locked)::after {
+  content: '★';
+  position: absolute;
+  top: 6px;
+  right: 8px;
+  font-size: 0.72rem;
+  color: var(--accent-amber);
+  pointer-events: none;
 }
 
 #modal-play .arcade-mode-card:hover:not(.is-locked) {
@@ -1805,6 +1881,70 @@ body {
   font-size: 0.7rem;
   font-weight: 700;
   line-height: 1.6;
+}
+
+.play-bounties {
+  margin-top: 6px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border-subtle);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.play-bounties-title {
+  margin: 0;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-secondary);
+}
+
+.play-bounties-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.play-bounty-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 8px;
+  border-radius: 8px;
+  border: 1px solid var(--border-subtle);
+  background: var(--surface-sunken);
+  font-size: 0.74rem;
+}
+
+.play-bounty-row.is-done {
+  border-color: var(--accent-emerald);
+}
+
+.play-bounty-title {
+  color: var(--text-main);
+  overflow-wrap: anywhere;
+}
+
+.play-bounty-progress {
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.play-bounty-row.is-done .play-bounty-progress {
+  color: var(--accent-emerald);
+  font-weight: 700;
+}
+
+.play-bounty-reward {
+  color: var(--text-gold-soft);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
 }
 
 /* Disclosure toggles under a card: full width of the cell, chevron drawn as text. */
@@ -2824,6 +2964,12 @@ body {
     align-items: baseline;
     gap: 6px;
   }
+  .hud-stat-shots .sag-meter {
+    min-width: 44px;
+    flex: 1 1 44px;
+    align-self: center;
+    margin-top: 0;
+  }
   .hud-stat-coins,
   .hud-stat-best,
   .hud-mode-banner,
@@ -2928,6 +3074,21 @@ body {
   }
   .powerup-btn:last-child {
     margin-right: max(4px, env(safe-area-inset-right));
+  }
+  .stage-container:has(.powerups-bar.hidden) .launcher-controls-dock {
+    grid-column: 1 / -1;
+    grid-row: 3;
+    display: flex;
+    justify-content: center;
+    gap: 8px;
+    padding: 0 max(8px, env(safe-area-inset-left));
+  }
+  .stage-container:has(.powerups-bar.hidden) .polarity-floating-btn,
+  .stage-container:has(.powerups-bar.hidden) .swap-floating-btn {
+    flex: 1 1 0;
+    max-width: 140px;
+    margin-left: 0;
+    margin-right: 0;
   }
   .powerup-btn {
     flex-direction: column;
@@ -3538,6 +3699,7 @@ body {
   .sag-meter,
   .achievement-progress-track,
   .achievement-tier-badge,
+  .hud-badge.quota-warning,
   .hud-badge.ghost,
   .hud-badge.merge-event,
   .hud-badge.merge-contract,
@@ -3589,9 +3751,11 @@ body {
   }
   .nav-btn.active-mode,
   .arcade-mode-card.active-mode,
+  .arcade-mode-card.is-mastered:not(.is-locked),
   .play-hub-section.active-mode,
   .puzzle-stage-btn.active,
   .modal-tab.active,
+  .stats-filter-btn.active,
   .powerup-btn.equipped,
   .polarity-floating-btn.active,
   .nav-btn.badge-btn.active {
@@ -3624,6 +3788,9 @@ body {
       Canvas calc(100% / var(--sag-size, 1) - 2px),
       Canvas calc(100% / var(--sag-size, 1))
     );
+  }
+  .pressure-meter::after {
+    content: none;
   }
   .sag-meter.warning {
     border: 1px dashed CanvasText;

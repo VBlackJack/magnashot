@@ -25,6 +25,11 @@ const POSITIVE_SETTINGS = Object.freeze([
   ['game', 'scoring.overchargeMax'],
   ['game', 'juice.slowMotion.timeScale'],
   ['game', 'juice.particles.maxParticles'],
+  ['game', 'juice.particles.adaptiveBudget.highFrameMs'],
+  ['game', 'juice.particles.adaptiveBudget.recoverFrameMs'],
+  ['game', 'juice.particles.adaptiveBudget.minScale'],
+  ['game', 'juice.particles.adaptiveBudget.stepDown'],
+  ['game', 'juice.particles.adaptiveBudget.stepUp'],
   ['game', 'juice.particles.maxShatteringBalls'],
   ['game', 'juice.particles.maxExplosions'],
   ['physics', 'simulation.fixedStepMs'],
@@ -56,6 +61,15 @@ export function validateConfigs(configs) {
     if (!Number.isFinite(value) || value < 0) {
       throw new Error(`Invalid config ${namespace}.${path}: expected a number of zero or more, got ${value}`);
     }
+  }
+  const adaptive = read('game', 'juice.particles.adaptiveBudget');
+  if (adaptive.recoverFrameMs >= adaptive.highFrameMs) {
+    throw new Error(
+      `Invalid config game.juice.particles.adaptiveBudget: recoverFrameMs (${adaptive.recoverFrameMs}) must be below highFrameMs (${adaptive.highFrameMs})`
+    );
+  }
+  if (adaptive.minScale > 1) {
+    throw new Error(`Invalid config game.juice.particles.adaptiveBudget.minScale: expected <= 1, got ${adaptive.minScale}`);
   }
 }
 

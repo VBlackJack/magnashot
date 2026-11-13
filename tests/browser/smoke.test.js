@@ -4133,3 +4133,113 @@ describe('Progress transfer', () => {
     }
   });
 });
+
+describe('Lot E and audit smoke checks', () => {
+  const allUnlocked = String(GAME_CONFIG.modeUnlocks.campaignLevelCleared.merge + 2);
+  const fullPuzzleStats = JSON.stringify(
+    Object.fromEntries(
+      GAME_CONFIG.puzzles.map((p) => [String(p.id), { bestScore: 1000, stars: 3, attempts: 1, cleared: true }])
+    )
+  );
+  const fullProfileStorage = {
+    [`${STORAGE_PREFIX}${STORAGE_KEYS.unlockedLevel}`]: allUnlocked,
+    [`${STORAGE_PREFIX}${STORAGE_KEYS.endlessHighScore}`]: String(GAME_CONFIG.playHub.mastery.endlessScore + 500),
+    [`${STORAGE_PREFIX}${STORAGE_KEYS.puzzleBestStage}`]: String(GAME_CONFIG.puzzles.length),
+    [`${STORAGE_PREFIX}${STORAGE_KEYS.puzzleStageStats}`]: fullPuzzleStats,
+    [`${STORAGE_PREFIX}${STORAGE_KEYS.ghostDuels}`]: JSON.stringify([
+      { mode: 'daily', key: '2026-01-01', alias: 'Sam', ghostScore: 1000, myScore: 1240, outcome: 'won', dateKey: '2026-01-02' },
+      { mode: 'flux', key: 'abc123', alias: 'Alex', ghostScore: 900, myScore: 800, outcome: 'lost', dateKey: '2026-01-02' }
+    ])
+  };
+
+  test('launches new Arcade modes cleanly on desktop and widens canvas on portrait phone when powerups bar hides', async () => {
+    const arcadeCards = [
+      ['#btn-mode-hex-grid', GAME_MODES.HEX_GRID],
+      ['#btn-mode-pinball', GAME_MODES.PINBALL],
+      ['#btn-mode-orbital', GAME_MODES.ORBITAL],
+      ['#btn-mode-convoy', GAME_MODES.CONVOY],
+      ['#btn-mode-merge', GAME_MODES.MERGE],
+      ['#btn-mode-blitz', GAME_MODES.BLITZ]
+    ];
+    const desktop = await openGame(VIEWPORTS[0], { initStorage: fullProfileStorage });
+    try {
+      for (const [selector, mode] of arcadeCards) {
+        await openPlayHub(desktop.page, VIEWPORTS[0]);
+        await desktop.page.click(selector);
+        await desktop.page.waitForFunction((expected) => window.__fluxEngine.mode === expected, mode);
+        await assertLayoutFits(desktop.page, mode);
+      }
+      assert.deepEqual(desktop.errors, []);
+    } finally {
+      await desktop.context.close();
+    }
+
+    const phoneViewport = VIEWPORTS.find((viewport) => viewport.name === 'phone portrait');
+    const phone = await openGame(phoneViewport, { initStorage: fullProfileStorage });
+    try {
+      await openPlayHub(phone.page, phoneViewport);
+      await phone.page.click('#btn-mode-hex-grid');
+      await phone.page.waitForFunction((expected) => window.__fluxEngine.mode === expected, GAME_MODES.HEX_GRID);
+      await assertLayoutFits(phone.page, GAME_MODES.HEX_GRID);
+      const portraitGeometry = await phone.page.evaluate(() => {
+        const bar = document.querySelector('.powerups-bar');
+        const canvas = document.getElementById('game-canvas');
+        return {
+          barHidden: Boolean(bar) && bar.classList.contains('hidden'),
+          canvasWidth: canvas ? canvas.getBoundingClientRect().width : 0,
+          viewportWidth: window.innerWidth
+        };
+      });
+      assert.equal(portraitGeometry.barHidden, true, 'Hex Grid hides the specials bar on portrait phone');
+      assert.ok(
+        portraitGeometry.canvasWidth >= portraitGeometry.viewportWidth - 60,
+        `expected wider portrait canvas (${portraitGeometry.canvasWidth} vs ${portraitGeometry.viewportWidth})`
+      );
+      assert.deepEqual(phone.errors, []);
+    } finally {
+      await phone.context.close();
+    }
+  });
+
+  test('shows Daily Contracts, mastered mode cards, all 20 Puzzle stages, and Ghost Duel filters', async () => {
+    const viewport = VIEWPORTS[0];
+    const { context, page, errors } = await openGame(viewport, { initStorage: fullProfileStorage });
+    try {
+      await openPlayHub(page, viewport);
+      const bountyCount = await page.locator('#play-bounties-list > li').count();
+      assert.equal(bountyCount, GAME_CONFIG.bounties.dailyCount);
+      assert.equal(
+        await page.evaluate(() => document.getElementById('btn-endless')?.classList.contains('is-mastered')),
+        true
+      );
+      assert.equal(
+        await page.evaluate(() => document.getElementById('btn-mode-puzzle')?.classList.contains('is-mastered')),
+        true
+      );
+
+      await page.click('#btn-puzzle-stages-toggle');
+      await waitShown(page, '#puzzle-stages-strip');
+      const stageCount = await page.locator('#puzzle-stages-strip .puzzle-stage-btn').count();
+      assert.equal(stageCount, 20);
+      await page.click('#puzzle-stages-strip .puzzle-stage-btn[data-puzzle-stage="20"]');
+      await page.waitForFunction(
+        (puzzleMode) => window.__fluxEngine.mode === puzzleMode && window.__fluxEngine.currentPuzzleStage === 20,
+        GAME_MODES.PUZZLE
+      );
+
+      await clickMenuButton(page, viewport, '#btn-stats');
+      await waitShown(page, '#modal-stats');
+      await waitShown(page, '#stats-duels-filters');
+      assert.equal(await page.locator('#stats-duels-list > li').count(), 2);
+      await page.click('#btn-duels-filter-daily');
+      assert.equal(await page.locator('#stats-duels-list > li').count(), 1);
+      await page.click('#btn-duels-filter-flux');
+      assert.equal(await page.locator('#stats-duels-list > li').count(), 1);
+      await page.click('#btn-duels-filter-all');
+      assert.equal(await page.locator('#stats-duels-list > li').count(), 2);
+      assert.deepEqual(errors, []);
+    } finally {
+      await context.close();
+    }
+  });
+});

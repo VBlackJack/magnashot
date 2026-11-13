@@ -32,6 +32,8 @@ export function willSimulationAdvance(engine) {
  * Scene flag value that forces a time scale of 1 and ignores hit-stop on every board.
  */
 export const SCENE_TIME_SCALE_FIXED = 'fixed';
+/** Frame gaps at or above this ceiling indicate a backgrounded tab rather than slow rendering. */
+const BACKGROUND_TAB_GAP_MS = 1000;
 
 /**
  * Creates a fixed-timestep game loop with render interpolation.
@@ -95,7 +97,8 @@ export function createGameLoop({
       return;
     }
     try {
-      const elapsed = lastTime === null ? 0 : Math.min(maxAccumulatedMs, Math.max(0, now - lastTime));
+      const rawFrameMs = lastTime === null ? 0 : Math.max(0, now - lastTime);
+      const elapsed = Math.min(maxAccumulatedMs, rawFrameMs);
       lastTime = now;
       // A failing input hook must not stop the simulation or the rendering.
       try {
@@ -140,6 +143,12 @@ export function createGameLoop({
       // A scene that says it is not advancing (paused, between rounds, behind a dialog) is static: idle redraw.
       const isSceneHeld = typeof scene.isAdvancing === 'function' && !scene.isAdvancing();
       const isLive = !isSceneHeld && boards.some((board) => board.engine.state === GAME_STATES.PLAYING || board.engine.isVictoryCelebrating());
+      if (isLive && rawFrameMs > 0 && rawFrameMs < BACKGROUND_TAB_GAP_MS) {
+        const measuredMs = Math.min(rawFrameMs, maxAccumulatedMs);
+        for (const board of boards) {
+          board.engine.particleSystem?.adaptBudget?.(measuredMs);
+        }
+      }
       if (isLive || lastRenderTime === null || now - lastRenderTime >= idleRenderIntervalMs) {
         for (let i = 0; i < boards.length; i++) {
           const alpha = lastUpdateAdvanced[i] && fixedStepMs > 0 ? accumulator / fixedStepMs : 1.0;

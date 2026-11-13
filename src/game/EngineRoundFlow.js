@@ -26,6 +26,7 @@ import {
 import { t } from '../core/I18n.js';
 import { SeededRandom } from '../core/SeededRandom.js';
 import { getSagSpec, getSagPhase, SAG_PHASES } from './SagMeter.js';
+import { reportBountyEvent } from './Bounties.js';
 
 /**
  * Stars a Puzzle attempt count allows: the fewer attempts before the first clear, the higher
@@ -569,6 +570,9 @@ export const engineRoundFlowMethods = {
     this.settleGhostDuel();
     this.persistRunHighScore();
     this.recordRunOutcome('loss');
+    if (this.mode === GAME_MODES.DAILY && !this.isDailyRematch && this.hasFiredInRound) {
+      reportBountyEvent(this, 'daily_run_finished', 1);
+    }
     this.flushPendingRunCoins();
     this.storageManager.clearRunSnapshot();
     this.audioManager.playEffect('gameOver');

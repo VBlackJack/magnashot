@@ -133,6 +133,11 @@ export class ModeBehavior {
     return false;
   }
 
+  /** Continuous spatial-danger state for modes without ceiling sag, or null. */
+  getPressureState() {
+    return null;
+  }
+
   serializeModeState() {
     return null;
   }

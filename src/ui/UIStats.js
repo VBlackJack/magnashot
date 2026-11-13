@@ -273,6 +273,17 @@ export const uiStatsMethods = {
         }
       });
     });
+    const duelFilters = [
+      this.elements.btnDuelsFilterAll,
+      this.elements.btnDuelsFilterDaily,
+      this.elements.btnDuelsFilterFlux
+    ];
+    for (const button of duelFilters) {
+      button?.addEventListener('click', () => {
+        this.statsDuelsFilter = button.dataset?.duelFilter || 'all';
+        this.renderStatsDuels();
+      });
+    }
     this.elements.btnCopyStats?.addEventListener('click', () => {
       this.copyPlayerStats();
     });
@@ -389,9 +400,9 @@ export const uiStatsMethods = {
           wave: storage.getConvoyBestWave?.() ?? 0
         },
         [GAME_MODES.MERGE]: {
-          score: storage.getMergeHighScore?.() ?? 0,
+          score: Math.max(storage.getMergeHighScore?.(false) ?? 0, storage.getMergeHighScore?.(true) ?? 0),
           kind: RECORD_KIND_TIER,
-          tier: storage.getMergeBestTier?.() ?? 0
+          tier: Math.max(storage.getMergeBestTier?.(false) ?? 0, storage.getMergeBestTier?.(true) ?? 0)
         }
       }
     };

@@ -23,6 +23,7 @@ import {
 import { t } from '../../core/I18n.js';
 import { Ball } from '../../entities/Ball.js';
 import { ModeBehavior, registerModeBehavior } from './ModeBehavior.js';
+import { reportBountyEvent } from '../Bounties.js';
 
 const INITIAL_SPAWNED_COUNT = 8;
 const TOUCH_TOLERANCE_PX = 2.0;
@@ -40,6 +41,13 @@ const VORTEX_ARM_ARC_RAD = 1.1;
 const CLUMP_NEIGHBOR_CHANCE = 0.35;
 const WAVE_CLEAR_POPUP_OFFSET_Y = 70;
 const SUPERELLIPSE_EXP = 0.76;
+const SNAP_BRIDGE_MIN_ALPHA = 0.55;
+const SNAP_BRIDGE_AMP_ALPHA = 0.35;
+const SNAP_BRIDGE_STATIC_ALPHA = 0.85;
+const SNAP_BRIDGE_PULSE_SPEED = 0.009;
+const SNAP_BRIDGE_LINE_WIDTH = 5;
+const SNAP_BRIDGE_DASH = Object.freeze([8, 6]);
+const SNAP_BRIDGE_DASH_SPEED = 0.035;
 
 const CONVOY_CHROME = Object.freeze({
   ambientLiquid: false,
@@ -353,6 +361,10 @@ export class ConvoyBehavior extends ModeBehavior {
     }
 
     if (world.balls.length === 0) {
+      if (state.nearDanger) {
+        state.nearDanger = false;
+        engine.notifyUI();
+      }
       if (state.spawnRemaining <= 0 && !world.projectile) {
         this.completeConvoyWave(engine);
       }
@@ -440,19 +452,29 @@ export class ConvoyBehavior extends ModeBehavior {
       this.resolveSnapbackCollision(engine, snapbackImpactBall, lut);
     }
 
-    // Check Singularity drain defeat
+    // Check Singularity drain defeat & near-danger transition
     if (engine.isRunPlaying() && world.balls.length > 0) {
       const frontMost = world.balls[world.balls.length - 1];
+      const progress = lut.totalLength > 0 ? frontMost.convoyS / lut.totalLength : 0;
+      const nextDanger = progress >= cfg.nearMissProgress;
+      if (nextDanger !== Boolean(state.nearDanger)) {
+        state.nearDanger = nextDanger;
+        engine.notifyUI();
+      }
       if (frontMost.convoyS >= lut.totalLength) {
         engine.triggerGameOver(GAME_OVER_REASONS.VORTEX_REACHED);
       }
+    } else if (state.nearDanger) {
+      state.nearDanger = false;
+      engine.notifyUI();
     }
   }
 
   resolveSnapbackCollision(engine, impactBall, lut) {
     const cfg = engine.modesConfig.convoy;
     const world = engine.physicsWorld;
-    engine.audioManager.playEffect('snap');
+    engine.audioManager.playEffect('convoySnapback');
+    reportBountyEvent(engine, 'convoy_snapback', 1);
     engine.particleSystem.spawnShockwave(
       impactBall.x,
       impactBall.y,
@@ -693,10 +715,12 @@ export class ConvoyBehavior extends ModeBehavior {
     this.sortAndSyncConvoy(engine, lut);
   }
 
-  drawUnderlay(ctx, engine, renderer, theme, now) {
+  drawUnderlay(ctx, engine, renderer, theme, now = 0) {
     const cfg = engine.modesConfig.convoy;
     const trackId = engine.modeState?.trackId || cfg.tracks[0];
     const lut = this.getTrackLut(engine, trackId);
+    const railColor = theme.launcherAccentColor || theme.aimLineColor;
+    const vortexColor = theme.dangerLineColor || theme.dangerZoneColor;
 
     ctx.save();
     ctx.lineCap = 'round';
@@ -707,7 +731,7 @@ export class ConvoyBehavior extends ModeBehavior {
     for (let i = 1; i <= lut.count; i++) {
       ctx.lineTo(lut.xs[i], lut.ys[i]);
     }
-    ctx.strokeStyle = theme.aimLineColor;
+    ctx.strokeStyle = railColor;
     ctx.globalAlpha = RAIL_OUTER_ALPHA;
     ctx.lineWidth = RAIL_OUTER_WIDTH;
     ctx.stroke();
@@ -716,11 +740,53 @@ export class ConvoyBehavior extends ModeBehavior {
     ctx.lineWidth = RAIL_INNER_WIDTH;
     ctx.stroke();
 
+    // Highlight magnetically attracted Snapback gaps along the LUT curve
+    const balls = engine.physicsWorld?.balls;
+    if (balls && balls.length > 1) {
+      const sorted = [...balls].sort((a, b) => a.convoyS - b.convoyS);
+      ctx.save();
+      ctx.strokeStyle = theme.overchargePopupColor;
+      ctx.lineWidth = SNAP_BRIDGE_LINE_WIDTH;
+      ctx.setLineDash(SNAP_BRIDGE_DASH);
+      ctx.lineDashOffset = engine.isReducedMotion ? 0 : -(now * SNAP_BRIDGE_DASH_SPEED);
+      ctx.globalAlpha = engine.isReducedMotion
+        ? SNAP_BRIDGE_STATIC_ALPHA
+        : SNAP_BRIDGE_MIN_ALPHA
+          + (Math.sin(now * SNAP_BRIDGE_PULSE_SPEED) * 0.5 + 0.5) * SNAP_BRIDGE_AMP_ALPHA;
+      for (let i = 1; i < sorted.length; i++) {
+        const rear = sorted[i - 1];
+        const front = sorted[i];
+        if (front.convoyS - rear.convoyS <= cfg.ballSpacing + TOUCH_TOLERANCE_PX) {
+          continue;
+        }
+        if (!this.areEndsMagneticallyAttracted(engine, rear, front)) {
+          continue;
+        }
+        const startS = Math.max(0, rear.convoyS);
+        const endS = Math.min(lut.totalLength, front.convoyS);
+        if (endS <= startS) {
+          continue;
+        }
+        const startPt = sampleTrackAt(lut, startS);
+        const endPt = sampleTrackAt(lut, endS);
+        ctx.beginPath();
+        ctx.moveTo(startPt.x, startPt.y);
+        for (let k = 0; k <= lut.count; k++) {
+          if (lut.arcS[k] > startS && lut.arcS[k] < endS) {
+            ctx.lineTo(lut.xs[k], lut.ys[k]);
+          }
+        }
+        ctx.lineTo(endPt.x, endPt.y);
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
+
     // Draw Singularity Vortex at end of rail
     const spin = engine.isReducedMotion ? 0 : now * VORTEX_SPIN_SPEED;
     ctx.translate(lut.endX, lut.endY);
     ctx.rotate(spin);
-    ctx.strokeStyle = theme.dangerZoneColor;
+    ctx.strokeStyle = vortexColor;
     ctx.globalAlpha = VORTEX_RING_ALPHA;
     ctx.lineWidth = VORTEX_LINE_WIDTH;
     ctx.beginPath();
@@ -734,6 +800,38 @@ export class ConvoyBehavior extends ModeBehavior {
       ctx.stroke();
     }
     ctx.restore();
+  }
+
+  /** Continuous progress of the front-most convoy sphere toward the vortex drain. */
+  getPressureState(engine) {
+    const cfg = engine.modesConfig?.convoy;
+    const world = engine.physicsWorld;
+    const state = engine.modeState;
+    if (!cfg || !world || !state) {
+      return null;
+    }
+    if (!world.balls.length) {
+      return { active: true, modeKey: 'convoy', ratio: 0, danger: false, critical: false };
+    }
+    const lut = this.getTrackLut(engine, state.trackId || cfg.tracks[0]);
+    if (!lut || lut.totalLength <= 0) {
+      return { active: true, modeKey: 'convoy', ratio: 0, danger: false, critical: false };
+    }
+    let maxS = 0;
+    for (const ball of world.balls) {
+      if (Number.isFinite(ball.convoyS) && ball.convoyS > maxS) {
+        maxS = ball.convoyS;
+      }
+    }
+    const ratio = Math.max(0, Math.min(1, maxS / lut.totalLength));
+    const danger = Boolean(state.nearDanger) || ratio >= cfg.nearMissProgress;
+    return {
+      active: true,
+      modeKey: 'convoy',
+      ratio,
+      danger,
+      critical: ratio >= (1 + cfg.nearMissProgress) * MATH_CONSTANTS.HALF
+    };
   }
 }
 

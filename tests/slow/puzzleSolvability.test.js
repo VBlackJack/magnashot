@@ -127,7 +127,7 @@ function assertWindow(label, results, step) {
 
 test('The stages ship the content the solutions were measured on', () => {
   assert.equal(solutions.seed, 7);
-  assert.equal(puzzles.length, 10);
+  assert.equal(puzzles.length, 20);
   for (const stage of Object.keys(solutions.oneShot)) {
     assert.equal(puzzles[stage - 1].shots, 1, `stage ${stage} is a one-shot stage`);
   }

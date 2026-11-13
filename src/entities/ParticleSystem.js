@@ -45,6 +45,7 @@ export class ParticleSystem {
     this.shakeIntensity = 0;
     this.reducedMotion = false;
     this.animationSpeed = 1;
+    this.budgetScale = 1;
   }
 
   /**
@@ -94,6 +95,29 @@ export class ParticleSystem {
     this.liquidVelocities.fill(0);
     while (this.floatingTexts.length > 0) {
       this.textPool.push(this.floatingTexts.pop());
+    }
+    this.budgetScale = 1;
+  }
+
+  /** Effective particle cap scaled by current frame-time adaptive budget. */
+  getEffectiveMaxParticles() {
+    return Math.max(1, Math.round(this.cfg.maxParticles * this.budgetScale));
+  }
+
+  /**
+   * Adapts particle budget dynamically from frame duration so heavy bursts stay smooth
+   * on modest devices and recover automatically when frame times normalize.
+   * @param {number} frameMs - Elapsed frame duration in milliseconds.
+   */
+  adaptBudget(frameMs) {
+    const adaptive = this.cfg.adaptiveBudget;
+    if (!adaptive || !Number.isFinite(frameMs) || frameMs <= 0) {
+      return;
+    }
+    if (frameMs > adaptive.highFrameMs) {
+      this.budgetScale = Math.max(adaptive.minScale, this.budgetScale - adaptive.stepDown);
+    } else if (frameMs < adaptive.recoverFrameMs && this.budgetScale < 1) {
+      this.budgetScale = Math.min(1, this.budgetScale + adaptive.stepUp);
     }
   }
 
@@ -158,7 +182,7 @@ export class ParticleSystem {
     }
     const cfg = this.cfg;
     // Trim instead of recycling a live item: swap-removal breaks age order and prev* interpolation.
-    count = Math.min(count, cfg.maxParticles - this.particles.length);
+    count = Math.min(count, this.getEffectiveMaxParticles() - this.particles.length);
     if (count <= 0) {
       return;
     }

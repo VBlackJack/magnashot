@@ -19,11 +19,15 @@ import {
   GAME_OVER_REASONS,
   LAUNCHER_POSTURES,
   MATH_CONSTANTS,
-  OBSTACLE_TYPES
+  OBSTACLE_TYPES,
+  SPECIAL_TYPES
 } from '../../core/Constants.js';
 import { t } from '../../core/I18n.js';
 import { Obstacle } from '../../entities/Obstacle.js';
 import { ModeBehavior, registerModeBehavior } from './ModeBehavior.js';
+import { reportBountyEvent } from '../Bounties.js';
+
+const VALID_SPECIAL_TYPES = new Set(Object.values(SPECIAL_TYPES));
 
 const INNER_ANCHOR_COUNT = 6;
 const INNER_RADIUS_FACTOR = 1.18;
@@ -34,10 +38,25 @@ const RING_LINE_WIDTH = 2.5;
 const COLLECTOR_ARC_LINE_WIDTH = 6;
 const NEAR_MISS_RING_ALPHA = 0.22;
 const CONTAINMENT_RING_ALPHA = 0.72;
+const NEAR_DANGER_RING_MIN_ALPHA = 0.56;
+const NEAR_DANGER_RING_AMP_ALPHA = 0.4;
+const NEAR_DANGER_RING_STATIC_ALPHA = 0.94;
+const NEAR_DANGER_RING_LINE_WIDTH = 3.5;
+const NEAR_DANGER_PULSE_SPEED = 0.008;
 const COLLECTOR_ARC_ALPHA = 0.85;
+const DEFAULT_ARC_CLAMP_RATIO = 0.92;
 const CORE_PIVOT_RADIUS = 20;
 const NEXT_BALL_OFFSET_X = 60;
 const NEXT_BALL_OFFSET_Y = 12;
+
+/** Half-angular span of each Orbital collector arc, widened cleanly by collectorMagnet. */
+function getCollectorHalfSpan(cfg, collectorMagnetLevel = 0) {
+  const span =
+    cfg.collectorArcSpanRad + Math.max(0, collectorMagnetLevel) * (cfg.collectorArcSpanPerLevel || 0);
+  const maxHalfSpan =
+    (Math.PI / Math.max(1, cfg.collectorArcCount)) * (cfg.collectorArcClampRatio || DEFAULT_ARC_CLAMP_RATIO);
+  return Math.min(maxHalfSpan, span * MATH_CONSTANTS.HALF);
+}
 
 const ORBITAL_CHROME = Object.freeze({
   ambientLiquid: false,
@@ -312,8 +331,8 @@ export class OrbitalBehavior extends ModeBehavior {
     }
   }
 
-  isAngleInsideCollectorArc(angle, phase, cfg) {
-    const halfSpan = cfg.collectorArcSpanRad * MATH_CONSTANTS.HALF;
+  isAngleInsideCollectorArc(angle, phase, cfg, collectorMagnetLevel = 0) {
+    const halfSpan = getCollectorHalfSpan(cfg, collectorMagnetLevel);
     const step = MATH_CONSTANTS.TWO_PI / cfg.collectorArcCount;
     for (let i = 0; i < cfg.collectorArcCount; i++) {
       const center = phase + i * step;
@@ -371,11 +390,13 @@ export class OrbitalBehavior extends ModeBehavior {
       const newDist = Math.hypot(b.x - cfg.coreX, b.y - cfg.coreY);
       if (newDist >= cfg.dangerRadius - cfg.collectorCatchThickness * MATH_CONSTANTS.HALF) {
         const angle = Math.atan2(b.y - cfg.coreY, b.x - cfg.coreX);
-        if (this.isAngleInsideCollectorArc(angle, engine.modeState.collectorPhase, cfg)) {
+        const collectorLvl = engine.getEffectiveUpgradeLevel?.('collectorMagnet') || 0;
+        if (this.isAngleInsideCollectorArc(angle, engine.modeState.collectorPhase, cfg, collectorLvl)) {
           const pts = Math.round(cfg.collectorBonusPoints * Math.max(1, engine.combo));
           engine.addScore(pts);
           engine.addOvercharge(cfg.collectorOverchargeGain);
-          engine.audioManager.playEffect('portal');
+          engine.audioManager.playEffect('orbitalCatch');
+          reportBountyEvent(engine, 'orbital_arc_catch', 1);
           engine.particleSystem.spawnBurst(
             b.x,
             b.y,
@@ -410,6 +431,7 @@ export class OrbitalBehavior extends ModeBehavior {
     }
     const cfg = engine.modesConfig.orbital;
     const anchoredSet = engine.physicsWorld.getAnchoredBallIds();
+    let nearDanger = false;
     for (const ball of engine.physicsWorld.balls) {
       if (!anchoredSet.has(ball.id)) {
         continue;
@@ -419,6 +441,13 @@ export class OrbitalBehavior extends ModeBehavior {
         engine.triggerGameOver(GAME_OVER_REASONS.RING_BREACHED);
         return;
       }
+      if (dist >= cfg.nearMissRadius) {
+        nearDanger = true;
+      }
+    }
+    if (engine.modeState && nearDanger !== Boolean(engine.modeState.nearDanger)) {
+      engine.modeState.nearDanger = nearDanger;
+      engine.notifyUI();
     }
   }
 
@@ -476,17 +505,49 @@ export class OrbitalBehavior extends ModeBehavior {
     return {
       turnsUntilWave: state.turnsUntilWave ?? 1,
       waveCadence: state.waveCadence ?? 1,
-      collectorPhase: state.collectorPhase ?? MATH_CONSTANTS.QUARTER_PI
+      collectorPhase: state.collectorPhase ?? MATH_CONSTANTS.QUARTER_PI,
+      driftingBalls: Array.isArray(state.driftingBalls)
+        ? state.driftingBalls.map(({ x, y, vx, vy, radius, colorId, specialType }) => ({
+          x,
+          y,
+          vx,
+          vy,
+          radius,
+          colorId: colorId ?? null,
+          specialType: specialType ?? null
+        }))
+        : []
     };
   }
 
   validateModeState(rawState) {
-    return Boolean(
+    if (!(
       rawState
       && typeof rawState === 'object'
       && Number.isInteger(rawState.turnsUntilWave)
+      && rawState.turnsUntilWave >= 0
       && Number.isFinite(rawState.collectorPhase)
-    );
+    )) {
+      return false;
+    }
+    if (rawState.driftingBalls === undefined) {
+      return true;
+    }
+    if (!Array.isArray(rawState.driftingBalls)) {
+      return false;
+    }
+    return rawState.driftingBalls.every((entry) => (
+      entry
+      && typeof entry === 'object'
+      && Number.isFinite(entry.x)
+      && Number.isFinite(entry.y)
+      && Number.isFinite(entry.vx)
+      && Number.isFinite(entry.vy)
+      && Number.isFinite(entry.radius)
+      && entry.radius > 0
+      && (entry.colorId === null || typeof entry.colorId === 'string')
+      && (entry.specialType === null || entry.specialType === undefined || VALID_SPECIAL_TYPES.has(entry.specialType))
+    ));
   }
 
   restoreModeState(engine, rawState) {
@@ -499,33 +560,55 @@ export class OrbitalBehavior extends ModeBehavior {
     engine.activePalette = engine.ballsConfig.standardColors.slice(0, paletteSize).map((c) => c.id);
     engine.physicsWorld.gravityMultiplier = 0;
     engine.physicsWorld.customPivotDamping = cfg.angularDamping;
+    const driftingBalls = Array.isArray(rawState.driftingBalls)
+      ? rawState.driftingBalls.map((entry) => ({
+        x: entry.x,
+        y: entry.y,
+        vx: entry.vx,
+        vy: entry.vy,
+        radius: entry.radius,
+        colorId: entry.colorId ?? null,
+        specialType: entry.specialType ?? null
+      }))
+      : [];
     engine.modeState = {
       turnsUntilWave: Math.max(1, rawState.turnsUntilWave),
       waveCadence: Math.max(1, rawState.waveCadence || cfg.shotsPerRingWave),
       collectorPhase: rawState.collectorPhase,
-      driftingBalls: []
+      driftingBalls
     };
   }
 
-  drawUnderlay(ctx, engine, renderer, theme) {
+  drawUnderlay(ctx, engine, renderer, theme, now = 0) {
     const cfg = engine.modesConfig.orbital;
     const phase = engine.modeState?.collectorPhase ?? MATH_CONSTANTS.QUARTER_PI;
-    const halfSpan = cfg.collectorArcSpanRad * MATH_CONSTANTS.HALF;
+    const collectorLvl = engine.getEffectiveUpgradeLevel?.('collectorMagnet') || 0;
+    const halfSpan = getCollectorHalfSpan(cfg, collectorLvl);
     const step = MATH_CONSTANTS.TWO_PI / cfg.collectorArcCount;
+    const dangerColor = theme.dangerLineColor || theme.dangerZoneColor;
+    const nearDanger = Boolean(engine.modeState?.nearDanger);
 
     ctx.save();
     // Subtle warning halo inside containment boundary
-    ctx.strokeStyle = theme.dangerZoneColor;
-    ctx.globalAlpha = NEAR_MISS_RING_ALPHA;
-    ctx.lineWidth = 1;
+    ctx.strokeStyle = dangerColor;
+    ctx.globalAlpha = nearDanger ? NEAR_MISS_RING_ALPHA * 1.8 : NEAR_MISS_RING_ALPHA;
+    ctx.lineWidth = nearDanger ? 1.5 : 1;
     ctx.setLineDash(RING_DASH_PATTERN);
     ctx.beginPath();
     ctx.arc(cfg.coreX, cfg.coreY, cfg.nearMissRadius, 0, MATH_CONSTANTS.TWO_PI);
     ctx.stroke();
 
-    // Red outer containment ring
-    ctx.globalAlpha = CONTAINMENT_RING_ALPHA;
-    ctx.lineWidth = RING_LINE_WIDTH;
+    // Outer containment ring (pulses urgently when anchored spheres cross nearMissRadius)
+    if (nearDanger) {
+      ctx.globalAlpha = engine.isReducedMotion
+        ? NEAR_DANGER_RING_STATIC_ALPHA
+        : NEAR_DANGER_RING_MIN_ALPHA
+          + (Math.sin(now * NEAR_DANGER_PULSE_SPEED) * 0.5 + 0.5) * NEAR_DANGER_RING_AMP_ALPHA;
+      ctx.lineWidth = NEAR_DANGER_RING_LINE_WIDTH;
+    } else {
+      ctx.globalAlpha = CONTAINMENT_RING_ALPHA;
+      ctx.lineWidth = RING_LINE_WIDTH;
+    }
     ctx.beginPath();
     ctx.arc(cfg.coreX, cfg.coreY, cfg.dangerRadius, 0, MATH_CONSTANTS.TWO_PI);
     ctx.stroke();
@@ -553,6 +636,37 @@ export class OrbitalBehavior extends ModeBehavior {
     for (const d of drifting) {
       renderer.drawDetachedPreviewBall(ctx, d.x, d.y, d.radius, d.colorId, d.specialType);
     }
+  }
+
+  /** Continuous perimeter ratio of the outermost anchored sphere vs containment radius. */
+  getPressureState(engine) {
+    const cfg = engine.modesConfig?.orbital;
+    const world = engine.physicsWorld;
+    const state = engine.modeState;
+    if (!cfg || !world || !state || !cfg.dangerRadius) {
+      return null;
+    }
+    const anchoredSet = world.getAnchoredBallIds?.() || new Set();
+    let maxOuterDist = 0;
+    for (const ball of world.balls) {
+      if (!anchoredSet.has(ball.id)) {
+        continue;
+      }
+      const dist = Math.hypot(ball.x - cfg.coreX, ball.y - cfg.coreY) + ball.radius;
+      if (dist > maxOuterDist) {
+        maxOuterDist = dist;
+      }
+    }
+    const ratio = Math.max(0, Math.min(1, maxOuterDist / cfg.dangerRadius));
+    const warnThreshold = cfg.nearMissRadius / cfg.dangerRadius;
+    const danger = Boolean(state.nearDanger) || ratio >= warnThreshold;
+    return {
+      active: true,
+      modeKey: 'orbital',
+      ratio,
+      danger,
+      critical: ratio >= (1 + warnThreshold) * MATH_CONSTANTS.HALF
+    };
   }
 }
 

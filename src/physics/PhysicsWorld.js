@@ -79,6 +79,8 @@ export class PhysicsWorld {
     this.skipClusterStep = false;
     this.customProjectileStep = null;
     this.customPivotDamping = null;
+    this.aimReflectOnBallHit = false;
+    this.aimBallRestitution = 1;
     this.randomSource = Math.random;
     const attractRange = physicsConfig.ball.radius * physicsConfig.magnetism.attractionRangeFactor;
     this.spatialGrid = new SpatialHashGrid(attractRange);
@@ -229,6 +231,8 @@ export class PhysicsWorld {
     this.skipClusterStep = false;
     this.customProjectileStep = null;
     this.customPivotDamping = null;
+    this.aimReflectOnBallHit = false;
+    this.aimBallRestitution = 1;
     this.aimCacheValid = false;
   }
 
@@ -1590,6 +1594,8 @@ export class PhysicsWorld {
       this.projectileGravity,
       this.projectileLaunchSpeedOverride,
       this.snapCeilingY,
+      this.aimReflectOnBallHit,
+      this.aimBallRestitution,
       this.projectileFields.length
     );
     for (const field of this.projectileFields) {
@@ -1835,11 +1841,13 @@ export class PhysicsWorld {
     this.pushAimPoint(startX, startY, false);
 
     let traveled = 0;
+    let ballBounces = 0;
     let snapTarget = null;
     let landingX = startX;
     let landingY = startY;
+    const bounceLimit = this.aimReflectOnBallHit ? maxBounces + 1 : maxBounces;
 
-    while (traveled < maxDistance && state.bounces <= maxBounces && !this.isFlightExhausted(state)) {
+    while (traveled < maxDistance && state.bounces <= bounceLimit && !this.isFlightExhausted(state)) {
       if (state.flightSteps % substeps === 0) {
         this.advancePreviewObstacles();
       }
@@ -1867,6 +1875,58 @@ export class PhysicsWorld {
       if (isAnvil && state.y <= minWallY) {
         landingY = minWallY;
         break;
+      }
+
+      if (this.aimReflectOnBallHit) {
+        if (!isAnvil) {
+          let hitStopped = false;
+          for (let i = this.balls.length - 1; i >= 0; i--) {
+            const target = this.balls[i];
+            const bx = preview.ballX[i];
+            const by = preview.ballY[i];
+            const dx = state.x - bx;
+            const dy = state.y - by;
+            const minDist = r + (target.radius || r);
+            if (dx * dx + dy * dy >= minDist * minDist) {
+              continue;
+            }
+            if (specialType) {
+              landingX = state.x;
+              landingY = state.y;
+              hitStopped = true;
+              break;
+            }
+            const n = this.writeSeparationNormal(dx, dy, state.vx, state.vy, this.normalScratch);
+            state.x = bx + n.x * minDist;
+            state.y = by + n.y * minDist;
+            if (ballBounces === 0) {
+              const dot = state.vx * n.x + state.vy * n.y;
+              if (dot < 0) {
+                state.vx = (state.vx - 2 * dot * n.x) * this.aimBallRestitution;
+                state.vy = (state.vy - 2 * dot * n.y) * this.aimBallRestitution;
+                this.clampProjectileSpeed(state);
+                state.bounces++;
+              }
+              ballBounces++;
+              this.pushAimPoint(state.x, state.y, false, true);
+              landingX = state.x;
+              landingY = state.y;
+              break;
+            }
+            this.pushAimPoint(state.x, state.y, false, true);
+            landingX = state.x;
+            landingY = state.y;
+            hitStopped = true;
+            break;
+          }
+          if (hitStopped) {
+            break;
+          }
+        }
+        if (state.vy > 0 && state.y > canvasCfg.logicalHeight + r) {
+          break;
+        }
+        continue;
       }
 
       if (!isAnvil) {

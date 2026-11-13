@@ -178,6 +178,24 @@ test('Pinball bucket catch refunds +1 shot, lighting all Core Pegs advances stag
   assert.equal(engine.gameOverSummary?.reasonKey, GAME_OVER_REASONS.OUT_OF_SHOTS);
 });
 
+test('Pinball stage transition keeps avalanche pegs dropping without phantom collector payouts', () => {
+  const engine = createEngine();
+  engine.startPinballMode(1);
+  const nonCoreBefore = engine.physicsWorld.balls.filter((b) => !b.pinballCore).length;
+  assert.ok(nonCoreBefore > 0);
+  for (const peg of engine.physicsWorld.balls) {
+    if (peg.pinballCore) {
+      pinballBehavior.lightPeg(engine, peg);
+    }
+  }
+  pinballBehavior.settlePinballTurn(engine, true);
+  assert.equal(engine.pinballStage, 2);
+  assert.equal(engine.physicsWorld.droppingBalls.length, nonCoreBefore);
+  const scoreBefore = engine.score;
+  engine.getStepCallbacks().onCollectorBinPass({ x: 120 });
+  assert.equal(engine.score, scoreBefore);
+});
+
 test('Pinball snapshot preserves stage, bucket state, and Core Peg assignments on restore', () => {
   const engine = createEngine();
   engine.startPinballMode(2);
@@ -195,4 +213,37 @@ test('Pinball snapshot preserves stage, bucket state, and Core Peg assignments o
   assert.equal(restored.modeState.bucketX, 190);
   assert.equal(restored.modeState.bucketDir, -1);
   assert.equal(restored.modeState.corePegsRemaining, coreCountBefore);
+});
+
+test('Pinball 1-bounce ballistic aim reflects off first peg, avoids snapTarget, and collectorMagnet widens bucket & adds overcharge', () => {
+  const engine = createEngine();
+  engine.startPinballMode(1);
+  const cfg = modesConfig.pinball;
+  // Position a single peg directly below the downward aim line
+  engine.physicsWorld.balls = [engine.physicsWorld.balls[0]];
+  engine.physicsWorld.ballMap.clear();
+  const peg = engine.physicsWorld.balls[0];
+  peg.x = cfg.launcherX + 10;
+  peg.y = 280;
+  engine.physicsWorld.ballMap.set(peg.id, peg);
+  engine.physicsWorld.aimCacheValid = false;
+
+  engine.updateAimFromAngle(Math.PI * 0.5);
+  assert.ok(engine.aimPoints.length > 5);
+  assert.equal(engine.aimPoints.snapTarget, null, 'pinball aim must never highlight pegs as snap cluster targets');
+  assert.ok(engine.aimPoints.some((pt) => pt.isBounce), 'pinball aim traces through first peg ricochet');
+
+  const baseWidth = pinballBehavior.getEffectiveBucketWidth(engine);
+  assert.equal(baseWidth, cfg.bucketWidth);
+  engine.storageManager.safeSetItem(
+    gameConfig.storage.keys.upgrades,
+    JSON.stringify({ collectorMagnet: 3 })
+  );
+  engine.storageManager.upgradesCache = null;
+  const upgradedWidth = pinballBehavior.getEffectiveBucketWidth(engine);
+  assert.equal(upgradedWidth, cfg.bucketWidth + 3 * cfg.bucketWidthPerLevel);
+
+  const overchargeBefore = engine.overcharge;
+  pinballBehavior.refundBucketCatch(engine, cfg.launcherX, cfg.bucketY);
+  assert.ok(engine.overcharge > overchargeBefore, 'collector bucket catch grants overcharge');
 });

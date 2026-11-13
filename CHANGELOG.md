@@ -4,7 +4,16 @@ All notable changes to **MagnaShot** are documented in this file.
 
 ## [Unreleased]
 
+## [1.28.0] - 2026-11-13
+
 ### Added
+- Puzzle Mode: expanded from 10 to 20 deterministic stages (`P1` to `P20`), adding trick-shot puzzles covering Bumpers, Repulsors, Sliding Rail Anchors, Antimagnets, Tethered groups, Singularities, Portal Relays, and a two-color Rotor Finale (`railHalfWidth` anchor support in Puzzle mode).
+- Daily Contracts (Bounties): 3 seeded UTC daily contracts selectable and tracked in the Play Hub Challenges section (`+35` to `+50` coin rewards).
+- Play Hub Mastery & Ghost Duel filter: mode cards highlight with a gold star badge once their mastery milestone is reached; the Stats Ghost Duels section now filters by `All`, `Daily`, or `Flux`.
+- Arcade SFX & Blitz 90s pacing: distinct pitched sounds for Convoy snapbacks, Orbital collector catches, Pinball bucket refunds, Merge calibre fusions, urgent 5-second Blitz countdown ticks, and capped `+3s` avalanche time bonuses on large Blitz drops.
+- First-load Arcade mode objective banners, tactile physics & preview improvements: rest-landing ghost target & same-tier ring in Merge Basin, Convoy exposed polarity gap snapbacks, Pinball collector bucket magnet attraction and live polarity flight curvature, Orbital Spin angular momentum & collector arc expansion, and Hex Grid polarity pulse aim preview.
+- Continuous spatial pressure meters (`role="meter"`) in the HUD for Magnetic Convoy, Orbital Spin, and Merge Basin, with danger-threshold visual states and polite live announcements.
+- Workshop mode-specific notes explaining shotless upgrades for Magnetic Convoy and Orbital Spin, proactive `localStorage` quota warning badge and announcement when device storage fills up, and frame-time adaptive particle budgets.
 - Merge Basin special spheres: from the 10th drop, a rare special sphere (about 1 drop in 20) can queue up, previewed in the launcher with a symbol (not only a colour) and announced politely once per kind and run. A Joker fuses with the first plain sphere it touches as if two of that calibre met, a frozen sphere cannot fuse until a fusion shockwave reaches it or it thaws after 8 seconds, and a Bomb goes off 1 second after landing and removes the calibre 1 to 4 spheres within 90 px for 40 points each, outside the combo and golden events. Saved runs keep them.
 - Merge Basin contracts: from the 15th drop, and again every 6 to 10 drops, an optional goal (fuse a given calibre, or make 6 fusions) must be met within 8 drops, shown as a chip next to the event badge and announced politely when it starts and when it ends. Meeting it pays bonus points that ignore the combo and the golden event (300 per calibre, or 1500) and brings the Shake 2 drops closer; missing it costs nothing.
 - Merge Basin shapes: every run draws one of three basin shapes at random, the classic basin, a narrow one (walls 30 px closer on each side) or one with two static pegs in the lower half, and announces it with a floating text and a polite announcement. Records and achievements are shared by all shapes, and the narrow and pegs shapes use gentler overflow line pressure. The shapes live in `merge.shapes` (with an optional per-shape `pressure` override), the shape is saved with the run, and a run saved before shapes existed resumes as the classic basin.
@@ -12,10 +21,12 @@ All notable changes to **MagnaShot** are documented in this file.
 
 ### Changed
 - Merge Basin spheres can no longer sink a pixel or two into the basin walls and floor: each physics step now ends with every sphere inside the basin.
+- Extracted `RendererParticles.js`, `RendererMagnetarCharges.js`, and `StorageMigrations.js` to keep core rendering and save migration modules focused.
 
 ### Fixed
 - On phones, when the browser drops fullscreen by itself (back gesture, app switch, share sheet), the next tap on the game now brings it back, until the player turns it off with the fullscreen button. On desktop, Escape still leaves fullscreen for good.
 - On tablets such as an 11-inch 2560x1600 tablet held in portrait, the board now fills the screen instead of stopping at a fixed width.
+- Portrait mobile HUD overflow (`.powerups-bar.hidden` full-width canvas ergonomics), Hex Grid aim preview polarity pulse feedback, mode-switching timer & listener isolation, and persistent save integrity across snapshot restores.
 
 ## [1.27.0] - 2026-11-12
 

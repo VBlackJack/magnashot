@@ -36,6 +36,13 @@ import {
 
 /** Version of the discovery list that predates versioning: its seeding is never redone. */
 const LEGACY_DISCOVERIES_VERSION = 1;
+const ARCADE_INTRO_MODES = new Set([
+  GAME_MODES.HEX_GRID,
+  GAME_MODES.ORBITAL,
+  GAME_MODES.PINBALL,
+  GAME_MODES.CONVOY,
+  GAME_MODES.MERGE
+]);
 
 /** Methods of GameEngine that belong to this domain, installed on its prototype. */
 export const engineDiscoveryMethods = {
@@ -247,7 +254,8 @@ export const engineDiscoveryMethods = {
   hasLevelHints() {
     return (
       this.isRunPlaying() &&
-      this.listReplayableHints().some((mechanicId) => mechanicId !== BOARD_MECHANICS.BASICS)
+      (ARCADE_INTRO_MODES.has(this.mode)
+        || this.listReplayableHints().some((mechanicId) => mechanicId !== BOARD_MECHANICS.BASICS))
     );
   },
 
@@ -260,6 +268,12 @@ export const engineDiscoveryMethods = {
   replayLevelHints() {
     if (!this.isRunPlaying()) {
       return false;
+    }
+    if (ARCADE_INTRO_MODES.has(this.mode) && !this.levelIntro) {
+      this.modeIntroReplaySeq = (this.modeIntroReplaySeq || 0) + 1;
+      this.levelIntro = { arcadeMode: this.mode, replaySeq: this.modeIntroReplaySeq };
+      this.notifyUI();
+      return true;
     }
     const queue = this.listReplayableHints();
     if (queue.length === 0) {

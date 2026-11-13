@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-const APP_VERSION = '1.27.0';
+const APP_VERSION = '1.28.0';
 const CACHE_NAME = `magnashot-cache-v${APP_VERSION}`;
 
 // The service worker cannot read configs/*.json before it has a cache, so its
@@ -53,6 +53,7 @@ const PRECACHE_ASSETS = [
   './src/core/installMethods.js',
   './src/core/SeededRandom.js',
   './src/core/StorageManager.js',
+  './src/core/StorageMigrations.js',
   './src/core/WorldGeometry.js',
   './src/entities/Ball.js',
   './src/entities/Obstacle.js',
@@ -60,6 +61,7 @@ const PRECACHE_ASSETS = [
   './src/game/DailyShare.js',
   './src/game/ModeUnlocks.js',
   './src/game/WeeklyFlux.js',
+  './src/game/Bounties.js',
   './src/game/PlayerStats.js',
   './src/game/ShotTimeline.js',
   './src/game/GhostCodec.js',
@@ -85,6 +87,8 @@ const PRECACHE_ASSETS = [
   './src/game/GameLoop.js',
   './src/game/ImpactPreview.js',
   './src/game/Renderer.js',
+  './src/game/RendererMagnetarCharges.js',
+  './src/game/RendererParticles.js',
   './src/game/Resonance.js',
   './src/game/RunSnapshot.js',
   './src/game/Discovery.js',

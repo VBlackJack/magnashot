@@ -143,6 +143,48 @@
       "endFreq": 900,
       "duration": 0.04,
       "hapticMs": 0
+    },
+    "convoySnapback": {
+      "type": "sine",
+      "startFreq": 360,
+      "endFreq": 720,
+      "duration": 0.14,
+      "harmonic": true,
+      "hapticMs": 18
+    },
+    "orbitalCatch": {
+      "type": "triangle",
+      "startFreq": 580,
+      "endFreq": 920,
+      "duration": 0.15,
+      "harmonic": true,
+      "hapticMs": 20
+    },
+    "pinballBucket": {
+      "notes": [523.25, 659.25, 1046.5],
+      "noteDuration": 0.06,
+      "hapticMs": 22
+    },
+    "mergeFusion": {
+      "type": "triangle",
+      "baseFreq": 280,
+      "pitchStep": 48,
+      "endFreqMultiplier": 1.4,
+      "duration": 0.16,
+      "harmonic": true,
+      "hapticMs": 20
+    },
+    "blitzTick": {
+      "type": "square",
+      "startFreq": 880,
+      "endFreq": 760,
+      "duration": 0.045,
+      "hapticMs": 0
+    },
+    "blitzTimeBonus": {
+      "notes": [587.33, 880, 1174.66],
+      "noteDuration": 0.065,
+      "hapticMs": 25
     }
   },
   "music": {

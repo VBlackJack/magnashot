@@ -183,9 +183,28 @@ test('Storage quota failure keeps the debited coin balance authoritative', () =>
     assert.equal(sm.purchaseUpgrade('laserSight'), true);
     assert.equal(sm.getCoins(), 500 - cost);
     assert.equal(sm.getUpgradeLevel('laserSight'), 1);
+    assert.equal(sm.hasQuotaExceeded(), true);
   } finally {
     restore();
   }
+
+  const engineStorage = new StorageManager();
+  engineStorage.init();
+  const engine = new GameEngine({
+    gameConfig,
+    physicsConfig,
+    ballsConfig,
+    obstaclesConfig,
+    levelsConfig,
+    campaignConfig,
+    campaignTuning,
+    fluxConfig,
+    audioManager: { playEffect: () => {}, stopAll: () => {}, isMuted: () => true, setMuted: () => {} },
+    storageManager: engineStorage
+  });
+  engine.startPuzzleMode(1);
+  assert.equal(engine.canBuySpecialAmmo(), false);
+  assert.equal(engine.getSpecialAmmoBlockReason(), null);
 });
 
 test('Corrupted JSON shapes ("null", arrays, numbers, bad entries) never throw and totals stay numeric', () => {

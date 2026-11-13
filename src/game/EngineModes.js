@@ -47,6 +47,21 @@ export const FLUX_PERK_IDS = Object.freeze({
   GOLDEN: 'golden'
 });
 
+/**
+ * Returns a one-time first-run objective banner payload for modes without authored levels.
+ * Replay via `?` uses `EngineDiscovery.replayLevelHints` independently of `introducedModes`.
+ * @param {object} engine - GameEngine instance.
+ * @param {string} mode - GAME_MODES identifier.
+ * @returns {{ arcadeMode: string } | null}
+ */
+function maybeBuildArcadeModeIntro(engine, mode) {
+  if (!engine.introducedModes || engine.introducedModes.has(mode)) {
+    return null;
+  }
+  engine.introducedModes.add(mode);
+  return { arcadeMode: mode };
+}
+
 /** Methods of GameEngine that belong to this domain, installed on its prototype. */
 export const engineModeMethods = {
   startCampaignLevel(levelId) {
@@ -339,6 +354,8 @@ export const engineModeMethods = {
         clusterModifier: mod,
         armorHits: bSpec.armorHits !== undefined ? bSpec.armorHits : this.getInitialArmor(mod),
         isAnchor: Boolean(bSpec.isAnchor),
+        railMinX: bSpec.railHalfWidth > 0 ? x - bSpec.railHalfWidth : null,
+        railMaxX: bSpec.railHalfWidth > 0 ? x + bSpec.railHalfWidth : null,
         pivotRef,
         pivotRadius: pivotRef ? Math.hypot(x - pivotRef.x, y - pivotRef.y) : 0,
         pivotAngle: pivotRef ? Math.atan2(y - pivotRef.y, x - pivotRef.x) - pivotRef.angle : 0
@@ -402,6 +419,7 @@ export const engineModeMethods = {
     this.blitzFramesRemaining = blitzCfg.durationFrames;
     this.blitzWaveTimerFrames = blitzCfg.waveIntervalFrames;
     this.blitzIdleFrames = 0;
+    this.blitzBonusFramesEarned = 0;
     this.specialInventory = { ...blitzCfg.initialSpecialCounts };
     this.activePalette = this.ballsConfig.standardColors
       .slice(0, this.gameConfig.endless.paletteCount)
@@ -991,6 +1009,7 @@ export const engineModeMethods = {
 
   startHexGridMode() {
     this.resetRunState(GAME_MODES.HEX_GRID);
+    this.specialInventory = Object.fromEntries(Object.values(SPECIAL_TYPES).map((type) => [type, 0]));
     this.audioManager.stopAll();
     this.particleSystem.clear();
     const behavior = this.getModeBehavior();
@@ -1002,6 +1021,7 @@ export const engineModeMethods = {
     const spec = this.getLauncherSpec();
     this.updateAimFromAngle(spec.defaultAngle);
     this.refreshDiscovery();
+    this.levelIntro = maybeBuildArcadeModeIntro(this, GAME_MODES.HEX_GRID);
     this.notifyUI();
   },
 
@@ -1019,6 +1039,7 @@ export const engineModeMethods = {
     const spec = this.getLauncherSpec();
     this.updateAimFromAngle(spec.defaultAngle);
     this.refreshDiscovery();
+    this.levelIntro = maybeBuildArcadeModeIntro(this, GAME_MODES.ORBITAL);
     this.notifyUI();
   },
 
@@ -1036,6 +1057,7 @@ export const engineModeMethods = {
     const spec = this.getLauncherSpec();
     this.updateAimFromAngle(spec.defaultAngle);
     this.refreshDiscovery();
+    this.levelIntro = maybeBuildArcadeModeIntro(this, GAME_MODES.PINBALL);
     this.notifyUI();
   },
 
@@ -1053,11 +1075,13 @@ export const engineModeMethods = {
     const spec = this.getLauncherSpec();
     this.updateAimFromAngle(spec.defaultAngle);
     this.refreshDiscovery();
+    this.levelIntro = maybeBuildArcadeModeIntro(this, GAME_MODES.CONVOY);
     this.notifyUI();
   },
 
   startMergeMode() {
     this.resetRunState(GAME_MODES.MERGE);
+    this.specialInventory = Object.fromEntries(Object.values(SPECIAL_TYPES).map((type) => [type, 0]));
     this.audioManager.stopAll();
     this.particleSystem.clear();
     const behavior = this.getModeBehavior();
@@ -1071,6 +1095,7 @@ export const engineModeMethods = {
     const spec = this.getLauncherSpec();
     this.updateAimFromAngle(spec.defaultAngle);
     this.refreshDiscovery();
+    this.levelIntro = maybeBuildArcadeModeIntro(this, GAME_MODES.MERGE);
     this.notifyUI();
   },
 };

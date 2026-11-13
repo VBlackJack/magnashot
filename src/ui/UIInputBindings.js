@@ -346,9 +346,15 @@ export const uiInputBindingMethods = {
     if (this.elements.btnSettings) {
       this.elements.btnSettings.addEventListener('click', () => {
         this.syncInstallControls();
+        this.progressBackup?.refresh();
         this.openOverlayModal(this.elements.modalSettings, this.elements.btnCloseSettings);
       });
     }
+    this.elements.quotaBadge?.addEventListener('click', () => {
+      this.syncInstallControls();
+      this.progressBackup?.refresh();
+      this.openOverlayModal(this.elements.modalSettings, this.elements.btnCloseSettings);
+    });
     if (this.elements.btnCloseSettings) {
       this.elements.btnCloseSettings.addEventListener('click', () => {
         this.closeOverlayModal(this.elements.modalSettings);
@@ -731,6 +737,7 @@ export const uiInputBindingMethods = {
 
     this.elements.btnSettingsPause?.addEventListener('click', () => {
       this.syncInstallControls();
+      this.progressBackup?.refresh();
       this.openOverlayModal(this.elements.modalSettings, this.elements.btnCloseSettings);
       this.elements.modalPause.classList.add('hidden');
       this.syncModalInertState();

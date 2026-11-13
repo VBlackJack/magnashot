@@ -25,6 +25,7 @@ import {
 import { t } from '../core/I18n.js';
 import { DISCOVERY_INTERACTIONS } from './Discovery.js';
 import { applyTurn, SAG_STEPS } from './SagMeter.js';
+import { reportBountyEvent } from './Bounties.js';
 
 /** Methods of GameEngine that belong to this domain, installed on its prototype. */
 export const engineTurnResolutionMethods = {
@@ -635,6 +636,31 @@ export const engineTurnResolutionMethods = {
 
       this.storageManager?.recordAchievementProgress?.({ maxAvalanche: detached.length });
       this.unlockAchievementTiers('firstAvalanche', detached.length);
+      reportBountyEvent(this, 'avalanche_balls', detached.length);
+
+      if (this.mode === GAME_MODES.BLITZ) {
+        const blitzCfg = this.gameConfig.blitz;
+        const minSpheres = blitzCfg.avalancheTimeBonusMinSpheres;
+        const bonusStep = blitzCfg.avalancheTimeBonusFrames;
+        const maxBonus = blitzCfg.maxBonusDurationFrames;
+        if (detached.length >= minSpheres && bonusStep > 0 && maxBonus > 0) {
+          const earned = this.blitzBonusFramesEarned || 0;
+          const granted = Math.min(bonusStep, Math.max(0, maxBonus - earned));
+          if (granted > 0) {
+            this.blitzFramesRemaining += granted;
+            this.blitzBonusFramesEarned = earned + granted;
+            const bonusSeconds = Math.max(1, Math.round(granted / blitzCfg.framesPerSecond));
+            this.audioManager?.playEffect('blitzTimeBonus');
+            this.particleSystem.spawnFloatingText(
+              sample.x,
+              sample.y + this.gameConfig.canvas.floatingTextOffsetY,
+              t('gameplay.feedback.blitz.timeBonus', { seconds: bonusSeconds }),
+              this.gameConfig.theme.wavePopupColor
+            );
+            this.notifyUI();
+          }
+        }
+      }
 
       if (this.isSurvivalMode() && this.random() < scoring.specialDropChanceEndless) {
         this.grantRandomSpecialBall();
@@ -732,6 +758,7 @@ export const engineTurnResolutionMethods = {
         continue;
       }
       this.grantRandomSpecialBall();
+      reportBountyEvent(this, 'overcharge_full', 1);
       if (this.mode === GAME_MODES.BOSS_RUSH && this.bossRushWave === startWave) {
         const bossBall = this.physicsWorld.balls.find((b) => b.clusterModifier === CLUSTER_MODIFIERS.BOSS_CORE);
         if (this.magnetar) {

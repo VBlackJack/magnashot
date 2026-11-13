@@ -221,3 +221,44 @@ test('Convoy special spheres do not push lead spheres into the Singularity and m
   assert.equal(restored.mode, GAME_MODES.CONVOY);
   assert.ok(restored.physicsWorld.balls.length >= 1);
 });
+
+test('Convoy drawUnderlay highlights attracted Snapback gaps along LUT without mutating balls', () => {
+  const engine = createEngine();
+  engine.startConvoyMode();
+  const cfg = modesConfig.convoy;
+  const lut = convoyBehavior.getTrackLut(engine, engine.modeState.trackId);
+  engine.physicsWorld.balls = [];
+  engine.physicsWorld.ballMap.clear();
+  const addConvoy = (s, colorId) => {
+    const pt = convoyBehavior.getTrackLut(engine, engine.modeState.trackId);
+    const ball = new Ball({ x: pt.xs[0], y: pt.ys[0], radius: physicsConfig.ball.radius, colorId });
+    ball.convoyS = s;
+    engine.physicsWorld.addBall(ball);
+  };
+  addConvoy(120, 'crimson');
+  addConvoy(120 + cfg.ballSpacing + 90, 'crimson');
+  convoyBehavior.sortAndSyncConvoy(engine, lut);
+  const originalOrder = engine.physicsWorld.balls.map((b) => b.id);
+
+  let strokes = 0;
+  let pathPoints = 0;
+  const ctx = {
+    save() {},
+    restore() {},
+    translate() {},
+    rotate() {},
+    setLineDash() {},
+    beginPath() {},
+    moveTo() { pathPoints++; },
+    lineTo() { pathPoints++; },
+    arc() {},
+    stroke() { strokes++; }
+  };
+  convoyBehavior.drawUnderlay(ctx, engine, null, {
+    launcherAccentColor: '#7be0ff',
+    overchargePopupColor: '#56e39f',
+    dangerLineColor: '#ff4757'
+  });
+  assert.deepEqual(engine.physicsWorld.balls.map((b) => b.id), originalOrder);
+  assert.ok(strokes >= 3 && pathPoints > 4, 'draws rail, LUT snapback bridge, and singularity vortex');
+});

@@ -138,6 +138,8 @@ export class UIManager {
       starMeterFill: document.getElementById('hud-star-meter-fill'),
       sagMeter: document.getElementById('hud-sag-meter'),
       sagMeterFill: document.getElementById('hud-sag-meter-fill'),
+      pressureMeter: document.getElementById('hud-pressure-meter'),
+      pressureMeterFill: document.getElementById('hud-pressure-meter-fill'),
       highScoreValue: document.getElementById('hud-best-value'),
       coinsValue: document.getElementById('hud-coins-value'),
       overchargePct: document.getElementById('hud-overcharge-pct'),
@@ -151,6 +153,7 @@ export class UIManager {
       mergeContractBadge: document.getElementById('hud-merge-contract'),
       frozenBadge: document.getElementById('hud-frozen-badge'),
       magnetarTelegraph: document.getElementById('hud-magnetar-telegraph'),
+      quotaBadge: document.getElementById('hud-quota-badge'),
       bestRunBadge: document.getElementById('hud-best-run'),
       hudGhost: document.getElementById('hud-ghost'),
       powerupsContainer: document.getElementById('powerups-bar'),
@@ -223,6 +226,7 @@ export class UIManager {
       playCampaignMeterFill: document.getElementById('play-campaign-meter-fill'),
       dailyReward: document.getElementById('daily-reward'),
       weeklyReward: document.getElementById('weekly-reward'),
+      playBountiesList: document.getElementById('play-bounties-list'),
       btnPuzzleStagesToggle: document.getElementById('btn-puzzle-stages-toggle'),
       btnFluxSeedToggle: document.getElementById('btn-flux-seed-toggle'),
       fluxSeedEntry: document.getElementById('flux-seed-entry'),
@@ -366,6 +370,10 @@ export class UIManager {
       btnDuelOk: document.getElementById('btn-duel-ok'),
       inputDuelName: document.getElementById('input-duel-name'),
       statsDuelsRecord: document.getElementById('stats-duels-record'),
+      statsDuelsFilters: document.getElementById('stats-duels-filters'),
+      btnDuelsFilterAll: document.getElementById('btn-duels-filter-all'),
+      btnDuelsFilterDaily: document.getElementById('btn-duels-filter-daily'),
+      btnDuelsFilterFlux: document.getElementById('btn-duels-filter-flux'),
       statsDuelsEmpty: document.getElementById('stats-duels-empty'),
       statsDuelsList: document.getElementById('stats-duels-list'),
       srAnnouncer: document.getElementById('sr-announcer'),
@@ -699,6 +707,7 @@ export class UIManager {
       }
       banner.classList.add('hidden');
       this.levelIntroShotsAtShow = null;
+      this.levelIntroRunShotsAtShow = null;
       return;
     }
     // A discovery card owns the slot: the Puzzle objective waits for it (deferred, never dropped).
@@ -714,6 +723,17 @@ export class UIManager {
         this.levelIntroShotsAtShow = engine.shotsRemaining;
       } else if (engine.shotsRemaining < this.levelIntroShotsAtShow) {
         this.levelIntroShotsAtShow = null;
+        this.levelIntroRunShotsAtShow = null;
+        engine.dismissLevelIntro?.();
+        banner.classList.add('hidden');
+        return;
+      }
+    } else if (typeof engine.runShotsFired === 'number') {
+      if (this.levelIntroRunShotsAtShow === null || this.levelIntroRunShotsAtShow === undefined) {
+        this.levelIntroRunShotsAtShow = engine.runShotsFired;
+      } else if (engine.runShotsFired > this.levelIntroRunShotsAtShow) {
+        this.levelIntroShotsAtShow = null;
+        this.levelIntroRunShotsAtShow = null;
         engine.dismissLevelIntro?.();
         banner.classList.add('hidden');
         return;
@@ -731,7 +751,9 @@ export class UIManager {
     });
     const introKey =
       intro.levelId ??
-      (intro.puzzleStage ? `puzzle:${intro.puzzleStage}` : `daily:${intro.dailySeed || intro.mutatorKey}`);
+      (intro.arcadeMode
+        ? `arcade:${intro.arcadeMode}:${intro.replaySeq || 0}`
+        : (intro.puzzleStage ? `puzzle:${intro.puzzleStage}` : `daily:${intro.dailySeed || intro.mutatorKey}`));
     if (this.announcedLevelIntroId !== introKey) {
       this.announcedLevelIntroId = introKey;
       this.announce(text);

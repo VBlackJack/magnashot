@@ -703,3 +703,21 @@ test('with reduced motion the Magnetar fall keeps its sound but no screen shake'
   assert.equal(effects.filter((name) => name === 'magnetarFall').length, 1);
   assert.equal(shakes.length, 0);
 });
+
+test('Magnetar Barrage charges truncate solo aim and clear preview when holding a special ball', () => {
+  const engine = bossRushEngine(1);
+  setShotColor(engine, 1);
+  engine.updateAimFromAngle(-Math.PI / 2);
+  const clearEndY = lastPoint(engine).y;
+  assert.equal(engine.aimPreview, undefined);
+
+  const spec = engine.getLauncherSpec();
+  engine.magnetar.charges = [{ id: 1, x: spec.x, y: spec.y - 110, strength: 1, polarity: -1 }];
+  engine.updateAimFromAngle(-Math.PI / 2);
+  assert.ok(lastPoint(engine).y > clearEndY, 'aim path truncates at Magnetar charge');
+  assert.equal(engine.aimPreview?.chargeHit?.outcome, 'neutralised');
+
+  engine.currentBall.specialType = SPECIAL_TYPES.BOMB;
+  engine.updateAimFromAngle(-Math.PI / 2);
+  assert.equal(engine.aimPreview, undefined, 'special ball flies past charges without preview hit');
+});

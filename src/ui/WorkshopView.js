@@ -29,6 +29,11 @@ const BASELINE_NOTE_KEYS = Object.freeze({
   [GAME_MODES.HEX_GRID]: 'modals.shop.upgrades.puristBaselineNote',
   [GAME_MODES.MERGE]: 'modals.shop.upgrades.puristBaselineNote'
 });
+/** Workshop note shown in shotless modes where specific upgrades behave differently. */
+const SHOTLESS_NOTE_KEYS = Object.freeze({
+  [GAME_MODES.CONVOY]: 'modals.shop.upgrades.convoyNote',
+  [GAME_MODES.ORBITAL]: 'modals.shop.upgrades.orbitalNote'
+});
 export { FULL_PERCENT };
 
 /** Achievement tiers, lowest first. */
@@ -167,13 +172,19 @@ export function renderWorkshopContents() {
   const grid = this.elements.shopGrid;
   grid.replaceChildren();
 
-  // Upgrades are bought as usual but count for nothing in a Daily run that neutralises them:
+  // Upgrades are bought as usual but count for nothing in neutralised runs, or partially in shotless modes:
   // say so, as text, only while such a run is active.
-  if (this.engine.areUpgradesNeutralised() && this.isRunActive()) {
+  const isNeutralised = this.engine.areUpgradesNeutralised();
+  const isShotlessActive = !isNeutralised && this.engine.usesShotBudget?.() === false;
+  if (this.isRunActive() && (isNeutralised || isShotlessActive)) {
     const baselineNote = document.createElement('p');
     baselineNote.className = 'levels-empty-filter';
     baselineNote.setAttribute('role', 'note');
-    baselineNote.textContent = t(BASELINE_NOTE_KEYS[this.engine.mode] || 'modals.shop.upgrades.dailyBaselineNote');
+    baselineNote.textContent = t(
+      isNeutralised
+        ? (BASELINE_NOTE_KEYS[this.engine.mode] || 'modals.shop.upgrades.dailyBaselineNote')
+        : (SHOTLESS_NOTE_KEYS[this.engine.mode] || 'modals.shop.upgrades.arcadeShotlessNote')
+    );
     grid.appendChild(baselineNote);
   }
 

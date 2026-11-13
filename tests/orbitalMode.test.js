@@ -160,12 +160,15 @@ test('Orbital triggers RING_BREACHED when an anchored cluster sphere crosses the
   assert.equal(engine.gameOverSummary?.reasonKey, GAME_OVER_REASONS.RING_BREACHED);
 });
 
-test('Orbital snapshot preserves wave countdown, collector phase, and zero-G physics on restore', () => {
+test('Orbital snapshot preserves wave countdown, collector phase, drifting balls, and zero-G physics on restore', () => {
   const engine = createEngine();
   engine.startOrbitalMode();
   engine.hasFiredInRound = true;
   engine.modeState.turnsUntilWave = 3;
   engine.modeState.collectorPhase = 1.25;
+  engine.modeState.driftingBalls = [
+    { x: 180, y: 220, vx: -12, vy: 18, radius: 14, colorId: 'crimson', specialType: null }
+  ];
   engine.saveRunSnapshot({ force: true });
 
   const restored = createEngine();
@@ -175,4 +178,34 @@ test('Orbital snapshot preserves wave countdown, collector phase, and zero-G phy
   assert.equal(restored.physicsWorld.gravityMultiplier, 0);
   assert.equal(restored.modeState.turnsUntilWave, 3);
   assert.equal(restored.modeState.collectorPhase, 1.25);
+  assert.deepEqual(restored.modeState.driftingBalls, engine.modeState.driftingBalls);
+});
+
+test('Orbital collectorMagnet widens collector arc span and nearDanger draws danger halo cleanly', () => {
+  const engine = createEngine();
+  engine.startOrbitalMode();
+  const cfg = modesConfig.orbital;
+  const phase = engine.modeState.collectorPhase;
+  const testOffsetAngle = cfg.collectorArcSpanRad * 0.5 + 0.12;
+  assert.equal(orbitalBehavior.isAngleInsideCollectorArc(phase + testOffsetAngle, phase, cfg, 0), false);
+  assert.equal(orbitalBehavior.isAngleInsideCollectorArc(phase + testOffsetAngle, phase, cfg, 3), true);
+
+  const arcs = [];
+  const ctx = {
+    save() {},
+    restore() {},
+    setLineDash() {},
+    beginPath() {},
+    stroke() {},
+    arc(x, y, radius, start, end) {
+      arcs.push({ radius, start, end, span: end - start });
+    }
+  };
+  engine.modeState.nearDanger = true;
+  orbitalBehavior.drawUnderlay(ctx, engine, null, {
+    dangerLineColor: '#ff4757',
+    overchargePopupColor: '#7be0ff'
+  });
+  assert.ok(arcs.length >= 2 + cfg.collectorArcCount);
+  assert.ok(arcs.every((a) => Number.isFinite(a.span)), '4-arg drawUnderlay handles missing now cleanly');
 });

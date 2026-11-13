@@ -60,6 +60,8 @@ export const DEFAULT_MODES_CONFIG = Object.freeze({
     radialDriftAccel: 340,
     collectorArcCount: 4,
     collectorArcSpanRad: 0.72,
+    collectorArcSpanPerLevel: 0.14,
+    collectorArcClampRatio: 0.92,
     collectorCatchThickness: 26,
     collectorBonusPoints: 60,
     collectorOverchargeGain: 6,
@@ -100,6 +102,7 @@ export const DEFAULT_MODES_CONFIG = Object.freeze({
     maxBumpers: 3,
     bucketY: 744,
     bucketWidth: 104,
+    bucketWidthPerLevel: 8,
     bucketHeight: 22,
     bucketSpeed: 155,
     bucketMarginX: 62,
@@ -139,7 +142,20 @@ export const DEFAULT_MODES_CONFIG = Object.freeze({
     tracks: Object.freeze(['spiral', 'serpent', 'figure8', 'orbitLoop'])
   }),
   merge: Object.freeze({
-    shake: null,
+    shake: Object.freeze({
+      queryParam: 'mergeShake',
+      queryValue: '1',
+      keyCode: 'KeyG',
+      rechargeDrops: 4,
+      maxImpulsePxPerSec: 120,
+      gesture: Object.freeze({
+        peakAcceleration: 10,
+        quietAcceleration: 4,
+        reversalWindowMs: 280,
+        quietWindowMs: 240,
+        gravitySmoothing: 0.85
+      })
+    }),
     launcherY: 82,
     dropStepPx: 14,
     nextOffsetX: 156,
@@ -151,6 +167,7 @@ export const DEFAULT_MODES_CONFIG = Object.freeze({
     overflowGraceSec: 1.6,
     nearMissBufferPx: 44,
     dropCooldownSec: 0.38,
+    comboWindowSec: 1.8,
     gravity: 920,
     tiltAcceleration: 260,
     wallRestitution: 0.24,

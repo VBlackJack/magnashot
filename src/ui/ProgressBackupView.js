@@ -95,7 +95,11 @@ export class ProgressBackupView {
   }
 
   refresh() {
-    this.setStatus(this.status);
+    if (!this.status && this.ui.storageManager?.hasQuotaExceeded?.()) {
+      setTextIfChanged(this.message, t(`${KEY}.status.quotaExceeded`));
+    } else {
+      this.setStatus(this.status);
+    }
     if (this.pending) {
       setTextIfChanged(this.summary, t(`${KEY}.confirm.summary`, { count: formatNumber(this.pending.count) }));
     }
