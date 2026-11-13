@@ -1000,6 +1000,15 @@ export const uiHudRefreshMethods = {
       );
     }
 
+    if (Array.isArray(extra.completedBounties) && extra.completedBounties.length > 0) {
+      const coinsTotal = extra.completedBounties.reduce((sum, item) => sum + (item.coins || 0), 0);
+      const labelList = extra.completedBounties
+        .map((item) => t(`modals.play.bounties.items.${item.id}.title`, { target: formatNumber(item.target) }))
+        .join(t('gameplay.feedback.achievement.listSeparator'));
+      this.announce(t('gameplay.feedback.bounty.completed', { name: labelList, coins: formatNumber(coinsTotal) }));
+      delete this.lastExtra.completedBounties;
+    }
+
     if (Array.isArray(unlockedAchievementIds) && unlockedAchievementIds.length > 0) {
       const rewardCoins = unlockedAchievementIds.reduce(
         (sum, id) => sum + (this.gameConfig.achievements?.[id]?.rewardCoins || 0),

@@ -247,7 +247,15 @@
         "iceOutlineColor": "#ffffff",
         "iceOutlineDash": [4, 3],
         "bombColor": "#14141c",
-        "bombAlpha": 0.88
+        "bombAlpha": 0.88,
+        "jokerRingColors": [
+          "#ff5a5a",
+          "#ffb347",
+          "#fff45a",
+          "#5aff8a",
+          "#5ab4ff",
+          "#b45aff"
+        ]
       },
       "kinds": {
         "joker": { "weight": 1, "sizeTierIndex": 2 },

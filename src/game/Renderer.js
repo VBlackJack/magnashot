@@ -376,7 +376,7 @@ export class Renderer {
     bgGradient.addColorStop(1, theme.backgroundBottom);
     layerCtx.fillStyle = bgGradient;
     layerCtx.fillRect(0, 0, width, height);
-    if (theme.horizonGlowColor && typeof layerCtx.createRadialGradient === 'function') {
+    if (theme.horizonGlowColor && theme.transparentColor && typeof layerCtx.createRadialGradient === 'function') {
       const launcherY = this.gameConfig.canvas.launcherY ?? (height - (this.gameConfig.canvas.launcherBottomOffset || 0));
       const glowRadius = width * (theme.horizonGlowRadiusFactor);
       const horizonGrad = layerCtx.createRadialGradient(
@@ -388,18 +388,18 @@ export class Renderer {
         glowRadius
       );
       horizonGrad.addColorStop(0, theme.horizonGlowColor);
-      horizonGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+      horizonGrad.addColorStop(1, theme.transparentColor);
       layerCtx.fillStyle = horizonGrad;
       layerCtx.fillRect(0, 0, width, height);
     }
     this.drawGrid(layerCtx, width, height, theme);
-    if (theme.vignetteColor && typeof layerCtx.createRadialGradient === 'function') {
+    if (theme.vignetteColor && theme.transparentColor && typeof layerCtx.createRadialGradient === 'function') {
       const cx = width * MATH_CONSTANTS.HALF;
       const cy = height * MATH_CONSTANTS.HALF;
       const innerR = width * (theme.vignetteInnerRadiusFactor);
       const outerR = height * (theme.vignetteOuterRadiusFactor);
       const vignetteGrad = layerCtx.createRadialGradient(cx, cy, innerR, cx, cy, outerR);
-      vignetteGrad.addColorStop(0, 'rgba(0, 0, 0, 0)');
+      vignetteGrad.addColorStop(0, theme.transparentColor);
       vignetteGrad.addColorStop(1, theme.vignetteColor);
       layerCtx.fillStyle = vignetteGrad;
       layerCtx.fillRect(0, 0, width, height);

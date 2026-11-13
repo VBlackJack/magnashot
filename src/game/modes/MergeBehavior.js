@@ -34,7 +34,6 @@ import {
 } from './MergeEvents.js';
 import { MERGE_CONTRACT_OUTCOMES, MERGE_CONTRACT_TYPES } from './MergeContracts.js';
 import {
-  MERGE_JOKER_RING_COLORS,
   MERGE_SPECIAL_KINDS,
   getMergeCalibre,
   getMergeFusionCalibre,
@@ -282,11 +281,21 @@ export class MergeBehavior extends ModeBehavior {
     return { shapeId: this.getShapeId(engine), announceSerial: state.shapeAnnounceSerial ?? null };
   }
 
+  getSpawnMaxTierIndex(engine) {
+    const cfg = engine.modesConfig.merge;
+    return this.getActiveEventParams(engine, MERGE_EVENT_IDS.BIG_DROPS)?.spawnMaxTierIndex
+      ?? cfg.spawnMaxTierIndex;
+  }
+
+  syncActivePalette(engine) {
+    const cfg = engine.modesConfig.merge;
+    const spawnCount = Math.min(cfg.tiers.length, this.getSpawnMaxTierIndex(engine) + 1);
+    engine.activePalette = cfg.tiers.slice(0, spawnCount).map((item) => item.id);
+  }
+
   pickLauncherColor(engine, roll = engine.random()) {
     const cfg = engine.modesConfig.merge;
-    const maxTierIndex = this.getActiveEventParams(engine, MERGE_EVENT_IDS.BIG_DROPS)?.spawnMaxTierIndex
-      ?? cfg.spawnMaxTierIndex;
-    const spawnCount = Math.min(cfg.tiers.length, maxTierIndex + 1);
+    const spawnCount = Math.min(cfg.tiers.length, this.getSpawnMaxTierIndex(engine) + 1);
     const idx = Math.min(spawnCount - 1, Math.floor(roll * spawnCount));
     return cfg.tiers[idx].id;
   }
@@ -340,6 +349,7 @@ export class MergeBehavior extends ModeBehavior {
     state.upcomingEvent = null;
     state.eventCount += 1;
     if (state.event.id === MERGE_EVENT_IDS.BIG_DROPS) {
+      this.syncActivePalette(engine);
       this.recolorLauncher(engine, RECOLOR_PHASE_START);
     }
     engine.particleSystem.spawnFloatingText(
@@ -357,6 +367,7 @@ export class MergeBehavior extends ModeBehavior {
     state.event = null;
     state.dropsUntilEvent = this.drawEventGap(engine, state.eventCount);
     if (wasBigDrops) {
+      this.syncActivePalette(engine);
       this.recolorLauncher(engine, RECOLOR_PHASE_END);
     }
   }
@@ -924,8 +935,6 @@ export class MergeBehavior extends ModeBehavior {
     world.clear();
     world.skipClusterStep = true;
 
-    const spawnPool = cfg.tiers.slice(0, cfg.spawnMaxTierIndex + 1).map((item) => item.id);
-    engine.activePalette = spawnPool;
     engine.specialInventory = Object.fromEntries(Object.values(SPECIAL_TYPES).map((type) => [type, 0]));
     engine.mergeDropX = engine.gameConfig.canvas.logicalWidth * MATH_CONSTANTS.HALF;
     engine.mergeBestTier = 1;
@@ -952,6 +961,7 @@ export class MergeBehavior extends ModeBehavior {
       specialAnnounce: null,
       ...this.createPressureState()
     };
+    this.syncActivePalette(engine);
     if (cfg.events) {
       engine.modeState.dropsUntilEvent = this.drawEventGap(engine, 0);
     }
@@ -1419,12 +1429,14 @@ export class MergeBehavior extends ModeBehavior {
    * two bombs always go off in the same order.
    */
   updateSpecials(engine, dtSec) {
+    if (!engine.physicsWorld.balls.some(
+      (ball) => ball.mergeKind === MERGE_SPECIAL_KINDS.ICE || ball.mergeKind === MERGE_SPECIAL_KINDS.BOMB
+    )) {
+      return;
+    }
     const timed = engine.physicsWorld.balls
       .filter((ball) => ball.mergeKind === MERGE_SPECIAL_KINDS.ICE || ball.mergeKind === MERGE_SPECIAL_KINDS.BOMB)
       .sort((a, b) => a.id - b.id);
-    if (timed.length === 0) {
-      return;
-    }
     const geometry = this.getBasinGeometry(engine);
     for (const ball of timed) {
       if (!engine.physicsWorld.ballMap.has(ball.id)) {
@@ -1540,6 +1552,8 @@ export class MergeBehavior extends ModeBehavior {
         engine.modeState.supernovas = (engine.modeState.supernovas || 0) + 1;
         this.recordFusedCalibre(engine, cfg.tiers.length);
         this.recordContractFusion(engine, cfg.tiers.length, mx, my);
+        engine.waveCount = engine.mergeBestTier;
+        reportBountyEvent(engine, 'merge_fusion', 1);
         engine.audioManager.playEffect('victory');
         engine.particleSystem.spawnShockwave(
           mx,
@@ -1562,6 +1576,8 @@ export class MergeBehavior extends ModeBehavior {
         );
         this.emitMergeShockwave(engine, mx, my, a.radius, cfg.supernovaShockwaveImpulse, -1);
         engine.unlockAchievementTiers('mergeTiers', cfg.tiers.length);
+        engine.storageManager?.recordAchievementProgress?.({ maxCombo: engine.combo });
+        engine.unlockAchievementTiers('comboMaster', engine.combo);
         continue;
       }
 
@@ -1738,6 +1754,7 @@ export class MergeBehavior extends ModeBehavior {
     if (cfg.events) {
       this.restoreEventCycle(engine, rawState);
     }
+    this.syncActivePalette(engine);
     if (cfg.contracts) {
       this.restoreContractCycle(engine, rawState);
     }
@@ -1937,18 +1954,23 @@ export class MergeBehavior extends ModeBehavior {
     return Math.max(cfg.launcherY, dropY);
   }
 
-  /** True when the predicted landing position contacts at least one matching resting sphere or Joker. */
+  /** True when the predicted landing position contacts at least one fusion-compatible resting sphere. */
   hasEqualTierContactAt(engine, dropX, dropY, radius, tier) {
     const cfg = engine.modesConfig.merge;
-    const launcherKind = engine.currentBall?.mergeKind ?? null;
+    const launcherKind = sanitizeMergeSpecialKind(engine.currentBall?.mergeKind, this.getSpecialsConfig(engine)?.kinds);
+    const resolvedTier = Number.isInteger(tier)
+      ? tier
+      : (this.getTierSpecById(engine, engine.currentBall?.colorId)?.tier ?? 0);
+    const probe = {
+      mergeKind: launcherKind,
+      mergeTier: this.hasOwnCalibre(launcherKind) ? resolvedTier : null
+    };
+    const topCalibre = cfg.tiers.length - 1;
     for (const ball of engine.physicsWorld.balls) {
-      if (ball.y <= cfg.launcherY || isMergeFrozen(ball)) {
+      if (!ball || ball.y <= cfg.launcherY) {
         continue;
       }
-      const compatible = launcherKind === MERGE_SPECIAL_KINDS.JOKER
-        ? !ball.mergeKind
-        : (ball.mergeTier === tier || ball.mergeKind === MERGE_SPECIAL_KINDS.JOKER);
-      if (!compatible) {
+      if (getMergeFusionCalibre(probe, ball, topCalibre) === null) {
         continue;
       }
       const sumR = radius + ball.radius + TOUCH_MERGE_TOLERANCE_PX;
@@ -2081,9 +2103,10 @@ export class MergeBehavior extends ModeBehavior {
       ctx.stroke();
       ctx.setLineDash([]);
     } else if (kind === MERGE_SPECIAL_KINDS.JOKER) {
-      const arc = MATH_CONSTANTS.TWO_PI / MERGE_JOKER_RING_COLORS.length;
+      const ringColors = look.jokerRingColors;
+      const arc = MATH_CONSTANTS.TWO_PI / ringColors.length;
       ctx.lineWidth = look.ringWidth;
-      MERGE_JOKER_RING_COLORS.forEach((color, idx) => {
+      ringColors.forEach((color, idx) => {
         ctx.strokeStyle = color;
         ctx.beginPath();
         ctx.arc(x, y, radius + look.ringGap, idx * arc, (idx + 1) * arc);
@@ -2118,20 +2141,26 @@ export class MergeBehavior extends ModeBehavior {
    * pulse. Nothing moves, so reduced motion keeps it.
    */
   drawOverlay(ctx, engine, renderer, theme) {
+    let hasPulsing = false;
     for (const ball of engine.physicsWorld.balls) {
       if (ball.mergeKind) {
         this.drawSpecialMark(ctx, engine, theme, ball, ball.x, ball.y);
       }
+      if ((ball.mergePulseSec || 0) > 0) {
+        hasPulsing = true;
+      }
     }
-    const pulsing = engine.physicsWorld.balls.filter((ball) => (ball.mergePulseSec || 0) > 0);
-    if (pulsing.length === 0) {
+    if (!hasPulsing) {
       return;
     }
     ctx.save();
     ctx.strokeStyle = theme.overchargePopupColor;
     ctx.globalAlpha = PULSE_RING_ALPHA;
     ctx.lineWidth = PULSE_RING_WIDTH;
-    for (const ball of pulsing) {
+    for (const ball of engine.physicsWorld.balls) {
+      if ((ball.mergePulseSec || 0) <= 0) {
+        continue;
+      }
       ctx.beginPath();
       ctx.arc(ball.x, ball.y, ball.radius + PULSE_RING_GAP, 0, MATH_CONSTANTS.TWO_PI);
       ctx.stroke();

@@ -63,6 +63,7 @@ export const uiModalMethods = {
     // `always` guards a run that holds progress before the first shot (a restored Flux run between shapes).
     // Past the first Flux shape the run holds cleared shapes and perks, whether or not a shot was fired.
     const holdsStageProgress =
+      (this.engine.mode === GAME_MODES.CLASSIC && this.engine.classicStage > 1) ||
       (this.engine.mode === GAME_MODES.FLUX && this.engine.fluxStage > 1) ||
       (this.engine.mode === GAME_MODES.PINBALL && this.engine.pinballStage > 1) ||
       (this.engine.mode === GAME_MODES.MERGE && (this.engine.mergeBestTier > 1 || this.engine.waveCount > 1)) ||
@@ -73,7 +74,8 @@ export const uiModalMethods = {
         this.engine.mode === GAME_MODES.CASCADE ||
         this.engine.mode === GAME_MODES.ENDLESS) &&
         this.engine.waveCount > 1);
-    const runHasBalls = this.isRunActive() && this.engine.physicsWorld.balls.length > 0;
+    const allowsEmptyBoard = Boolean(this.engine.getModeBehavior?.()?.allowsEmptyBoardSnapshot?.());
+    const runHasBalls = this.isRunActive() && (this.engine.physicsWorld.balls.length > 0 || allowsEmptyBoard);
     const isMidRound = runHasBalls && (always || holdsStageProgress || this.engine.hasFiredInRound);
 
     if (!isMidRound || !this.elements.modalConfirm) {

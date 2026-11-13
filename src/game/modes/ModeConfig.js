@@ -143,11 +143,10 @@ export const DEFAULT_MODES_CONFIG = Object.freeze({
   }),
   merge: Object.freeze({
     shake: Object.freeze({
-      queryParam: 'mergeShake',
-      queryValue: '1',
       keyCode: 'KeyG',
       rechargeDrops: 4,
-      maxImpulsePxPerSec: 120,
+      maxImpulsePxPerSec: 500,
+      liftImpulsePxPerSec: 400,
       gesture: Object.freeze({
         peakAcceleration: 10,
         quietAcceleration: 4,
@@ -260,7 +259,15 @@ export const DEFAULT_MODES_CONFIG = Object.freeze({
         iceOutlineColor: '#ffffff',
         iceOutlineDash: Object.freeze([4, 3]),
         bombColor: '#14141c',
-        bombAlpha: 0.88
+        bombAlpha: 0.88,
+        jokerRingColors: Object.freeze([
+          '#ff5a5a',
+          '#ffb347',
+          '#fff45a',
+          '#5aff8a',
+          '#5ab4ff',
+          '#b45aff'
+        ])
       }),
       kinds: Object.freeze({
         joker: Object.freeze({ weight: 1, sizeTierIndex: 2 }),
@@ -479,8 +486,29 @@ function resolveMergeSpecials(partial) {
     const entry = kindsSource[id];
     kinds[id] = { ...(defaults.kinds[id] ?? {}), ...(entry && typeof entry === 'object' ? entry : {}) };
   }
-  const render = { ...defaults.render, ...(source.render && typeof source.render === 'object' ? source.render : {}) };
+  const renderSource = source.render && typeof source.render === 'object' ? source.render : {};
+  const render = {
+    ...defaults.render,
+    ...renderSource,
+    jokerRingColors: Array.isArray(renderSource.jokerRingColors) && renderSource.jokerRingColors.length > 0
+      ? [...renderSource.jokerRingColors]
+      : [...defaults.render.jokerRingColors]
+  };
   return { ...defaults, ...source, render, kinds };
+}
+
+/**
+ * Merge Basin shake settings over their defaults, keeping nested gesture thresholds intact on
+ * partial overrides.
+ */
+function resolveMergeShake(partial) {
+  const defaults = DEFAULT_MODES_CONFIG.merge.shake;
+  const source = partial && typeof partial === 'object' ? partial : {};
+  const gesture = {
+    ...defaults.gesture,
+    ...(source.gesture && typeof source.gesture === 'object' ? source.gesture : {})
+  };
+  return { ...defaults, ...source, gesture };
 }
 
 /**
@@ -517,6 +545,7 @@ export function resolveModesConfig(modesConfig) {
     merge: {
       ...DEFAULT_MODES_CONFIG.merge,
       ...(modesConfig.merge ?? {}),
+      shake: resolveMergeShake(modesConfig.merge?.shake),
       chain: { ...DEFAULT_MODES_CONFIG.merge.chain, ...(modesConfig.merge?.chain ?? {}) },
       pressure: { ...DEFAULT_MODES_CONFIG.merge.pressure, ...(modesConfig.merge?.pressure ?? {}) },
       shapes: resolveMergeShapes(modesConfig.merge?.shapes),

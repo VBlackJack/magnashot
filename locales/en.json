@@ -866,7 +866,7 @@
       },
       "arcade": {
         "puzzle": "Puzzle",
-        "puzzleDesc": "10 trick-shot stages • 1 or 2 shots",
+        "puzzleDesc": "20 trick-shot stages • 1 or 2 shots",
         "puzzleRecord": "Puzzle {{stage}}/{{total}} • Stars: {{stars}}/{{maxStars}}",
         "puzzleStage": "Puzzle {{stage}}",
         "puzzleStageLocked": "Clear Puzzle {{previous}} to unlock.",
@@ -893,7 +893,8 @@
         "convoyDesc": "360° turret • Moving rail train • Polarity snap-back",
         "merge": "Merge Basin",
         "mergeDesc": "12 calibre tiers • Top drop rail • Shockwave fusion • Shake",
-        "mergeRecord": "Calibre {{tier}} • Best: {{score}}"
+        "mergeRecord": "Calibre {{tier}} • Best: {{score}}",
+        "masteredBadge": ", Mastered"
       },
       "jumpCurrent": "Current level",
       "grid": {
@@ -1003,6 +1004,11 @@
             "icon": "⏬",
             "name": "Sag",
             "description": "In Survival, Daily and Purist, each shot that clears nothing fills the Sag meter; when it is full the cluster drops. Avalanches drain it."
+          },
+          "rail": {
+            "icon": "🛤️",
+            "name": "Drop Rail",
+            "description": "In Merge Basin, slide along the top rail (pointer, touch drag, Arrow keys or gamepad stick) and release to drop spheres vertically into the basin."
           }
         },
         "mutators": {
@@ -1203,7 +1209,42 @@
             "merge": {
               "icon": "🫧",
               "name": "Merge Basin (12 Calibre Tiers)",
-              "description": "Drop spheres from a top rail into a rigid basin. Identical calibres fuse into the next tier (1 to 12) with a magnetic shockwave. Each Polarity press pulls identical calibres together for a moment and pushes the others apart. The Shake recharges after a few drops and nudges the whole basin sideways."
+              "description": "Drop spheres from a top rail into Classic, Narrow or Pegged basins. Identical calibres fuse (1 to 12) with a magnetic shockwave while the overflow line steps down as pressure rises. Polarity pulses pull matching calibres together, and Shake recharges after drops or chains."
+            }
+          }
+        },
+        "mergeGuide": {
+          "title": "Merge Basin Specials & Hazards",
+          "items": {
+            "joker": {
+              "icon": "★",
+              "name": "Joker Sphere",
+              "description": "Fuses on contact with any unfrozen non-bomb sphere below calibre 12, promoting it by one tier."
+            },
+            "ice": {
+              "icon": "❄",
+              "name": "Ice Sphere",
+              "description": "Frozen for a few drops: cannot fuse until thawed, though nearby fusions crack the ice one drop faster."
+            },
+            "bomb": {
+              "icon": "💣",
+              "name": "Timed Bomb Sphere",
+              "description": "Counts down each drop and detonates on zero, clearing small spheres around it and hurling heavy calibres outward."
+            },
+            "events": {
+              "icon": "🌪️",
+              "name": "Basin Events",
+              "description": "Periodic weather shifts: Crosswind pushes drops sideways, Low Gravity slows falls, Bouncy Walls amplify ricochets, Big Drops unlock calibres 6-7, and Golden Basin doubles fusion points."
+            },
+            "contracts": {
+              "icon": "📜",
+              "name": "Live Basin Contracts",
+              "description": "Optional drop-window challenges (reach a calibre, trigger a chain, fuse without Shake, or fuse in a side half) that grant bonus points and recharge Shake."
+            },
+            "shapes": {
+              "icon": "📐",
+              "name": "Basin Shapes & Rising Pressure",
+              "description": "Each run picks a Classic, Narrow or Pegged basin, and the overflow line lowers in telegraphed steps as drops accumulate."
             }
           }
         }

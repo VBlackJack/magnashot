@@ -82,7 +82,16 @@ class MemoryStorage {
 
 test('Every shipped portable field maps to a real storage key and survives export', () => {
   const { storage: config } = JSON.parse(readFileSync(new URL('../configs/game.json', import.meta.url), 'utf8'));
-  const samples = { integer: '18', object: '{}', array: '[]', date: '2026-11-11', week: '2026-W46', string: 'classic', boolean: 'true' };
+  const samples = {
+    integer: '18',
+    object: '{}',
+    array: '[]',
+    date: '2026-11-11',
+    week: '2026-W46',
+    string: 'classic',
+    optionalString: '',
+    boolean: 'true'
+  };
   const fields = Object.entries(config.progressBackup.fields);
   assert.ok(fields.every(([field, type]) => Object.hasOwn(config.keys, field) && Object.hasOwn(samples, type)));
   const storage = new MemoryStorage(fields.map(([field, type]) => [config.prefix + config.keys[field], samples[type]]));
@@ -209,4 +218,24 @@ test('A failed immediate rollback keeps the before-image for recovery after relo
   assert.equal(recoverProgressImport(reopened, storageConfig), true);
   assert.deepEqual(reopened.entries, new Map(initial));
   assert.equal(recoverProgressImport(reopened, storageConfig), false);
+});
+
+test('Shipped backup config round-trips bounties, ghostDuels, and both empty and non-empty ghostAlias', () => {
+  const { storage: shipped } = JSON.parse(readFileSync(new URL('../configs/game.json', import.meta.url), 'utf8'));
+  const origin = new MemoryStorage([
+    [shipped.prefix + shipped.keys.bounties, '{"dateKey":"2026-11-13","items":[{"id":"merge_fusions","completed":true}]}'],
+    [shipped.prefix + shipped.keys.ghostDuels, '[{"outcome":"win","gap":120}]'],
+    [shipped.prefix + shipped.keys.ghostAlias, '']
+  ]);
+  const exported = exportProgress(origin, shipped);
+  const parsed = parseProgress(exported, shipped);
+  assert.equal(parsed.fields.ghostAlias, '');
+  assert.match(parsed.fields.bounties, /merge_fusions/);
+  assert.match(parsed.fields.ghostDuels, /win/);
+
+  const dest = new MemoryStorage([[shipped.prefix + shipped.keys.ghostAlias, 'OldAlias']]);
+  assert.equal(importProgress(dest, shipped, parsed), 3);
+  assert.equal(dest.getItem(shipped.prefix + shipped.keys.ghostAlias), '');
+  assert.equal(dest.getItem(shipped.prefix + shipped.keys.bounties), origin.getItem(shipped.prefix + shipped.keys.bounties));
+  assert.equal(dest.getItem(shipped.prefix + shipped.keys.ghostDuels), origin.getItem(shipped.prefix + shipped.keys.ghostDuels));
 });

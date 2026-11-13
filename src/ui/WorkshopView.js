@@ -17,10 +17,7 @@
 import { BALL_STYLES, BALL_STYLES_ORDER, GAME_MODES, SPECIAL_TYPES_ORDER } from '../core/Constants.js';
 import { t, formatNumber } from '../core/I18n.js';
 import { specialIconBackground } from './CodexView.js';
-import { filterFocusTrapCandidates } from './UIHelpers.js';
-
-/** Percent scale of the HUD gauges (star progress, overcharge, tutorial offset, achievements). */
-const FULL_PERCENT = 100;
+import { FULL_PERCENT, filterFocusTrapCandidates } from './UIHelpers.js';
 
 /** Workshop note shown while a mode neutralises upgrades; Daily is the fallback. */
 const BASELINE_NOTE_KEYS = Object.freeze({
@@ -126,6 +123,10 @@ export function computeAchievementProgress(achId, achSpec, isUnlocked, progressC
     rawCurrent = progressContext.convoyWave || 0;
   } else if (familyId === 'mergeTiers') {
     rawCurrent = progressContext.mergeTier || 0;
+  } else if (familyId === 'magnetarsGrounded') {
+    rawCurrent = progressContext.magnetarsGrounded || 0;
+  } else if (familyId === 'magnetarLandslide') {
+    rawCurrent = progressContext.magnetarLandslide || 0;
   } else if (familyId === 'campaignComplete') {
     target = Math.max(1, progressContext.campaignLevelCount || 1);
     rawCurrent = Math.max(0, (progressContext.unlockedLevel || 1) - 1);
@@ -470,6 +471,8 @@ export function renderWorkshopContents() {
         this.engine.bossesDestroyedInRun || 0
       ),
       shotsRemainingOnClear: persistedRecords.shotsRemainingOnClear || 0,
+      magnetarsGrounded: persistedRecords.magnetarsGrounded || 0,
+      magnetarLandslide: persistedRecords.magnetarLandslide || 0,
       fluxStage: this.storageManager.getFluxBestStage?.() || 0,
       bossRushWave: this.storageManager.getBossRushBestWave?.() || 0,
       hexGridWave: Math.max(

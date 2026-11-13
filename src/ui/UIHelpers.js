@@ -16,8 +16,46 @@
 
 import { BOARD_MECHANICS, GAME_MODES, GAME_OVER_REASONS, INPUT_MODES } from '../core/Constants.js';
 import { t, formatNumber } from '../core/I18n.js';
-import { FULL_PERCENT } from './WorkshopView.js';
-import { formatLevelName } from './LevelSelectView.js';
+import { LEVEL_FORMATS } from '../game/LevelCatalog.js';
+
+/** Percent scale of the HUD gauges (star progress, overcharge, tutorial offset, achievements). */
+const FULL_PERCENT = 100;
+export { FULL_PERCENT };
+
+/** Generated level formats whose name and description say what sets them apart. */
+export const LABELLED_LEVEL_FORMATS = new Set([
+  LEVEL_FORMATS.TWIST,
+  LEVEL_FORMATS.PRECISION,
+  LEVEL_FORMATS.ARSENAL
+]);
+
+/** Theme of a generated chapter: its featured mechanic, or its pair of them. */
+export function formatChapterTheme(featuredMechanics) {
+  const [first, second] = featuredMechanics.map((mechanic) => t(`levels.generated.themes.${mechanic}`));
+  return second ? t('levels.generated.themePair', { first, second }) : first;
+}
+
+/**
+ * Display name of a campaign level: its own name when authored, else its chapter theme
+ * and its place in the chapter, then its format when it is not a standard level.
+ * @param {object} summary - A level summary from the level catalog.
+ */
+export function formatLevelName(summary) {
+  if (!summary.isGenerated) {
+    return t(summary.nameKey);
+  }
+  const name = t('levels.generated.name', {
+    theme: formatChapterTheme(summary.featuredMechanics),
+    index: summary.chapterLevel
+  });
+  if (!LABELLED_LEVEL_FORMATS.has(summary.format)) {
+    return name;
+  }
+  const format = t(`levels.generated.formats.${summary.format}.label`, {
+    mechanic: summary.twistMechanic ? t(`levels.generated.themes.${summary.twistMechanic}`) : ''
+  });
+  return t('levels.generated.formatName', { name, format });
+}
 
 /** Elements a modal focus trap may cycle through (inactive tabs use tabindex="-1"). */
 export const MODAL_FOCUSABLE_SELECTOR =

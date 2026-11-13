@@ -24,7 +24,7 @@ import vm from 'node:vm';
 const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 
 // Directories whose every file must be available offline
-const OFFLINE_DIRECTORIES = ['src', 'configs', 'locales', 'icons'];
+const OFFLINE_DIRECTORIES = ['src', 'configs', 'locales', 'icons', 'styles'];
 
 function listFiles(directory) {
   return readdirSync(directory, { withFileTypes: true }).flatMap((entry) =>

@@ -15,7 +15,7 @@
  */
 
 import { MATH_CONSTANTS } from '../core/Constants.js';
-import { t } from '../core/I18n.js';
+import { formatNumber, t } from '../core/I18n.js';
 import { SeededRandom } from '../core/SeededRandom.js';
 
 const BOUNTY_SEED_SUFFIX = ':bounties';
@@ -144,14 +144,16 @@ export function reportBountyEvent(engine, eventKey, amount = 1) {
     return [];
   }
   const coinsTotal = completed.reduce((sum, item) => sum + (item.coins || 0), 0);
-  const labelList = completed.map((item) => t(`modals.play.bounties.items.${item.id}.title`)).join(', ');
+  const labelList = completed
+    .map((item) => t(`modals.play.bounties.items.${item.id}.title`, { target: formatNumber(item.target) }))
+    .join(t('gameplay.feedback.achievement.listSeparator'));
   engine.audioManager?.playEffect('achievement');
   const canvasCfg = engine.gameConfig?.canvas;
   if (canvasCfg && engine.particleSystem?.spawnFloatingText) {
     engine.particleSystem.spawnFloatingText(
       canvasCfg.logicalWidth * MATH_CONSTANTS.HALF,
       canvasCfg.launcherY + canvasCfg.anvilPopupOffsetY,
-      t('gameplay.feedback.bounty.completed', { name: labelList, coins: coinsTotal }),
+      t('gameplay.feedback.bounty.completed', { name: labelList, coins: formatNumber(coinsTotal) }),
       engine.gameConfig.theme?.coinPopupColor
     );
   }

@@ -55,6 +55,7 @@ const VALUE_VALIDATORS = Object.freeze({
   date: isDateKey,
   week: (raw) => WEEK_KEY.test(raw),
   string: (raw) => raw.length > 0,
+  optionalString: (raw) => typeof raw === 'string',
   boolean: (raw) => raw === 'true' || raw === 'false'
 });
 

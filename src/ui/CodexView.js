@@ -22,7 +22,10 @@ import { MAGNETAR_BEHAVIOURS } from '../game/MagnetarRules.js';
 export const SPECIAL_ICON_HIGHLIGHT_POSITION = '30% 30%';
 
 /** Core board and launcher mechanics documented in the Workshop Codex. */
-export const CODEX_MECHANICS_ORDER = Object.freeze(['polarity', 'collectors', 'overcharge', 'resonance', 'sag']);
+export const CODEX_MECHANICS_ORDER = Object.freeze(['polarity', 'collectors', 'overcharge', 'resonance', 'sag', 'rail']);
+
+/** Merge Basin specials, events, contracts, and basin rules documented in the Workshop Codex. */
+export const CODEX_MERGE_GUIDE_ORDER = Object.freeze(['joker', 'ice', 'bomb', 'events', 'contracts', 'shapes']);
 
 /**
  * Background of a special ball icon: lit from the top left, like the ball on the board.
@@ -305,4 +308,42 @@ export function buildCodexPane() {
     behaviorsGrid.appendChild(card);
   }
   pane.appendChild(behaviorsGrid);
+
+  const mergeHeading = document.createElement('h3');
+  mergeHeading.className = 'modal-subtitle';
+  mergeHeading.textContent = t('modals.shop.codex.mergeGuide.title');
+  pane.appendChild(mergeHeading);
+
+  const mergeGrid = document.createElement('div');
+  mergeGrid.className = 'codex-grid';
+  mergeGrid.dataset.codexSection = 'mergeGuide';
+  for (const itemId of CODEX_MERGE_GUIDE_ORDER) {
+    const card = document.createElement('div');
+    card.className = 'codex-card';
+    card.dataset.codexMergeItem = itemId;
+
+    const badge = document.createElement('div');
+    badge.className = 'codex-badge';
+    const mergeColor = this.gameConfig.theme.wavePopupColor || this.gameConfig.theme.collectorLabelColor;
+    badge.style.borderColor = mergeColor;
+    badge.style.background = specialIconBackground({
+      highlight: mergeColor,
+      fill: this.gameConfig.theme.launcherBaseColor
+    });
+    badge.textContent = t(`modals.shop.codex.mergeGuide.items.${itemId}.icon`);
+
+    const info = document.createElement('div');
+    info.className = 'codex-info';
+    const title = document.createElement('div');
+    title.className = 'codex-title';
+    title.textContent = t(`modals.shop.codex.mergeGuide.items.${itemId}.name`);
+    const desc = document.createElement('div');
+    desc.className = 'codex-desc';
+    desc.textContent = t(`modals.shop.codex.mergeGuide.items.${itemId}.description`);
+    info.append(title, desc);
+
+    card.append(badge, info);
+    mergeGrid.appendChild(card);
+  }
+  pane.appendChild(mergeGrid);
 }

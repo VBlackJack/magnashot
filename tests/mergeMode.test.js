@@ -2896,3 +2896,98 @@ test('A shockwave thaws a large Ice sphere as soon as the wave reaches its edge'
   mergeBehavior.emitMergeShockwave(engine, source.x, source.y, source.radius, modesConfig.merge.shockwaveImpulse, 0);
   assert.equal(far.mergeKind, 'ice');
 });
+
+test('DEFAULT_MODES_CONFIG.merge.shake matches modes.json and partial shake overrides preserve liftImpulsePxPerSec without NaN', () => {
+  assert.deepEqual(resolveModesConfig(null).merge.shake, modesConfig.merge.shake);
+  const partial = resolveModesConfig({ merge: { shake: { rechargeDrops: 2, gesture: { reversalWindowMs: 320 } } } });
+  assert.equal(partial.merge.shake.liftImpulsePxPerSec, modesConfig.merge.shake.liftImpulsePxPerSec);
+  assert.equal(partial.merge.shake.maxImpulsePxPerSec, modesConfig.merge.shake.maxImpulsePxPerSec);
+  assert.equal(partial.merge.shake.gesture.peakAcceleration, modesConfig.merge.shake.gesture.peakAcceleration);
+  assert.equal(partial.merge.shake.gesture.reversalWindowMs, 320);
+
+  const engine = createEngine();
+  engine.modesConfig = partial;
+  engine.startMergeMode();
+  const ball = placeBall(engine, 2, 235, 500);
+  assert.equal(engine.modeState.shakeRemaining, 2);
+  engine.modeState.shakeRemaining = 0;
+  assert.equal(mergeBehavior.shake(engine), true);
+  assert.equal(engine.modeState.shakeRemaining, 2);
+  assert.equal(Number.isFinite(ball.vx), true);
+  assert.equal(Number.isFinite(ball.vy), true);
+  assert.ok(ball.vy < 0, 'upward lift impulse applied cleanly');
+});
+
+test('Reloading a Merge Basin run during bigDrops preserves merge_t5/merge_t6 queue and special upcomingKinds alignment', () => {
+  const engine = createSpecialEngine();
+  engine.modeState.upcomingEvent = { id: 'bigDrops', direction: null };
+  mergeBehavior.startEvent(engine);
+  const tier6Id = modesConfig.merge.tiers[5].id;
+  const tier7Id = modesConfig.merge.tiers[6].id;
+  engine.currentBall.colorId = tier6Id;
+  engine.currentBall.mergeTier = 5;
+  engine.nextBall.colorId = tier7Id;
+  engine.nextBall.mergeTier = 6;
+  engine.upcomingColorIds = [tier6Id, tier7Id];
+  engine.modeState.upcomingKinds = [null, 'joker'];
+  engine.saveRunSnapshot({ force: true });
+
+  const restored = createSpecialEngine();
+  restored.storageManager = engine.storageManager;
+  assert.equal(restored.restoreSavedRun(), true);
+  assert.equal(restored.modeState.event?.id, 'bigDrops');
+  assert.ok(restored.activePalette.includes(tier6Id) && restored.activePalette.includes(tier7Id));
+  assert.equal(restored.currentBall.colorId, tier6Id);
+  assert.equal(restored.nextBall.colorId, tier7Id);
+  assert.deepEqual(restored.upcomingColorIds, [tier6Id, tier7Id]);
+  assert.deepEqual(restored.modeState.upcomingKinds, [null, 'joker']);
+});
+
+test('hasEqualTierContactAt rejects Bomb, frozen Ice, and calibre-12 Joker contacts while highlighting valid Joker and equal-tier contacts', () => {
+  const engine = createSpecialEngine();
+  const topIndex = TIERS.length - 1;
+  const plainT3 = placeBall(engine, 2, 200, 500);
+
+  engine.currentBall.mergeKind = null;
+  engine.currentBall.mergeTier = 2;
+  assert.equal(mergeBehavior.hasEqualTierContactAt(engine, 200, 500 - plainT3.radius - 10, 12, 2), true);
+
+  engine.currentBall.mergeKind = 'bomb';
+  engine.currentBall.mergeTier = null;
+  assert.equal(mergeBehavior.hasEqualTierContactAt(engine, 200, 500 - plainT3.radius - 10, 12, 2), false);
+
+  engine.currentBall.mergeKind = 'ice';
+  engine.currentBall.mergeTier = 2;
+  assert.equal(mergeBehavior.hasEqualTierContactAt(engine, 200, 500 - plainT3.radius - 10, 12, 2), false);
+
+  engine.currentBall.mergeKind = 'joker';
+  engine.currentBall.mergeTier = null;
+  assert.equal(mergeBehavior.hasEqualTierContactAt(engine, 200, 500 - plainT3.radius - 10, 12, null), true);
+
+  engine.physicsWorld.removeBall(plainT3);
+  const topBall = placeBall(engine, topIndex, 200, 500);
+  assert.equal(mergeBehavior.hasEqualTierContactAt(engine, 200, 500 - topBall.radius - 10, 12, null), false);
+
+  const frozenT3 = placeBall(engine, 2, 320, 500, { mergeKind: 'ice' });
+  engine.currentBall.mergeKind = null;
+  engine.currentBall.mergeTier = 2;
+  assert.equal(mergeBehavior.hasEqualTierContactAt(engine, 320, 500 - frozenT3.radius - 10, 12, 2), false);
+});
+
+test('Supernova fusion updates waveCount, reports merge_fusion bounty progress, and records comboMaster progress', () => {
+  const engine = createSpecialEngine();
+  const topIdx = TIERS.length - 1;
+  const bountyEvents = [];
+  const origRecordBounty = engine.storageManager.recordBountyProgress.bind(engine.storageManager);
+  engine.storageManager.recordBountyProgress = (event, amount, cfg, today) => {
+    bountyEvents.push({ event, amount });
+    return origRecordBounty(event, amount, cfg, today);
+  };
+  engine.combo = 4;
+  placeTouchingPair(engine, topIdx, 200);
+  stepFusions(engine);
+  assert.equal(engine.modeState.supernovas, 1);
+  assert.equal(engine.waveCount, TIERS.length);
+  assert.deepEqual(bountyEvents, [{ event: 'merge_fusion', amount: 1 }]);
+  assert.ok(engine.storageManager.getAchievementRecords().maxCombo >= 5);
+});

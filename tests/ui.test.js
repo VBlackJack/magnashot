@@ -2969,3 +2969,255 @@ test('HUD surfaces Merge Shake ready copy, Magnetar rest countdown, and one-shot
     i18n.currentLocale = previousLocale;
   }
 });
+
+test('Phase 1 audit guards: Magnetar cumulative achievements, Purist & empty-board confirm guard, dailyBest fold, accessible mastery badge, and zero UIHelpers import cycles', () => {
+  for (const id of ['magnetarsGrounded', 'magnetarsGroundedSilver', 'magnetarsGroundedGold', 'magnetarLandslide', 'magnetarLandslideSilver', 'magnetarLandslideGold']) {
+    assert.equal(gameConfig.achievements[id]?.cumulative, true, `${id} marked cumulative`);
+  }
+  const grounded = computeAchievementProgress(
+    'magnetarsGroundedGold',
+    gameConfig.achievements.magnetarsGroundedGold,
+    false,
+    { magnetarsGrounded: 14 }
+  );
+  assert.deepEqual(grounded, {
+    current: 14,
+    target: gameConfig.achievements.magnetarsGroundedGold.threshold,
+    pct: Math.round((14 / gameConfig.achievements.magnetarsGroundedGold.threshold) * 100)
+  });
+  const landslide = computeAchievementProgress(
+    'magnetarLandslideSilver',
+    gameConfig.achievements.magnetarLandslideSilver,
+    false,
+    { magnetarLandslide: 2 }
+  );
+  assert.deepEqual(landslide, {
+    current: 2,
+    target: gameConfig.achievements.magnetarLandslideSilver.threshold,
+    pct: Math.round((2 / gameConfig.achievements.magnetarLandslideSilver.threshold) * 100)
+  });
+
+  const uiHelpersCode = readFileSync('./src/ui/UIHelpers.js', 'utf8');
+  assert.doesNotMatch(uiHelpersCode, /from '\.\/WorkshopView\.js'/, 'UIHelpers does not cycle back to WorkshopView');
+  assert.doesNotMatch(uiHelpersCode, /from '\.\/LevelSelectView\.js'/, 'UIHelpers does not cycle back to LevelSelectView');
+
+  const statsUi = Object.create(UIManager.prototype);
+  statsUi.gameConfig = gameConfig;
+  statsUi.storageManager = {
+    getDailyHistory: () => [{ d: '2026-11-12', s: 1400 }],
+    getDailyHighScore: () => 2950
+  };
+  assert.equal(statsUi.buildStatsRecords().modes[GAME_MODES.DAILY].score, 2950, 'dailyBest folds live getDailyHighScore');
+
+  const makeModalUi = (engineOverrides) => {
+    const ui = Object.create(UIManager.prototype);
+    const modalConfirm = { classList: fakeClassList(['hidden']) };
+    ui.elements = { modalConfirm, btnConfirmYes: { textContent: '', setAttribute() {} }, btnConfirmNo: { focus() {} } };
+    ui.isAnyModalOpen = () => false;
+    ui.saveLastFocusedElement = () => {};
+    ui.syncModalInertState = () => {};
+    ui.updateConfirmButtonLabel = () => {};
+    ui.engine = {
+      state: GAME_STATES.PLAYING,
+      mode: GAME_MODES.CLASSIC,
+      classicStage: 2,
+      hasFiredInRound: false,
+      physicsWorld: { balls: [{}] },
+      ...engineOverrides
+    };
+    return { ui, modalConfirm };
+  };
+
+  let ranPurist = false;
+  const puristCase = makeModalUi({});
+  puristCase.ui.requestDestructiveAction(() => { ranPurist = true; });
+  assert.equal(ranPurist, false, 'Purist Stage 2+ asks confirmation even before first shot of stage');
+  assert.equal(puristCase.modalConfirm.classList.contains('hidden'), false);
+
+  let ranEmptyMerge = false;
+  const emptyMergeCase = makeModalUi({
+    mode: GAME_MODES.MERGE,
+    classicStage: 1,
+    hasFiredInRound: true,
+    physicsWorld: { balls: [] },
+    getModeBehavior: () => ({ allowsEmptyBoardSnapshot: () => true })
+  });
+  emptyMergeCase.ui.requestDestructiveAction(() => { ranEmptyMerge = true; });
+  assert.equal(ranEmptyMerge, false, 'Active Merge run with empty board asks confirmation');
+
+  let ranFreshMerge = false;
+  const freshMergeCase = makeModalUi({
+    mode: GAME_MODES.MERGE,
+    classicStage: 1,
+    waveCount: 1,
+    mergeBestTier: 1,
+    hasFiredInRound: false,
+    physicsWorld: { balls: [] },
+    getModeBehavior: () => ({ allowsEmptyBoardSnapshot: () => true })
+  });
+  freshMergeCase.ui.requestDestructiveAction(() => { ranFreshMerge = true; });
+  assert.equal(ranFreshMerge, true, 'Fresh Merge run with zero drops executes immediately without prompt');
+  assert.equal(freshMergeCase.modalConfirm.classList.contains('hidden'), true);
+});
+
+test('PlayHubView syncMasteredBadge and CodexView rail + mergeGuide render accessible localized DOM without raw keys', async () => {
+  const { CODEX_MERGE_GUIDE_ORDER, buildCodexPane } = await import('../src/ui/CodexView.js');
+  const ballsConfig = loadJson('./configs/balls.json');
+  const obstaclesConfig = loadJson('./configs/obstacles.json');
+
+  const makeDomNode = (tag) => {
+    const attrs = new Map();
+    const node = {
+      tagName: tag.toUpperCase(),
+      className: '',
+      textContent: '',
+      style: {},
+      dataset: {},
+      children: [],
+      classList: fakeClassList(),
+      setAttribute(k, v) {
+        attrs.set(k, String(v));
+        if (k === 'class') node.className = String(v);
+      },
+      getAttribute(k) {
+        return attrs.has(k) ? attrs.get(k) : null;
+      },
+      removeAttribute(k) {
+        attrs.delete(k);
+      },
+      append(...items) {
+        for (const item of items) {
+          if (item && typeof item === 'object') node.children.push(item);
+        }
+      },
+      appendChild(item) {
+        node.children.push(item);
+        return item;
+      },
+      replaceChildren(...items) {
+        node.children = [];
+        node.append(...items);
+      },
+      querySelector(selector) {
+        if (!selector.startsWith('.')) return null;
+        const targetCls = selector.slice(1);
+        const search = (cur) => {
+          for (const child of cur.children) {
+            const tokens = new Set([...String(child.className || '').split(/\s+/).filter(Boolean)]);
+            if (tokens.has(targetCls) || child.classList?.contains?.(targetCls)) return child;
+            const nested = search(child);
+            if (nested) return nested;
+          }
+          return null;
+        };
+        return search(node);
+      }
+    };
+    return node;
+  };
+
+  const previousDocument = globalThis.document;
+  const previousLocale = i18n.currentLocale;
+  globalThis.document = { createElement: makeDomNode };
+  try {
+    i18n.dictionaries.set('en', loadJson('./locales/en.json'));
+    i18n.dictionaries.set('fr', loadJson('./locales/fr.json'));
+    i18n.currentLocale = 'en';
+
+    const endlessCard = makeDomNode('button');
+    let endlessScore = 6500;
+    const hubUi = Object.assign(Object.create(UIManager.prototype), {
+      gameConfig,
+      engine: { state: GAME_STATES.IDLE, levelCatalog: { count: 20 } },
+      elements: { btnEndless: endlessCard },
+      storageManager: {
+        getEndlessHighScore: () => endlessScore,
+        isDailyCompleted: () => false,
+        getDailyStreakState: () => ({ streak: 0 }),
+        hasClaimedWeeklyFluxBonus: () => false,
+        getDailyBounties: () => ({ items: [] })
+      }
+    });
+    hubUi.refreshPlayHubRecords();
+    assert.equal(endlessCard.classList.contains('is-mastered'), true);
+    const badge = endlessCard.querySelector('.mode-mastered-badge');
+    assert.ok(badge, 'mounts .mode-mastered-badge on mastered card');
+    assert.equal(badge.classList.contains('hidden'), false);
+    const starSpan = badge.querySelector('.mode-mastered-star');
+    assert.equal(starSpan?.getAttribute('aria-hidden'), 'true');
+    assert.equal(starSpan?.textContent, gameConfig.theme.starFilledSymbol);
+    const srSpan = badge.querySelector('.visually-hidden');
+    assert.equal(srSpan?.textContent, ', Mastered');
+
+    endlessScore = 200;
+    hubUi.refreshPlayHubRecords();
+    assert.equal(endlessCard.classList.contains('is-mastered'), false);
+    assert.equal(badge.classList.contains('hidden'), true, 'hides badge when unmastered');
+
+    const codexPane = makeDomNode('div');
+    buildCodexPane.call({
+      elements: { codexPane },
+      ballsConfig,
+      gameConfig,
+      obstaclesConfig,
+      engine: { storageManager: { getDiscoveries: () => ({ specials: {}, mechanics: { rail: true } }) } }
+    });
+    const mechHeadingIndex = codexPane.children.findIndex(
+      (n) => n.textContent === t('modals.shop.codex.mechanicsTitle')
+    );
+    const mechanicsGrid = mechHeadingIndex >= 0 ? codexPane.children[mechHeadingIndex + 1] : null;
+    assert.ok(mechanicsGrid, 'renders mechanics codex section');
+    const railCard = mechanicsGrid.children.find((card) =>
+      card.querySelector('.codex-title')?.textContent === t('modals.shop.codex.mechanics.rail.name')
+    );
+    assert.ok(railCard, 'renders Sliding Rail mechanic card');
+    const mergeGrid = codexPane.children.find((n) => n.dataset.codexSection === 'mergeGuide');
+    assert.ok(mergeGrid, 'renders mergeGuide codex section');
+    assert.equal(mergeGrid.children.length, CODEX_MERGE_GUIDE_ORDER.length, 'renders every mergeGuide card');
+    for (const card of mergeGrid.children) {
+      assert.doesNotMatch(
+        String(card.querySelector('.codex-title')?.textContent || ''),
+        /^modals\.shop\.codex\./,
+        'no raw i18n key in mergeGuide title'
+      );
+      assert.doesNotMatch(
+        String(card.querySelector('.codex-desc')?.textContent || ''),
+        /^modals\.shop\.codex\./,
+        'no raw i18n key in mergeGuide description'
+      );
+    }
+  } finally {
+    globalThis.document = previousDocument;
+    i18n.currentLocale = previousLocale;
+  }
+});
+
+test('reportBountyEvent interpolates {{target}} in floating popup and notifies UI without raw placeholders', async () => {
+  const { reportBountyEvent } = await import('../src/game/Bounties.js');
+  const previousLocale = i18n.currentLocale;
+  try {
+    i18n.dictionaries.set('en', loadJson('./locales/en.json'));
+    i18n.currentLocale = 'en';
+    const popups = [];
+    const notifications = [];
+    const fakeEngine = {
+      gameConfig,
+      storageManager: {
+        recordBountyProgress: () => [{ id: 'merge_fusions', target: 12, coins: 40, completed: true }]
+      },
+      audioManager: { playEffect() {} },
+      particleSystem: {
+        spawnFloatingText: (_x, _y, text) => popups.push(text)
+      },
+      notifyUI: (extra) => notifications.push(extra)
+    };
+    const completed = reportBountyEvent(fakeEngine, 'merge_fusion', 1);
+    assert.equal(completed.length, 1);
+    assert.equal(popups.length, 1);
+    assert.doesNotMatch(popups[0], /\{\{/, 'floating popup has no raw {{target}} placeholder');
+    assert.match(popups[0], /12/, 'floating popup renders target count');
+    assert.equal(notifications[0]?.completedBounties?.length, 1);
+  } finally {
+    i18n.currentLocale = previousLocale;
+  }
+});

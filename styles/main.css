@@ -1824,14 +1824,18 @@ body {
   padding-inline-end: 16px;
 }
 
-#modal-play .arcade-mode-card.is-mastered:not(.is-locked)::after {
-  content: '★';
+#modal-play .arcade-mode-card .mode-mastered-badge {
   position: absolute;
   top: 6px;
   right: 8px;
   font-size: 0.72rem;
   color: var(--accent-amber);
   pointer-events: none;
+}
+
+#modal-play .arcade-mode-card.is-locked .mode-mastered-badge,
+#modal-play .arcade-mode-card .mode-mastered-badge.hidden {
+  display: none;
 }
 
 #modal-play .arcade-mode-card:hover:not(.is-locked) {
@@ -3410,12 +3414,15 @@ body {
   .nav-btn,
   .nav-btn.icon-btn,
   .hud-menu-btn,
-  .powerup-btn {
+  .powerup-btn,
+  .stats-filter-btn,
+  .hud-badge.quota-warning {
     min-height: var(--touch-target);
     min-width: var(--touch-target);
   }
   .modal-tab,
   .ammo-buy-btn,
+  .hud-mode-banner,
   .polarity-floating-btn,
   .swap-floating-btn {
     min-height: var(--touch-target);
@@ -3675,6 +3682,7 @@ body {
   .nav-btn,
   .modal-btn,
   .modal-tab,
+  .stats-filter-btn,
   .powerup-btn,
   .polarity-floating-btn,
   .swap-floating-btn,

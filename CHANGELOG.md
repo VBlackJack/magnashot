@@ -4,6 +4,17 @@ All notable changes to **MagnaShot** are documented in this file.
 
 ## [Unreleased]
 
+### Added
+- Workshop Codex: added the Drop Rail (`rail`) mechanic and a dedicated Merge Basin Specials & Hazards section covering Joker, Ice, and Timed Bomb spheres, Basin Events, Live Contracts, Basin Shapes, and Rising Pressure.
+
+### Fixed
+- Merge Basin snapshot restore during `bigDrops` events now restores the event cycle before rebuilding `activePalette`, preserving calibre 6-7 launcher queues and special sphere kind tags on reload.
+- `DEFAULT_MODES_CONFIG.merge.shake` and `resolveModesConfig` now include `liftImpulsePxPerSec` and deep-merge nested `shake` overrides, preventing `NaN` velocities when running with default or partial mode configs.
+- Merge Basin ghost aim highlight (`hasEqualTierContactAt`) now delegates to `getMergeFusionCalibre`, eliminating false-positive fusion rings on Timed Bombs, frozen Ice spheres, and calibre-12 Joker contacts; Supernova fusions now advance `merge_fusion` bounties, sync `waveCount`, and record `comboMaster` progress.
+- Workshop Bounties & Achievements now compute live progress bars for `magnetarsGrounded` and `magnetarLandslide` families; Play Hub Polarity Duel (`VERSUS`) mastery now reads `getVersusRecords().hard.w` and renders an accessible screen-reader label alongside the star badge.
+- Progress Backup (`ProgressBackup.js`, `configs/game.json`) now exports and imports `bounties`, `ghostDuels`, and `ghostAlias` (`optionalString`), preventing same-day Daily Contract double-claims and preserving Ghost Duel history across devices.
+- Destructive-action confirmation (`UIModals`) now guards Purist (`CLASSIC`) runs past stage 1 and active empty-board runs; `Bounties.reportBountyEvent` now interpolates `{{target}}` and `UIHudRefresh` announces completed Daily Contracts once to screen readers; `UIStats` folds today's live `getDailyHighScore()` into `dailyBest`; Workshop tabs support `Home`/`End` keyboard navigation; `.stats-filter-btn`, `.hud-mode-banner`, and `.hud-badge.quota-warning` enforce 44 px coarse-pointer touch sizing; circular ESM imports in `UIHelpers.js` were removed; Play Hub Puzzle description updated to 20 stages.
+
 ## [1.28.0] - 2026-11-13
 
 ### Added
