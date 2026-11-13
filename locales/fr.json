@@ -179,6 +179,32 @@
       "combo": {
         "label": "Combo x{{count}}"
       },
+      "mergeEvent": {
+        "active": "{{icon}} {{count}}",
+        "upcoming": "{{icon}} {{next}}",
+        "next": "bientôt",
+        "aria": {
+          "one": "{{name}} : {{count}} lâcher restant",
+          "other": "{{name}} : {{count}} lâchers restants"
+        },
+        "upcomingAria": "Bientôt : {{name}}"
+      },
+      "mergeContract": {
+        "fuseCalibre": "★ {{target}} · {{count}}",
+        "fusionCount": "★ {{progress}}/{{target}} · {{count}}",
+        "aria": {
+          "fuseCalibre": {
+            "last": "Contrat : fusionner un calibre {{target}}, dernier lâcher en cours",
+          "one": "Contrat : fusionner un calibre {{target}}, {{count}} lâcher restant",
+            "other": "Contrat : fusionner un calibre {{target}}, {{count}} lâchers restants"
+          },
+          "fusionCount": {
+            "last": "Contrat, fusions : {{progress}} sur {{target}}, dernier lâcher en cours",
+          "one": "Contrat, fusions : {{progress}} sur {{target}}, {{count}} lâcher restant",
+            "other": "Contrat, fusions : {{progress}} sur {{target}}, {{count}} lâchers restants"
+          }
+        }
+      },
       "frozen": {
         "label": "Gel actif ({{turns}})"
       },
@@ -541,7 +567,101 @@
       },
       "merge": {
         "fused": "CALIBRE {{tier}} ! +{{points}}",
-        "supernova": "SUPERNOVA MAGNÉTIQUE ! +{{points}}"
+        "supernova": "SUPERNOVA MAGNÉTIQUE ! +{{points}}",
+        "chain": "Chaîne x{{chain}} : +{{points}}",
+        "chainShake": "+1 Secousse",
+        "eventStart": "ÉVÉNEMENT : {{name}}",
+        "eventStartAnnounce": "Événement : {{name}}. {{description}}",
+        "eventEnd": "Fin de l'événement : {{name}}.",
+        "eventUpcoming": "Bientôt : {{name}}.",
+        "contractDone": "CONTRAT REMPLI ! +{{points}}",
+        "contractSuccess": "Contrat rempli : +{{points}} points, et la Secousse se recharge plus vite.",
+        "contractFailure": "Contrat échoué. Aucune pénalité.",
+        "contractStart": {
+          "fuseCalibre": {
+            "one": "Contrat : fusionner un calibre {{target}} en {{count}} lâcher.",
+            "other": "Contrat : fusionner un calibre {{target}} en {{count}} lâchers."
+          },
+          "fusionCount": {
+            "one": "Contrat : réussir {{target}} fusions en {{count}} lâcher.",
+            "other": "Contrat : réussir {{target}} fusions en {{count}} lâchers."
+          }
+        },
+        "shapeStart": "Bassin : {{name}}",
+        "shapeAnnounce": "Bassin : {{name}}. {{description}}",
+        "specialAnnounce": "{{name}} à venir : {{description}}",
+        "bombBoom": "Boum ! +{{points}}",
+        "pressureStep": "LA LIGNE EST DESCENDUE",
+        "pressureStepAnnounce": "La ligne de débordement est descendue.",
+        "pressureWarning": {
+          "one": "La ligne de débordement descend dans {{count}} lâcher.",
+          "other": "La ligne de débordement descend dans {{count}} lâchers."
+        }
+      }
+    },
+    "merge": {
+      "specials": {
+        "joker": {
+          "name": "Joker",
+          "description": "Fusionne avec la première sphère ordinaire qu'il touche, comme si deux sphères de ce calibre se rencontraient.",
+          "icon": "★︎"
+        },
+        "ice": {
+          "name": "Sphère gelée",
+          "description": "Ne fusionne pas tant qu'une onde de fusion ne l'atteint pas ou qu'elle n'a pas dégelé.",
+          "icon": "❄︎"
+        },
+        "bomb": {
+          "name": "Bombe",
+          "description": "Explose peu après avoir touché le fond et détruit les petites sphères autour d'elle.",
+          "icon": "✸︎"
+        }
+      },
+      "shapes": {
+        "classic": {
+          "name": "Classique",
+          "description": "Le bassin habituel."
+        },
+        "narrow": {
+          "name": "Étroit",
+          "description": "Les parois sont plus rapprochées."
+        },
+        "pegs": {
+          "name": "Plots",
+          "description": "Des plots fixes se dressent dans la moitié basse."
+        }
+      },
+      "events": {
+        "windLeft": {
+          "name": "Vent vers la gauche",
+          "description": "Les sphères dérivent sur le côté : lâchez du côté d'où vient le vent.",
+          "icon": "💨←"
+        },
+        "windRight": {
+          "name": "Vent vers la droite",
+          "description": "Les sphères dérivent sur le côté : lâchez du côté d'où vient le vent.",
+          "icon": "💨→"
+        },
+        "lowGravity": {
+          "name": "Gravité faible",
+          "description": "Les sphères tombent lentement et flottent plus longtemps.",
+          "icon": "🪶"
+        },
+        "bouncy": {
+          "name": "Sphères rebondissantes",
+          "description": "Les sphères rebondissent bien plus haut sur les parois, le sol et entre elles.",
+          "icon": "🏀"
+        },
+        "bigDrops": {
+          "name": "Gros calibres",
+          "description": "Des calibres plus gros peuvent tomber.",
+          "icon": "🟣"
+        },
+        "golden": {
+          "name": "Fusions dorées",
+          "description": "Chaque fusion rapporte des points en plus.",
+          "icon": "🌟"
+        }
       }
     },
     "mutators": {
@@ -772,7 +892,7 @@
         "convoy": "Convoi sur Rail",
         "convoyDesc": "Tourelle 360° • Convoi mobile • Rappel magnétique",
         "merge": "Fusion en Bassin",
-        "mergeDesc": "10 calibres • Rail de lâcher • Onde de choc de fusion",
+        "mergeDesc": "12 calibres • Rail de lâcher • Onde de choc de fusion • Secousse",
         "mergeRecord": "Calibre {{tier}} • Record : {{score}}"
       },
       "jumpCurrent": "Niveau en cours",
@@ -1082,8 +1202,8 @@
             },
             "merge": {
               "icon": "🫧",
-              "name": "Fusion en Bassin (10 Calibres)",
-              "description": "Lâchez vos billes depuis un rail supérieur dans un bassin physique. Deux calibres identiques fusionnent au rang suivant (1 à 10) avec une onde de choc, et la polarité module l'aimantation."
+              "name": "Fusion en Bassin (12 Calibres)",
+              "description": "Lâchez vos billes depuis un rail supérieur dans un bassin physique. Deux calibres identiques fusionnent au rang suivant (1 à 12) avec une onde de choc. Chaque appui sur Polarité rapproche un instant les calibres identiques et écarte les autres. La secousse se recharge après quelques lâchers et pousse tout le bassin sur le côté."
             }
           }
         }
@@ -1442,6 +1562,11 @@
           "touch": "Polarité & Arsenal : touchez 🧲 pour inverser la façon dont les sphères attirent votre tir (il courbe de l'autre côté), ou sélectionnez une sphère spéciale chargée par la Surcharge"
         },
         "physics": "Astuce : Détachez les ancres ou déséquilibrez les rotors pour créer des réactions en chaîne !",
+        "mergeKeyboard": {
+          "pointer": "Clavier : Flèches gauche/droite pour déplacer le rail, Entrée pour lâcher, F (ou 🧲) pour rapprocher les calibres identiques, G pour secouer le bassin",
+          "touch": "Polarité & Secousse : touchez 🧲 pour rapprocher les calibres identiques, ou touchez Secousse quand elle est prête"
+        },
+        "mergeTip": "Astuce : deux calibres identiques fusionnent au rang suivant. Utilisez la Secousse quand elle est prête pour projeter la pile vers le côté le plus vide !",
         "pad": "Manette : stick gauche pour viser (stick droit pour affiner), bouton du bas ou gâchette droite pour tirer, bouton de gauche pour échanger, bouton du haut pour inverser la polarité, boutons de tranche pour les sphères spéciales, Start pour la pause"
       },
       "button": {

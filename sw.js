@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-const APP_VERSION = '1.26.1';
+const APP_VERSION = '1.27.0';
 const CACHE_NAME = `magnashot-cache-v${APP_VERSION}`;
 
 // The service worker cannot read configs/*.json before it has a cache, so its
@@ -100,6 +100,9 @@ const PRECACHE_ASSETS = [
   './src/game/modes/ConvoyBehavior.js',
   './src/game/modes/HexGridBehavior.js',
   './src/game/modes/MergeBehavior.js',
+  './src/game/modes/MergeEvents.js',
+  './src/game/modes/MergeContracts.js',
+  './src/game/modes/MergeSpecials.js',
   './src/game/modes/ModeBehavior.js',
   './src/game/modes/ModeConfig.js',
   './src/game/modes/OrbitalBehavior.js',

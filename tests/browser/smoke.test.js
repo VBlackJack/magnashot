@@ -32,14 +32,17 @@ import { decodeGhost, encodeGhost } from '../../src/game/GhostCodec.js';
 import { startStaticServer } from './staticServer.js';
 
 /**
- * The layouts of styles/main.css: wide desktop, portrait tablet, landscape and portrait
- * phones, and a narrow portrait phone where the eight-button control row is the tightest.
+ * The layouts of styles/main.css: wide desktop, portrait tablets (768x1024 and the 800x1280
+ * of a Xiaomi Mi Pad 5), a landscape tablet, landscape and portrait phones, and a narrow
+ * portrait phone where the eight-button control row is the tightest.
  * hasDrawer / hasRestartButton: all viewports expose the slide-in burger menu and Restart.
  * Both flags stay explicit per viewport in the test matrix.
  */
 const VIEWPORTS = Object.freeze([
   { name: 'desktop', width: 1300, height: 850, isTouch: false, hasDrawer: true, hasRestartButton: true },
   { name: 'tablet', width: 768, height: 1024, isTouch: true, hasDrawer: true, hasRestartButton: true },
+  { name: 'tablet landscape', width: 1280, height: 800, isTouch: true, hasDrawer: true, hasRestartButton: true },
+  { name: 'tablet portrait', width: 800, height: 1280, isTouch: true, hasDrawer: true, hasRestartButton: true },
   { name: 'phone landscape', width: 844, height: 390, isTouch: true, hasDrawer: true, hasRestartButton: true },
   { name: 'phone portrait', width: 390, height: 844, isTouch: true, hasDrawer: true, hasRestartButton: true },
   { name: 'narrow phone portrait', width: 360, height: 800, isTouch: true, hasDrawer: true, hasRestartButton: true }
@@ -68,7 +71,7 @@ const SHORT_WIDE_VIEWPORT = Object.freeze({ width: 1000, height: 520, isTouch: f
 const WAIT_TIMEOUT_MS = 20000;
 
 /** Layouts with the side panel, where a level without special balls says so in the panel. */
-const EMPTY_SPECIALS_NOTE_VIEWPORTS = new Set(['desktop', 'tablet']);
+const EMPTY_SPECIALS_NOTE_VIEWPORTS = new Set(['desktop', 'tablet', 'tablet landscape', 'tablet portrait']);
 /** Layouts where the Settings install entry is exercised: in the header and in the slide-in menu. */
 const INSTALL_ENTRY_VIEWPORTS = new Set(['desktop', 'phone portrait']);
 /** Layout whose board overlays move off the board, into the column beside it. */
@@ -149,6 +152,8 @@ const VERSUS_PLAYER_STORAGE = Object.freeze({
 const VERSUS_LAYOUT_BY_VIEWPORT = Object.freeze({
   desktop: 'split',
   tablet: 'split',
+  'tablet landscape': 'split',
+  'tablet portrait': 'split',
   'phone landscape': 'mini',
   'phone portrait': 'mini',
   'narrow phone portrait': 'mini'
@@ -446,6 +451,45 @@ const LEVELS_WITHOUT_AND_WITH_SPECIALS = [
   { levelId: 2, showsSpecials: true }
 ];
 
+/** Tolerance when comparing the board width with the width its layout allows. */
+const BOARD_FILL_TOLERANCE_PX = 2;
+
+/**
+ * Fails when the board is narrower than the room its layout gives it (a fixed width cap
+ * leaves the stage half empty on tablets). The allowed width is measured with a probe
+ * that uses the stylesheet's own stage reserve variables, in the board's container.
+ */
+async function assertBoardFillsStage(page, label) {
+  const board = await page.evaluate(() => {
+    const canvas = document.querySelector('#game-canvas');
+    const stage = document.querySelector('.stage-container');
+    const stageStyle = getComputedStyle(stage);
+    const wide = stageStyle.display === 'contents';
+    // Only the stage layouts make the stage a size container; other layouts (landscape phone) size the board otherwise.
+    if (!wide && !stageStyle.containerType.includes('size')) {
+      return null;
+    }
+    // Same formula as the stylesheet, minus the --canvas-max-width term under test.
+    const stageFormula =
+      'min(calc(100cqw - var(--stage-reserve-x)), calc((100cqh - var(--stage-reserve-y)) * var(--canvas-aspect)))';
+    const wideFormula =
+      'min(calc((100dvh - max(var(--shell-pad-y), env(safe-area-inset-top)) - max(var(--shell-pad-y), env(safe-area-inset-bottom)) - var(--canvas-border)) * var(--canvas-aspect)), calc(100vw - 2 * var(--shell-pad-x) - 2 * var(--side-column-width) - 2 * var(--stage-gap) - var(--canvas-border)))';
+    const probe = document.createElement('div');
+    probe.style.cssText = `position:absolute;visibility:hidden;height:0;width:${wide ? wideFormula : stageFormula}`;
+    canvas.parentElement.appendChild(probe);
+    const allowed = probe.getBoundingClientRect().width;
+    probe.remove();
+    return { actual: canvas.getBoundingClientRect().width, allowed, wide };
+  });
+  if (board === null) {
+    return;
+  }
+  assert.ok(
+    board.actual >= board.allowed - BOARD_FILL_TOLERANCE_PX,
+    `${label}: the board is ${board.actual}px wide but its ${board.wide ? 'window' : 'stage'} allows ${board.allowed}px`
+  );
+}
+
 /** Fails when the page scrolls sideways or a visible control label is clipped. */
 async function assertLayoutFits(page, levelId) {
   const layout = await page.evaluate(
@@ -552,6 +596,7 @@ for (const viewport of VIEWPORTS) {
             assert.equal(await isShown(page, '#powerups-empty'), !showsSpecials, `level ${levelId} empty special balls note`);
           }
           await assertLayoutFits(page, levelId);
+          await assertBoardFillsStage(page, `level ${levelId}`);
         }
         assert.deepEqual(errors, []);
       } finally {
@@ -2306,7 +2351,16 @@ describe('Polarity Duel, two players (desktop)', () => {
           });
         }
       }
-      await waitShown(page, '#modal-duel-result');
+      // The guard lasts only resultInputGuardMs: read it in the same poll that sees the card,
+      // before the slower checks below, so a busy machine cannot outlast it.
+      const guardWhenShown = await page.waitForFunction(() => {
+        const card = document.querySelector('#modal-duel-result');
+        if (!card || card.classList.contains('hidden') || !card.checkVisibility()) {
+          return false;
+        }
+        return { ariaDisabled: document.querySelector('#btn-versus-rematch').getAttribute('aria-disabled') };
+      }).then((handle) => handle.jsonValue());
+      assert.equal(guardWhenShown.ariaDisabled, 'true', 'the main button waits out its guard time');
       assert.equal(await page.evaluate(() => document.querySelector('#modal-duel-result-title').textContent), 'Player 1 wins');
       assert.equal(
         await page.evaluate(() => document.querySelector('#versus-result-score').textContent),
@@ -2315,11 +2369,6 @@ describe('Polarity Duel, two players (desktop)', () => {
       assert.equal(await isShown(page, '#btn-versus-share'), false, 'no Share for a match on one device');
       assert.equal(await isShown(page, '#versus-result-tier'), false, 'no CPU tier line');
       assert.equal(await isShown(page, '#btn-versus-change-players'), true);
-      assert.equal(
-        await page.evaluate(() => document.querySelector('#btn-versus-rematch').getAttribute('aria-disabled')),
-        'true',
-        'the main button waits out its guard time'
-      );
       await page.waitForFunction(() => document.querySelector('#btn-versus-rematch').getAttribute('aria-disabled') === null, null, {
         timeout: LOCAL_RESULT_GUARD_WAIT_MS
       });
@@ -3695,7 +3744,7 @@ describe('puzzle stage intro (desktop)', () => {
 describe('Merge shake', () => {
   const modes = JSON.parse(readFileSync(new URL('../../configs/modes.json', import.meta.url), 'utf8'));
   const { shake } = modes.merge;
-  const path = `/?${shake.queryParam}=${shake.queryValue}`;
+  const path = '/';
   const selector = '#btn-merge-shake';
   const initStorage = {
     ...languageStorage('en'),
@@ -3718,6 +3767,177 @@ describe('Merge shake', () => {
     }, shake.rechargeDrops);
     assert.equal(await page.locator(selector).isEnabled(), true);
   }
+
+  /** Makes the next drop start the given event, without waiting for the random gap. */
+  async function startEventOnNextDrop(page, id) {
+    await page.evaluate((eventId) => {
+      const engine = window.__fluxEngine;
+      engine.modeState.upcomingEvent = { id: eventId, direction: -1 };
+      engine.modeState.dropsUntilEvent = 1;
+      engine.modeState.dropCooldownSec = 0;
+      engine.shoot();
+    }, id);
+  }
+
+  test('a Basin event shows a badge, telegraphed first and then counting its drops', async () => {
+    const viewport = VIEWPORTS[0];
+    const { context, page, errors } = await openGame(viewport, { initStorage, path });
+    const badge = '#hud-merge-event';
+    try {
+      await startBasin(page, viewport);
+      assert.equal(await page.locator(badge).isHidden(), true, 'no badge between events');
+
+      await page.evaluate(() => {
+        const engine = window.__fluxEngine;
+        engine.modeState.upcomingEvent = { id: 'lowGravity', direction: 1 };
+        engine.modeState.dropsUntilEvent = 2;
+        engine.notifyUI();
+      });
+      await waitShown(page, badge);
+      const lowGravity = localeText('en', 'gameplay.merge.events.lowGravity.name');
+      assert.equal(
+        await page.locator(badge).getAttribute('aria-label'),
+        localeText('en', 'hud.stats.mergeEvent.upcomingAria', { name: lowGravity })
+      );
+
+      await startEventOnNextDrop(page, 'lowGravity');
+      const count = modes.merge.events.durationDrops;
+      await page.waitForFunction(
+        (expected) => document.getElementById('hud-merge-event').getAttribute('aria-label') === expected,
+        localeText('en', 'hud.stats.mergeEvent.aria.other', { name: lowGravity, count })
+      );
+      assert.equal(await page.locator(badge).getAttribute('title'), await page.locator(badge).getAttribute('aria-label'));
+      assert.equal(
+        await page.locator(badge).innerText(),
+        localeText('en', 'hud.stats.mergeEvent.active', {
+          icon: localeText('en', 'gameplay.merge.events.lowGravity.icon'),
+          count
+        })
+      );
+      assert.deepEqual(errors, []);
+    } finally {
+      await context.close();
+    }
+  });
+
+  async function forceContract(page, contract) {
+    await page.evaluate((forced) => {
+      const engine = window.__fluxEngine;
+      engine.modeState.contract = forced;
+      engine.modeState.contractCount = 1;
+      engine.notifyUI();
+    }, contract);
+  }
+
+  test('a Basin contract shows a chip with its goal and the drops left, and hides when it ends', async () => {
+    const viewport = VIEWPORTS[0];
+    const { context, page, errors } = await openGame(viewport, { initStorage, path });
+    const chip = '#hud-merge-contract';
+    try {
+      await startBasin(page, viewport);
+      assert.equal(await page.locator(chip).isHidden(), true, 'no chip between contracts');
+
+      const dropsLeft = modes.merge.contracts.durationDrops;
+      await forceContract(page, { type: 'fuseCalibre', target: 9, progress: 0, dropsLeft });
+      await waitShown(page, chip);
+      assert.equal(
+        await page.locator(chip).getAttribute('aria-label'),
+        localeText('en', 'hud.stats.mergeContract.aria.fuseCalibre.other', { target: 9, count: dropsLeft })
+      );
+      assert.equal(await page.locator(chip).getAttribute('title'), await page.locator(chip).getAttribute('aria-label'));
+      assert.equal(
+        await page.locator(chip).innerText(),
+        localeText('en', 'hud.stats.mergeContract.fuseCalibre', { target: 9, count: dropsLeft })
+      );
+
+      await forceContract(page, { type: 'fusionCount', target: 6, progress: 2, dropsLeft: 1 });
+      await page.waitForFunction(
+        (expected) => document.getElementById('hud-merge-contract').getAttribute('aria-label') === expected,
+        localeText('en', 'hud.stats.mergeContract.aria.fusionCount.one', { target: 6, progress: 2, count: 1 })
+      );
+
+      await page.evaluate(() => {
+        const engine = window.__fluxEngine;
+        engine.modeState.contract = null;
+        engine.notifyUI();
+      });
+      await page.waitForFunction(() => document.getElementById('hud-merge-contract').classList.contains('hidden'));
+      assert.deepEqual(errors, []);
+    } finally {
+      await context.close();
+    }
+  });
+
+  for (const viewport of VIEWPORTS.filter(({ isTouch }) => isTouch)) {
+    test(`the French contract chip and event badge fit together on ${viewport.name}`, async () => {
+      const { context, page } = await openGame(viewport, {
+        initStorage: { ...initStorage, ...languageStorage('fr') },
+        path
+      });
+      try {
+        await startBasin(page, viewport);
+        await startEventOnNextDrop(page, 'wind');
+        await forceContract(page, {
+          type: 'fusionCount',
+          target: 6,
+          progress: 2,
+          dropsLeft: modes.merge.contracts.durationDrops
+        });
+        await waitShown(page, '#hud-merge-event');
+        await waitShown(page, '#hud-merge-contract');
+        await assertLayoutFits(page, 'Merge contract chip');
+        assert.equal(
+          await page.locator('#hud-merge-contract').getAttribute('aria-label'),
+          localeText('fr', 'hud.stats.mergeContract.aria.fusionCount.other', {
+            target: 6,
+            progress: 2,
+            count: modes.merge.contracts.durationDrops
+          })
+        );
+      } finally {
+        await context.close();
+      }
+    });
+  }
+
+  for (const viewport of VIEWPORTS.filter(({ isTouch }) => isTouch)) {
+    test(`the French event badge fits on ${viewport.name}`, async () => {
+      const { context, page } = await openGame(viewport, {
+        initStorage: { ...initStorage, ...languageStorage('fr') },
+        path
+      });
+      try {
+        await startBasin(page, viewport);
+        await startEventOnNextDrop(page, 'wind');
+        await waitShown(page, '#hud-merge-event');
+        await assertLayoutFits(page, 'Merge event badge');
+        assert.equal(
+          await page.locator('#hud-merge-event').getAttribute('aria-label'),
+          localeText('fr', 'hud.stats.mergeEvent.aria.other', {
+            name: localeText('fr', 'gameplay.merge.events.windLeft.name'),
+            count: modes.merge.events.durationDrops
+          })
+        );
+      } finally {
+        await context.close();
+      }
+    });
+  }
+
+  test('Pause shows the Basin tip and keyboard line, not the generic ones', async () => {
+    const viewport = VIEWPORTS[0];
+    const { context, page, errors } = await openGame(viewport, { initStorage, path });
+    try {
+      await startBasin(page, viewport);
+      await clickMenuButton(page, viewport, '#btn-pause');
+      await waitShown(page, '#modal-pause');
+      assert.equal(await page.locator('#pause-instruction-tip').innerText(), localeText('en', 'modals.pause.instructions.mergeTip'));
+      assert.equal(await page.locator('#pause-instruction-keyboard').innerText(), localeText('en', 'modals.pause.instructions.mergeKeyboard.pointer'));
+      assert.deepEqual(errors, []);
+    } finally {
+      await context.close();
+    }
+  });
 
   test('the desktop HUD, keyboard and right bumper each use one charge', async () => {
     const viewport = VIEWPORTS[0];
@@ -3818,6 +4038,38 @@ describe('Merge shake', () => {
       await context.close();
     }
   });
+
+  test('special spheres in the launcher and on the board draw without errors and keep the layout', async () => {
+    const viewport = VIEWPORTS[0];
+    const { context, page, errors } = await openGame(viewport, { initStorage, path });
+    const nextFrame = () => page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+    try {
+      await startBasin(page, viewport);
+      await page.evaluate(() => {
+        const engine = window.__fluxEngine;
+        engine.currentBall.mergeKind = 'joker';
+        engine.nextBall.mergeKind = 'bomb';
+        engine.notifyUI();
+      });
+      await nextFrame();
+      for (const nextKind of ['ice', 'joker']) {
+        await page.evaluate((kind) => {
+          const engine = window.__fluxEngine;
+          engine.modeState.dropCooldownSec = 0;
+          engine.shoot();
+          engine.nextBall.mergeKind = kind;
+          engine.notifyUI();
+        }, nextKind);
+        await nextFrame();
+      }
+      const kinds = await page.evaluate(() => window.__fluxEngine.physicsWorld.balls.map((ball) => ball.mergeKind));
+      assert.ok(kinds.includes('joker') || kinds.includes('bomb'), 'a special sphere is on the board');
+      await assertLayoutFits(page, 'Merge specials');
+      assert.deepEqual(errors, []);
+    } finally {
+      await context.close();
+    }
+  });
 });
 
 describe('Progress transfer', () => {
@@ -3837,7 +4089,7 @@ describe('Progress transfer', () => {
     const source = await openGame(viewport, { initStorage: {
       [unlockedKey]: newLevel, [coinsKey]: '30', [contrastKey]: 'true', [foreignKey]: 'source'
     } });
-    const target = await openGame(viewport, { path: '/?mergeShake=1' });
+    const target = await openGame(viewport, { path: '/' });
     try {
       await openSettings(source.page);
       const [download] = await Promise.all([

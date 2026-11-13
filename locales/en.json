@@ -179,6 +179,32 @@
       "combo": {
         "label": "Combo x{{count}}"
       },
+      "mergeEvent": {
+        "active": "{{icon}} {{count}}",
+        "upcoming": "{{icon}} {{next}}",
+        "next": "soon",
+        "aria": {
+          "one": "{{name}}: {{count}} drop left",
+          "other": "{{name}}: {{count}} drops left"
+        },
+        "upcomingAria": "Coming up: {{name}}"
+      },
+      "mergeContract": {
+        "fuseCalibre": "★ {{target}} · {{count}}",
+        "fusionCount": "★ {{progress}}/{{target}} · {{count}}",
+        "aria": {
+          "fuseCalibre": {
+            "last": "Contract: fuse a calibre {{target}}, last drop in play",
+          "one": "Contract: fuse a calibre {{target}}, {{count}} drop left",
+            "other": "Contract: fuse a calibre {{target}}, {{count}} drops left"
+          },
+          "fusionCount": {
+            "last": "Contract: fusions {{progress}} of {{target}}, last drop in play",
+          "one": "Contract: fusions {{progress}} of {{target}}, {{count}} drop left",
+            "other": "Contract: fusions {{progress}} of {{target}}, {{count}} drops left"
+          }
+        }
+      },
       "frozen": {
         "label": "Frozen ({{turns}})"
       },
@@ -541,7 +567,101 @@
       },
       "merge": {
         "fused": "CALIBRE {{tier}}! +{{points}}",
-        "supernova": "SUPERNOVA FUSION! +{{points}}"
+        "supernova": "SUPERNOVA FUSION! +{{points}}",
+        "chain": "Chain x{{chain}}: +{{points}}",
+        "chainShake": "+1 Shake",
+        "eventStart": "EVENT: {{name}}",
+        "eventStartAnnounce": "Event: {{name}}. {{description}}",
+        "eventEnd": "Event over: {{name}}.",
+        "eventUpcoming": "Coming up: {{name}}.",
+        "contractDone": "CONTRACT DONE! +{{points}}",
+        "contractSuccess": "Contract complete: +{{points}} points, and the Shake charges faster.",
+        "contractFailure": "Contract failed. No penalty.",
+        "contractStart": {
+          "fuseCalibre": {
+            "one": "Contract: fuse a calibre {{target}} within {{count}} drop.",
+            "other": "Contract: fuse a calibre {{target}} within {{count}} drops."
+          },
+          "fusionCount": {
+            "one": "Contract: make {{target}} fusions within {{count}} drop.",
+            "other": "Contract: make {{target}} fusions within {{count}} drops."
+          }
+        },
+        "shapeStart": "Basin: {{name}}",
+        "shapeAnnounce": "Basin: {{name}}. {{description}}",
+        "specialAnnounce": "{{name}} coming up: {{description}}",
+        "bombBoom": "Boom! +{{points}}",
+        "pressureStep": "THE LINE CAME DOWN",
+        "pressureStepAnnounce": "The overflow line came down.",
+        "pressureWarning": {
+          "one": "The overflow line comes down in {{count}} drop.",
+          "other": "The overflow line comes down in {{count}} drops."
+        }
+      }
+    },
+    "merge": {
+      "specials": {
+        "joker": {
+          "name": "Joker",
+          "description": "Fuses with the first plain sphere it touches, as if two of that calibre met.",
+          "icon": "★︎"
+        },
+        "ice": {
+          "name": "Frozen sphere",
+          "description": "Cannot fuse until a fusion shockwave reaches it or it thaws.",
+          "icon": "❄︎"
+        },
+        "bomb": {
+          "name": "Bomb",
+          "description": "Goes off soon after landing and clears the small spheres around it.",
+          "icon": "✸︎"
+        }
+      },
+      "shapes": {
+        "classic": {
+          "name": "Classic",
+          "description": "The usual basin."
+        },
+        "narrow": {
+          "name": "Narrow",
+          "description": "The walls are closer together."
+        },
+        "pegs": {
+          "name": "Pegs",
+          "description": "Fixed pegs sit in the lower half."
+        }
+      },
+      "events": {
+        "windLeft": {
+          "name": "Wind to the left",
+          "description": "Spheres drift sideways: drop on the windward side.",
+          "icon": "💨←"
+        },
+        "windRight": {
+          "name": "Wind to the right",
+          "description": "Spheres drift sideways: drop on the windward side.",
+          "icon": "💨→"
+        },
+        "lowGravity": {
+          "name": "Low gravity",
+          "description": "Spheres fall slowly and float for longer.",
+          "icon": "🪶"
+        },
+        "bouncy": {
+          "name": "Bouncy spheres",
+          "description": "Spheres bounce much higher off the walls, the floor and each other.",
+          "icon": "🏀"
+        },
+        "bigDrops": {
+          "name": "Big drops",
+          "description": "Larger calibres can drop.",
+          "icon": "🟣"
+        },
+        "golden": {
+          "name": "Golden fusions",
+          "description": "Every fusion scores extra points.",
+          "icon": "🌟"
+        }
       }
     },
     "mutators": {
@@ -772,7 +892,7 @@
         "convoy": "Magnetic Convoy",
         "convoyDesc": "360° turret • Moving rail train • Polarity snap-back",
         "merge": "Merge Basin",
-        "mergeDesc": "10 calibre tiers • Top drop rail • Shockwave fusion",
+        "mergeDesc": "12 calibre tiers • Top drop rail • Shockwave fusion • Shake",
         "mergeRecord": "Calibre {{tier}} • Best: {{score}}"
       },
       "jumpCurrent": "Current level",
@@ -1082,8 +1202,8 @@
             },
             "merge": {
               "icon": "🫧",
-              "name": "Merge Basin (10 Calibre Tiers)",
-              "description": "Drop spheres from a top rail into a rigid basin. Identical calibres fuse into the next tier (1 to 10) with a magnetic shockwave, while polarity biases attraction and repulsion."
+              "name": "Merge Basin (12 Calibre Tiers)",
+              "description": "Drop spheres from a top rail into a rigid basin. Identical calibres fuse into the next tier (1 to 12) with a magnetic shockwave. Each Polarity press pulls identical calibres together for a moment and pushes the others apart. The Shake recharges after a few drops and nudges the whole basin sideways."
             }
           }
         }
@@ -1442,6 +1562,11 @@
           "touch": "Polarity & Arsenal: tap 🧲 to flip how spheres pull your shot (it curves the other way), or tap a Special Sphere charged by Overcharge"
         },
         "physics": "Tip: Sever anchor links or unbalance rotors to trigger chain reactions!",
+        "mergeKeyboard": {
+          "pointer": "Keyboard: Left/Right to move the rail, Enter to drop, F (or 🧲) to pull identical calibres together, G to shake the basin",
+          "touch": "Polarity & Shake: tap 🧲 to pull identical calibres together, or tap Shake when it is ready"
+        },
+        "mergeTip": "Tip: Two identical calibres fuse into the next one. Use the Shake when it is ready to throw the pile towards the emptier side!",
         "pad": "Controller: left stick to aim (right stick for fine aim), bottom face button or right trigger to shoot, left face button to swap, top face button to flip polarity, bumpers for Special Spheres, Start to pause"
       },
       "button": {

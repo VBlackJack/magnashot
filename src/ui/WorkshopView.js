@@ -489,8 +489,7 @@ export function renderWorkshopContents() {
         this.engine.mode === GAME_MODES.CONVOY ? this.engine.waveCount || 0 : 0
       ),
       mergeTier: Math.max(
-        this.storageManager.getMergeBestTier?.(false) || 0,
-        this.storageManager.getMergeBestTier?.(true) || 0,
+        this.storageManager.getMergeBestTier?.() || 0,
         this.engine.mode === GAME_MODES.MERGE ? this.engine.mergeBestTier || 0 : 0
       ),
       unlockedLevel: this.storageManager.getUnlockedLevel(),

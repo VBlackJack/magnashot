@@ -68,6 +68,25 @@ export class ModeBehavior {
     return false;
   }
 
+  /**
+   * Locale key a Pause input hint reads in this mode.
+   * @param {string} key - Generic hint key from MODAL_INPUT_HINTS.
+   * @returns {string} The key to read, the generic one unless the mode words it its own way.
+   */
+  getInputHintKey(key) {
+    return key;
+  }
+
+  /** Locale key of the tip shown at the foot of the Pause instructions. */
+  getPauseTipKey() {
+    return 'modals.pause.instructions.physics';
+  }
+
+  /** False for a mode without colour matches or anchors, where the basics hint would mislead. */
+  teachesMatchBasics() {
+    return true;
+  }
+
   neutralizesWorkshopUpgrades() {
     return false;
   }
@@ -132,6 +151,8 @@ export class ModeBehavior {
   drawUnderlay() {}
 
   drawOverlay() {}
+
+  drawLauncherOverlay() {}
 }
 
 export const DEFAULT_MODE_BEHAVIOR = Object.freeze(new ModeBehavior('default'));

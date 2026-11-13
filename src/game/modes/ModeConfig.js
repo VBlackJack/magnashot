@@ -181,9 +181,100 @@ export const DEFAULT_MODES_CONFIG = Object.freeze({
     polarityBiasRange: 150,
     polarityBiasAcceleration: 210,
     polarityWindowSec: 1.4,
+    polarityPulseAcceleration: 2500,
+    polarityPulseSec: 0.65,
     spawnMaxTierIndex: 4,
-    supernovaBonus: 1500,
+    supernovaBonus: 4000,
     supernovaShockwaveImpulse: 340,
+    chain: Object.freeze({ shakeAdvanceAt: 3 }),
+    pressure: Object.freeze({
+      fromFusedTier: 6,
+      pxPerTier: 15,
+      topTier: 11,
+      topTierStepDrops: 35,
+      pxPerStep: 15,
+      maxOffsetPx: 240,
+      warnDrops: 3,
+      holdMaxDrops: 3,
+      stepGraceFactor: 2,
+      entryGraceMaxSec: 2.5,
+      shakeGraceSec: 2,
+      settledSpeedPxPerSec: 30
+    }),
+    shapes: Object.freeze({
+      ids: Object.freeze(['classic', 'narrow', 'pegs']),
+      weights: Object.freeze({ classic: 1, narrow: 1, pegs: 1 }),
+      classic: Object.freeze({ pressure: Object.freeze({}) }),
+      narrow: Object.freeze({
+        insetPx: 30,
+        pressure: Object.freeze({ topTierStepDrops: 50, pxPerTier: 12, maxOffsetPx: 180 })
+      }),
+      pegs: Object.freeze({
+        radius: 9,
+        restitution: 0.4,
+        positions: Object.freeze([
+          Object.freeze({ xFrac: 0.38, yFromFloorPx: 158 }),
+          Object.freeze({ xFrac: 0.62, yFromFloorPx: 293 })
+        ]),
+        pressure: Object.freeze({ topTierStepDrops: 50, maxOffsetPx: 180 })
+      })
+    }),
+    eventTextOffsetY: 56,
+    events: Object.freeze({
+      gapMinDrops: 9,
+      gapMaxDrops: 14,
+      durationDrops: 6,
+      pool: Object.freeze({
+        wind: Object.freeze({ acceleration: 260 }),
+        lowGravity: Object.freeze({ gravityFactor: 0.45 }),
+        bouncy: Object.freeze({ restitution: 0.6 }),
+        bigDrops: Object.freeze({ spawnMaxTierIndex: 6 }),
+        golden: Object.freeze({ pointsFactor: 1.5 })
+      })
+    }),
+    contracts: Object.freeze({
+      firstAfterDrops: 15,
+      gapMinDrops: 6,
+      gapMaxDrops: 10,
+      durationDrops: 8,
+      rewardShakeDrops: 2,
+      lastDropGraceSec: 2.5,
+      types: Object.freeze({
+        fuseCalibre: Object.freeze({ offsetBelowBest: 2, minCalibre: 7, maxCalibre: 10, pointsPerCalibre: 300 }),
+        fusionCount: Object.freeze({ count: 6, points: 1500 })
+      })
+    }),
+    specials: Object.freeze({
+      fromDrop: 10,
+      chance: 0.05,
+      render: Object.freeze({
+        ringWidth: 3,
+        ringGap: 3,
+        glyphSizeFactor: 1.1,
+        glyphFill: '#ffffff',
+        glyphStroke: '#101018',
+        glyphStrokeWidth: 3,
+        fontFamily: 'sans-serif',
+        iceColor: '#d8f1ff',
+        iceAlpha: 0.62,
+        iceOutlineColor: '#ffffff',
+        iceOutlineDash: Object.freeze([4, 3]),
+        bombColor: '#14141c',
+        bombAlpha: 0.88
+      }),
+      kinds: Object.freeze({
+        joker: Object.freeze({ weight: 1, sizeTierIndex: 2 }),
+        ice: Object.freeze({ weight: 1, thawTimeoutSec: 8, maxTierIndex: 4 }),
+        bomb: Object.freeze({
+          weight: 1,
+          fuseSec: 1,
+          radiusPx: 90,
+          maxTierIndex: 3,
+          pointsPerSphere: 40,
+          sizeTierIndex: 2
+        })
+      })
+    }),
     tiers: Object.freeze([
       Object.freeze({
         id: 'merge_t0',
@@ -314,10 +405,105 @@ export const DEFAULT_MODES_CONFIG = Object.freeze({
         symbol: '10',
         polarity: -1,
         points: 1200
+      }),
+      Object.freeze({
+        id: 'merge_t10',
+        tier: 10,
+        radius: 66,
+        fill: '#a3e635',
+        highlight: '#d9f99d',
+        shadow: '#4d7c0f',
+        glow: 'rgba(163, 230, 53, 0.55)',
+        pattern: 'stripesD',
+        symbol: '11',
+        polarity: 1,
+        points: 1700
+      }),
+      Object.freeze({
+        id: 'merge_t11',
+        tier: 11,
+        radius: 72,
+        fill: '#94a3b8',
+        highlight: '#cbd5e1',
+        shadow: '#334155',
+        glow: 'rgba(148, 163, 184, 0.55)',
+        pattern: 'stripesV',
+        symbol: '12',
+        polarity: -1,
+        points: 2400
       })
     ])
   })
 });
+
+/**
+ * Merge Basin events over their defaults, entry by entry, so a partial config never leaves
+ * a missing field behind: each pool entry keeps its default numbers.
+ */
+function resolveMergeEvents(partial) {
+  const defaults = DEFAULT_MODES_CONFIG.merge.events;
+  const source = partial && typeof partial === 'object' ? partial : {};
+  const poolSource = source.pool && typeof source.pool === 'object' ? source.pool : defaults.pool;
+  const pool = {};
+  for (const [id, entry] of Object.entries(poolSource)) {
+    pool[id] = { ...(defaults.pool[id] ?? {}), ...(entry && typeof entry === 'object' ? entry : {}) };
+  }
+  return { ...defaults, ...source, pool };
+}
+
+/**
+ * Merge Basin contracts over their defaults, type by type, so a partial config keeps every
+ * default number: the types are replaced only when the config gives some.
+ */
+function resolveMergeContracts(partial) {
+  const defaults = DEFAULT_MODES_CONFIG.merge.contracts;
+  const source = partial && typeof partial === 'object' ? partial : {};
+  const typesSource = source.types && typeof source.types === 'object' ? source.types : defaults.types;
+  const types = {};
+  for (const [id, entry] of Object.entries(typesSource)) {
+    types[id] = { ...(defaults.types[id] ?? {}), ...(entry && typeof entry === 'object' ? entry : {}) };
+  }
+  return { ...defaults, ...source, types };
+}
+
+/**
+ * Merge Basin special spheres over their defaults, kind by kind, so a partial config keeps
+ * every default kind and number; a kind is switched off with a weight of zero.
+ */
+function resolveMergeSpecials(partial) {
+  const defaults = DEFAULT_MODES_CONFIG.merge.specials;
+  const source = partial && typeof partial === 'object' ? partial : {};
+  const kindsSource = source.kinds && typeof source.kinds === 'object' ? source.kinds : {};
+  const kinds = {};
+  for (const id of new Set([...Object.keys(defaults.kinds), ...Object.keys(kindsSource)])) {
+    const entry = kindsSource[id];
+    kinds[id] = { ...(defaults.kinds[id] ?? {}), ...(entry && typeof entry === 'object' ? entry : {}) };
+  }
+  const render = { ...defaults.render, ...(source.render && typeof source.render === 'object' ? source.render : {}) };
+  return { ...defaults, ...source, render, kinds };
+}
+
+/**
+ * Merge Basin shapes over their defaults, shape by shape, so a partial config keeps every
+ * default number: the id list and the weights are replaced only when the config gives some.
+ */
+function resolveMergeShapes(partial) {
+  const defaults = DEFAULT_MODES_CONFIG.merge.shapes;
+  const source = partial && typeof partial === 'object' ? partial : {};
+  const isObject = (value) => Boolean(value) && typeof value === 'object';
+  const resolved = { ...defaults, ...source };
+  resolved.ids = Array.isArray(source.ids) && source.ids.length > 0 ? source.ids : defaults.ids;
+  resolved.weights = { ...defaults.weights, ...(isObject(source.weights) ? source.weights : {}) };
+  for (const id of defaults.ids) {
+    const entry = isObject(source[id]) ? source[id] : {};
+    resolved[id] = {
+      ...defaults[id],
+      ...entry,
+      pressure: { ...defaults[id].pressure, ...(isObject(entry.pressure) ? entry.pressure : {}) }
+    };
+  }
+  return resolved;
+}
 
 export function resolveModesConfig(modesConfig) {
   if (!modesConfig || typeof modesConfig !== 'object') {
@@ -331,6 +517,12 @@ export function resolveModesConfig(modesConfig) {
     merge: {
       ...DEFAULT_MODES_CONFIG.merge,
       ...(modesConfig.merge ?? {}),
+      chain: { ...DEFAULT_MODES_CONFIG.merge.chain, ...(modesConfig.merge?.chain ?? {}) },
+      pressure: { ...DEFAULT_MODES_CONFIG.merge.pressure, ...(modesConfig.merge?.pressure ?? {}) },
+      shapes: resolveMergeShapes(modesConfig.merge?.shapes),
+      events: resolveMergeEvents(modesConfig.merge?.events),
+      contracts: resolveMergeContracts(modesConfig.merge?.contracts),
+      specials: resolveMergeSpecials(modesConfig.merge?.specials),
       tiers: Array.isArray(modesConfig.merge?.tiers) && modesConfig.merge.tiers.length > 0
         ? modesConfig.merge.tiers
         : DEFAULT_MODES_CONFIG.merge.tiers

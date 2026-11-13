@@ -149,6 +149,8 @@ export class UIManager {
       shotsLabel: document.getElementById('hud-shots-label'),
       shotsValue: document.getElementById('hud-shots-value'),
       comboBadge: document.getElementById('hud-combo-badge'),
+      mergeEventBadge: document.getElementById('hud-merge-event'),
+      mergeContractBadge: document.getElementById('hud-merge-contract'),
       frozenBadge: document.getElementById('hud-frozen-badge'),
       magnetarTelegraph: document.getElementById('hud-magnetar-telegraph'),
       quotaBadge: document.getElementById('hud-quota-badge'),
@@ -327,6 +329,7 @@ export class UIManager {
       drawerPerks: document.getElementById('drawer-perks'),
       drawerPerksStat: document.getElementById('drawer-perks-stat'),
       pauseLevelTip: document.getElementById('pause-level-tip'),
+      pauseInstructionTip: document.getElementById('pause-instruction-tip'),
       btnResume: document.getElementById('btn-resume'),
       btnRestartPause: document.getElementById('btn-restart-pause'),
       btnLevelsPause: document.getElementById('btn-levels-pause'),
@@ -553,7 +556,8 @@ export class UIManager {
       'hud.launcher.swap.caption'
     );
     for (const { elementId, key } of MODAL_INPUT_HINTS) {
-      setTextIfChanged(document.getElementById(elementId), t(`${key}.${this.getHintInputMode(key)}`));
+      const modeKey = this.engine?.getModeBehavior?.().getInputHintKey(key) ?? key;
+      setTextIfChanged(document.getElementById(elementId), t(`${modeKey}.${this.getHintInputMode(key)}`));
     }
     setAttributeIfChanged(
       this.elements.modeBanner,
@@ -1334,7 +1338,7 @@ export class UIManager {
     if (engine.mode === GAME_MODES.MERGE) {
       return t('modals.gameOver.stats.mergeSummary', {
         tier: formatNumber(engine.mergeBestTier || 1),
-        best: formatNumber(Math.max(engine.mergeBestTier || 1, this.storageManager.getMergeBestTier?.(engine.getMergeShakeRemaining() !== null) || 1)),
+        best: formatNumber(Math.max(engine.mergeBestTier || 1, this.storageManager.getMergeBestTier?.() || 1)),
         coins: formatNumber(summary?.earnedCoins || 0)
       });
     }

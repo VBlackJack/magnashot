@@ -87,8 +87,7 @@ export class GameEngine {
     storageManager,
     onStateChange,
     role = ENGINE_ROLES.MAIN,
-    seedSource = null,
-    mergeShakePrototype = false
+    seedSource = null
   }) {
     this.gameConfig = gameConfig;
     this.physicsConfig = physicsConfig;
@@ -97,7 +96,6 @@ export class GameEngine {
     this.levelsConfig = levelsConfig;
     this.fluxConfig = fluxConfig;
     this.modesConfig = resolveModesConfig(modesConfig);
-    this.mergeShakePrototype = mergeShakePrototype;
     /** Idle settle margins of the generated Flux shapes (configs/fluxShapeTuning.json); null draws every shape. */
     this.fluxShapeTuning = fluxShapeTuning;
     this.levelCatalog = new LevelCatalog({
@@ -437,6 +435,59 @@ export class GameEngine {
     return this.mode === GAME_MODES.MERGE ? this.modeState?.shakeRemaining ?? null : null;
   }
 
+  /**
+   * Event cycle of the Merge Basin for the HUD.
+   * @returns {{eventCount: number, active: object|null, upcoming: object|null}|null} Null outside a live Basin run.
+   */
+  getMergeEventState() {
+    const live = this.state === GAME_STATES.PLAYING || this.state === GAME_STATES.PAUSED;
+    return this.mode === GAME_MODES.MERGE && live ? this.getModeBehavior().getEventView(this) : null;
+  }
+
+  /**
+   * Mini-contract of the Merge Basin for the HUD.
+   * @returns {{contractCount: number, active: object|null, result: object|null}|null} Null outside a live Basin run.
+   */
+  getMergeContractState() {
+    const live = this.state === GAME_STATES.PLAYING || this.state === GAME_STATES.PAUSED;
+    return this.mode === GAME_MODES.MERGE && live ? this.getModeBehavior().getContractView(this) : null;
+  }
+
+  /**
+   * Overflow line pressure of the Merge Basin for the HUD.
+   * @returns {{lineOffsetPx: number, pendingOffsetPx: number|null, pendingDropsLeft: number}|null} Null outside a live Basin run.
+   */
+  getMergePressureState() {
+    const live = this.state === GAME_STATES.PLAYING || this.state === GAME_STATES.PAUSED;
+    return this.mode === GAME_MODES.MERGE && live ? this.getModeBehavior().getPressureView(this) : null;
+  }
+
+  /**
+   * Basin shape of the Merge Basin for the HUD.
+   * @returns {{shapeId: string, announceSerial: number|null}|null} Null outside a live Basin run.
+   */
+  getMergeShapeState() {
+    const live = this.state === GAME_STATES.PLAYING || this.state === GAME_STATES.PAUSED;
+    return this.mode === GAME_MODES.MERGE && live ? this.getModeBehavior().getShapeView(this) : null;
+  }
+
+  /**
+   * Latest special sphere announcement of the Merge Basin for the HUD.
+   * @returns {{kind: string|null, announceSerial: number|null}|null} Null outside a live Basin run.
+   */
+  getMergeSpecialState() {
+    const live = this.state === GAME_STATES.PLAYING || this.state === GAME_STATES.PAUSED;
+    return this.mode === GAME_MODES.MERGE && live ? this.getModeBehavior().getSpecialView(this) : null;
+  }
+
+  /**
+   * Walls, floor and pegs of the Merge Basin run's shape.
+   * @returns {{left: number, right: number, floor: number, pegs: Array<{x: number, y: number, radius: number}>}|null} Null outside the Basin.
+   */
+  getMergeBasinGeometry() {
+    return this.mode === GAME_MODES.MERGE ? this.getModeBehavior().getBasinGeometry(this) : null;
+  }
+
   tryMergeShake() {
     if (this.getMergeShakeRemaining() !== 0 || !this.isRunPlaying()) {
       return false;
@@ -522,7 +573,7 @@ export class GameEngine {
     } else if (this.mode === GAME_MODES.CONVOY) {
       best = storage.getConvoyBestWave?.() || 0;
     } else if (this.mode === GAME_MODES.MERGE) {
-      best = storage.getMergeHighScore?.(this.getMergeShakeRemaining() !== null) || 0;
+      best = storage.getMergeHighScore?.() || 0;
     }
     this.runBestBaseline = { metric: measured.metric, best };
     return this.runBestBaseline;
@@ -643,11 +694,11 @@ export class GameEngine {
       this.storageManager.setConvoyRecord?.(this.score, this.waveCount);
       this.unlockAchievementTiers('convoyWaves', this.waveCount);
     } else if (this.mode === GAME_MODES.MERGE) {
-      const prototype = this.getMergeShakeRemaining() !== null;
-      this.storageManager.setMergeRecord?.(this.score, this.mergeBestTier, prototype);
-      if (!prototype || this.mergeShakePrototype) {
-        this.unlockAchievementTiers('mergeTiers', this.mergeBestTier);
-      }
+      this.storageManager.setMergeRecord?.(this.score, this.mergeBestTier);
+      this.unlockAchievementTiers(
+        'mergeTiers',
+        Math.max(this.mergeBestTier, this.storageManager.getMergeBestTier?.() || 0)
+      );
     }
   }
 

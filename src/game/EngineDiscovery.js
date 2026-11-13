@@ -190,6 +190,9 @@ export const engineDiscoveryMethods = {
    */
   listPresentMechanics() {
     const present = listBoardMechanics(this.physicsWorld.balls, this.physicsWorld.obstacles, this.specialInventory);
+    if (!this.getModeBehavior().teachesMatchBasics()) {
+      present.delete(BOARD_MECHANICS.BASICS);
+    }
     if (this.mode === GAME_MODES.CAMPAIGN) {
       const levelDef = this.levelCatalog.get(this.currentLevelId);
       for (const mechanicId of levelDef?.teachesMechanics || []) {

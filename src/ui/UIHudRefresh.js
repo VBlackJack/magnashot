@@ -19,6 +19,8 @@ import { t, formatNumber } from '../core/I18n.js';
 import { SeededRandom } from '../core/SeededRandom.js';
 import { resolveHintText } from '../game/Discovery.js';
 import { MAGNETAR_PHASES } from '../game/MagnetarRules.js';
+import { getMergeEventTextKey } from '../game/modes/MergeEvents.js';
+import { MERGE_CONTRACT_OUTCOMES, getMergeContractPluralKey } from '../game/modes/MergeContracts.js';
 import { SAG_PHASES } from '../game/SagMeter.js';
 import { getUtcIsoWeekKey } from '../game/WeeklyFlux.js';
 import { FULL_PERCENT } from './WorkshopView.js';
@@ -148,6 +150,211 @@ export const uiHudRefreshMethods = {
       meter.classList.remove('hidden');
     }
     this.announceSagChanges(engine, sag);
+  },
+
+  /**
+   * Merge Basin event badge: the running event with the drops it has left, else the one
+   * telegraphed for the next drop. Hidden outside the Basin.
+   * @param {object} engine - Game engine.
+   */
+  refreshMergeEventBadge(engine) {
+    const badge = this.elements.mergeEventBadge;
+    const view = engine.getMergeEventState?.() ?? null;
+    this.announceMergeShape(engine.getMergeShapeState?.() ?? null);
+    this.announceMergeSpecial(engine.getMergeSpecialState?.() ?? null);
+    if (!badge) {
+      return;
+    }
+    this.announceMergeEventChanges(view);
+    const shown = view?.active ?? view?.upcoming ?? null;
+    if (!shown) {
+      badge.classList.add('hidden');
+      return;
+    }
+    const icon = t(getMergeEventTextKey(shown, 'icon'));
+    const name = t(getMergeEventTextKey(shown, 'name'));
+    if (view.active) {
+      const count = view.active.dropsLeft;
+      const label = t(`hud.stats.mergeEvent.aria.${count === 1 ? 'one' : 'other'}`, { name, count });
+      setTextIfChanged(badge, t('hud.stats.mergeEvent.active', { icon, count }));
+      setAttributeIfChanged(badge, 'aria-label', label);
+      setAttributeIfChanged(badge, 'title', label);
+    } else {
+      const label = t('hud.stats.mergeEvent.upcomingAria', { name });
+      setTextIfChanged(badge, t('hud.stats.mergeEvent.upcoming', { icon, next: t('hud.stats.mergeEvent.next') }));
+      setAttributeIfChanged(badge, 'aria-label', label);
+      setAttributeIfChanged(badge, 'title', label);
+    }
+    badge.classList.remove('hidden');
+  },
+
+  /**
+   * Merge Basin contract chip: the goal with its progress and the drops left. Hidden outside
+   * the Basin and between contracts.
+   * @param {object} engine - Game engine.
+   */
+  refreshMergeContractBadge(engine) {
+    const badge = this.elements.mergeContractBadge;
+    const view = engine.getMergeContractState?.() ?? null;
+    this.announceMergeContractChanges(view);
+    if (!badge) {
+      return;
+    }
+    const contract = view?.active ?? null;
+    if (!contract) {
+      badge.classList.add('hidden');
+      return;
+    }
+    const params = {
+      target: contract.target,
+      progress: contract.progress,
+      count: contract.dropsLeft
+    };
+    const label = t(`hud.stats.mergeContract.aria.${contract.type}.${getMergeContractPluralKey(contract.dropsLeft)}`, params);
+    setTextIfChanged(badge, t(`hud.stats.mergeContract.${contract.type}`, params));
+    setAttributeIfChanged(badge, 'aria-label', label);
+    setAttributeIfChanged(badge, 'title', label);
+    badge.classList.remove('hidden');
+  },
+
+  /**
+   * Polite announcements for the Basin contracts: once when one starts and once when it ends
+   * (success or failure, never both), never per drop. The first refresh of a run only records.
+   * @param {{contractCount: number, active: object|null, result: object|null}|null} view - Contract view.
+   */
+  announceMergeContractChanges(view) {
+    if (!view) {
+      this.mergeContractAnnouncerState = null;
+      return;
+    }
+    // A lower contract count means a new run took over: record its state, announce nothing.
+    const previous = this.mergeContractAnnouncerState;
+    const seen = previous && view.contractCount >= previous.contractCount ? previous : null;
+    this.mergeContractAnnouncerState = {
+      contractCount: view.contractCount,
+      resultId: view.result?.id ?? null
+    };
+    if (!seen) {
+      return;
+    }
+    if (view.result && view.result.id !== seen.resultId) {
+      const key = view.result.outcome === MERGE_CONTRACT_OUTCOMES.SUCCESS
+        ? 'gameplay.feedback.merge.contractSuccess'
+        : 'gameplay.feedback.merge.contractFailure';
+      this.announce(t(key, { points: view.result.points }));
+    } else if (view.active && view.contractCount > seen.contractCount) {
+      const { type, target, dropsLeft } = view.active;
+      this.announce(t(
+        `gameplay.feedback.merge.contractStart.${type}.${getMergeContractPluralKey(dropsLeft)}`,
+        { target, count: dropsLeft }
+      ));
+    }
+  },
+
+  /**
+   * Polite announcement of the Basin shape, once per fresh run (a restored run has no serial).
+   * @param {{shapeId: string, announceSerial: number|null}|null} view - Shape view.
+   */
+  announceMergeShape(view) {
+    if (!view) {
+      this.mergeShapeAnnouncedSerial = null;
+      return;
+    }
+    if (view.announceSerial === null || view.announceSerial === this.mergeShapeAnnouncedSerial) {
+      return;
+    }
+    this.mergeShapeAnnouncedSerial = view.announceSerial;
+    this.announce(t('gameplay.feedback.merge.shapeAnnounce', {
+      name: t(`gameplay.merge.shapes.${view.shapeId}.name`),
+      description: t(`gameplay.merge.shapes.${view.shapeId}.description`)
+    }));
+  },
+
+  /**
+   * Polite announcement of a special sphere, once per kind and run (the engine only raises a
+   * new serial the first time a kind reaches the launcher).
+   * @param {{kind: string|null, announceSerial: number|null}|null} view - Special view.
+   */
+  announceMergeSpecial(view) {
+    if (!view) {
+      this.mergeSpecialAnnouncedSerial = null;
+      return;
+    }
+    if (view.announceSerial === null || view.announceSerial === this.mergeSpecialAnnouncedSerial) {
+      return;
+    }
+    this.mergeSpecialAnnouncedSerial = view.announceSerial;
+    this.announce(t('gameplay.feedback.merge.specialAnnounce', {
+      name: t(`gameplay.merge.specials.${view.kind}.name`),
+      description: t(`gameplay.merge.specials.${view.kind}.description`)
+    }));
+  },
+
+  /**
+   * Polite announcements for the Basin event cycle: once when an event is telegraphed, once
+   * when it starts and once when it ends, never per drop. The first refresh only records.
+   */
+  announceMergeEventChanges(view) {
+    if (!view) {
+      this.mergeEventAnnouncerState = null;
+      return;
+    }
+    const keyOf = (event) => (event ? `${event.id}:${event.direction}` : null);
+    // A lower event count means a new run took over: record its state, announce nothing.
+    const previous = this.mergeEventAnnouncerState;
+    const seen = previous && view.eventCount >= previous.eventCount ? previous : null;
+    this.mergeEventAnnouncerState = {
+      eventCount: view.eventCount,
+      activeKey: keyOf(view.active),
+      upcomingKey: keyOf(view.upcoming),
+      active: view.active
+    };
+    if (!seen) {
+      return;
+    }
+    const current = this.mergeEventAnnouncerState;
+    if (current.activeKey && current.activeKey !== seen.activeKey) {
+      this.announce(t('gameplay.feedback.merge.eventStartAnnounce', {
+        name: t(getMergeEventTextKey(view.active, 'name')),
+        description: t(getMergeEventTextKey(view.active, 'description'))
+      }));
+    } else if (!current.activeKey && seen.activeKey) {
+      this.announce(t('gameplay.feedback.merge.eventEnd', {
+        name: t(getMergeEventTextKey(seen.active, 'name'))
+      }));
+    } else if (current.upcomingKey && current.upcomingKey !== seen.upcomingKey) {
+      this.announce(t('gameplay.feedback.merge.eventUpcoming', {
+        name: t(getMergeEventTextKey(view.upcoming, 'name'))
+      }));
+    }
+  },
+
+  /**
+   * Polite announcements for the Basin overflow line: once when a step is telegraphed and
+   * once when the line comes down, never per drop. The first refresh of a run only records.
+   * @param {{lineOffsetPx: number, pendingOffsetPx: number|null, pendingDropsLeft: number}|null} view - Pressure view.
+   */
+  announceMergePressureChanges(view) {
+    if (!view) {
+      this.mergePressureAnnouncerState = null;
+      return;
+    }
+    // A lower offset means a new run took over: record its state, announce nothing.
+    const previous = this.mergePressureAnnouncerState;
+    const seen = previous && view.lineOffsetPx >= previous.lineOffsetPx ? previous : null;
+    this.mergePressureAnnouncerState = {
+      lineOffsetPx: view.lineOffsetPx,
+      pending: view.pendingOffsetPx !== null
+    };
+    if (!seen) {
+      return;
+    }
+    if (view.lineOffsetPx > seen.lineOffsetPx) {
+      this.announce(t('gameplay.feedback.merge.pressureStepAnnounce'));
+    } else if (view.pendingOffsetPx !== null && !seen.pending) {
+      const count = view.pendingDropsLeft;
+      this.announce(t(`gameplay.feedback.merge.pressureWarning.${count === 1 ? 'one' : 'other'}`, { count }));
+    }
   },
 
   /** Hides the meter and forgets what the announcer saw, outside the Sag modes. */
@@ -347,7 +554,7 @@ export const uiHudRefreshMethods = {
     } else if (engine.mode === GAME_MODES.CONVOY) {
       bestScore = this.storageManager.getConvoyHighScore?.() || 0;
     } else if (engine.mode === GAME_MODES.MERGE) {
-      bestScore = this.storageManager.getMergeHighScore?.(engine.getMergeShakeRemaining() !== null) || 0;
+      bestScore = this.storageManager.getMergeHighScore?.() || 0;
     } else {
       bestScore = this.storageManager.getEndlessHighScore();
     }
@@ -683,6 +890,10 @@ export const uiHudRefreshMethods = {
       this.elements.comboBadge.classList.add('hidden');
     }
 
+    this.refreshMergeEventBadge(engine);
+    this.refreshMergeContractBadge(engine);
+    this.announceMergePressureChanges(engine.getMergePressureState?.() ?? null);
+
     const convoyFrozenSec = engine.mode === GAME_MODES.CONVOY
       ? Math.ceil(engine.modeState?.freezeTimerSec || 0)
       : 0;
@@ -804,6 +1015,8 @@ export const uiHudRefreshMethods = {
     }
 
     if (engine.state === GAME_STATES.PAUSED && !this.isRunHeldByUi() && !this.isAnyOverlayModalOpen()) {
+      setTextIfChanged(this.elements.pauseInstructionTip, t(engine.getModeBehavior().getPauseTipKey()));
+      this.updateInputHints();
       if (this.elements.pauseLevelTip) {
         if (engine.levelTutorialKey) {
           setTextIfChanged(

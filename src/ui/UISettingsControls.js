@@ -31,6 +31,109 @@ import {
   setAttributeIfChanged
 } from './UIHelpers.js';
 
+/** Gestures that grant the user activation touch devices need to re-enter fullscreen (pointerdown does not). */
+const FULLSCREEN_REENTRY_EVENTS = ['pointerup', 'keydown'];
+
+/** Keys that grant no user activation (Escape is a deliberate exit), so they never trigger a re-entry. */
+const FULLSCREEN_REENTRY_IGNORED_KEYS = ['Escape'];
+
+/** True when the primary pointer is coarse (touch), where the browser drops fullscreen on its own. */
+function isCoarsePointer(ui) {
+  const query = ui.gameConfig?.defaults?.coarsePointerMediaQuery;
+  if (!query || typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
+    return false;
+  }
+  return Boolean(window.matchMedia(query).matches);
+}
+
+/**
+ * Sticky fullscreen applies only on touch devices: on desktop Escape is a deliberate exit,
+ * and an installed app already in fullscreen display mode has nothing to restore.
+ */
+function isStickyFullscreenActive(ui, doc) {
+  return Boolean(ui.fullscreenWish) && isFullscreenSupported(doc) && !ui.isFullscreenDisplayMode() && isCoarsePointer(ui);
+}
+
+/** Arms or disarms the re-entry after a fullscreenchange, depending on the wish. */
+function syncStickyFullscreen(ui, doc) {
+  if (isDocumentFullscreen(doc)) {
+    disarmFullscreenReentry(ui, doc);
+  } else if (isStickyFullscreenActive(ui, doc)) {
+    armFullscreenReentry(ui, doc);
+  }
+}
+
+/**
+ * Waits for the next tap or key press, the only gestures that grant the user activation
+ * needed to re-enter fullscreen (pointerdown does not on touch). It never stops the event,
+ * so the same tap still reaches the game.
+ */
+function armFullscreenReentry(ui, doc) {
+  if (ui.fullscreenReentryHandler || !doc?.addEventListener) {
+    return;
+  }
+  const handler = async (event) => {
+    // A tap on a fullscreen button is left to its own click, which would otherwise exit what pointerup just entered.
+    if ([ui.elements?.btnFullscreen, ui.elements?.btnFullscreenHud].some((b) => b?.contains?.(event?.target))) {
+      return;
+    }
+    if (event?.repeat || FULLSCREEN_REENTRY_IGNORED_KEYS.includes(event?.key)) {
+      return;
+    }
+    if (ui.fullscreenReentryPending) {
+      return;
+    }
+    if (!isStickyFullscreenActive(ui, doc) || isDocumentFullscreen(doc)) {
+      disarmFullscreenReentry(ui, doc);
+      return;
+    }
+    ui.fullscreenReentryPending = true;
+    try {
+      // A rejected request keeps the listeners armed so the next tap retries.
+      if (await requestFullscreenEntry(doc)) {
+        disarmFullscreenReentry(ui, doc);
+      }
+    } finally {
+      ui.fullscreenReentryPending = false;
+    }
+    ui.updateFullscreenButton();
+  };
+  ui.fullscreenReentryHandler = handler;
+  for (const type of FULLSCREEN_REENTRY_EVENTS) {
+    doc.addEventListener(type, handler, true);
+  }
+}
+
+/** Removes the re-entry listeners, if armed. */
+function disarmFullscreenReentry(ui, doc) {
+  const handler = ui.fullscreenReentryHandler;
+  if (!handler) {
+    return;
+  }
+  ui.fullscreenReentryHandler = null;
+  for (const type of FULLSCREEN_REENTRY_EVENTS) {
+    doc?.removeEventListener?.(type, handler, true);
+  }
+}
+
+/** Requests fullscreen on the root element (standard, then WebKit); resolves true when it was granted. */
+async function requestFullscreenEntry(doc) {
+  const root = doc.documentElement;
+  try {
+    if (typeof root.requestFullscreen === 'function') {
+      await root.requestFullscreen({ navigationUI: 'hide' });
+      return true;
+    }
+    if (typeof root.webkitRequestFullscreen === 'function') {
+      await root.webkitRequestFullscreen();
+      return true;
+    }
+  } catch {
+    return false;
+  }
+  return false;
+}
+
 /** Recognizes one reversal on either screen axis and rearms only after a quiet interval. */
 export function createShakeDetector(config) {
   let gravity = null;
@@ -307,8 +410,7 @@ export const uiSettingsControlMethods = {
     if (!button) {
       return;
     }
-    const visible = this.mergeShakeGestureSupported && (this.engine.mergeShakePrototype
-      || this.engine.getMergeShakeRemaining?.() != null);
+    const visible = this.mergeShakeGestureSupported && this.engine.getMergeShakeRemaining?.() != null;
     button.closest('.pause-setting')?.classList.toggle('hidden', !visible);
     const key = 'modals.settings.shakeGesture';
     const enabled = Boolean(this.mergeShakeGestureEnabled);
@@ -480,6 +582,7 @@ export const uiSettingsControlMethods = {
     }
     const syncState = () => {
       this.updateFullscreenButton();
+      syncStickyFullscreen(this, doc);
     };
     doc.addEventListener?.('fullscreenchange', syncState);
     doc.addEventListener?.('webkitfullscreenchange', syncState);
@@ -505,17 +608,16 @@ export const uiSettingsControlMethods = {
       return;
     }
     if (isDocumentFullscreen(doc)) {
+      // Cleared first so the fullscreenchange caused by this exit does not re-arm the re-entry.
+      this.fullscreenWish = false;
+      disarmFullscreenReentry(this, doc);
       const exitFn = doc.exitFullscreen || doc.webkitExitFullscreen;
       if (typeof exitFn === 'function') {
         await Promise.resolve(exitFn.call(doc)).catch(() => {});
       }
     } else {
-      const root = doc.documentElement;
-      if (typeof root.requestFullscreen === 'function') {
-        await Promise.resolve(root.requestFullscreen({ navigationUI: 'hide' })).catch(() => {});
-      } else if (typeof root.webkitRequestFullscreen === 'function') {
-        await Promise.resolve(root.webkitRequestFullscreen()).catch(() => {});
-      }
+      this.fullscreenWish = true;
+      await requestFullscreenEntry(doc);
     }
     this.updateFullscreenButton();
   },

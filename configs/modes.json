@@ -132,11 +132,10 @@
   },
   "merge": {
     "shake": {
-      "queryParam": "mergeShake",
-      "queryValue": "1",
       "keyCode": "KeyG",
       "rechargeDrops": 4,
-      "maxImpulsePxPerSec": 120,
+      "maxImpulsePxPerSec": 500,
+      "liftImpulsePxPerSec": 400,
       "gesture": {
         "peakAcceleration": 10,
         "quietAcceleration": 4,
@@ -170,9 +169,92 @@
     "polarityBiasRange": 150,
     "polarityBiasAcceleration": 210,
     "polarityWindowSec": 1.4,
+    "polarityPulseAcceleration": 2500,
+    "polarityPulseSec": 0.65,
     "spawnMaxTierIndex": 4,
-    "supernovaBonus": 1500,
+    "supernovaBonus": 4000,
     "supernovaShockwaveImpulse": 340,
+    "chain": {
+      "shakeAdvanceAt": 3
+    },
+    "pressure": {
+      "fromFusedTier": 6,
+      "pxPerTier": 15,
+      "topTier": 11,
+      "topTierStepDrops": 35,
+      "pxPerStep": 15,
+      "maxOffsetPx": 240,
+      "warnDrops": 3,
+      "holdMaxDrops": 3,
+      "stepGraceFactor": 2,
+      "entryGraceMaxSec": 2.5,
+      "shakeGraceSec": 2,
+      "settledSpeedPxPerSec": 30
+    },
+    "shapes": {
+      "ids": ["classic", "narrow", "pegs"],
+      "weights": { "classic": 1, "narrow": 1, "pegs": 1 },
+      "classic": { "pressure": {} },
+      "narrow": { "insetPx": 30, "pressure": { "topTierStepDrops": 50, "pxPerTier": 12, "maxOffsetPx": 180 } },
+      "pegs": {
+        "radius": 9,
+        "restitution": 0.4,
+        "positions": [
+          { "xFrac": 0.38, "yFromFloorPx": 158 },
+          { "xFrac": 0.62, "yFromFloorPx": 293 }
+        ],
+        "pressure": { "topTierStepDrops": 50, "maxOffsetPx": 180 }
+      }
+    },
+    "eventTextOffsetY": 56,
+    "events": {
+      "gapMinDrops": 9,
+      "gapMaxDrops": 14,
+      "durationDrops": 6,
+      "pool": {
+        "wind": { "acceleration": 260 },
+        "lowGravity": { "gravityFactor": 0.45 },
+        "bouncy": { "restitution": 0.6 },
+        "bigDrops": { "spawnMaxTierIndex": 6 },
+        "golden": { "pointsFactor": 1.5 }
+      }
+    },
+    "contracts": {
+      "firstAfterDrops": 15,
+      "gapMinDrops": 6,
+      "gapMaxDrops": 10,
+      "durationDrops": 8,
+      "rewardShakeDrops": 2,
+      "lastDropGraceSec": 2.5,
+      "types": {
+        "fuseCalibre": { "offsetBelowBest": 2, "minCalibre": 7, "maxCalibre": 10, "pointsPerCalibre": 300 },
+        "fusionCount": { "count": 6, "points": 1500 }
+      }
+    },
+    "specials": {
+      "fromDrop": 10,
+      "chance": 0.05,
+      "render": {
+        "ringWidth": 3,
+        "ringGap": 3,
+        "glyphSizeFactor": 1.1,
+        "glyphFill": "#ffffff",
+        "glyphStroke": "#101018",
+        "glyphStrokeWidth": 3,
+        "fontFamily": "sans-serif",
+        "iceColor": "#d8f1ff",
+        "iceAlpha": 0.62,
+        "iceOutlineColor": "#ffffff",
+        "iceOutlineDash": [4, 3],
+        "bombColor": "#14141c",
+        "bombAlpha": 0.88
+      },
+      "kinds": {
+        "joker": { "weight": 1, "sizeTierIndex": 2 },
+        "ice": { "weight": 1, "thawTimeoutSec": 8, "maxTierIndex": 4 },
+        "bomb": { "weight": 1, "fuseSec": 1, "radiusPx": 90, "maxTierIndex": 3, "pointsPerSphere": 40, "sizeTierIndex": 2 }
+      }
+    },
     "tiers": [
       {
         "id": "merge_t0",
@@ -303,6 +385,32 @@
         "symbol": "10",
         "polarity": -1,
         "points": 1200
+      },
+      {
+        "id": "merge_t10",
+        "tier": 10,
+        "radius": 66,
+        "fill": "#a3e635",
+        "highlight": "#d9f99d",
+        "shadow": "#4d7c0f",
+        "glow": "rgba(163, 230, 53, 0.55)",
+        "pattern": "stripesD",
+        "symbol": "11",
+        "polarity": 1,
+        "points": 1700
+      },
+      {
+        "id": "merge_t11",
+        "tier": 11,
+        "radius": 72,
+        "fill": "#94a3b8",
+        "highlight": "#cbd5e1",
+        "shadow": "#334155",
+        "glow": "rgba(148, 163, 184, 0.55)",
+        "pattern": "stripesV",
+        "symbol": "12",
+        "polarity": -1,
+        "points": 2400
       }
     ]
   }
