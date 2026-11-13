@@ -743,7 +743,14 @@ export class ConvoyBehavior extends ModeBehavior {
     // Highlight magnetically attracted Snapback gaps along the LUT curve
     const balls = engine.physicsWorld?.balls;
     if (balls && balls.length > 1) {
-      const sorted = [...balls].sort((a, b) => a.convoyS - b.convoyS);
+      let ordered = true;
+      for (let i = 1; i < balls.length; i++) {
+        if (balls[i].convoyS < balls[i - 1].convoyS) {
+          ordered = false;
+          break;
+        }
+      }
+      const sorted = ordered ? balls : [...balls].sort((a, b) => a.convoyS - b.convoyS);
       ctx.save();
       ctx.strokeStyle = theme.overchargePopupColor;
       ctx.lineWidth = SNAP_BRIDGE_LINE_WIDTH;

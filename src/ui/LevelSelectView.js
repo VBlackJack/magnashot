@@ -17,15 +17,17 @@
 import { GAME_STATES, MATH_CONSTANTS } from '../core/Constants.js';
 import { t, formatNumber } from '../core/I18n.js';
 import { LEVEL_FORMATS } from '../game/LevelCatalog.js';
-import { revealLiveRegion, scheduleNextFrame, setTextIfChanged } from './UIHelpers.js';
-import { FULL_PERCENT } from './WorkshopView.js';
+import {
+  FULL_PERCENT,
+  LABELLED_LEVEL_FORMATS,
+  formatChapterTheme,
+  formatLevelName,
+  revealLiveRegion,
+  scheduleNextFrame,
+  setTextIfChanged
+} from './UIHelpers.js';
 
-/** Generated level formats whose name and description say what sets them apart. */
-export const LABELLED_LEVEL_FORMATS = new Set([
-  LEVEL_FORMATS.TWIST,
-  LEVEL_FORMATS.PRECISION,
-  LEVEL_FORMATS.ARSENAL
-]);
+export { LABELLED_LEVEL_FORMATS, formatChapterTheme, formatLevelName };
 
 /** Localization keys for the level card format badges. */
 export const LEVEL_FORMAT_BADGE_KEYS = Object.freeze({
@@ -51,34 +53,6 @@ export function resolveLevelFormatBadgeKey(summary) {
     return LEVEL_FORMAT_BADGE_KEYS[summary.format];
   }
   return null;
-}
-
-/** Theme of a generated chapter: its featured mechanic, or its pair of them. */
-export function formatChapterTheme(featuredMechanics) {
-  const [first, second] = featuredMechanics.map((mechanic) => t(`levels.generated.themes.${mechanic}`));
-  return second ? t('levels.generated.themePair', { first, second }) : first;
-}
-
-/**
- * Display name of a campaign level: its own name when authored, else its chapter theme
- * and its place in the chapter, then its format when it is not a standard level.
- * @param {object} summary - A level summary from the level catalog.
- */
-export function formatLevelName(summary) {
-  if (!summary.isGenerated) {
-    return t(summary.nameKey);
-  }
-  const name = t('levels.generated.name', {
-    theme: formatChapterTheme(summary.featuredMechanics),
-    index: summary.chapterLevel
-  });
-  if (!LABELLED_LEVEL_FORMATS.has(summary.format)) {
-    return name;
-  }
-  const format = t(`levels.generated.formats.${summary.format}.label`, {
-    mechanic: summary.twistMechanic ? t(`levels.generated.themes.${summary.twistMechanic}`) : ''
-  });
-  return t('levels.generated.formatName', { name, format });
 }
 
 /** Description of a campaign level, from its summary in the level catalog. */

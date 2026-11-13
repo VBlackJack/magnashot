@@ -396,3 +396,11 @@ test('resolveModeMastery marks only modes that meet configured mastery milestone
   assert.equal(mastery[GAME_MODES.PINBALL], false);
   assert.equal(mastery[GAME_MODES.MERGE], true);
 });
+
+test('resolveModeMastery reads StorageManager.getVersusRecords().hard.w for Polarity Duel mastery', () => {
+  const cfg = { playHub: { mastery: { versusHardWins: 1 } } };
+  const unmastered = resolveModeMastery({ getVersusRecords: () => ({ easy: { w: 3, l: 0 }, normal: { w: 2, l: 0 }, hard: { w: 0, l: 1 } }) }, cfg);
+  assert.equal(unmastered[GAME_MODES.VERSUS], false);
+  const mastered = resolveModeMastery({ getVersusRecords: () => ({ easy: { w: 0, l: 0 }, normal: { w: 0, l: 0 }, hard: { w: 1, l: 0 } }) }, cfg);
+  assert.equal(mastered[GAME_MODES.VERSUS], true);
+});

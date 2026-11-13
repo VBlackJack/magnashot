@@ -866,7 +866,7 @@
       },
       "arcade": {
         "puzzle": "Puzzle",
-        "puzzleDesc": "10 défis d'adresse • 1 ou 2 tirs",
+        "puzzleDesc": "20 défis d'adresse • 1 ou 2 tirs",
         "puzzleRecord": "Puzzle {{stage}}/{{total}} • Étoiles : {{stars}}/{{maxStars}}",
         "puzzleStage": "Puzzle {{stage}}",
         "puzzleStageLocked": "Terminez le Puzzle {{previous}} pour débloquer.",
@@ -893,7 +893,8 @@
         "convoyDesc": "Tourelle 360° • Convoi mobile • Rappel magnétique",
         "merge": "Fusion en Bassin",
         "mergeDesc": "12 calibres • Rail de lâcher • Onde de choc de fusion • Secousse",
-        "mergeRecord": "Calibre {{tier}} • Record : {{score}}"
+        "mergeRecord": "Calibre {{tier}} • Record : {{score}}",
+        "masteredBadge": ", Maîtrisé"
       },
       "jumpCurrent": "Niveau en cours",
       "grid": {
@@ -1003,6 +1004,11 @@
             "icon": "⏬",
             "name": "Affaissement",
             "description": "En Survie, Défi du Jour et Puriste, chaque tir qui ne détruit rien remplit la jauge d'Affaissement ; quand elle est pleine, l'amas descend. Les avalanches la vident."
+          },
+          "rail": {
+            "icon": "🛤️",
+            "name": "Rail de Lâcher",
+            "description": "En Fusion en Bassin, glissez sur le rail supérieur (pointeur, glisser tactile, flèches ou stick manette) et relâchez pour lâcher vos sphères verticalement dans le bassin."
           }
         },
         "mutators": {
@@ -1203,7 +1209,42 @@
             "merge": {
               "icon": "🫧",
               "name": "Fusion en Bassin (12 Calibres)",
-              "description": "Lâchez vos billes depuis un rail supérieur dans un bassin physique. Deux calibres identiques fusionnent au rang suivant (1 à 12) avec une onde de choc. Chaque appui sur Polarité rapproche un instant les calibres identiques et écarte les autres. La secousse se recharge après quelques lâchers et pousse tout le bassin sur le côté."
+              "description": "Lâchez vos billes depuis un rail supérieur dans un bassin Classique, Étroit ou à Plots. Deux calibres identiques fusionnent (1 à 12) avec une onde de choc tandis que la ligne de débordement descend sous la pression. La Polarité rapproche les calibres identiques, et la Secousse se recharge après quelques lâchers ou chaînes."
+            }
+          }
+        },
+        "mergeGuide": {
+          "title": "Spécialités & Aléas du Bassin",
+          "items": {
+            "joker": {
+              "icon": "★",
+              "name": "Sphère Joker",
+              "description": "Fusionne au contact de toute sphère non gelée (hors bombe) sous le calibre 12 et la fait monter d'un rang."
+            },
+            "ice": {
+              "icon": "❄",
+              "name": "Sphère de Glace",
+              "description": "Gelée pendant quelques lâchers : impossible à fusionner tant qu'elle n'a pas fondu, mais les fusions voisines fendent sa glace plus vite."
+            },
+            "bomb": {
+              "icon": "💣",
+              "name": "Sphère Bombe à Retardement",
+              "description": "Décompte à chaque lâcher puis explose à zéro, éliminant les petits calibres voisins et projetant les gros au loin."
+            },
+            "events": {
+              "icon": "🌪️",
+              "name": "Événements du Bassin",
+              "description": "Météo périodique : Vent latéral dévie les lâchers, Basse gravité ralentit les chutes, Parois rebondissantes amplifie les ricochets, Gros calibres débloque les rangs 6-7, et Bassin doré double les points."
+            },
+            "contracts": {
+              "icon": "📜",
+              "name": "Contrats en Direct",
+              "description": "Défis temporaires en cours de partie (atteindre un calibre, enchaîner des fusions, fusionner sans Secousse ou dans une moitié du bassin) offrant points bonus et recharge de Secousse."
+            },
+            "shapes": {
+              "icon": "📐",
+              "name": "Formes du Bassin & Pression",
+              "description": "Chaque partie tire un bassin Classique, Étroit ou à Plots, et la ligne de débordement s'abaisse par paliers annoncés au fil des lâchers."
             }
           }
         }

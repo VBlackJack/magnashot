@@ -24,16 +24,6 @@ export const MERGE_SPECIAL_KINDS = Object.freeze({
 /** Every special kind, in the order weights are summed so a draw stays deterministic. */
 export const MERGE_SPECIAL_KIND_IDS = Object.freeze(Object.values(MERGE_SPECIAL_KINDS));
 
-/** Rainbow ring of a Joker, drawn as equal arcs (a shape cue as well as a colour one). */
-export const MERGE_JOKER_RING_COLORS = Object.freeze([
-  '#ff5a5a',
-  '#ffb347',
-  '#fff45a',
-  '#5aff8a',
-  '#5ab4ff',
-  '#b45aff'
-]);
-
 /** True when `kind` names a special sphere. */
 export function isMergeSpecialKind(kind) {
   return MERGE_SPECIAL_KIND_IDS.includes(kind);

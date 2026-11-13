@@ -498,6 +498,15 @@ export const uiInputBindingMethods = {
             const nextIdx = (i + dir + shopTabs.length) % shopTabs.length;
             this.switchShopTab(shopTabs[nextIdx].name);
             shopTabs[nextIdx].el.focus();
+          } else if (e.key === 'Home') {
+            e.preventDefault();
+            this.switchShopTab(shopTabs[0].name);
+            shopTabs[0].el.focus();
+          } else if (e.key === 'End') {
+            e.preventDefault();
+            const last = shopTabs[shopTabs.length - 1];
+            this.switchShopTab(last.name);
+            last.el.focus();
           }
         });
       }

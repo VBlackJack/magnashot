@@ -349,7 +349,8 @@ export const uiStatsMethods = {
     const unlockedLevel = storage.getUnlockedLevel?.() ?? 0;
     const totalStars = storage.getTotalStars?.() ?? 0;
     const hasCampaignProgress = unlockedLevel > 1 || totalStars > 0;
-    const dailyBest = (storage.getDailyHistory?.() ?? []).reduce((top, entry) => Math.max(top, entry.s), 0);
+    const dailyHistoryBest = (storage.getDailyHistory?.() ?? []).reduce((top, entry) => Math.max(top, entry.s), 0);
+    const dailyBest = Math.max(dailyHistoryBest, storage.getDailyHighScore?.() ?? 0);
     return {
       campaign: { level: hasCampaignProgress ? unlockedLevel : 0, stars: totalStars },
       versus: storage.getVersusRecords?.() ?? {},
@@ -400,9 +401,9 @@ export const uiStatsMethods = {
           wave: storage.getConvoyBestWave?.() ?? 0
         },
         [GAME_MODES.MERGE]: {
-          score: Math.max(storage.getMergeHighScore?.(false) ?? 0, storage.getMergeHighScore?.(true) ?? 0),
+          score: storage.getMergeHighScore?.() ?? 0,
           kind: RECORD_KIND_TIER,
-          tier: Math.max(storage.getMergeBestTier?.(false) ?? 0, storage.getMergeBestTier?.(true) ?? 0)
+          tier: storage.getMergeBestTier?.() ?? 0
         }
       }
     };

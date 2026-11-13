@@ -20,14 +20,15 @@ import { SeededRandom } from '../core/SeededRandom.js';
 import { getUtcIsoWeekKey } from '../game/WeeklyFlux.js';
 import {
   ARCADE_CARD_SPECS,
+  FULL_PERCENT,
   MODE_BUTTON_KEYS,
+  VISUALLY_HIDDEN_CLASS,
   WEEKLY_ACCESS_KEY,
   isCurrentWeeklyRun,
   isModeUnlocked,
   setAttributeIfChanged,
   setTextIfChanged
 } from './UIHelpers.js';
-import { FULL_PERCENT } from './WorkshopView.js';
 
 /*
  * The Play hub: the one dialog that lists every mode. This module holds its behaviour
@@ -304,6 +305,46 @@ const DEFAULT_MASTERY = Object.freeze({
   versusHardWins: 1
 });
 const MASTERED_CLASS = 'is-mastered';
+const MASTERED_BADGE_CLASS = 'mode-mastered-badge';
+const MASTERED_STAR_CLASS = 'mode-mastered-star';
+
+/**
+ * Attaches or updates an accessible Mastery badge inside a Play Hub mode card.
+ * @param {HTMLElement|object|null|undefined} card - Mode button element.
+ * @param {boolean} mastered - Whether the mode has reached mastery.
+ * @param {string} starSymbol - Star symbol from `gameConfig.theme.starFilledSymbol`.
+ * @param {string} srLabel - Localized screen-reader label for mastery.
+ */
+function syncMasteredBadge(card, mastered, starSymbol, srLabel) {
+  if (!card) {
+    return;
+  }
+  card.classList?.toggle(MASTERED_CLASS, Boolean(mastered));
+  if (typeof document === 'undefined' || typeof card.querySelector !== 'function' || typeof card.append !== 'function') {
+    return;
+  }
+  let badge = card.querySelector(`.${MASTERED_BADGE_CLASS}`);
+  if (!mastered) {
+    badge?.classList?.add(HIDDEN_CLASS);
+    return;
+  }
+  if (!badge) {
+    badge = document.createElement('span');
+    badge.className = MASTERED_BADGE_CLASS;
+    const starSpan = document.createElement('span');
+    starSpan.className = MASTERED_STAR_CLASS;
+    starSpan.setAttribute('aria-hidden', 'true');
+    const srSpan = document.createElement('span');
+    srSpan.className = VISUALLY_HIDDEN_CLASS;
+    badge.append(starSpan, srSpan);
+    card.append(badge);
+  }
+  badge.classList.remove(HIDDEN_CLASS);
+  const starSpan = badge.querySelector(`.${MASTERED_STAR_CLASS}`);
+  const srSpan = badge.querySelector(`.${VISUALLY_HIDDEN_CLASS}`);
+  setTextIfChanged(starSpan, starSymbol);
+  setTextIfChanged(srSpan, srLabel);
+}
 
 /**
  * Computes which Play Hub mode cards have reached their configured mastery milestone.
@@ -319,8 +360,8 @@ export function resolveModeMastery(storage, gameConfig) {
   const m = { ...DEFAULT_MASTERY, ...(gameConfig?.playHub?.mastery || {}) };
   const totalPuzzles = Math.max(1, gameConfig?.puzzles?.length || 1);
   const maxPuzzleStars = gameConfig?.scoring?.maxStars || 0;
-  const bestMergeTier = Math.max(storage.getMergeBestTier?.(false) || 0, storage.getMergeBestTier?.(true) || 0);
-  const versusStats = storage.getVersusStats?.() || {};
+  const bestMergeTier = storage.getMergeBestTier?.() || 0;
+  const versusRecords = storage.getVersusRecords?.() || storage.getVersusStats?.() || {};
   return {
     [GAME_MODES.ENDLESS]: (storage.getEndlessHighScore?.() || 0) >= m.endlessScore,
     [GAME_MODES.CLASSIC]: (storage.getClassicBestStage?.() || 0) >= m.classicStage,
@@ -334,7 +375,7 @@ export function resolveModeMastery(storage, gameConfig) {
     [GAME_MODES.ORBITAL]: (storage.getOrbitalBestWave?.() || 0) >= m.orbitalWave,
     [GAME_MODES.CONVOY]: (storage.getConvoyBestWave?.() || 0) >= m.convoyWave,
     [GAME_MODES.MERGE]: bestMergeTier >= m.mergeTier,
-    [GAME_MODES.VERSUS]: (versusStats.hard?.won || 0) >= m.versusHardWins
+    [GAME_MODES.VERSUS]: (versusRecords.hard?.w ?? versusRecords.hard?.won ?? 0) >= m.versusHardWins
   };
 }
 
@@ -458,8 +499,8 @@ export const uiPlayHubMethods = {
         score: formatNumber(storage.getConvoyHighScore?.() || 0)
       })
     );
-    const bestMergeTier = Math.max(storage.getMergeBestTier?.(false) || 0, storage.getMergeBestTier?.(true) || 0);
-    const bestMergeScore = Math.max(storage.getMergeHighScore?.(false) || 0, storage.getMergeHighScore?.(true) || 0);
+    const bestMergeTier = storage.getMergeBestTier?.() || 0;
+    const bestMergeScore = storage.getMergeHighScore?.() || 0;
     setTextIfChanged(
       els.arcadeBestMerge,
       t('modals.levelSelect.arcade.mergeRecord', {
@@ -471,9 +512,11 @@ export const uiPlayHubMethods = {
     writeRewardChip(els.weeklyReward, this.describeWeeklyRewardChip());
     renderDailyBounties(els.playBountiesList, storage.getDailyBountiesState?.());
     const mastery = resolveModeMastery(storage, this.gameConfig);
+    const starSymbol = this.gameConfig?.theme?.starFilledSymbol || '';
+    const masteredLabel = t('modals.levelSelect.arcade.masteredBadge');
     for (const [mode, spec] of Object.entries(ARCADE_CARD_SPECS)) {
       if (Object.hasOwn(mastery, mode)) {
-        els[spec.card]?.classList?.toggle(MASTERED_CLASS, Boolean(mastery[mode]));
+        syncMasteredBadge(els[spec.card], Boolean(mastery[mode]), starSymbol, masteredLabel);
       }
     }
   },

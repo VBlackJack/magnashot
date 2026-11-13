@@ -1687,42 +1687,48 @@
       "tierOf": "magnetarsGrounded",
       "tier": "bronze",
       "threshold": 1,
-      "rewardCoins": 80
+      "rewardCoins": 80,
+      "cumulative": true
     },
     "magnetarsGroundedSilver": {
       "id": "magnetarsGroundedSilver",
       "tierOf": "magnetarsGrounded",
       "tier": "silver",
       "threshold": 5,
-      "rewardCoins": 140
+      "rewardCoins": 140,
+      "cumulative": true
     },
     "magnetarsGroundedGold": {
       "id": "magnetarsGroundedGold",
       "tierOf": "magnetarsGrounded",
       "tier": "gold",
       "threshold": 15,
-      "rewardCoins": 240
+      "rewardCoins": 240,
+      "cumulative": true
     },
     "magnetarLandslide": {
       "id": "magnetarLandslide",
       "tierOf": "magnetarLandslide",
       "tier": "bronze",
       "threshold": 1,
-      "rewardCoins": 120
+      "rewardCoins": 120,
+      "cumulative": true
     },
     "magnetarLandslideSilver": {
       "id": "magnetarLandslideSilver",
       "tierOf": "magnetarLandslide",
       "tier": "silver",
       "threshold": 3,
-      "rewardCoins": 180
+      "rewardCoins": 180,
+      "cumulative": true
     },
     "magnetarLandslideGold": {
       "id": "magnetarLandslideGold",
       "tierOf": "magnetarLandslide",
       "tier": "gold",
       "threshold": 10,
-      "rewardCoins": 300
+      "rewardCoins": 300,
+      "cumulative": true
     },
     "hexGridWaves": {
       "id": "hexGridWaves",
@@ -2255,7 +2261,7 @@
         "puzzleBestStage", "classicHighScore", "classicBestStage", "versusRecords",
         "hexGridHighScore", "hexGridBestWave", "pinballHighScore", "pinballBestStage",
         "orbitalHighScore", "orbitalBestWave", "convoyHighScore", "convoyBestWave",
-        "mergeHighScore", "mergeBestTier",
+        "mergeHighScore", "mergeBestTier", "mergeShakeHighScore", "mergeShakeBestTier",
         "dailyBest", "dailyLastPlayedDate", "coins", "upgrades",
         "achievements", "achievementRecords", "unlockedBallStyles", "runSnapshot", "discoveries"
       ],
@@ -2396,13 +2402,16 @@
         "modeUnlocks": "object",
         "weeklyFluxBest": "object",
         "playerStats": "object",
+        "bounties": "object",
         "dailyHistory": "array",
+        "ghostDuels": "array",
         "dailyBestDate": "date",
         "dailyLastPlayedDate": "date",
         "dailyStreakDate": "date",
         "dailyStreakGraceDate": "date",
         "weeklyFluxClaimedWeek": "week",
         "activeBallStyle": "string",
+        "ghostAlias": "optionalString",
         "versusTutorialSeen": "boolean"
       }
     },
@@ -2514,6 +2523,7 @@
     "fontFamily": "system-ui, sans-serif",
     "backgroundTop": "#0b0f1d",
     "backgroundBottom": "#171f38",
+    "transparentColor": "rgba(0, 0, 0, 0)",
     "horizonGlowColor": "rgba(56, 189, 248, 0.11)",
     "horizonGlowRadiusFactor": 0.65,
     "vignetteColor": "rgba(2, 6, 23, 0.46)",

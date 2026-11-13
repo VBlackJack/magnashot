@@ -23,7 +23,7 @@ import eslintConfig from '../eslint.config.js';
 
 const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 
-const SKIPPED_DIRECTORIES = new Set(['.git', '.claude', '.codex', '.gemini', '.agent', 'node_modules', 'local']);
+const SKIPPED_DIRECTORIES = new Set(['.git', '.claude', '.codex', '.gemini', '.agent', 'node_modules', 'local', '_site']);
 const SKIPPED_FILES = new Set(['CLAUDE.md', 'AGENTS.md', 'GEMINI.md']);
 
 const SCANNED_EXTENSIONS = new Set([

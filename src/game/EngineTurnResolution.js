@@ -304,8 +304,7 @@ export const engineTurnResolutionMethods = {
       ball.x,
       ball.y + this.gameConfig.canvas.floatingTextOffsetY,
       t('gameplay.feedback.rescueCore.freed', {
-        points: rescueSpec.pointsPerCore,
-        coins: rescueSpec.coinsReward
+        points: rescueSpec.pointsPerCore
       }),
       rescueSpec.highlight
     );
