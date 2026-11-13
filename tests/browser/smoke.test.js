@@ -4174,9 +4174,10 @@ describe('Lot E and audit smoke checks', () => {
       await desktop.context.close();
     }
 
-    const phone = await openGame(VIEWPORTS[3], { initStorage: fullProfileStorage });
+    const phoneViewport = VIEWPORTS.find((viewport) => viewport.name === 'phone portrait');
+    const phone = await openGame(phoneViewport, { initStorage: fullProfileStorage });
     try {
-      await openPlayHub(phone.page, VIEWPORTS[3]);
+      await openPlayHub(phone.page, phoneViewport);
       await phone.page.click('#btn-mode-hex-grid');
       await phone.page.waitForFunction((expected) => window.__fluxEngine.mode === expected, GAME_MODES.HEX_GRID);
       await assertLayoutFits(phone.page, GAME_MODES.HEX_GRID);
