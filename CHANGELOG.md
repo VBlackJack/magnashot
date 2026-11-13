@@ -4,6 +4,8 @@ All notable changes to **MagnaShot** are documented in this file.
 
 ## [Unreleased]
 
+## [1.28.0] - 2026-11-13
+
 ### Added
 - Puzzle Mode: expanded from 10 to 20 deterministic stages (`P1` to `P20`), adding trick-shot puzzles covering Bumpers, Repulsors, Sliding Rail Anchors, Antimagnets, Tethered groups, Singularities, Portal Relays, and a two-color Rotor Finale (`railHalfWidth` anchor support in Puzzle mode).
 - Daily Contracts (Bounties): 3 seeded UTC daily contracts selectable and tracked in the Play Hub Challenges section (`+35` to `+50` coin rewards).
