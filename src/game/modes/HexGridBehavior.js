@@ -23,6 +23,7 @@ import {
 import { t } from '../../core/I18n.js';
 import { Ball } from '../../entities/Ball.js';
 import { ModeBehavior, registerModeBehavior } from './ModeBehavior.js';
+import { reportBountyEvent } from '../Bounties.js';
 
 const HEX_SIDES = 6;
 const HEX_ANGLE_STEP = MATH_CONSTANTS.TWO_PI / HEX_SIDES;
@@ -524,6 +525,7 @@ export class HexGridBehavior extends ModeBehavior {
       engine.gameConfig.theme.victoryPopupColor
     );
     engine.unlockAchievementTiers('hexGridWaves', engine.waveCount);
+    reportBountyEvent(engine, 'hex_wave_cleared', 1);
     engine.persistRunHighScore();
   }
 

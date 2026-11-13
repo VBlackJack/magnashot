@@ -51,6 +51,51 @@ const SAG_METER_CLASS_BY_PHASE = Object.freeze({
   [SAG_PHASES.FULL]: 'critical'
 });
 
+const PRESSURE_ARIA_KEYS = Object.freeze({
+  convoy: 'hud.stats.pressure.convoyAria',
+  orbital: 'hud.stats.pressure.orbitalAria',
+  merge: 'hud.stats.pressure.mergeAria'
+});
+
+/** Updates the continuous spatial-pressure meter for Convoy, Orbital, and Merge modes. */
+export function updatePressureMeter(ui, engine, sagActive) {
+  const meter = ui.elements.pressureMeter;
+  if (!meter) {
+    return;
+  }
+  const pressure = !sagActive ? engine.getModeBehavior?.()?.getPressureState?.(engine) : null;
+  if (!pressure?.active) {
+    meter.classList.add('hidden');
+    return;
+  }
+  const pct = Math.round(Math.max(0, Math.min(1, pressure.ratio || 0)) * FULL_PERCENT);
+  const ariaKey = PRESSURE_ARIA_KEYS[pressure.modeKey] || PRESSURE_ARIA_KEYS.convoy;
+  setAttributeIfChanged(meter, 'aria-valuenow', String(pct));
+  setAttributeIfChanged(meter, 'aria-valuetext', t(ariaKey, { pct: formatNumber(pct) }));
+  meter.style.setProperty('--pressure-pct', String(pct));
+  meter.classList.toggle('warning', Boolean(pressure.danger) && !pressure.critical);
+  meter.classList.toggle('critical', Boolean(pressure.critical));
+  meter.classList.remove('hidden');
+}
+
+/** Shows the storage quota badge when localStorage overflows and announces it once per session. */
+export function updateQuotaWarning(ui, engine, transitionedRoundEnd) {
+  const exceeded = Boolean(ui.storageManager?.hasQuotaExceeded?.());
+  const badge = ui.elements.quotaBadge;
+  if (badge) {
+    if (exceeded) {
+      setTextIfChanged(badge, t('hud.stats.quotaWarning.badge'));
+      setAttributeIfChanged(badge, 'aria-label', t('hud.stats.quotaWarning.aria'));
+      setAttributeIfChanged(badge, 'title', t('hud.stats.quotaWarning.aria'));
+    }
+    badge.classList.toggle('hidden', !exceeded);
+  }
+  if (exceeded && !ui.hasAnnouncedQuotaExceeded && !transitionedRoundEnd && engine.state === GAME_STATES.PLAYING) {
+    ui.hasAnnouncedQuotaExceeded = true;
+    ui.announce(t('hud.announcer.storageQuotaExceeded'));
+  }
+}
+
 /** Methods installed on UIManager.prototype by UIManager.js. */
 /**
  * Locale key of the Flux banner: a Magnetar boss stage also names its Moorings.
@@ -479,18 +524,21 @@ export const uiHudRefreshMethods = {
         );
       } else if (engine.mode === GAME_MODES.BOSS_RUSH) {
         const shields = engine.getBossBall()?.armorHits || 0;
-        setTextIfChanged(
-          this.elements.modeBanner,
-          magnetarView
-            ? t('hud.stats.mode.bossRushMagnetar', {
-              wave: engine.bossRushWave,
-              moorings: formatNumber(magnetarView.moorings)
-            })
-            : t('hud.stats.mode.bossRush', {
-              wave: engine.bossRushWave,
-              shields: formatNumber(shields)
-            })
-        );
+        let bannerText;
+        if (magnetarView) {
+          const isResting = magnetarView.phase === 'rest' && Number.isFinite(magnetarView.restLeft);
+          bannerText = t(isResting ? 'hud.stats.mode.bossRushMagnetarRest' : 'hud.stats.mode.bossRushMagnetar', {
+            wave: engine.bossRushWave,
+            moorings: formatNumber(magnetarView.moorings),
+            ...(isResting ? { rest: formatNumber(magnetarView.restLeft) } : {})
+          });
+        } else {
+          bannerText = t('hud.stats.mode.bossRush', {
+            wave: engine.bossRushWave,
+            shields: formatNumber(shields)
+          });
+        }
+        setTextIfChanged(this.elements.modeBanner, bannerText);
       } else if (engine.mode === GAME_MODES.CASCADE) {
         setTextIfChanged(
           this.elements.modeBanner,
@@ -545,6 +593,7 @@ export const uiHudRefreshMethods = {
       if (sag?.active) {
         this.refreshSagMeter(engine, sag);
       } else {
+        const shakeLeft = engine.mode === GAME_MODES.MERGE ? engine.getMergeShakeRemaining?.() : null;
         if (this.elements.shotsLabel) {
           let shotsLabelKey = 'hud.stats.shots.waveLabel';
           if (engine.mode === GAME_MODES.BOSS_RUSH) {
@@ -552,12 +601,15 @@ export const uiHudRefreshMethods = {
           } else if (engine.mode === GAME_MODES.CONVOY) {
             shotsLabelKey = 'hud.stats.shots.convoyLabel';
           } else if (engine.mode === GAME_MODES.MERGE) {
-            shotsLabelKey = 'hud.stats.shots.calibreLabel';
+            shotsLabelKey = shakeLeft !== null && shakeLeft !== undefined
+              ? 'hud.stats.shots.shakeLabel'
+              : 'hud.stats.shots.mergesLabel';
           }
           setTextIfChanged(this.elements.shotsLabel, t(shotsLabelKey));
         }
         let waveCountdown = 0;
-        let isShotsWarning = false;
+        let waveValueText = null;
+        let isShotsWarning;
         if (engine.mode === GAME_MODES.CASCADE) {
           waveCountdown = engine.cascadeTurnsUntilDrop;
           isShotsWarning = waveCountdown <= warningShotsThreshold;
@@ -569,15 +621,21 @@ export const uiHudRefreshMethods = {
           isShotsWarning = waveCountdown <= warningShotsThreshold;
         } else if (engine.mode === GAME_MODES.ORBITAL) {
           waveCountdown = engine.modeState?.turnsUntilWave ?? 0;
-          isShotsWarning = waveCountdown <= warningShotsThreshold;
+          isShotsWarning = waveCountdown <= warningShotsThreshold || Boolean(engine.modeState?.nearDanger);
         } else if (engine.mode === GAME_MODES.CONVOY) {
           waveCountdown = engine.physicsWorld.balls.length + (engine.modeState?.spawnRemaining ?? 0);
+          isShotsWarning = Boolean(engine.modeState?.nearDanger);
         } else if (engine.mode === GAME_MODES.MERGE) {
-          waveCountdown = engine.mergeBestTier || 1;
+          if (shakeLeft !== null && shakeLeft !== undefined) {
+            waveValueText = shakeLeft === 0 ? t('hud.stats.shots.shakeReady') : formatNumber(shakeLeft);
+          } else {
+            waveCountdown = engine.modeState?.mergesCount ?? 0;
+          }
+          isShotsWarning = Boolean(engine.modeState?.nearDanger);
         } else {
           isShotsWarning = waveCountdown <= warningShotsThreshold;
         }
-        setTextIfChanged(this.elements.shotsValue, formatNumber(waveCountdown));
+        setTextIfChanged(this.elements.shotsValue, waveValueText ?? formatNumber(waveCountdown));
         this.elements.shotsValue.classList.toggle('warning', isShotsWarning);
       }
       if (this.elements.starProgress) {
@@ -585,10 +643,30 @@ export const uiHudRefreshMethods = {
       }
     }
 
-    if (!engine.getSagState?.().active) {
+    const sagActive = Boolean(engine.getSagState?.().active);
+    if (!sagActive) {
       this.hideSagMeter();
     }
+    updatePressureMeter(this, engine, sagActive);
     this.refreshMagnetarHud(engine, magnetarView);
+    if (
+      engine.state === GAME_STATES.PLAYING
+      && (engine.mode === GAME_MODES.CONVOY || engine.mode === GAME_MODES.ORBITAL || engine.mode === GAME_MODES.MERGE)
+    ) {
+      const nextNearDanger = Boolean(engine.modeState?.nearDanger);
+      if (this.nearDangerAnnouncedMode !== engine.mode) {
+        this.nearDangerAnnouncedMode = engine.mode;
+        this.nearDangerWasActive = nextNearDanger;
+      } else if (nextNearDanger && !this.nearDangerWasActive) {
+        this.nearDangerWasActive = true;
+        this.announce(t(`hud.announcer.nearDanger.${engine.mode}`));
+      } else if (!nextNearDanger) {
+        this.nearDangerWasActive = false;
+      }
+    } else {
+      this.nearDangerAnnouncedMode = null;
+      this.nearDangerWasActive = false;
+    }
 
     if (this.elements.modeBanner) {
       setAttributeIfChanged(
@@ -961,6 +1039,9 @@ export const uiHudRefreshMethods = {
         best: this.elements.highScoreValue.textContent
       })
     );
+    const transitionedRoundEnd = transitionedState
+      && (engine.state === GAME_STATES.VICTORY || engine.state === GAME_STATES.GAME_OVER);
+    updateQuotaWarning(this, engine, transitionedRoundEnd);
     this.syncDrawerStats();
     this.syncModalInertState();
   },

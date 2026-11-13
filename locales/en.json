@@ -149,6 +149,7 @@
         "blitz": "Blitz 90s • Wave {{wave}}",
         "bossRush": "Boss Rush • Wave {{wave}} (👑 {{shields}})",
         "bossRushMagnetar": "Boss Rush • Wave {{wave}} ({{moorings}} moorings)",
+        "bossRushMagnetarRest": "Boss Rush • Wave {{wave}} ({{moorings}} moorings • rest {{rest}})",
         "cascade": "Cascade • Wave {{wave}}",
         "coreRescueProgress": "💎 {{rescued}}/{{total}}",
         "switchHint": "Click to change mode or level",
@@ -166,7 +167,10 @@
         "shieldsLabel": "Boss Shields",
         "mooringsLabel": "Moorings",
         "convoyLabel": "Spheres Left",
-        "calibreLabel": "Max Calibre"
+        "calibreLabel": "Max Calibre",
+        "shakeLabel": "Basin Shake",
+        "shakeReady": "Ready",
+        "mergesLabel": "Merges"
       },
       "time": {
         "label": "Time Left",
@@ -191,6 +195,16 @@
         "value": "{{level}}/{{size}}",
         "aria": "Sag {{level}} of {{size}}: {{remaining}} missed shots before the cluster drops",
         "ariaOne": "Sag {{level}} of {{size}}: {{remaining}} missed shot before the cluster drops"
+      },
+      "pressure": {
+        "label": "Spatial pressure",
+        "convoyAria": "Convoy progress toward vortex: {{pct}}%",
+        "orbitalAria": "Orbit perimeter reached: {{pct}}%",
+        "mergeAria": "Basin fill pressure: {{pct}}%"
+      },
+      "quotaWarning": {
+        "badge": "⚠ Memory save",
+        "aria": "Browser storage is full: click to open Settings and export your progress"
       }
     },
     "launcher": {
@@ -312,7 +326,13 @@
         "armed": "Magnetar: {{behaviour}} next turn. {{counter}}",
         "lastMooring": "One mooring left.",
         "down": "Magnetar down."
-      }
+      },
+      "nearDanger": {
+        "convoy": "Warning: convoy approaching the singularity drain.",
+        "orbital": "Warning: orbit reaching the containment ring.",
+        "merge": "Warning: basin nearing overflow limit."
+      },
+      "storageQuotaExceeded": "Browser storage is full. Open Settings to export your progress."
     },
     "hints": {
       "replayAria": "Show this level's hints again"
@@ -349,7 +369,24 @@
         "stage7": "The order is fixed: break the Quantum Lock first, then free the core.",
         "stage8": "Set off the Paint Core: the rust takes its color and can be grouped.",
         "stage9": "Wake the Dormant Barrels: their blasts clear the board.",
-        "stage10": "The core hangs from a Chained Sphere on the rotor: build a group of three on it."
+        "stage10": "The core hangs from a Chained Sphere on the rotor: build a group of three on it.",
+        "stage11": "The barrier blocks the direct line: bank off the bumper with inverted polarity.",
+        "stage12": "Curve under the barrier using the magnetic repulsor slingshot.",
+        "stage13": "Break the Quantum Lock on the right first, then rescue the left core.",
+        "stage14": "Fire the Laser Rocket straight through the platform to spark the Dormant Barrel.",
+        "stage15": "Use the attractor below to tug your shot into the sliding rail anchors.",
+        "stage16": "Split shot past the central Antimagnet: clear both wings cleanly.",
+        "stage17": "Paint the Tethered anchor crimson with the Brush to trigger the chain reaction.",
+        "stage18": "Curve an explosive Bomb around the Singularity with inverted polarity.",
+        "stage19": "Thread the portal relay first to blow open the top-right cluster, then clear the left.",
+        "stage20": "Unlock the rotor shield on the right first, then drop the hanging core."
+      },
+      "arcadeModes": {
+        "hex_grid": "Hex Grid: snap spheres onto the anchored hex lattice. Clear connected cells to trigger magnetic pulses before misses drop the grid.",
+        "orbital": "Orbital 360: build around the zero-G core and steer falling fragments into rotating collector arcs before touching the outer ring.",
+        "pinball": "Pinball: clear every glowing Core Peg before shots run out. Catch your sphere in the bottom bucket for a free shot refund.",
+        "convoy": "Convoy: break the rolling chain before it reaches the singularity. Exposed opposite polarities snap segments back into collisions.",
+        "merge": "Merge Basin: fuse matching spheres into higher calibres inside the basin. Flip polarity to nudge pairs, and shake when ready."
       }
     },
     "ghost": {
@@ -435,7 +472,8 @@
         "freed": "CORE RESCUED! +{{points}}"
       },
       "blitz": {
-        "autoFire": "AUTO-FIRE!"
+        "autoFire": "AUTO-FIRE!",
+        "timeBonus": "+{{seconds}}s BLITZ!"
       },
       "bossRush": {
         "overchargeStrike": "OVERCHARGE STRIKE! -1 SHIELD",
@@ -466,6 +504,9 @@
       },
       "weeklyBonus": {
         "claimed": "Weekly Flux bonus +{{coins}} ⬡"
+      },
+      "bounty": {
+        "completed": "CONTRACT: {{name}} +{{coins}} ⬡"
       },
       "sag": {
         "warning": "One more miss and the cluster drops",
@@ -1266,14 +1307,17 @@
         },
         "startingShots": {
           "name": "Projectile Reserve",
-          "description": "Adds +{{shots}} starting shots per rank in Campaign and Flux Mode runs."
+          "description": "Adds +{{shots}} starting shots per rank in Campaign, Flux Mode, and Pinball runs."
         },
         "collectorMagnet": {
           "name": "Collector Magnet",
           "description": "Adds +{{points}} bonus points and +{{overcharge}}% Overcharge per avalanche sphere in the bottom collector bins per rank."
         },
         "puzzleBaselineNote": "Upgrades are paused in Puzzle: every player meets the same puzzle.",
-        "puristBaselineNote": "Upgrades are paused in this purist mode."
+        "puristBaselineNote": "Upgrades are paused in this purist mode.",
+        "convoyNote": "Aiming, blast, and overcharge stay active here; Projectile Reserve and Collector Magnet do not apply in Convoy.",
+        "orbitalNote": "Aiming, blast, overcharge, and Collector Magnet (wider collector arcs) stay active here; Projectile Reserve does not apply.",
+        "arcadeShotlessNote": "Aiming, blast, overcharge, and collector upgrades stay active here; Projectile Reserve applies only to shot-limited modes."
       },
       "feedback": {
         "upgradePurchased": "{{name}} upgraded to level {{level}} of {{maxLevel}}.",
@@ -1432,7 +1476,8 @@
           "tooLarge": "This progress file is too large.",
           "empty": "This file has no progress to import.",
           "invalid": "This is not a valid MagnaShot progress file for this version.",
-          "importError": "The import could not be completed. Keep your progress file and try again."
+          "importError": "The import could not be completed. Keep your progress file and try again.",
+          "quotaExceeded": "Browser storage is full. Export your progress so recent changes are not lost."
         }
       },
       "shakeGesture": {
@@ -1550,7 +1595,14 @@
       "duels": {
         "title": "Duels",
         "record": "{{won}} won - {{lost}} lost",
-        "empty": "No duels yet."
+        "empty": "No duels yet.",
+        "filterAria": "Filter duels by mode",
+        "filters": {
+          "all": "All",
+          "daily": "Daily",
+          "flux": "Flux"
+        },
+        "filteredEmpty": "No duels in this mode yet."
       }
     },
     "play": {
@@ -1576,6 +1628,22 @@
       },
       "weekly": {
         "desc": "A new Flux seed every Monday, the same for everyone."
+      },
+      "bounties": {
+        "title": "Daily Contracts",
+        "progress": "{{progress}}/{{target}}",
+        "done": "Done ✓",
+        "reward": "+{{coins}} ⬡",
+        "items": {
+          "pinball_cores": { "title": "Light {{target}} Core Pegs in Pinball" },
+          "convoy_snapbacks": { "title": "Trigger {{target}} Gap Snapbacks in Convoy" },
+          "orbital_catches": { "title": "Catch {{target}} Orbiters in Orbital Arcs" },
+          "merge_fusions": { "title": "Fuse {{target}} spheres in Merge Basin" },
+          "hex_waves": { "title": "Clear {{target}} waves in Hex Grid" },
+          "any_avalanches": { "title": "Drop {{target}} spheres in Avalanches" },
+          "overcharge_bursts": { "title": "Fill Overcharge {{target}} times" },
+          "daily_clear": { "title": "Complete a Daily Challenge run" }
+        }
       },
       "arcade": {
         "endlessDesc": "Endless waves. Every miss brings the cluster closer.",

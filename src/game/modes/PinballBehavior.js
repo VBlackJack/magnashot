@@ -26,6 +26,7 @@ import { t } from '../../core/I18n.js';
 import { Ball } from '../../entities/Ball.js';
 import { Obstacle } from '../../entities/Obstacle.js';
 import { ModeBehavior, registerModeBehavior } from './ModeBehavior.js';
+import { reportBountyEvent } from '../Bounties.js';
 
 const STEPS_PER_SECOND = 60;
 const STUCK_PEG_HIT_LIMIT = 5;
@@ -116,14 +117,23 @@ export class PinballBehavior extends ModeBehavior {
     world.disableBounceCap = true;
     world.projectileGravity = cfg.projectileGravityPerStep;
     world.projectileLaunchSpeedOverride = cfg.launchSpeed;
+    world.aimReflectOnBallHit = true;
+    world.aimBallRestitution = cfg.pegRestitution;
     world.customProjectileStep = (projectile, dt, callbacks) =>
       this.stepPinballProjectile(engine, projectile, dt, callbacks);
   }
 
-  buildStageBoard(engine, stage) {
+  /** Collector bucket width scaled by the player's effective collectorMagnet upgrade rank. */
+  getEffectiveBucketWidth(engine) {
+    const cfg = engine.modesConfig.pinball;
+    const lvl = engine.getEffectiveUpgradeLevel?.('collectorMagnet') || 0;
+    return cfg.bucketWidth + lvl * (cfg.bucketWidthPerLevel || 0);
+  }
+
+  buildStageBoard(engine, stage, { keepDroppingBalls = false } = {}) {
     const cfg = engine.modesConfig.pinball;
     const world = engine.physicsWorld;
-    world.clear();
+    world.clear({ keepDroppingBalls });
     this.configureWorldHooks(engine);
 
     const paletteSize = Math.min(
@@ -263,8 +273,13 @@ export class PinballBehavior extends ModeBehavior {
       return;
     }
     const cfg = engine.modesConfig.pinball;
-    const minX = cfg.bucketMarginX + cfg.bucketWidth * MATH_CONSTANTS.HALF;
-    const maxX = engine.gameConfig.canvas.logicalWidth - cfg.bucketMarginX - cfg.bucketWidth * MATH_CONSTANTS.HALF;
+    const halfBucketW = this.getEffectiveBucketWidth(engine) * MATH_CONSTANTS.HALF;
+    const minX = cfg.bucketMarginX + halfBucketW;
+    const maxX = engine.gameConfig.canvas.logicalWidth - cfg.bucketMarginX - halfBucketW;
+    if (minX >= maxX) {
+      engine.modeState.bucketX = engine.gameConfig.canvas.logicalWidth * MATH_CONSTANTS.HALF;
+      return;
+    }
     let nextX = engine.modeState.bucketX + engine.modeState.bucketDir * cfg.bucketSpeed * dtSec;
     if (nextX >= maxX) {
       nextX = maxX;
@@ -293,6 +308,9 @@ export class PinballBehavior extends ModeBehavior {
     engine.addScore(pts);
     engine.addOvercharge(scoring.overchargePerMatchedBall);
     engine.audioManager.playEffect('match', engine.combo);
+    if (peg.pinballCore) {
+      reportBountyEvent(engine, 'pinball_core_lit', 1);
+    }
 
     const palette = engine.ballsConfig.standardColors.find((c) => c.id === peg.colorId);
     const burstColor = peg.pinballCore
@@ -396,7 +414,7 @@ export class PinballBehavior extends ModeBehavior {
 
     // Check Magnetic Collector Bucket catch at bottom
     const bucketX = state ? state.bucketX : cfg.launcherX;
-    const halfBucketW = cfg.bucketWidth * MATH_CONSTANTS.HALF;
+    const halfBucketW = this.getEffectiveBucketWidth(engine) * MATH_CONSTANTS.HALF;
     const halfBucketH = cfg.bucketHeight * MATH_CONSTANTS.HALF;
     if (
       p.vy >= 0
@@ -452,15 +470,20 @@ export class PinballBehavior extends ModeBehavior {
 
   refundBucketCatch(engine, bx, by) {
     const cfg = engine.modesConfig.pinball;
+    const bucketW = this.getEffectiveBucketWidth(engine);
     const maxShots = Math.max(engine.shotsRemaining, cfg.maxShotsCap + engine.getStartingShotsBonus());
     engine.shotsRemaining = Math.min(maxShots, engine.shotsRemaining + 1);
     engine.addScore(cfg.bucketCatchBonus);
-    engine.audioManager.playEffect('overcharge');
+    const overchargeGain = engine.getCollectorOvercharge?.() || 0;
+    if (overchargeGain > 0) {
+      engine.addOvercharge(overchargeGain);
+    }
+    engine.audioManager.playEffect('pinballBucket');
     engine.particleSystem.spawnShockwave(
       bx,
       by,
       engine.gameConfig.theme.overchargePopupColor,
-      cfg.bucketWidth * BUCKET_SHOCKWAVE_RADIUS_FACTOR
+      bucketW * BUCKET_SHOCKWAVE_RADIUS_FACTOR
     );
     engine.particleSystem.spawnFloatingText(
       bx,
@@ -543,7 +566,7 @@ export class PinballBehavior extends ModeBehavior {
     );
     engine.combo = 0;
 
-    this.buildStageBoard(engine, engine.pinballStage);
+    this.buildStageBoard(engine, engine.pinballStage, { keepDroppingBalls: true });
     engine.refreshStaleLauncherColors();
     engine.unlockAchievementTiers('pinballStages', engine.pinballStage);
     engine.persistRunHighScore();
@@ -631,13 +654,14 @@ export class PinballBehavior extends ModeBehavior {
 
     // Draw oscillating Magnetic Collector Bucket at the bottom
     const bucketX = engine.modeState?.bucketX ?? cfg.launcherX;
-    const left = bucketX - cfg.bucketWidth * MATH_CONSTANTS.HALF;
+    const bucketW = this.getEffectiveBucketWidth(engine);
+    const left = bucketX - bucketW * MATH_CONSTANTS.HALF;
     const top = cfg.bucketY - cfg.bucketHeight * MATH_CONSTANTS.HALF;
 
     ctx.globalAlpha = BUCKET_GLOW_ALPHA;
     ctx.fillStyle = theme.overchargePopupColor;
     ctx.beginPath();
-    ctx.roundRect(left, top, cfg.bucketWidth, cfg.bucketHeight, BUCKET_CORNER_RADIUS);
+    ctx.roundRect(left, top, bucketW, cfg.bucketHeight, BUCKET_CORNER_RADIUS);
     ctx.fill();
 
     ctx.globalAlpha = 0.95;

@@ -4,6 +4,16 @@ All notable changes to **MagnaShot** are documented in this file.
 
 ## [Unreleased]
 
+### Added
+- Puzzle Mode: expanded from 10 to 20 deterministic stages (`P1` to `P20`), adding trick-shot puzzles covering Bumpers, Repulsors, Sliding Rail Anchors, Antimagnets, Tethered groups, Singularities, Portal Relays, and a two-color Rotor Finale (supports `railHalfWidth` anchors in Puzzle mode).
+- Daily Contracts (Bounties): 3 seeded UTC daily contracts selectable and tracked in the Play Hub Challenges section (`+35` to `+50` coin rewards).
+- Play Hub Mastery & Ghost Duel filter: mode cards highlight with a gold star badge once their mastery milestone is reached; the Stats Ghost Duels section now filters by `All`, `Daily`, or `Flux`.
+- Arcade SFX & Blitz 90s pacing: added distinct pitched sounds for Convoy snapbacks, Orbital collector catches, Pinball bucket refunds, Merge calibre fusions, urgent 5-second Blitz countdown ticks, and capped `+3s` avalanche time bonuses on large Blitz drops.
+- First-load Arcade mode objective banners (Hex Grid, Orbital 360, Pinball, Convoy, Merge Basin) and tactile physics/feedback polish (Magnetic Convoy exposed polarity gap snapbacks, Pinball collector bucket magnet attraction and live polarity flight curvature, Orbital Spin angular momentum & collector arc expansion, Merge Basin calibre shockwaves and polarity cohesion, portrait phone `.powerups-bar.hidden` full-width canvas ergonomics, and Hex Grid polarity pulse aim preview).
+
+### Fixed
+- Portrait mobile HUD overflow, Hex Grid aim preview polarity pulse feedback, mode-switching timer & listener isolation, and persistent save integrity across snapshot restores.
+
 ## [1.26.1] - 2026-11-12
 
 ### Removed

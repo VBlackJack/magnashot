@@ -401,7 +401,7 @@ export class AudioManager {
     }
     this.triggerHaptic(fx.hapticMs);
 
-    if (effectName === 'match') {
+    if (Number.isFinite(fx.baseFreq) && Number.isFinite(fx.pitchStep)) {
       const freq = fx.baseFreq + comboIndex * fx.pitchStep;
       const endFreq = freq * fx.endFreqMultiplier;
       this.playTone(fx.type, freq, endFreq, fx.duration);

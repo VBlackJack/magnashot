@@ -22,6 +22,8 @@ import {
 } from '../core/Constants.js';
 import { isRunSnapshotable } from './RunSnapshot.js';
 import { DISCOVERY_INTERACTIONS } from './Discovery.js';
+import { truncateAimAtCharges } from './ImpactPreview.js';
+import { resolveChargeHit, shotPolarity } from './VersusRules.js';
 
 /** Methods of GameEngine that belong to this domain, installed on its prototype. */
 export const engineControlsMethods = {
@@ -89,7 +91,13 @@ export const engineControlsMethods = {
    * choice pending).
    */
   canBuySpecialAmmo() {
-    return !this.isDailyAmmoLocked() && isRunSnapshotable(this) && !this.isStageChanging() && !this.isAwaitingPerk();
+    return (
+      !this.isDailyAmmoLocked()
+      && this.mode !== GAME_MODES.PUZZLE
+      && isRunSnapshotable(this)
+      && !this.isStageChanging()
+      && !this.isAwaitingPerk()
+    );
   },
 
   /**
@@ -98,6 +106,9 @@ export const engineControlsMethods = {
    */
   getSpecialAmmoBlockReason() {
     if (this.state !== GAME_STATES.PLAYING && this.state !== GAME_STATES.PAUSED) {
+      return null;
+    }
+    if (this.mode === GAME_MODES.PUZZLE) {
       return null;
     }
     if (this.isDailyAmmoLocked()) {
@@ -374,6 +385,30 @@ export const engineControlsMethods = {
     );
     if (this.versus) {
       this.applyVersusAimPreview();
+    } else if (this.magnetar && this.magnetar.charges.length > 0 && !this.currentBall?.specialType) {
+      const hitRadius = this.getChargeRadius() + this.physicsConfig.ball.radius;
+      const cut = truncateAimAtCharges(this.aimPoints, this.magnetar.charges, hitRadius);
+      if (cut.hit) {
+        const shot = shotPolarity(
+          this.currentBall?.colorId,
+          this.isPolarityFlipped,
+          this.gameConfig.versus,
+          this.physicsWorld.polarityMap
+        );
+        this.aimPreview = {
+          chargeHit: {
+            x: cut.hit.x,
+            y: cut.hit.y,
+            polarity: cut.hit.charge.polarity,
+            outcome: shot === null ? null : resolveChargeHit(cut.hit.charge, { polarity: shot }).outcome
+          }
+        };
+        this.aimPoints = cut.points;
+      } else if (this.aimPreview) {
+        this.aimPreview = undefined;
+      }
+    } else if (this.aimPreview) {
+      this.aimPreview = undefined;
     }
   },
 

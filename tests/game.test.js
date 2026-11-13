@@ -765,3 +765,45 @@ test('Cascade Drop mode builds a platform well with amplified downward cluster g
   assert.ok(platformCount >= 2, 'Cascade well includes support platforms');
   assert.ok(antimagnetCount >= 1, 'Cascade well includes antimagnet cushions');
 });
+
+test('Blitz 90s awards capped avalanche time bonuses and plays urgent countdown ticks', () => {
+  const storage = createTestStorage();
+  const engine = createTestEngine(storage);
+  const playedEffects = [];
+  engine.audioManager = {
+    playEffect: (name, ...args) => playedEffects.push([name, ...args]),
+    stopAll: () => {}
+  };
+  engine.startBlitzMode();
+  engine.physicsWorld.clear();
+
+  const blitzCfg = gameConfig.blitz;
+  const r = physicsConfig.ballRadius;
+  const anchor = new Ball({ x: 200, y: 120, colorId: 'red', radius: r, isAnchor: true });
+  engine.physicsWorld.addBall(anchor);
+  for (let i = 0; i < blitzCfg.avalancheTimeBonusMinSpheres; i++) {
+    engine.physicsWorld.addBall(new Ball({ x: 60 + i * 32, y: 320, colorId: 'blue', radius: r }));
+  }
+
+  const framesBefore = engine.blitzFramesRemaining;
+  const dropped = engine.detachAndRewardAvalanche();
+  assert.equal(dropped, blitzCfg.avalancheTimeBonusMinSpheres);
+  assert.equal(engine.blitzFramesRemaining, framesBefore + blitzCfg.avalancheTimeBonusFrames);
+  assert.equal(engine.blitzBonusFramesEarned, blitzCfg.avalancheTimeBonusFrames);
+  assert.ok(playedEffects.some(([name]) => name === 'blitzTimeBonus'));
+
+  // Cap check
+  engine.blitzBonusFramesEarned = blitzCfg.maxBonusDurationFrames;
+  for (let i = 0; i < blitzCfg.avalancheTimeBonusMinSpheres; i++) {
+    engine.physicsWorld.addBall(new Ball({ x: 60 + i * 32, y: 320, colorId: 'green', radius: r }));
+  }
+  const framesAtCap = engine.blitzFramesRemaining;
+  engine.detachAndRewardAvalanche();
+  assert.equal(engine.blitzFramesRemaining, framesAtCap, 'Blitz bonus duration does not exceed cap');
+
+  // Urgent tick check
+  playedEffects.length = 0;
+  engine.blitzFramesRemaining = blitzCfg.urgentAudioSeconds * blitzCfg.framesPerSecond + 1;
+  engine.update();
+  assert.ok(playedEffects.some(([name]) => name === 'blitzTick'), 'Urgent second tick plays audio cue');
+});

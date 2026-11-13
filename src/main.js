@@ -90,7 +90,7 @@ class Application {
         fluxConfig,
         modesConfig,
         mergeShakePrototype: new URLSearchParams(window.location.search).get(modesConfig.merge.shake.queryParam)
-          === modesConfig.merge.shake.queryValue,
+          !== '0',
         audioManager,
         storageManager,
         onStateChange: (eng, extra) => {

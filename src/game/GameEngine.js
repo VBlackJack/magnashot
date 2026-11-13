@@ -224,6 +224,8 @@ export class GameEngine {
     // Levels whose banner already showed in this session, so a retry after a defeat is quiet.
     this.introducedLevelIds = new Set();
     this.introducedDailySeeds = new Set();
+    this.introducedModes = new Set();
+    this.modeIntroReplaySeq = 0;
     this.levelTutorialKey = null;
     this.isAimCancelled = false;
     this.isAimLocked = false;
@@ -260,6 +262,7 @@ export class GameEngine {
     this.blitzFramesRemaining = 0;
     this.blitzWaveTimerFrames = 0;
     this.blitzIdleFrames = 0;
+    this.blitzBonusFramesEarned = 0;
     this.bossRushWave = 1;
     this.cascadeWave = 1;
     this.cascadeTurnsUntilDrop = 0;
@@ -642,7 +645,7 @@ export class GameEngine {
     } else if (this.mode === GAME_MODES.MERGE) {
       const prototype = this.getMergeShakeRemaining() !== null;
       this.storageManager.setMergeRecord?.(this.score, this.mergeBestTier, prototype);
-      if (!prototype) {
+      if (!prototype || this.mergeShakePrototype) {
         this.unlockAchievementTiers('mergeTiers', this.mergeBestTier);
       }
     }
@@ -835,6 +838,7 @@ export class GameEngine {
     this.blitzFramesRemaining = 0;
     this.blitzWaveTimerFrames = 0;
     this.blitzIdleFrames = 0;
+    this.blitzBonusFramesEarned = 0;
     this.bossRushWave = 1;
     this.cascadeWave = 1;
     this.cascadeTurnsUntilDrop = 0;
@@ -1186,7 +1190,7 @@ export class GameEngine {
         this.particleSystem.splashLiquid(ball.x / this.gameConfig.canvas.logicalWidth, ball.vy);
       },
       onCollectorBinPass: (ball) => {
-        if (!this.isRunPlaying()) {
+        if (!this.isRunPlaying() || this.getModeBehavior().getRenderChrome(this).collectorBins === false) {
           return;
         }
         const collectorCfg = this.gameConfig.scoring.collector;
@@ -1578,6 +1582,10 @@ export class GameEngine {
         return;
       }
       if (this.blitzFramesRemaining % blitzCfg.framesPerSecond === 0) {
+        const secondsLeft = Math.ceil(this.blitzFramesRemaining / blitzCfg.framesPerSecond);
+        if (secondsLeft > 0 && secondsLeft <= blitzCfg.urgentAudioSeconds) {
+          this.audioManager.playEffect('blitzTick');
+        }
         this.notifyUI();
       }
       this.blitzWaveTimerFrames--;

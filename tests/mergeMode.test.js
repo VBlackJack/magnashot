@@ -342,3 +342,83 @@ test('Shake motion rejects slow tilt and isolated spikes, then latches until qui
   assert.equal(read(1500, peak), false);
   assert.equal(read(1550, -peak), true);
 });
+
+test('Merge preserves grace timers across snapshots and keeps combo alive inside the combo window', () => {
+  const engine = createEngine(true);
+  engine.startMergeMode();
+  engine.currentBall.colorId = modesConfig.merge.tiers[0].id;
+  engine.nextBall.colorId = modesConfig.merge.tiers[0].id;
+  engine.shoot();
+  const dropped = engine.physicsWorld.balls[0];
+  assert.ok((dropped.mergeGraceSec || 0) > 0);
+  engine.combo = 2;
+  engine.modeState.comboTimerSec = modesConfig.merge.comboWindowSec;
+  engine.modeState.dropCooldownSec = 0;
+  engine.shoot();
+  assert.equal(engine.combo, 2, 'fast consecutive drop keeps active merge combo');
+
+  engine.saveRunSnapshot({ force: true });
+  const restored = createEngine(true);
+  restored.storageManager = engine.storageManager;
+  assert.equal(restored.restoreSavedRun(), true);
+  assert.ok((restored.physicsWorld.balls[0].mergeGraceSec || 0) > 0);
+  assert.ok(restored.modeState.comboTimerSec > 0);
+});
+
+test('Merge drawUnderlay predicts resting landing Y below launcher and highlights matching tier contact', () => {
+  const engine = createEngine(true);
+  engine.startMergeMode();
+  const cfg = modesConfig.merge;
+  const tier1 = cfg.tiers[0];
+  engine.currentBall.colorId = tier1.id;
+  engine.currentBall.radius = tier1.radius;
+
+  const resting = new Ball({
+    x: engine.mergeDropX,
+    y: cfg.basinFloorY - tier1.radius,
+    radius: tier1.radius,
+    colorId: tier1.id
+  });
+  resting.mergeTier = tier1.tier;
+  engine.physicsWorld.addBall(resting);
+
+  // Also ensure a just-dropped ball at launcherY is ignored by landing Y projection
+  const dropping = new Ball({
+    x: engine.mergeDropX,
+    y: cfg.launcherY,
+    radius: tier1.radius,
+    colorId: tier1.id
+  });
+  dropping.mergeTier = tier1.tier;
+  engine.physicsWorld.addBall(dropping);
+
+  const landingY = mergeBehavior.predictDropLandingY(engine, cfg, engine.mergeDropX, tier1.radius);
+  assert.ok(landingY > cfg.launcherY && landingY < resting.y);
+  assert.equal(mergeBehavior.hasEqualTierContactAt(engine, engine.mergeDropX, landingY, tier1.radius, tier1.tier), true);
+  assert.equal(mergeBehavior.hasEqualTierContactAt(engine, engine.mergeDropX, landingY, tier1.radius, tier1.tier + 1), false);
+
+  const circles = [];
+  const ctx = {
+    save() {},
+    restore() {},
+    fillRect() {},
+    setLineDash() {},
+    beginPath() {},
+    moveTo() {},
+    lineTo() {},
+    stroke() {},
+    fill() {},
+    arc(x, y, r) { circles.push({ x, y, r }); }
+  };
+  mergeBehavior.drawUnderlay(ctx, engine, null, {
+    launcherAccentColor: '#7be0ff',
+    dangerLineColor: '#ff4757',
+    overchargePopupColor: '#56e39f',
+    targetHighlightColor: '#ffd166',
+    aimGhostFillAlpha: 0.25,
+    aimGhostStrokeAlpha: 0.85,
+    aimGhostLineWidth: 2
+  });
+  assert.equal(circles.length, 2, 'draws ghost sphere and same-tier merge ring');
+  assert.ok(circles.every((c) => c.y === landingY));
+});

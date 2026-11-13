@@ -19,7 +19,7 @@ import assert from 'node:assert/strict';
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { GAME_OVER_REASONS, GAME_STATES, INPUT_MODES, SPECIAL_TYPES_ORDER } from '../src/core/Constants.js';
+import { GAME_MODES, GAME_OVER_REASONS, GAME_STATES, INPUT_MODES, SPECIAL_TYPES_ORDER } from '../src/core/Constants.js';
 import { I18nService, i18n, resolveInitialLocale } from '../src/core/I18n.js';
 import {
   DISCOVERY_PULSE_CLASS,
@@ -1269,7 +1269,11 @@ test('Arcade modes live in the rich cards of the Play hub while the burger drawe
 });
 
 test('Graphical audit guards: collector labels, floating-text clamping, Antimagnet ring, Puzzle swap lock, Codex obstacle colors, and forced-colors tracks', () => {
-  const rendererCode = readFileSync('./src/game/Renderer.js', 'utf8')
+  const rendererCode = [
+    readFileSync('./src/game/Renderer.js', 'utf8'),
+    readFileSync('./src/game/RendererParticles.js', 'utf8')
+  ]
+    .join('\n')
     .replace(/\/\*[\s\S]*?\*\//g, '')
     .replace(/\/\/.*$/gm, '');
   assert.match(rendererCode, /theme\.collectorLabelColor/, 'drawCollectorBins uses theme.collectorLabelColor');
@@ -2735,4 +2739,69 @@ test('the Play hub keeps its moved ids, the new ids exist once, and the removed 
     assert.ok(!ids.includes(id), `#${id} is removed`);
   }
   assert.ok(indexHtml.indexOf('id="modal-play"') < indexHtml.indexOf('id="modal-levels"'), '#modal-play comes before #modal-levels');
+});
+
+test('arcade mode intro banners localize cleanly and dismiss after first shotless launch', () => {
+  const previousLocale = i18n.currentLocale;
+  try {
+    for (const locale of ['en', 'fr']) {
+      i18n.dictionaries.set(locale, loadJson(`./locales/${locale}.json`));
+      i18n.currentLocale = locale;
+      for (const mode of [GAME_MODES.HEX_GRID, GAME_MODES.ORBITAL, GAME_MODES.PINBALL, GAME_MODES.CONVOY, GAME_MODES.MERGE]) {
+        const text = buildLevelIntroText({ arcadeMode: mode }, t);
+        assert.ok(typeof text === 'string' && text.length > 10, `${locale}: ${mode} intro text`);
+      }
+    }
+    i18n.currentLocale = 'en';
+    const ui = Object.create(UIManager.prototype);
+    const announced = [];
+    ui.announce = (message) => announced.push(message);
+    const banner = { classList: fakeClassList(['hidden']) };
+    ui.elements = { levelIntroBanner: banner, levelIntroText: { textContent: '' } };
+    const dismissed = [];
+    const engine = {
+      state: GAME_STATES.PLAYING,
+      mode: GAME_MODES.CONVOY,
+      levelIntro: { arcadeMode: GAME_MODES.CONVOY },
+      usesShotBudget: () => false,
+      runShotsFired: 0,
+      dismissLevelIntro: () => {
+        dismissed.push(true);
+        engine.levelIntro = null;
+      }
+    };
+    ui.updateLevelIntro(engine);
+    assert.equal(banner.classList.contains('hidden'), false);
+    assert.equal(announced.length, 1);
+    engine.runShotsFired = 1;
+    ui.updateLevelIntro(engine);
+    assert.equal(dismissed.length, 1, 'shotless arcade intro dismisses on first launch');
+    assert.equal(banner.classList.contains('hidden'), true);
+
+    engine.levelIntro = { arcadeMode: GAME_MODES.CONVOY, replaySeq: 1 };
+    ui.updateLevelIntro(engine);
+    assert.equal(banner.classList.contains('hidden'), false, 'replaySeq opens intro again');
+    assert.equal(announced.length, 2, 'replay announces refreshed arcade intro');
+  } finally {
+    i18n.currentLocale = previousLocale;
+  }
+});
+
+test('HUD surfaces Merge Shake ready copy, Magnetar rest countdown, and one-shot nearDanger announcements', () => {
+  const previousLocale = i18n.currentLocale;
+  try {
+    i18n.dictionaries.set('en', loadJson('./locales/en.json'));
+    i18n.dictionaries.set('fr', loadJson('./locales/fr.json'));
+    i18n.currentLocale = 'en';
+    assert.equal(t('hud.stats.shots.shakeReady'), 'Ready');
+    assert.ok(t('hud.stats.mode.bossRushMagnetarRest', { wave: 2, rest: 3, moorings: 4 }).includes('3'));
+    for (const mode of [GAME_MODES.CONVOY, GAME_MODES.ORBITAL, GAME_MODES.MERGE]) {
+      assert.ok(t(`hud.announcer.nearDanger.${mode}`).length > 5, `nearDanger announcement for ${mode}`);
+      assert.ok(loadJson('./locales/fr.json').hud.announcer.nearDanger[mode].length > 5, `fr nearDanger for ${mode}`);
+    }
+    assert.ok(loadJson('./locales/en.json').modals.shop.upgrades.arcadeShotlessNote.length > 10);
+    assert.ok(loadJson('./locales/fr.json').modals.shop.upgrades.arcadeShotlessNote.length > 10);
+  } finally {
+    i18n.currentLocale = previousLocale;
+  }
 });

@@ -22,7 +22,7 @@ import { GAME_MODES, GAME_STATES } from '../src/core/Constants.js';
 import { i18n } from '../src/core/I18n.js';
 import { SeededRandom } from '../src/core/SeededRandom.js';
 import { UIManager } from '../src/ui/UIManager.js';
-import { formatDuelResultText, formatGhostBadge } from '../src/ui/UIGhostDuel.js';
+import { formatDuelResultText, formatGhostBadge, filterGhostDuels } from '../src/ui/UIGhostDuel.js';
 import { buildShareText } from '../src/game/DailyShare.js';
 import { DUEL_STATUS } from '../src/game/GhostCodec.js';
 
@@ -449,6 +449,13 @@ test('the stats list shows the record, the latest duels and an empty state', () 
   assert.equal(elements.statsDuelsList.children.length, 2);
   assert.match(elements.statsDuelsList.children[0].textContent, /You beat Sam by 240/);
   assert.match(elements.statsDuelsList.children[1].textContent, /Ghost wins by 100/);
+
+  ui.statsDuelsFilter = 'flux';
+  ui.renderStatsDuels();
+  assert.equal(elements.statsDuelsList.children.length, 1);
+  assert.match(elements.statsDuelsList.children[0].textContent, /Ghost wins by 100/);
+  assert.equal(filterGhostDuels(ui.storageManager.getGhostDuels(), 'daily').length, 1);
+  assert.equal(filterGhostDuels(ui.storageManager.getGhostDuels(), 'all').length, 2);
 });
 
 test('the alias field shows the stored alias as a value, never as markup', () => {

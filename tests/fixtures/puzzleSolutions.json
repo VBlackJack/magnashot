@@ -5,7 +5,13 @@
     "2": { "special": "brush", "flip": false, "from": 32.167, "to": 35.467 },
     "3": { "special": "lightning", "flip": false, "from": 38.767, "to": 43.967 },
     "6": { "special": null, "flip": false, "from": 34.967, "to": 40.667 },
-    "9": { "special": null, "flip": true, "from": 35.967, "to": 47.367 }
+    "9": { "special": null, "flip": true, "from": 35.967, "to": 47.367 },
+    "11": { "special": null, "flip": true, "from": 62.7, "to": 69.5 },
+    "12": { "special": null, "flip": false, "from": 61.5, "to": 72.6 },
+    "14": { "special": "rocket", "flip": false, "from": 41.1, "to": 69.3 },
+    "15": { "special": null, "flip": false, "from": 54.8, "to": 67.1 },
+    "17": { "special": "brush", "flip": false, "from": 85.0, "to": 95.0 },
+    "18": { "special": "bomb", "flip": true, "from": 41.2, "to": 43.5 }
   },
   "twoShot": {
     "4": {
@@ -32,6 +38,26 @@
       "preFrames": 390,
       "first": { "special": null, "flip": true, "mid": 114.667 },
       "second": { "special": null, "flip": true, "from": 53.167, "to": 64.667 }
+    },
+    "13": {
+      "preFrames": 0,
+      "first": { "special": null, "flip": false, "mid": 10.167 },
+      "second": { "special": null, "flip": false, "from": 111.0, "to": 116.75 }
+    },
+    "16": {
+      "preFrames": 0,
+      "first": { "special": null, "flip": false, "mid": 41.167 },
+      "second": { "special": null, "flip": false, "from": 31.5, "to": 42.25 }
+    },
+    "19": {
+      "preFrames": 0,
+      "first": { "special": null, "flip": false, "mid": 17.5 },
+      "second": { "special": null, "flip": false, "from": 120.5, "to": 128.25 }
+    },
+    "20": {
+      "preFrames": 0,
+      "first": { "special": null, "flip": false, "mid": 11.167 },
+      "second": { "special": null, "flip": false, "from": 36.0, "to": 39.25 }
     }
   },
   "thirdStar": {

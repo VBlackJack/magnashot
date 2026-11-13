@@ -91,6 +91,24 @@ export function formatGhostBadge(status) {
   return { text, label, side: comparison.side };
 }
 
+const DUEL_FILTER_ALL = 'all';
+
+/**
+ * Filters recorded Ghost Duels by mode (`'all'`, `'daily'`, or `'flux'`).
+ * @param {Array<object>} duels - Stored duel records.
+ * @param {string} [filter] - Selected filter key.
+ * @returns {Array<object>}
+ */
+export function filterGhostDuels(duels, filter = DUEL_FILTER_ALL) {
+  if (!Array.isArray(duels)) {
+    return [];
+  }
+  if (filter !== GHOST_MODE_DAILY && filter !== GAME_MODES.FLUX) {
+    return duels;
+  }
+  return duels.filter((entry) => entry?.mode === filter);
+}
+
 /** Ghost Duel methods installed on UIManager.prototype by UIManager.js. */
 export const uiGhostDuelMethods = {
   /** Wires the duel card buttons and the alias field. */
@@ -395,13 +413,17 @@ export const uiGhostDuelMethods = {
     };
   },
 
-  /** Lists the stored duels in the stats window: the record, then the latest duels. */
+  /** Lists the stored duels in the stats window: the record, filter bar, then the latest duels. */
   renderStatsDuels() {
     const els = this.elements;
     const storage = this.storageManager;
     const duels = storage.getGhostDuels?.() ?? [];
     const record = storage.getGhostDuelRecord?.() ?? { won: 0, lost: 0 };
     const hasDuels = duels.length > 0;
+    const activeFilter = this.statsDuelsFilter === GHOST_MODE_DAILY || this.statsDuelsFilter === GAME_MODES.FLUX
+      ? this.statsDuelsFilter
+      : DUEL_FILTER_ALL;
+    const filtered = filterGhostDuels(duels, activeFilter);
     if (els.statsDuelsRecord) {
       setTextIfChanged(
         els.statsDuelsRecord,
@@ -411,10 +433,27 @@ export const uiGhostDuelMethods = {
       );
       els.statsDuelsRecord.classList.toggle(HIDDEN_CLASS, !hasDuels);
     }
-    els.statsDuelsEmpty?.classList.toggle(HIDDEN_CLASS, hasDuels);
+    els.statsDuelsFilters?.classList.toggle(HIDDEN_CLASS, !hasDuels);
+    const filterButtons = [
+      [DUEL_FILTER_ALL, els.btnDuelsFilterAll],
+      [GHOST_MODE_DAILY, els.btnDuelsFilterDaily],
+      [GAME_MODES.FLUX, els.btnDuelsFilterFlux]
+    ];
+    for (const [key, button] of filterButtons) {
+      if (!button) {
+        continue;
+      }
+      const isSelected = activeFilter === key;
+      button.classList.toggle('active', isSelected);
+      setAttributeIfChanged(button, 'aria-pressed', isSelected ? 'true' : 'false');
+    }
+    if (els.statsDuelsEmpty) {
+      setTextIfChanged(els.statsDuelsEmpty, t(hasDuels ? 'modals.stats.duels.filteredEmpty' : 'modals.stats.duels.empty'));
+      els.statsDuelsEmpty.classList.toggle(HIDDEN_CLASS, filtered.length > 0);
+    }
     if (els.statsDuelsList) {
       els.statsDuelsList.replaceChildren(
-        ...duels.map((entry) => {
+        ...filtered.map((entry) => {
           const item = document.createElement('li');
           const name = entry.alias || t('duel.defaultName');
           const modeKey = entry.mode === GHOST_MODE_DAILY ? 'app.nav.button.daily' : MODE_NAME_KEYS[GAME_MODES.FLUX];
@@ -428,7 +467,7 @@ export const uiGhostDuelMethods = {
           return item;
         })
       );
-      els.statsDuelsList.classList.toggle(HIDDEN_CLASS, !hasDuels);
+      els.statsDuelsList.classList.toggle(HIDDEN_CLASS, filtered.length === 0);
     }
   }
 };

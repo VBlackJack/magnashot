@@ -29,6 +29,11 @@ const BASELINE_NOTE_KEYS = Object.freeze({
   [GAME_MODES.HEX_GRID]: 'modals.shop.upgrades.puristBaselineNote',
   [GAME_MODES.MERGE]: 'modals.shop.upgrades.puristBaselineNote'
 });
+/** Workshop note shown in shotless modes where specific upgrades behave differently. */
+const SHOTLESS_NOTE_KEYS = Object.freeze({
+  [GAME_MODES.CONVOY]: 'modals.shop.upgrades.convoyNote',
+  [GAME_MODES.ORBITAL]: 'modals.shop.upgrades.orbitalNote'
+});
 export { FULL_PERCENT };
 
 /** Achievement tiers, lowest first. */
@@ -167,13 +172,19 @@ export function renderWorkshopContents() {
   const grid = this.elements.shopGrid;
   grid.replaceChildren();
 
-  // Upgrades are bought as usual but count for nothing in a Daily run that neutralises them:
+  // Upgrades are bought as usual but count for nothing in neutralised runs, or partially in shotless modes:
   // say so, as text, only while such a run is active.
-  if (this.engine.areUpgradesNeutralised() && this.isRunActive()) {
+  const isNeutralised = this.engine.areUpgradesNeutralised();
+  const isShotlessActive = !isNeutralised && this.engine.usesShotBudget?.() === false;
+  if (this.isRunActive() && (isNeutralised || isShotlessActive)) {
     const baselineNote = document.createElement('p');
     baselineNote.className = 'levels-empty-filter';
     baselineNote.setAttribute('role', 'note');
-    baselineNote.textContent = t(BASELINE_NOTE_KEYS[this.engine.mode] || 'modals.shop.upgrades.dailyBaselineNote');
+    baselineNote.textContent = t(
+      isNeutralised
+        ? (BASELINE_NOTE_KEYS[this.engine.mode] || 'modals.shop.upgrades.dailyBaselineNote')
+        : (SHOTLESS_NOTE_KEYS[this.engine.mode] || 'modals.shop.upgrades.arcadeShotlessNote')
+    );
     grid.appendChild(baselineNote);
   }
 
@@ -444,13 +455,12 @@ export function renderWorkshopContents() {
     const persistedRecords = this.storageManager.getAchievementRecords?.() || {};
     const achEntries = Object.entries(this.gameConfig.achievements);
     const liveEndlessWave = this.engine.mode === GAME_MODES.ENDLESS ? this.engine.waveCount || 0 : 0;
-    const prototype = this.engine.getMergeShakeRemaining?.() != null;
     const progressContext = {
       maxCombo: Math.max(
         persistedRecords.maxCombo || 0,
-        prototype ? 0 : this.engine.combo || 0,
-        prototype ? 0 : this.engine.maxComboInRound || 0,
-        prototype ? 0 : this.engine.currentComboChain || 0
+        this.engine.combo || 0,
+        this.engine.maxComboInRound || 0,
+        this.engine.currentComboChain || 0
       ),
       totalStars: this.storageManager.getTotalStars(),
       endlessWave: Math.max(persistedRecords.endlessWave || 0, liveEndlessWave),
@@ -479,8 +489,9 @@ export function renderWorkshopContents() {
         this.engine.mode === GAME_MODES.CONVOY ? this.engine.waveCount || 0 : 0
       ),
       mergeTier: Math.max(
-        this.storageManager.getMergeBestTier?.() || 0,
-        this.engine.mode === GAME_MODES.MERGE && !prototype ? this.engine.mergeBestTier || 0 : 0
+        this.storageManager.getMergeBestTier?.(false) || 0,
+        this.storageManager.getMergeBestTier?.(true) || 0,
+        this.engine.mode === GAME_MODES.MERGE ? this.engine.mergeBestTier || 0 : 0
       ),
       unlockedLevel: this.storageManager.getUnlockedLevel(),
       campaignLevelCount: this.engine.levelCatalog.count

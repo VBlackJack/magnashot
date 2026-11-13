@@ -18,6 +18,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
+import { AudioManager } from '../src/core/AudioManager.js';
 
 const SOURCE_ROOT = './src';
 const audioConfig = JSON.parse(fs.readFileSync('./configs/audio.json', 'utf8'));
@@ -68,4 +69,23 @@ test('the scan reaches nested source folders and the effects added with it', () 
     assert.ok(effect.noteDuration > 0, `${name} has a note duration`);
     assert.ok(effect.hapticMs >= 0, `${name} has a haptic duration`);
   }
+});
+
+test('AudioManager generalizes pitched synthesis to any effect defining baseFreq and pitchStep', () => {
+  const manager = new AudioManager();
+  manager.config = audioConfig;
+  const tones = [];
+  manager.playTone = (type, startFreq, endFreq, duration, offset = 0, gain = 1) => {
+    tones.push({ type, startFreq, endFreq, duration, offset, gain });
+  };
+  manager.acceptEffect = () => true;
+  manager.triggerHaptic = () => {};
+
+  const tierIndex = 3;
+  manager.playEffect('mergeFusion', tierIndex);
+  const fx = audioConfig.effects.mergeFusion;
+  const expectedStart = fx.baseFreq + tierIndex * fx.pitchStep;
+  assert.equal(tones.length, 2, 'harmonic pitched fusion plays base + harmonic tones');
+  assert.equal(tones[0].startFreq, expectedStart);
+  assert.equal(tones[0].endFreq, expectedStart * fx.endFreqMultiplier);
 });

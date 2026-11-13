@@ -150,6 +150,7 @@ export const VERSUS_STORAGE_POLICY = Object.freeze({
   recordAchievementProgress: P.NOOP,
 
   // Discoveries (hints).
+  hasQuotaExceeded: P.FALSE,
   hasDiscoveries: P.FALSE,
   getDiscoveries: P.EMPTY_OBJECT,
   markDiscovered: P.NOOP,
@@ -236,6 +237,8 @@ export const VERSUS_STORAGE_POLICY = Object.freeze({
   setWeeklyFluxBest: P.NULL,
   claimWeeklyFluxBonus: P.FALSE,
   hasClaimedWeeklyFluxBonus: P.TRUE,
+  getDailyBountiesState: P.EMPTY_OBJECT,
+  recordBountyProgress: P.EMPTY_ARRAY,
 
   // Statistics and the run snapshot.
   getPlayerStats: P.EMPTY_OBJECT,

@@ -98,6 +98,7 @@
           <span id="hud-best-run" class="hud-badge best-run hidden"></span>
           <span id="hud-ghost" class="hud-badge ghost hidden" role="group"></span>
           <span id="hud-magnetar-telegraph" class="hud-badge magnetar hidden" aria-hidden="true"></span>
+          <button id="hud-quota-badge" type="button" class="hud-badge quota-warning hidden"></button>
           <span id="hud-perks" class="perk-chips hidden" role="group" data-i18n-aria-label="hud.stats.perks.label"></span>
         </div>
       </div>
@@ -105,6 +106,7 @@
         <span id="hud-shots-label" class="hud-label" data-i18n="hud.stats.shots.label"></span>
         <span id="hud-shots-value" class="hud-value highlight"></span>
         <span id="hud-sag-meter" class="sag-meter hidden" role="meter" aria-valuemin="0" aria-valuemax="1" aria-valuenow="0" aria-valuetext="" data-i18n-aria-label="hud.stats.sag.label"><span id="hud-sag-meter-fill" class="sag-meter-fill"></span></span>
+        <span id="hud-pressure-meter" class="sag-meter pressure-meter hidden" role="meter" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" aria-valuetext="" data-i18n-aria-label="hud.stats.pressure.label"><span id="hud-pressure-meter-fill" class="sag-meter-fill pressure-meter-fill"></span></span>
       </div>
       <div class="hud-stat-box hud-stat-coins">
         <span class="hud-label" data-i18n="hud.stats.coins.label"></span>
@@ -195,6 +197,10 @@
               <span class="arcade-card-desc" data-i18n="modals.play.weekly.desc"></span>
               <span id="weekly-reward" class="arcade-card-best gold-text hidden"></span>
             </button>
+          </div>
+          <div id="play-bounties" class="play-bounties">
+            <h4 class="play-bounties-title" data-i18n="modals.play.bounties.title"></h4>
+            <ul id="play-bounties-list" class="play-bounties-list"></ul>
           </div>
         </section>
         <section class="play-hub-section play-hub-arcade" aria-labelledby="play-section-arcade-title">
@@ -683,6 +689,11 @@
         <section id="stats-duels" class="stats-duels" aria-labelledby="stats-duels-title">
           <h3 id="stats-duels-title" class="stats-section-title" data-i18n="modals.stats.duels.title"></h3>
           <p id="stats-duels-record" class="modal-subtext hidden"></p>
+          <div id="stats-duels-filters" class="stats-duels-filters hidden" role="group" data-i18n-aria-label="modals.stats.duels.filterAria">
+            <button id="btn-duels-filter-all" type="button" class="stats-filter-btn active" data-duel-filter="all" aria-pressed="true" data-i18n="modals.stats.duels.filters.all"></button>
+            <button id="btn-duels-filter-daily" type="button" class="stats-filter-btn" data-duel-filter="daily" aria-pressed="false" data-i18n="modals.stats.duels.filters.daily"></button>
+            <button id="btn-duels-filter-flux" type="button" class="stats-filter-btn" data-duel-filter="flux" aria-pressed="false" data-i18n="modals.stats.duels.filters.flux"></button>
+          </div>
           <p id="stats-duels-empty" class="modal-subtext hidden" data-i18n="modals.stats.duels.empty"></p>
           <ul id="stats-duels-list" class="stats-campaign-list hidden"></ul>
         </section>

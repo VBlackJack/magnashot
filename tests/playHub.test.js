@@ -26,6 +26,7 @@ import {
   isModeRunning,
   resolveContinueTarget,
   resolveInitialFocusKey,
+  resolveModeMastery,
   resolveVersusLocalEntry,
   sumChapterStars,
   uiPlayHubMethods
@@ -375,4 +376,23 @@ test('P3-4: only a plain Flux run makes the Flux card the running one', () => {
     assert.equal(isModeRunning(engine, GAME_MODES.FLUX, WEEK), false, `${name}: no Flux card is running`);
     assert.equal(isModeRunning(engine, WEEKLY_ACCESS_KEY, WEEK), false, `${name}: Weekly is not running either`);
   }
+});
+
+test('resolveModeMastery marks only modes that meet configured mastery milestones', () => {
+  const cfg = {
+    puzzles: new Array(20).fill({}),
+    scoring: { maxStars: 3 },
+    playHub: { mastery: { endlessScore: 5000, pinballStage: 3, mergeTier: 7 } }
+  };
+  const storage = {
+    getEndlessHighScore: () => 5200,
+    getPuzzleTotalStars: () => 60,
+    getPinballBestStage: () => 2,
+    getMergeBestTier: () => 7
+  };
+  const mastery = resolveModeMastery(storage, cfg);
+  assert.equal(mastery[GAME_MODES.ENDLESS], true);
+  assert.equal(mastery[GAME_MODES.PUZZLE], true);
+  assert.equal(mastery[GAME_MODES.PINBALL], false);
+  assert.equal(mastery[GAME_MODES.MERGE], true);
 });

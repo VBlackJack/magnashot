@@ -219,6 +219,9 @@ export function resolveDailyFairPlayKey(fairPlay) {
  * @returns {string} The one-line summary.
  */
 export function buildLevelIntroText(intro, translate) {
+  if (intro.arcadeMode) {
+    return translate(`hud.levelIntro.arcadeModes.${intro.arcadeMode}`);
+  }
   if (intro.puzzleStage) {
     const shots = intro.shots === 1
       ? translate('hud.levelIntro.puzzleShots.one')

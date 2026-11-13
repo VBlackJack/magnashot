@@ -69,6 +69,7 @@ const ENGINE_SCALAR_FIELDS = [
   'blitzFramesRemaining',
   'blitzWaveTimerFrames',
   'blitzIdleFrames',
+  'blitzBonusFramesEarned',
   'bossRushWave',
   'cascadeWave',
   'cascadeTurnsUntilDrop',

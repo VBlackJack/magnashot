@@ -149,6 +149,7 @@
         "blitz": "Blitz 90s • Vague {{wave}}",
         "bossRush": "Boss Rush • Vague {{wave}} (👑 {{shields}})",
         "bossRushMagnetar": "Boss Rush • Vague {{wave}} ({{moorings}} amarres)",
+        "bossRushMagnetarRest": "Boss Rush • Vague {{wave}} ({{moorings}} amarres • repos {{rest}})",
         "cascade": "Cascade • Vague {{wave}}",
         "coreRescueProgress": "💎 {{rescued}}/{{total}}",
         "switchHint": "Cliquer pour changer de mode ou de niveau",
@@ -166,7 +167,10 @@
         "shieldsLabel": "Boucliers Boss",
         "mooringsLabel": "Amarres",
         "convoyLabel": "Sphères restantes",
-        "calibreLabel": "Calibre max"
+        "calibreLabel": "Calibre max",
+        "shakeLabel": "Secousse",
+        "shakeReady": "Prête",
+        "mergesLabel": "Fusions"
       },
       "time": {
         "label": "Temps restant",
@@ -191,6 +195,16 @@
         "value": "{{level}}/{{size}}",
         "aria": "Affaissement {{level}} sur {{size}} : {{remaining}} tirs manqués avant la chute de l'amas",
         "ariaOne": "Affaissement {{level}} sur {{size}} : {{remaining}} tir manqué avant la chute de l'amas"
+      },
+      "pressure": {
+        "label": "Pression spatiale",
+        "convoyAria": "Avancée du convoi vers le vortex : {{pct}} %",
+        "orbitalAria": "Rayon orbital atteint : {{pct}} %",
+        "mergeAria": "Niveau de remplissage du bassin : {{pct}} %"
+      },
+      "quotaWarning": {
+        "badge": "⚠ Mémoire locale",
+        "aria": "Stockage plein : cliquer pour ouvrir les Réglages et exporter la progression"
       }
     },
     "launcher": {
@@ -312,7 +326,13 @@
         "armed": "Magnetar : {{behaviour}} au prochain tour. {{counter}}",
         "lastMooring": "Une amarre restante.",
         "down": "Magnetar terrassé."
-      }
+      },
+      "nearDanger": {
+        "convoy": "Alerte : le convoi approche du vortex.",
+        "orbital": "Alerte : l'orbite atteint l'anneau de confinement.",
+        "merge": "Alerte : le bassin approche de la limite."
+      },
+      "storageQuotaExceeded": "Stockage du navigateur plein. Ouvrez les Réglages pour exporter votre progression."
     },
     "hints": {
       "replayAria": "Réafficher les astuces de ce niveau"
@@ -349,7 +369,24 @@
         "stage7": "L'ordre est fixe : brisez d'abord le Verrou Quantique, puis libérez le noyau.",
         "stage8": "Déclenchez le Coeur de Peinture : la rouille prend sa couleur et peut former un groupe.",
         "stage9": "Réveillez les Barils Explosifs : leurs explosions vident le plateau.",
-        "stage10": "Le noyau pend à une Sphère Enchaînée sur le rotor : formez un groupe de trois sur elle."
+        "stage10": "Le noyau pend à une Sphère Enchaînée sur le rotor : formez un groupe de trois sur elle.",
+        "stage11": "La barrière bloque le tir direct : utilisez le bumper en polarité inversée.",
+        "stage12": "Contournez la barrière grâce à la fronde du répulseur magnétique.",
+        "stage13": "Brisez d'abord le Verrou Quantique à droite, puis libérez le noyau à gauche.",
+        "stage14": "Tirez la Fusée Laser à travers la plateforme pour allumer le Baril Explosif.",
+        "stage15": "Exploitez l'attracteur pour courber le tir vers les ancres sur rail glissant.",
+        "stage16": "Passez de part et d'autre de l'Anti-Aimant central pour nettoyer les deux ailes.",
+        "stage17": "Peignez l'ancre liée en cramoisi avec le Pinceau pour déclencher la réaction.",
+        "stage18": "Contournez la Singularité avec la Bombe en polarité inversée.",
+        "stage19": "Passez par le relais portail à droite, puis éliminez la grappe à gauche.",
+        "stage20": "Déverrouillez le bouclier du rotor à droite, puis décrochez le noyau central."
+      },
+      "arcadeModes": {
+        "hex_grid": "Grille Hex : accrochez les sphères aux alvéoles. Éliminez des groupes pour charger des impulsions avant la descente.",
+        "orbital": "Orbital 360 : orbitez autour du noyau sans gravité et guidez les chutes vers les arcs collecteurs sans franchir l'anneau.",
+        "pinball": "Pinball : allumez tous les Noyaux dorés avant d'épuiser vos tirs. Rattrapez votre bille dans le panier pour +1 tir.",
+        "convoy": "Convoi : brisez la file avant le vortex. Les polarités opposées rappellent les segments en arrière pour créer des réactions.",
+        "merge": "Bassin Fusion : fusionnez les calibres identiques. Inversez la polarité pour attirer les paires et secouez dès que prête."
       }
     },
     "ghost": {
@@ -435,7 +472,8 @@
         "freed": "NOYAU SAUVÉ ! +{{points}}"
       },
       "blitz": {
-        "autoFire": "TIR AUTO !"
+        "autoFire": "TIR AUTO !",
+        "timeBonus": "+{{seconds}}s BLITZ !"
       },
       "bossRush": {
         "overchargeStrike": "SURCHARGE ! -1 BOUCLIER",
@@ -466,6 +504,9 @@
       },
       "weeklyBonus": {
         "claimed": "BONUS DE LA SEMAINE +{{coins}} ⬡"
+      },
+      "bounty": {
+        "completed": "CONTRAT : {{name}} +{{coins}} ⬡"
       },
       "sag": {
         "warning": "Un raté de plus et l'amas descend",
@@ -1266,14 +1307,17 @@
         },
         "startingShots": {
           "name": "Réserve de Projectiles",
-          "description": "Ajoute +{{shots}} sphères au début de chaque manche en Campagne et en Mode Flux par rang."
+          "description": "Ajoute +{{shots}} sphères au début de chaque manche en Campagne, Mode Flux et Pinball par rang."
         },
         "collectorMagnet": {
           "name": "Aimant Collecteur",
           "description": "Ajoute +{{points}} points bonus et +{{overcharge}} % de Surcharge par sphère d'avalanche dans les collecteurs du bas par rang."
         },
         "puzzleBaselineNote": "Les améliorations sont suspendues en Puzzle : chaque joueur affronte le même puzzle.",
-        "puristBaselineNote": "Les améliorations sont suspendues dans ce mode puriste."
+        "puristBaselineNote": "Les améliorations sont suspendues dans ce mode puriste.",
+        "convoyNote": "Visée, explosion et surcharge restent actifs ici ; Réserve de Projectiles et Aimant Collecteur ne s'appliquent pas en Convoi.",
+        "orbitalNote": "Visée, explosion, surcharge et Aimant Collecteur (arcs élargis) restent actifs ici ; Réserve de Projectiles ne s'applique pas.",
+        "arcadeShotlessNote": "Visée, explosion, surcharge et aimant restent actifs ici ; Réserve de Projectiles ne s'applique qu'aux modes à budget de tirs."
       },
       "feedback": {
         "upgradePurchased": "{{name}} amélioré au niveau {{level}} sur {{maxLevel}}.",
@@ -1432,7 +1476,8 @@
           "tooLarge": "Ce fichier de progression est trop volumineux.",
           "empty": "Ce fichier ne contient aucune progression à importer.",
           "invalid": "Ce fichier de progression MagnaShot est invalide pour cette version.",
-          "importError": "L'import n'a pas pu se terminer. Garde ton fichier de progression et réessaie."
+          "importError": "L'import n'a pas pu se terminer. Garde ton fichier de progression et réessaie.",
+          "quotaExceeded": "Le stockage du navigateur est plein. Exporte ta progression pour ne pas perdre les changements récents."
         }
       },
       "shakeGesture": {
@@ -1550,7 +1595,14 @@
       "duels": {
         "title": "Duels",
         "record": "{{won}} gagnés - {{lost}} perdus",
-        "empty": "Aucun duel pour l'instant."
+        "empty": "Aucun duel pour l'instant.",
+        "filterAria": "Filtrer les duels par mode",
+        "filters": {
+          "all": "Tous",
+          "daily": "Défi du Jour",
+          "flux": "Flux"
+        },
+        "filteredEmpty": "Aucun duel dans ce mode pour l'instant."
       }
     },
     "play": {
@@ -1576,6 +1628,22 @@
       },
       "weekly": {
         "desc": "Une nouvelle graine Flux chaque lundi, la même pour tous."
+      },
+      "bounties": {
+        "title": "Contrats du jour",
+        "progress": "{{progress}}/{{target}}",
+        "done": "Fait ✓",
+        "reward": "+{{coins}} ⬡",
+        "items": {
+          "pinball_cores": { "title": "Allumer {{target}} plots centraux en Flipper" },
+          "convoy_snapbacks": { "title": "Déclencher {{target}} jonctions en Convoi" },
+          "orbital_catches": { "title": "Capter {{target}} sphères dans les arcs orbitaux" },
+          "merge_fusions": { "title": "Fusionner {{target}} sphères en Bassin de Fusion" },
+          "hex_waves": { "title": "Terminer {{target}} vagues en Grille Hexa" },
+          "any_avalanches": { "title": "Faire tomber {{target}} sphères en avalanche" },
+          "overcharge_bursts": { "title": "Remplir la surcharge {{target}} fois" },
+          "daily_clear": { "title": "Terminer une partie du Défi du jour" }
+        }
       },
       "arcade": {
         "endlessDesc": "Vagues sans fin. Chaque raté rapproche l'amas.",
