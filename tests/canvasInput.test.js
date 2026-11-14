@@ -292,3 +292,26 @@ test('unbind removes every listener', () => {
   canvas.fire('pointermove', toClient(AIM_POINT.x, AIM_POINT.y));
   assert.deepEqual(engine.calls, []);
 });
+
+test('passive mouse hover clears isAimCancelled while dragging from board onto Next preview does not swap', () => {
+  const { canvas, engine } = setup();
+  engine.isAimCancelled = true;
+  canvas.fire('pointermove', toClient(CANVAS_CFG.launcherX, CANVAS_CFG.launcherY + 60));
+  assert.equal(engine.isAimCancelled, false, 'hover without pointerdown never leaves aim cancelled');
+
+  const nextX = CANVAS_CFG.launcherX + CANVAS_CFG.nextBallOffsetX;
+  const nextY = CANVAS_CFG.launcherY + CANVAS_CFG.nextBallOffsetY;
+  engine.calls.length = 0;
+
+  // Dragging from the board onto the Next preview shoots/cancels instead of swapping.
+  canvas.fire('pointerdown', toClient(AIM_POINT.x, AIM_POINT.y));
+  canvas.fire('pointerup', toClient(nextX, nextY));
+  assert.equal(names(engine).includes('swap'), false);
+  assert.equal(names(engine).includes('shoot'), true);
+
+  // Clicking directly on the Next preview still swaps.
+  engine.calls.length = 0;
+  canvas.fire('pointerdown', toClient(nextX, nextY));
+  canvas.fire('pointerup', toClient(nextX, nextY));
+  assert.equal(names(engine).includes('swap'), true);
+});

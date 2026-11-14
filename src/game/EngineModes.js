@@ -27,6 +27,7 @@ import { t } from '../core/I18n.js';
 import { SeededRandom } from '../core/SeededRandom.js';
 import { Ball } from '../entities/Ball.js';
 import { Obstacle } from '../entities/Obstacle.js';
+import { reportBountyEvent } from './Bounties.js';
 import { generateFluxStage } from './layouts/FluxStageGenerator.js';
 import {
   shiftObstacleDefsX,
@@ -900,6 +901,7 @@ export const engineModeMethods = {
     this.fluxPreviousFamily = this.fluxFamily;
     this.fluxStage = clearedStage + 1;
     this.unlockAchievementTiers('fluxShapes', this.fluxStage);
+    reportBountyEvent(this, 'flux_stage_cleared', 1);
     this.notifyUI({ fluxStageCleared: clearedStage });
   },
 

@@ -3221,3 +3221,87 @@ test('reportBountyEvent interpolates {{target}} in floating popup and notifies U
     i18n.currentLocale = previousLocale;
   }
 });
+
+test('Pinball and Convoy expose posture-aware pause cancel hints and Workshop renders pinballNote during Pinball runs', async () => {
+  const { PinballBehavior } = await import('../src/game/modes/PinballBehavior.js');
+  const { ConvoyBehavior } = await import('../src/game/modes/ConvoyBehavior.js');
+  const { renderWorkshopContents } = await import('../src/ui/WorkshopView.js');
+
+  const pinball = new PinballBehavior();
+  const convoy = new ConvoyBehavior();
+  assert.equal(pinball.getInputHintKey('modals.pause.instructions.cancel'), 'modals.pause.instructions.pinballCancel');
+  assert.equal(convoy.getInputHintKey('modals.pause.instructions.cancel'), 'modals.pause.instructions.convoyCancel');
+
+  const previousDocument = globalThis.document;
+  const previousLocale = i18n.currentLocale;
+  const makeNode = (tag) => ({
+    tagName: String(tag).toUpperCase(),
+    className: '',
+    textContent: '',
+    dataset: {},
+    style: {},
+    attributes: new Map(),
+    children: [],
+    setAttribute(k, v) { this.attributes.set(k, String(v)); },
+    getAttribute(k) { return this.attributes.get(k) ?? null; },
+    append(...nodes) { this.children.push(...nodes); },
+    appendChild(node) { this.children.push(node); return node; },
+    replaceChildren(...nodes) { this.children = [...nodes]; },
+    addEventListener() {}
+  });
+
+  try {
+    globalThis.document = { createElement: (tag) => makeNode(tag) };
+    i18n.dictionaries.set('en', loadJson('./locales/en.json'));
+    i18n.currentLocale = 'en';
+
+    const shopGrid = makeNode('div');
+    const shopBalance = makeNode('div');
+    const uiMock = {
+      gameConfig,
+      elements: { shopGrid, shopBalance },
+      isRunActive: () => true,
+      engine: {
+        mode: GAME_MODES.PINBALL,
+        areUpgradesNeutralised: () => false,
+        usesShotBudget: () => true,
+        canBuyUpgrade: () => true
+      },
+      storageManager: {
+        getCoins: () => 200,
+        getUpgradeLevel: () => 0,
+        getUpgradeCost: () => 50
+      }
+    };
+    renderWorkshopContents.call(uiMock);
+    const noteNode = shopGrid.children.find((child) => child.getAttribute('role') === 'note');
+    assert.ok(noteNode, 'renders upgrade note while Pinball run is active');
+    assert.equal(noteNode.textContent, t('modals.shop.upgrades.pinballNote'));
+  } finally {
+    globalThis.document = previousDocument;
+    i18n.currentLocale = previousLocale;
+  }
+});
+
+test('i18n.onChange live-refreshes open Play Hub, Workshop/Codex, and Campaign Map modals including stars summary', () => {
+  const previousLocale = i18n.currentLocale;
+  try {
+    i18n.dictionaries.set('en', loadJson('./locales/en.json'));
+    i18n.dictionaries.set('fr', loadJson('./locales/fr.json'));
+    i18n.currentLocale = 'en';
+
+    // Verify UIManager wires open-modal refresh branches directly inside its i18n.onChange listener.
+    const source = readFileSync('./src/ui/UIManager.js', 'utf8');
+    const onChangeStart = source.indexOf('i18n.onChange(');
+    assert.ok(onChangeStart > 0);
+    const onChangeSlice = source.slice(onChangeStart, onChangeStart + 2400);
+    assert.match(onChangeSlice, /modalPlay\.classList\.contains\('hidden'\)/);
+    assert.match(onChangeSlice, /this\.refreshPlayHubRecords\(\)/);
+    assert.match(onChangeSlice, /modalShop\.classList\.contains\('hidden'\)/);
+    assert.match(onChangeSlice, /this\.buildCodexPane\(\)/);
+    assert.match(onChangeSlice, /modalLevels\.classList\.contains\('hidden'\)/);
+    assert.match(onChangeSlice, /modals\.levelSelect\.starsTotal/);
+  } finally {
+    i18n.currentLocale = previousLocale;
+  }
+});

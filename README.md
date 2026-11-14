@@ -57,7 +57,7 @@
   - Every landing sends a swelling wave through the cluster, bond by bond and weaker at each step, with a light screen shake. The wave only changes how spheres are drawn; reduced motion turns both off.
   - The victory score rolls up and the earned stars pop in one after another; both respect reduced motion. The victory screen also shows how many points remain to reach the next star (or confirms 3★), and highlights new personal records across Campaign, Survival, Daily Challenge, and Flux Mode, while Campaign and Flux defeats report how many spheres were left on the board.
 - **Workshop & Codex**:
-  - Permanent upgrades (*Curved Laser Sight*, *Magnetic Amplifier*, *Overcharge Capacitor*, *Projectile Reserve*, *Collector Magnet*), with mode-specific guidance explaining how upgrades apply in shotless modes (*Magnetic Convoy*, *Orbital Spin*).
+  - Permanent upgrades (*Curved Laser Sight*, *Magnetic Amplifier*, *Overcharge Capacitor*, *Projectile Reserve*, *Collector Magnet*), with mode-specific guidance explaining how upgrades apply in shotless modes (*Magnetic Convoy*, *Orbital Spin*) and how *Collector Magnet* widens the moving catch bucket in *Magnetic Pinball*.
   - In-run Special Ammo refills (clicking or pressing `1`-`7` on an empty special sphere opens this tab), **4 Unlockable Sphere Visual Styles** (*Classic*, *Crystal*, *Neon*, *Metallic*) with live visual preview orbs, Bounties/Achievements with persistent all-time personal-best progress bars, grouped in Bronze, Silver and Gold tiers per family (new families for Flux shapes and Boss Rush waves), and an illustrated **Codex & Guide** covering cluster modifiers, magnetic obstacles, special spheres, Daily Challenge mutators, and core board & launcher mechanics (*Polarity Inversion*, *Magnetic Collector Bins*, *Overcharge Gauge*).
 - **Accessibility & Comfort**:
   - Frame-time adaptive particle budget that smoothly scales decorative bursts under sustained slow frames while preserving gameplay clarity, plus a proactive HUD warning badge and polite announcement if `localStorage` quota fills up and progress cannot be saved.
@@ -83,7 +83,7 @@
 | :--- | :--- | :--- |
 | **Aim** | Move pointer / Drag finger | `Left` / `Right` for fine steps (`+ Shift` for bigger ones) |
 | **Shoot** | Release pointer / finger | `Enter` |
-| **Cancel Aim** | Drag below the launcher ring | - |
+| **Cancel Aim** | Drag below the launcher ring (above the top launcher in Pinball, above the drop rail in Merge Basin, or onto the central turret in Convoy) | - |
 | **Swap Sphere** | Click secondary sphere or **Swap** button | `Space` |
 | **Flip Polarity** | Click **Polarity** button | `F` |
 | **Equip / Unequip Special Sphere** | Click Special Sphere slot (click again to stash) | `1` to `7` |

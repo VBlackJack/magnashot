@@ -618,6 +618,35 @@ export class UIManager {
       this.refreshVersusLanguage();
       this.refreshVersusLocalLanguage();
       this.refreshStatsIfOpen();
+      if (this.elements.modalPlay && !this.elements.modalPlay.classList.contains('hidden')) {
+        this.elements.playHubHint?.classList.add('hidden');
+        this.refreshPlayHubRecords();
+        this.refreshVersusCard();
+        this.renderPuzzleStagesStrip();
+        this.refreshModeLocks(this.getModeAccess());
+        this.refreshPlayHubCampaign();
+        this.syncPlayHubVersusLocal();
+      }
+      if (this.elements.modalShop && !this.elements.modalShop.classList.contains('hidden')) {
+        this.renderShopContents();
+        this.buildCodexPane();
+      }
+      if (this.elements.modalLevels && !this.elements.modalLevels.classList.contains('hidden')) {
+        if (this.elements.levelsStarsSummary) {
+          const maxCampaignStars = this.engine.levelCatalog.count * this.gameConfig.scoring.maxStars;
+          setTextIfChanged(
+            this.elements.levelsStarsSummary,
+            t('modals.levelSelect.starsTotal', {
+              stars: formatNumber(this.storageManager.getTotalStars()),
+              maxStars: formatNumber(maxCampaignStars)
+            })
+          );
+        }
+        this.elements.levelsChapterHint?.classList.add('hidden');
+        this.renderChapterSwitcher();
+        this.renderLevelTiles(this.getSuggestedLevelId());
+        this.renderLevelDetail(this.levelsSelectedId);
+      }
       this.refresh(this.engine, this.lastExtra);
     });
   }

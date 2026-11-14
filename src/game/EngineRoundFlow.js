@@ -333,6 +333,7 @@ export const engineRoundFlowMethods = {
         const earnedCoins = stars * this.gameConfig.scoring.coinsPerVictoryStar + firstStarBonus;
         this.storageManager.addCoins(earnedCoins);
         this.flushPendingRunCoins();
+        reportBountyEvent(this, 'campaign_level_cleared', 1);
         this.storageManager.unlockLevel(Math.min(this.currentLevelId + 1, this.levelCatalog.lastId));
         this.unlockAchievementTiers('starCollector', this.storageManager.getTotalStars());
         this.state = GAME_STATES.VICTORY;
@@ -449,6 +450,7 @@ export const engineRoundFlowMethods = {
         const waveBonus = bossRushCfg.waveClearBonusBase * this.bossRushWave;
         this.addScore(waveBonus);
         this.awardRunCoins(bossRushCfg.waveClearCoinBonus);
+        reportBountyEvent(this, 'boss_rush_wave_cleared', 1);
         this.particleSystem.spawnFloatingText(
           canvasCfg.logicalWidth * MATH_CONSTANTS.HALF,
           canvasCfg.logicalHeight * MATH_CONSTANTS.HALF,
@@ -503,6 +505,9 @@ export const engineRoundFlowMethods = {
         this.notifyUI();
       }
     } else if ((this.isSurvivalMode() || this.mode === GAME_MODES.BLITZ) && this.physicsWorld.balls.length === 0) {
+      if (this.mode === GAME_MODES.ENDLESS) {
+        reportBountyEvent(this, 'endless_wave_cleared', 1);
+      }
       this.spawnEndlessWave();
     }
   },

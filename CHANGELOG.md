@@ -5,9 +5,13 @@ All notable changes to **MagnaShot** are documented in this file.
 ## [Unreleased]
 
 ### Added
+- Daily Contracts UX: expanded the contract catalog with Campaign, Survival, Flux Mode, Boss Rush, and universal magnetic-group contracts, filtered daily rolls by unlocked modes on first roll of the day (preserving active contracts across mid-day unlocks), and turned Play Hub contract rows into interactive buttons with progress meters that launch or resume the target mode in one click.
+- Merge Basin pull-to-cancel & posture-aware pause instructions: dragging above the top drop rail (`cancelAboveOffset: 26`) now cancels a pending drop in Merge Basin, and the Pause screen shows posture-accurate cancel instructions in Magnetic Pinball, Magnetic Convoy, and Merge Basin.
 - Workshop Codex: added the Drop Rail (`rail`) mechanic and a dedicated Merge Basin Specials & Hazards section covering Joker, Ice, and Timed Bomb spheres, Basin Events, Live Contracts, Basin Shapes, and Rising Pressure.
 
 ### Fixed
+- Passive desktop mouse hover no longer arms `isAimCancelled` when no pointer button is held, and releasing a cancelled drag over the Next preview sphere no longer swaps launcher spheres by mistake.
+- Workshop Upgrades now display an accurate note during Magnetic Pinball runs explaining how Collector Magnet widens the moving catch bucket and adds catch Overcharge, and switching language (`i18n.onChange`) refreshes open Play Hub, Workshop/Codex, and Campaign Map modals live.
 - Merge Basin snapshot restore during `bigDrops` events now restores the event cycle before rebuilding `activePalette`, preserving calibre 6-7 launcher queues and special sphere kind tags on reload.
 - `DEFAULT_MODES_CONFIG.merge.shake` and `resolveModesConfig` now include `liftImpulsePxPerSec` and deep-merge nested `shake` overrides, preventing `NaN` velocities when running with default or partial mode configs.
 - Merge Basin ghost aim highlight (`hasEqualTierContactAt`) now delegates to `getMergeFusionCalibre`, eliminating false-positive fusion rings on Timed Bombs, frozen Ice spheres, and calibre-12 Joker contacts; Supernova fusions now advance `merge_fusion` bounties, sync `waveCount`, and record `comboMaster` progress.

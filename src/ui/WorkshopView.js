@@ -31,6 +31,10 @@ const SHOTLESS_NOTE_KEYS = Object.freeze({
   [GAME_MODES.CONVOY]: 'modals.shop.upgrades.convoyNote',
   [GAME_MODES.ORBITAL]: 'modals.shop.upgrades.orbitalNote'
 });
+/** Workshop note shown in shot-budget modes that repurpose a specific upgrade. */
+const MODE_UPGRADE_NOTE_KEYS = Object.freeze({
+  [GAME_MODES.PINBALL]: 'modals.shop.upgrades.pinballNote'
+});
 export { FULL_PERCENT };
 
 /** Achievement tiers, lowest first. */
@@ -177,15 +181,20 @@ export function renderWorkshopContents() {
   // say so, as text, only while such a run is active.
   const isNeutralised = this.engine.areUpgradesNeutralised();
   const isShotlessActive = !isNeutralised && this.engine.usesShotBudget?.() === false;
-  if (this.isRunActive() && (isNeutralised || isShotlessActive)) {
+  const modeSpecificNoteKey = !isNeutralised && !isShotlessActive
+    ? MODE_UPGRADE_NOTE_KEYS[this.engine.mode] || null
+    : null;
+  if (this.isRunActive() && (isNeutralised || isShotlessActive || modeSpecificNoteKey)) {
     const baselineNote = document.createElement('p');
     baselineNote.className = 'levels-empty-filter';
     baselineNote.setAttribute('role', 'note');
-    baselineNote.textContent = t(
-      isNeutralised
-        ? (BASELINE_NOTE_KEYS[this.engine.mode] || 'modals.shop.upgrades.dailyBaselineNote')
-        : (SHOTLESS_NOTE_KEYS[this.engine.mode] || 'modals.shop.upgrades.arcadeShotlessNote')
-    );
+    let noteKey = modeSpecificNoteKey;
+    if (isNeutralised) {
+      noteKey = BASELINE_NOTE_KEYS[this.engine.mode] || 'modals.shop.upgrades.dailyBaselineNote';
+    } else if (isShotlessActive) {
+      noteKey = SHOTLESS_NOTE_KEYS[this.engine.mode] || 'modals.shop.upgrades.arcadeShotlessNote';
+    }
+    baselineNote.textContent = t(noteKey);
     grid.appendChild(baselineNote);
   }
 

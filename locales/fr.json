@@ -1478,6 +1478,7 @@
         "puristBaselineNote": "Les améliorations sont suspendues dans ce mode puriste.",
         "convoyNote": "Visée, explosion et surcharge restent actifs ici ; Réserve de Projectiles et Aimant Collecteur ne s'appliquent pas en Convoi.",
         "orbitalNote": "Visée, explosion, surcharge et Aimant Collecteur (arcs élargis) restent actifs ici ; Réserve de Projectiles ne s'applique pas.",
+        "pinballNote": "Les 5 améliorations restent actives ici ; Aimant Collecteur élargit le panier mobile et ajoute de la Surcharge à chaque capture au lieu des points de bac.",
         "arcadeShotlessNote": "Visée, explosion, surcharge et aimant restent actifs ici ; Réserve de Projectiles ne s'applique qu'aux modes à budget de tirs."
       },
       "feedback": {
@@ -1597,6 +1598,18 @@
         "cancel": {
           "pointer": "Annuler un tir : relâchez le clic sous le lanceur",
           "touch": "Annuler un tir : ramenez le doigt sous le lanceur avant de relâcher"
+        },
+        "pinballCancel": {
+          "pointer": "Annuler un tir : relâchez le clic au-dessus du lanceur supérieur",
+          "touch": "Annuler un tir : glissez le doigt au-dessus du lanceur supérieur avant de relâcher"
+        },
+        "convoyCancel": {
+          "pointer": "Annuler un tir : relâchez le clic sur la tourelle centrale",
+          "touch": "Annuler un tir : ramenez le doigt sur la tourelle centrale avant de relâcher"
+        },
+        "mergeCancel": {
+          "pointer": "Annuler un lâcher : relâchez le clic au-dessus du rail",
+          "touch": "Annuler un lâcher : glissez le doigt au-dessus du rail avant de relâcher"
         },
         "keyboard": {
           "pointer": "Clavier & Arsenal : Flèches pour affiner la visée (Maj : plus vite), Entrée pour tirer, F (ou 🧲) pour inverser la polarité, 1-7 pour les sphères spéciales",
@@ -1806,6 +1819,11 @@
           "orbital_catches": { "title": "Capter {{target}} sphères dans les arcs orbitaux" },
           "merge_fusions": { "title": "Fusionner {{target}} sphères en Bassin de Fusion" },
           "hex_waves": { "title": "Terminer {{target}} vagues en Grille Hexa" },
+          "endless_waves": { "title": "Terminer {{target}} vagues en Survie" },
+          "flux_stages": { "title": "Terminer {{target}} formes en Mode Flux" },
+          "boss_rush_waves": { "title": "Vaincre {{target}} vagues Boss en Boss Rush" },
+          "campaign_levels": { "title": "Terminer {{target}} niveaux de Campagne" },
+          "any_groups": { "title": "Détruire {{target}} groupes magnétiques" },
           "any_avalanches": { "title": "Faire tomber {{target}} sphères en avalanche" },
           "overcharge_bursts": { "title": "Remplir la surcharge {{target}} fois" },
           "daily_clear": { "title": "Terminer une partie du Défi du jour" }

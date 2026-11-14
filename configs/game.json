@@ -441,6 +441,11 @@
       { "id": "orbital_catches", "eventKey": "orbital_arc_catch", "target": 6, "coins": 40, "mode": "orbital" },
       { "id": "merge_fusions", "eventKey": "merge_fusion", "target": 12, "coins": 40, "mode": "merge" },
       { "id": "hex_waves", "eventKey": "hex_wave_cleared", "target": 3, "coins": 45, "mode": "hex_grid" },
+      { "id": "endless_waves", "eventKey": "endless_wave_cleared", "target": 3, "coins": 35, "mode": "endless" },
+      { "id": "flux_stages", "eventKey": "flux_stage_cleared", "target": 3, "coins": 40, "mode": "flux" },
+      { "id": "boss_rush_waves", "eventKey": "boss_rush_wave_cleared", "target": 2, "coins": 45, "mode": "boss_rush" },
+      { "id": "campaign_levels", "eventKey": "campaign_level_cleared", "target": 2, "coins": 35, "mode": "campaign" },
+      { "id": "any_groups", "eventKey": "match_group_cleared", "target": 12, "coins": 35, "mode": null },
       { "id": "any_avalanches", "eventKey": "avalanche_balls", "target": 20, "coins": 35, "mode": null },
       { "id": "overcharge_bursts", "eventKey": "overcharge_full", "target": 4, "coins": 40, "mode": null },
       { "id": "daily_clear", "eventKey": "daily_run_finished", "target": 1, "coins": 50, "mode": "daily" }

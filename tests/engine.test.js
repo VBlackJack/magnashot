@@ -1401,3 +1401,72 @@ test('Daily sag timelines are identical across two runs of the same seed', () =>
   };
   assert.deepEqual(run(), run());
 });
+
+test('Phase 2 bounty events emit only on genuine Survival/BossRush/Flux/Campaign/group clears and never on Sag whiffs or empty post-turn cleanups', () => {
+  const engine = createTestEngine();
+  const recorded = [];
+  engine.storageManager.recordBountyProgress = (eventKey, amount) => {
+    recorded.push([eventKey, amount]);
+    return [];
+  };
+
+  // 1. Survival: Sag whiff wave drop must NOT emit endless_wave_cleared, whereas clearing the board DOES.
+  engine.startEndlessMode();
+  recorded.length = 0;
+  engine.spawnEndlessWave();
+  assert.equal(
+    recorded.some(([k]) => k === 'endless_wave_cleared'),
+    false,
+    'Sag/spawn wave drop must not emit endless_wave_cleared'
+  );
+  for (const b of [...engine.physicsWorld.balls]) {
+    engine.physicsWorld.removeBall(b);
+  }
+  engine.evaluateRoundEnd();
+  assert.deepEqual(recorded, [['endless_wave_cleared', 1]]);
+
+  // 2. Group clear: handlePostTurnCleanup(true) with 0 destroyed spheres emits nothing, while resolveColorMatchCluster emits match_group_cleared.
+  recorded.length = 0;
+  engine.handlePostTurnCleanup(true);
+  assert.equal(
+    recorded.some(([k]) => k === 'match_group_cleared'),
+    false,
+    'non-group cleanup must not emit match_group_cleared'
+  );
+  const sampleBalls = engine.physicsWorld.balls.slice(0, 3);
+  const sameColor = sampleBalls[0].colorId;
+  for (const b of sampleBalls) {
+    b.colorId = sameColor;
+    b.clusterModifier = null;
+    b.armorHits = 0;
+  }
+  engine.resolveColorMatchCluster(sampleBalls, sampleBalls[0], false);
+  assert.equal(recorded.filter(([k]) => k === 'match_group_cleared').length, 1);
+
+  // 3. Flux stage clear emits flux_stage_cleared.
+  engine.startFluxRun(TEST_FLUX_SEED);
+  recorded.length = 0;
+  engine.completeFluxStage();
+  assert.deepEqual(recorded, [['flux_stage_cleared', 1]]);
+
+  // 4. Boss Rush wave clear emits boss_rush_wave_cleared.
+  engine.startBossRushMode();
+  recorded.length = 0;
+  const bossBall = engine.getBossBall();
+  assert.ok(bossBall);
+  engine.physicsWorld.removeBall(bossBall);
+  engine.physicsWorld.projectile = null;
+  engine.physicsWorld.droppingBalls.length = 0;
+  engine.evaluateRoundEnd();
+  assert.equal(recorded.some(([k]) => k === 'boss_rush_wave_cleared'), true);
+
+  // 5. Campaign victory emits campaign_level_cleared.
+  engine.startCampaignLevel(1);
+  recorded.length = 0;
+  for (const b of [...engine.physicsWorld.balls]) {
+    engine.physicsWorld.removeBall(b);
+  }
+  engine.evaluateRoundEnd();
+  assert.equal(engine.state, GAME_STATES.VICTORY);
+  assert.equal(recorded.some(([k]) => k === 'campaign_level_cleared'), true);
+});

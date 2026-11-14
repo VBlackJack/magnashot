@@ -312,6 +312,10 @@ export const engineControlsMethods = {
   updateAim(targetX, targetY) {
     const spec = this.getLauncherSpec();
     if (spec.posture === LAUNCHER_POSTURES.DROP_RAIL) {
+      if (spec.cancelOffset > 0 && targetY < spec.y - spec.cancelOffset) {
+        this.isAimCancelled = true;
+        return;
+      }
       this.isAimCancelled = false;
       const behavior = this.getModeBehavior();
       const radius = this.currentBall?.radius || this.physicsConfig.ball.radius;

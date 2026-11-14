@@ -100,3 +100,96 @@ test('StorageManager tracks bounty progress, pays coins once on completion, and 
   mockEngine.isRestoringRun = true;
   assert.deepEqual(reportBountyEvent(mockEngine, second.eventKey, second.target), []);
 });
+
+test('every bounties.catalog entry has localized EN and FR titles and Day-1 progression filtering excludes locked modes', () => {
+  const en = loadJson('./locales/en.json');
+  const fr = loadJson('./locales/fr.json');
+  const enItems = en?.modals?.play?.bounties?.items || {};
+  const frItems = fr?.modals?.play?.bounties?.items || {};
+
+  for (const entry of gameConfig.bounties.catalog) {
+    assert.equal(typeof enItems[entry.id]?.title, 'string', `missing EN bounty title for ${entry.id}`);
+    assert.equal(typeof frItems[entry.id]?.title, 'string', `missing FR bounty title for ${entry.id}`);
+    assert.ok(enItems[entry.id].title.length > 0);
+    assert.ok(frItems[entry.id].title.length > 0);
+  }
+
+  const dayOneUnlocked = new Set(['campaign', 'daily']);
+  for (let day = 1; day <= 30; day++) {
+    const dateKey = `2026-11-${String(day).padStart(2, '0')}`;
+    const rolled = pickDailyBounties(gameConfig.bounties, dateKey, { unlockedModes: dayOneUnlocked });
+    assert.equal(rolled.length, gameConfig.bounties.dailyCount);
+    for (const item of rolled) {
+      assert.ok(
+        item.mode === null || dayOneUnlocked.has(item.mode),
+        `Day-1 roll on ${dateKey} included locked mode ${item.mode} (${item.id})`
+      );
+    }
+  }
+});
+
+test('normalizeBountiesState and StorageManager preserve valid daily contracts across mid-day unlocks and sanitize tampered backups', () => {
+  const sm = createTestStorage();
+  const dateKey = '2026-11-15';
+
+  // Fresh Day-1 player (0 campaign levels cleared) rolls only unlocked contracts.
+  const morning = sm.getDailyBountiesState(dateKey);
+  assert.equal(morning.items.length, gameConfig.bounties.dailyCount);
+  for (const item of morning.items) {
+    assert.ok(item.mode === null || item.mode === 'campaign' || item.mode === 'daily');
+  }
+
+  // Record partial progress, then clear campaign levels mid-day to unlock new modes.
+  const tracked = morning.items[0];
+  sm.recordBountyProgress(tracked.eventKey, 1, dateKey);
+  for (let lvl = 1; lvl <= 17; lvl++) {
+    sm.saveLevelResult(lvl, 5000, 3);
+  }
+  sm.syncEarnedModeUnlocks();
+
+  const afternoon = sm.getDailyBountiesState(dateKey);
+  assert.deepEqual(
+    afternoon.items.map((item) => item.id),
+    morning.items.map((item) => item.id),
+    'mid-day mode unlocks must not wipe or reroll today contracts'
+  );
+  assert.equal(afternoon.items[0].progress, Math.min(tracked.target, 1));
+
+  // Tampered or stale backup items are re-hydrated from canonical catalog and unknown IDs replaced.
+  const tampered = normalizeBountiesState(
+    {
+      dateKey,
+      items: [
+        { id: 'nonexistent_contract', progress: 99, completed: true, coins: 99999 },
+        { id: 'daily_clear', progress: 0, completed: false, coins: 99999, target: 0 }
+      ]
+    },
+    gameConfig.bounties,
+    dateKey,
+    { unlockedModes: new Set(['campaign', 'daily']) }
+  );
+  assert.equal(tampered.items.length, gameConfig.bounties.dailyCount);
+  assert.equal(tampered.items.some((item) => item.id === 'nonexistent_contract'), false);
+  const dailyItem = tampered.items.find((item) => item.id === 'daily_clear');
+  assert.ok(dailyItem);
+  assert.equal(dailyItem.coins, 50);
+  assert.equal(dailyItem.target, 1);
+
+  // Stale 0-progress locked contracts are replaced, while started progress on a locked contract is kept.
+  const staleLocked = normalizeBountiesState(
+    {
+      dateKey,
+      items: [
+        { id: 'pinball_cores', progress: 0, completed: false },
+        { id: 'convoy_snapbacks', progress: 2, completed: false }
+      ]
+    },
+    gameConfig.bounties,
+    dateKey,
+    { unlockedModes: new Set(['campaign', 'daily']) }
+  );
+  assert.equal(staleLocked.items.some((item) => item.id === 'pinball_cores'), false);
+  const keptStarted = staleLocked.items.find((item) => item.id === 'convoy_snapbacks');
+  assert.ok(keptStarted);
+  assert.equal(keptStarted.progress, 2);
+});

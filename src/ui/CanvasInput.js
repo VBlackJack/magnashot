@@ -167,6 +167,9 @@ export function bindCanvasInput(canvas, getEngine, gameConfig, options = {}) {
     const aimPos = getAimAdjustedCoords(engine, e, rawPos);
     if (aimsAtPointer(engine, e, aimPos)) {
       engine.updateAim(aimPos.x, aimPos.y);
+      if (!isPointerDownOnCanvas) {
+        engine.isAimCancelled = false;
+      }
     }
     onAimChanged(engine);
   });
@@ -231,7 +234,8 @@ export function bindCanvasInput(canvas, getEngine, gameConfig, options = {}) {
       return;
     }
     const rawPos = toLogicalCoords(e.clientX, e.clientY);
-    if (isSwapClick(engine, rawPos.x, rawPos.y) || isLauncherBaseTap(engine, rawPos.x, rawPos.y, startPos)) {
+    const startedOnSwap = startPos !== null && isSwapClick(engine, startPos.x, startPos.y);
+    if ((startedOnSwap && isSwapClick(engine, rawPos.x, rawPos.y)) || isLauncherBaseTap(engine, rawPos.x, rawPos.y, startPos)) {
       engine.isAimCancelled = false;
       engine.swapLauncherBalls();
       onAimChanged(engine);

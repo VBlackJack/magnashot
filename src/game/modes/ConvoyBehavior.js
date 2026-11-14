@@ -190,6 +190,10 @@ export class ConvoyBehavior extends ModeBehavior {
     };
   }
 
+  getInputHintKey(key) {
+    return key === 'modals.pause.instructions.cancel' ? 'modals.pause.instructions.convoyCancel' : key;
+  }
+
   getRenderChrome() {
     return CONVOY_CHROME;
   }

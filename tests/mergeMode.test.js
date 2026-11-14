@@ -2991,3 +2991,26 @@ test('Supernova fusion updates waveCount, reports merge_fusion bounty progress, 
   assert.deepEqual(bountyEvents, [{ event: 'merge_fusion', amount: 1 }]);
   assert.ok(engine.storageManager.getAchievementRecords().maxCombo >= 5);
 });
+
+test('Merge Basin DROP_RAIL supports pull-up-to-cancel above the rail and exposes posture-specific pause cancel hint', () => {
+  const engine = createEngine();
+  engine.startMergeMode();
+  const spec = mergeBehavior.getLauncherSpec(engine);
+  assert.equal(spec.cancelOffset, modesConfig.merge.cancelAboveOffset);
+  assert.equal(
+    mergeBehavior.getInputHintKey('modals.pause.instructions.cancel'),
+    'modals.pause.instructions.mergeCancel'
+  );
+
+  const countBefore = engine.physicsWorld.balls.length;
+  engine.updateAim(200, spec.y - spec.cancelOffset - 6);
+  assert.equal(engine.isAimCancelled, true);
+  engine.shoot();
+  assert.equal(engine.isAimCancelled, false);
+  assert.equal(engine.physicsWorld.balls.length, countBefore, 'cancelled drop spawns no sphere');
+
+  engine.updateAim(200, spec.y + 40);
+  assert.equal(engine.isAimCancelled, false);
+  engine.shoot();
+  assert.equal(engine.physicsWorld.balls.length, countBefore + 1, 'aiming below cancel line drops normally');
+});

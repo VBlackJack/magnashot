@@ -156,6 +156,7 @@ export const DEFAULT_MODES_CONFIG = Object.freeze({
       })
     }),
     launcherY: 82,
+    cancelAboveOffset: 26,
     dropStepPx: 14,
     nextOffsetX: 156,
     nextOffsetY: 0,

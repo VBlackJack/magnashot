@@ -4206,7 +4206,7 @@ describe('Lot E and audit smoke checks', () => {
     const { context, page, errors } = await openGame(viewport, { initStorage: fullProfileStorage });
     try {
       await openPlayHub(page, viewport);
-      const bountyCount = await page.locator('#play-bounties-list > li').count();
+      const bountyCount = await page.locator('#play-bounties-list > li.play-bounty-row > button.play-bounty-btn').count();
       assert.equal(bountyCount, GAME_CONFIG.bounties.dailyCount);
       assert.equal(
         await page.evaluate(() => document.getElementById('btn-endless')?.classList.contains('is-mastered')),
@@ -4216,6 +4216,19 @@ describe('Lot E and audit smoke checks', () => {
         await page.evaluate(() => document.getElementById('btn-mode-puzzle')?.classList.contains('is-mastered')),
         true
       );
+
+      // Clicking an interactive Daily Contract launches or resumes a playable run immediately.
+      await page.click('#play-bounty-0');
+      await page.waitForFunction(() => document.querySelector('#modal-play')?.classList.contains('hidden'));
+      assert.equal(
+        await page.evaluate(
+          (states) => window.__fluxEngine.state === states.PLAYING || window.__fluxEngine.state === states.PAUSED,
+          GAME_STATES
+        ),
+        true
+      );
+
+      await openPlayHub(page, viewport);
 
       await page.click('#btn-puzzle-stages-toggle');
       await waitShown(page, '#puzzle-stages-strip');
