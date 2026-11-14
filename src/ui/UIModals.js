@@ -66,6 +66,7 @@ export const uiModalMethods = {
       (this.engine.mode === GAME_MODES.CLASSIC && this.engine.classicStage > 1) ||
       (this.engine.mode === GAME_MODES.FLUX && this.engine.fluxStage > 1) ||
       (this.engine.mode === GAME_MODES.PINBALL && this.engine.pinballStage > 1) ||
+      (this.engine.mode === GAME_MODES.SLINGSHOT && this.engine.slingshotStage > 1) ||
       (this.engine.mode === GAME_MODES.MERGE && (this.engine.mergeBestTier > 1 || this.engine.waveCount > 1)) ||
       ((this.engine.mode === GAME_MODES.CONVOY ||
         this.engine.mode === GAME_MODES.HEX_GRID ||

@@ -807,3 +807,38 @@ test('Blitz 90s awards capped avalanche time bonuses and plays urgent countdown 
   engine.update();
   assert.ok(playedEffects.some(([name]) => name === 'blitzTick'), 'Urgent second tick plays audio cue');
 });
+
+test('Blitz Fever Streak awards wave-scaled points and capped time bonus every 3 consecutive hit turns, resets on whiff, and persists in RunSnapshot', () => {
+  const storage = createTestStorage();
+  const engine = createTestEngine(storage);
+  engine.startBlitzMode();
+  engine.hasFiredInRound = true;
+  engine.waveCount = 2;
+
+  const blitzCfg = gameConfig.blitz;
+  const framesStart = engine.blitzFramesRemaining;
+  const scoreStart = engine.score;
+
+  // Turns 1 and 2 build streak without triggering Fever yet.
+  engine.handlePostTurnCleanup(true);
+  assert.equal(engine.blitzHitStreak, 1);
+  engine.handlePostTurnCleanup(true);
+  assert.equal(engine.blitzHitStreak, 2);
+  assert.equal(engine.score, scoreStart);
+
+  // Turn 3 triggers Blitz Fever (+200 * waveCount pts, +120 frames).
+  engine.handlePostTurnCleanup(true);
+  assert.equal(engine.blitzHitStreak, 3);
+  assert.equal(engine.score, scoreStart + blitzCfg.feverBonusPoints * 2);
+  assert.equal(engine.blitzFramesRemaining, framesStart + blitzCfg.feverTimeBonusFrames);
+
+  // Snapshot round-trip preserves blitzHitStreak.
+  engine.saveRunSnapshot({ force: true });
+  const restored = createTestEngine(storage);
+  assert.equal(restored.restoreSavedRun(), true);
+  assert.equal(restored.blitzHitStreak, 3);
+
+  // A whiff turn resets blitzHitStreak to 0.
+  restored.handlePostTurnCleanup(false);
+  assert.equal(restored.blitzHitStreak, 0);
+});

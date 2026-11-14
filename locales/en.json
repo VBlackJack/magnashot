@@ -159,7 +159,8 @@
         "orbital": "Orbital 360 • Wave {{wave}}",
         "pinball": "Pinball • Stage {{stage}} (⚡ {{cores}})",
         "convoy": "Convoy • Wave {{wave}}",
-        "merge": "Merge Basin • Calibre {{tier}}"
+        "merge": "Merge Basin • Calibre {{tier}}",
+        "slingshot": "Slingshot • Stage {{stage}} (✦ {{cores}})"
       },
       "shots": {
         "label": "Shots Left",
@@ -333,7 +334,8 @@
         "withNearMiss": "{{result}} {{nearMiss}}.",
         "gameOver": "Game over. {{reason}} Score: {{score}}.",
         "fluxStageCleared": "Shape {{stage}} cleared. The next shape is coming.",
-        "classicStageCleared": "Stage {{stage}} cleared. The next stage is ready."
+        "classicStageCleared": "Stage {{stage}} cleared. The next stage is ready.",
+        "slingshotStageCleared": "Stage {{stage}} cleared. The next constellation is ready."
       },
       "hints": {
         "reset": "Discovery hints will show again."
@@ -412,7 +414,8 @@
         "orbital": "Orbital 360: build around the zero-G core and steer falling fragments into rotating collector arcs before touching the outer ring.",
         "pinball": "Pinball: clear every glowing Core Peg before shots run out. Catch your sphere in the bottom bucket for a free shot refund.",
         "convoy": "Convoy: break the rolling chain before it reaches the singularity. Exposed opposite polarities snap segments back into collisions.",
-        "merge": "Merge Basin: fuse matching spheres into higher calibres inside the basin. Flip polarity to nudge pairs, and shake when ready."
+        "merge": "Merge Basin: fuse matching spheres into higher calibres inside the basin. Flip polarity to nudge pairs, and shake when ready.",
+        "slingshot": "Magnetic Slingshot: curve shots around Dipole Wells (+ / -) to shatter every Radiant Core. Flip polarity (F) mid-flight inside a well's ring for a Polarity Whip boost."
       }
     },
     "ghost": {
@@ -499,7 +502,8 @@
       },
       "blitz": {
         "autoFire": "AUTO-FIRE!",
-        "timeBonus": "+{{seconds}}s BLITZ!"
+        "timeBonus": "+{{seconds}}s BLITZ!",
+        "fever": "FEVER x{{streak}}! +{{points}}"
       },
       "bossRush": {
         "overchargeStrike": "OVERCHARGE STRIKE! -1 SHIELD",
@@ -549,8 +553,12 @@
         "down": "MAGNETAR DOWN! +{{points}}"
       },
       "resonance": "Resonance!",
+      "cascade": {
+        "shelfCleared": "SHELF CLEAR! +{{points}}"
+      },
       "hexGrid": {
         "pulse": "HEX PULSE! +{{points}}",
+        "prismShattered": "PRISM SHATTERED! +{{points}} • +{{delay}} turns",
         "waveCleared": "GRID CLEARED! +{{points}}"
       },
       "orbital": {
@@ -563,7 +571,14 @@
       },
       "convoy": {
         "snapback": "MAGNETIC SNAP-BACK! +{{points}}",
+        "chainSnapback": "CHAIN SNAP-BACK x{{chain}}! +{{points}}",
         "waveCleared": "CONVOY CLEARED! +{{points}}"
+      },
+      "slingshot": {
+        "whip": "POLARITY WHIP!",
+        "whipCore": "WHIP SHATTER! +{{points}}",
+        "coreShattered": "RADIANT CORE! +{{points}}",
+        "stageCleared": "CONSTELLATION CLEARED! +{{points}}"
       },
       "merge": {
         "fused": "CALIBRE {{tier}}! +{{points}}",
@@ -894,6 +909,8 @@
         "merge": "Merge Basin",
         "mergeDesc": "12 calibre tiers • Top drop rail • Shockwave fusion • Shake",
         "mergeRecord": "Calibre {{tier}} • Best: {{score}}",
+        "slingshot": "Magnetic Slingshot",
+        "slingshotDesc": "Dipole gravity wells • Curved trick shots • Live Polarity Whip",
         "masteredBadge": ", Mastered"
       },
       "jumpCurrent": "Current level",
@@ -958,7 +975,7 @@
         "stock": "In Stock: {{count}}",
         "buy": "+1 ({{cost}} ⬡)",
         "unavailable": "No active run",
-        "unavailableHint": "Start a Campaign, Survival, Daily, Flux, Blitz, Boss Rush or Cascade run to buy ammo.",
+        "unavailableHint": "Start a Campaign, Survival, Daily, Flux, Blitz, Boss Rush, Cascade, or Slingshot run to buy ammo.",
         "puzzleLocked": "Fixed loadout",
         "puzzleLockedHint": "Puzzle stages use a fixed special-sphere loadout.",
         "puristLocked": "Purist rules",
@@ -1189,7 +1206,7 @@
             "hexGrid": {
               "icon": "⬡",
               "name": "Hex Grid (Rigid Snap)",
-              "description": "Straight-line shots snap instantly onto a rigid hex lattice with zero magnetic curve. Flip polarity (F) before shooting to trigger a 1-cell magnetic pulse on landing."
+              "description": "Straight-line shots snap instantly onto a rigid hex lattice with zero magnetic curve. Flip polarity (F) before shooting for a 1-cell magnetic pulse, and shatter Resonance Prism cells to delay ceiling descent."
             },
             "pinball": {
               "icon": "🎱",
@@ -1204,12 +1221,17 @@
             "convoy": {
               "icon": "🐍",
               "name": "Magnetic Convoy (Rail Snap-Back)",
-              "description": "A central 360° turret fires into a continuous sphere train advancing toward a vortex. Opening a gap between matching colors or opposite poles snaps the front train backward into chain combos."
+              "description": "A central 360° turret fires into a continuous sphere train advancing toward a vortex. Opening gaps between matching colors or opposite poles triggers escalating Chain Snap-Backs that push the surviving train backward."
             },
             "merge": {
               "icon": "🫧",
               "name": "Merge Basin (12 Calibre Tiers)",
               "description": "Drop spheres from a top rail into Classic, Narrow or Pegged basins. Identical calibres fuse (1 to 12) with a magnetic shockwave while the overflow line steps down as pressure rises. Polarity pulses pull matching calibres together, and Shake recharges after drops or chains."
+            },
+            "slingshot": {
+              "icon": "🏹",
+              "name": "Magnetic Slingshot (Dipole Wells)",
+              "description": "Curve shots around signed Dipole Wells (+ / -) to bypass deflectors and shatter Radiant Cores. Flip polarity (F) before firing to reverse every curve, or flip inside a well's dashed ring mid-flight for a Polarity Whip speed and score boost."
             }
           }
         },
@@ -1434,6 +1456,18 @@
           "mergeTiersGold": {
             "name": "Fusion Alchemist III",
             "description": "Fuse up to Calibre {{target}} in Merge Basin."
+          },
+          "slingshotStages": {
+            "name": "Gravity Bender",
+            "description": "Reach Stage {{target}} in Magnetic Slingshot."
+          },
+          "slingshotStagesSilver": {
+            "name": "Gravity Bender II",
+            "description": "Reach Stage {{target}} in Magnetic Slingshot."
+          },
+          "slingshotStagesGold": {
+            "name": "Gravity Bender III",
+            "description": "Reach Stage {{target}} in Magnetic Slingshot."
           }
         },
         "tier": {
@@ -1468,7 +1502,7 @@
         },
         "startingShots": {
           "name": "Projectile Reserve",
-          "description": "Adds +{{shots}} starting shots per rank in Campaign, Flux Mode, and Pinball runs."
+          "description": "Adds +{{shots}} starting shots per rank in Campaign, Flux Mode, Pinball, and Slingshot runs."
         },
         "collectorMagnet": {
           "name": "Collector Magnet",
@@ -1479,6 +1513,7 @@
         "convoyNote": "Aiming, blast, and overcharge stay active here; Projectile Reserve and Collector Magnet do not apply in Convoy.",
         "orbitalNote": "Aiming, blast, overcharge, and Collector Magnet (wider collector arcs) stay active here; Projectile Reserve does not apply.",
         "pinballNote": "All 5 upgrades stay active here; Collector Magnet widens the moving catch bucket and adds catch Overcharge instead of bin points.",
+        "slingshotNote": "All 5 upgrades stay active here; Collector Magnet widens the mid-flight Polarity Whip zone around Dipole Wells and boosts bin catches.",
         "arcadeShotlessNote": "Aiming, blast, overcharge, and collector upgrades stay active here; Projectile Reserve applies only to shot-limited modes."
       },
       "feedback": {
@@ -1538,6 +1573,7 @@
         "puzzleSummary": "Puzzle Stage: {{stage}} / {{total}}",
         "classicSummary": "Stage reached: {{stage}} (best: {{best}}) • Coins: +{{coins}} ⬡",
         "pinballSummary": "Pinball Stage: {{stage}} (best: {{best}}) • Coins: +{{coins}} ⬡",
+        "slingshotSummary": "Slingshot Stage: {{stage}} (best: {{best}}) • Coins: +{{coins}} ⬡",
         "mergeSummary": "Best Calibre: {{tier}} (best: {{best}}) • Coins: +{{coins}} ⬡"
       },
       "button": {
@@ -1621,6 +1657,7 @@
           "touch": "Polarity & Shake: tap 🧲 to pull identical calibres together, or tap Shake when it is ready"
         },
         "mergeTip": "Tip: Two identical calibres fuse into the next one. Use the Shake when it is ready to throw the pile towards the emptier side!",
+        "slingshotTip": "Tip: Flip polarity (F or 🧲) before firing to reverse Dipole Well curves, or flip inside a well's dashed ring mid-flight for a Polarity Whip surge!",
         "pad": "Controller: left stick to aim (right stick for fine aim), bottom face button or right trigger to shoot, left face button to swap, top face button to flip polarity, bumpers for Special Spheres, Start to pause"
       },
       "button": {
@@ -1818,6 +1855,7 @@
           "convoy_snapbacks": { "title": "Trigger {{target}} Gap Snapbacks in Convoy" },
           "orbital_catches": { "title": "Catch {{target}} Orbiters in Orbital Arcs" },
           "merge_fusions": { "title": "Fuse {{target}} spheres in Merge Basin" },
+          "slingshot_cores": { "title": "Shatter {{target}} Radiant Cores in Slingshot" },
           "hex_waves": { "title": "Clear {{target}} waves in Hex Grid" },
           "endless_waves": { "title": "Clear {{target}} waves in Survival" },
           "flux_stages": { "title": "Clear {{target}} shapes in Flux Mode" },
@@ -1857,6 +1895,7 @@
         "orbital": "🪐",
         "convoy": "🐍",
         "merge": "🫧",
+        "slingshot": "🏹",
         "versus": "⚔"
       }
     }
@@ -2066,6 +2105,10 @@
     "merge": {
       "header": "MagnaShot - Merge Basin",
       "stats": "Calibre {{tier}} - {{score}} pts"
+    },
+    "slingshot": {
+      "header": "MagnaShot - Magnetic Slingshot",
+      "stats": "Stage {{stage}} - {{score}} pts"
     }
   },
   "stats": {

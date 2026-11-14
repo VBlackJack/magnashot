@@ -238,3 +238,34 @@ test('Hex Grid snapshot preserves lattice coordinates and descent counter across
     expectedCells
   );
 });
+
+test('Hex Grid spawns Resonance Prism cells from wave 2+, delays descent on shatter, and preserves hexPrism in RunSnapshot', () => {
+  const engine = createEngine();
+  engine.startHexGridMode();
+  const cfg = modesConfig.hexGrid;
+
+  // First ceiling descent advances wave 1 -> wave 2 and marks exactly 1 top cell with hexPrism.
+  hexGridBehavior.descendCeilingRow(engine);
+  assert.equal(engine.waveCount, 2);
+  const prisms = engine.physicsWorld.balls.filter((b) => b.hexPrism);
+  assert.equal(prisms.length, 1);
+
+  // Snapshot preserves hexPrism flag on the exact cell.
+  engine.hasFiredInRound = true;
+  engine.saveRunSnapshot({ force: true });
+  const restored = createEngine();
+  restored.storageManager = engine.storageManager;
+  assert.equal(restored.restoreSavedRun(), true);
+  assert.equal(restored.physicsWorld.balls.filter((b) => b.hexPrism).length, 1);
+
+  // Shattering the prism grants +prismBonusPoints and +prismDescentDelay turns capped at descentCadence + prismMaxBuffer.
+  restored.state = GAME_STATES.PLAYING;
+  const prismBall = restored.physicsWorld.balls.find((b) => b.hexPrism);
+  restored.modeState.shotsUntilDescent = 2;
+  const scoreBefore = restored.score;
+  restored.physicsWorld.removeBall(prismBall);
+  hexGridBehavior.finishHexTurn(restored, true, [prismBall]);
+
+  assert.equal(restored.score, scoreBefore + cfg.prismBonusPoints);
+  assert.equal(restored.modeState.shotsUntilDescent, 2 + cfg.prismDescentDelay);
+});

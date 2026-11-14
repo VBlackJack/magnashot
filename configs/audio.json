@@ -185,6 +185,14 @@
       "notes": [587.33, 880, 1174.66],
       "noteDuration": 0.065,
       "hapticMs": 25
+    },
+    "slingshotWhip": {
+      "type": "sine",
+      "startFreq": 420,
+      "endFreq": 980,
+      "duration": 0.15,
+      "harmonic": true,
+      "hapticMs": 20
     }
   },
   "music": {
@@ -409,6 +417,17 @@
           "bass": 4,
           "arp": 6,
           "hat": 5
+        }
+      },
+      "slingshot": {
+        "bpm": 114,
+        "rootHz": 174.61,
+        "scale": [0, 2, 4, 6, 7, 9, 11],
+        "progression": [0, 3, 4, 2],
+        "euclid": {
+          "bass": 5,
+          "arp": 9,
+          "hat": 6
         }
       }
     }

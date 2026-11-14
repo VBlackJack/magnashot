@@ -31,6 +31,9 @@ export const DEFAULT_MODES_CONFIG = Object.freeze({
     wavesPerCadenceDrop: 4,
     pulseRangeCells: 2,
     pulseBonusPoints: 35,
+    prismBonusPoints: 180,
+    prismDescentDelay: 2,
+    prismMaxBuffer: 2,
     waveClearBonus: 250,
     nearMissRowsFromDanger: 1,
     aimPreviewAlpha: 0.48,
@@ -130,6 +133,8 @@ export const DEFAULT_MODES_CONFIG = Object.freeze({
     recoilAcceleration: 920,
     maxRecoilSpeed: 460,
     snapbackBonusPoints: 140,
+    chainBonusStep: 0.5,
+    chainPushbackPx: 18,
     freezeDurationSec: 5.5,
     freezeSpeedFactor: 0.12,
     initialWaveSpheres: 18,
@@ -441,6 +446,42 @@ export const DEFAULT_MODES_CONFIG = Object.freeze({
         points: 2400
       })
     ])
+  }),
+  slingshot: Object.freeze({
+    startingShots: 10,
+    stageRefillShots: 4,
+    maxShotsCap: 16,
+    initialColorCount: 4,
+    maxColorCount: 6,
+    stagesPerExtraColor: 3,
+    minConstellations: 2,
+    maxConstellations: 4,
+    stagesPerExtraConstellation: 2,
+    constellationTopY: 132,
+    constellationBottomY: 244,
+    constellationMarginX: 84,
+    guardCount: 4,
+    guardWindowHalfRad: 1.15,
+    corePoints: 220,
+    stageClearBonusBase: 450,
+    stageClearShotBonus: 100,
+    whipScoreMultiplier: 1.5,
+    whipBoostFactor: 1.22,
+    maxProjectileSpeed: 24,
+    whipRadius: 136,
+    whipRadiusPerLevel: 18,
+    wellCoreRadius: 18,
+    wellFieldRadius: 150,
+    wellStrength: 1.9,
+    wellMarginX: 78,
+    wellBandTopY: 372,
+    wellBandBottomY: 536,
+    barrierWidth: 86,
+    barrierHeight: 14,
+    barrierMarginX: 76,
+    barrierBandY: 312,
+    floorOutMarginFactor: 2,
+    maxFlightSubsteps: 1680
   })
 });
 
@@ -556,6 +597,7 @@ export function resolveModesConfig(modesConfig) {
       tiers: Array.isArray(modesConfig.merge?.tiers) && modesConfig.merge.tiers.length > 0
         ? modesConfig.merge.tiers
         : DEFAULT_MODES_CONFIG.merge.tiers
-    }
+    },
+    slingshot: { ...DEFAULT_MODES_CONFIG.slingshot, ...(modesConfig.slingshot ?? {}) }
   };
 }

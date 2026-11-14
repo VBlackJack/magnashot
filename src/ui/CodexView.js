@@ -270,7 +270,7 @@ export function buildCodexPane() {
   }
   pane.appendChild(patternsGrid);
 
-  const behaviorsOrder = ['hexGrid', 'pinball', 'orbital', 'convoy', 'merge'];
+  const behaviorsOrder = ['hexGrid', 'pinball', 'orbital', 'convoy', 'merge', 'slingshot'];
   const behaviorsHeading = document.createElement('h3');
   behaviorsHeading.className = 'modal-subtitle';
   behaviorsHeading.textContent = t('modals.shop.codex.behaviors.title');

@@ -32,6 +32,10 @@ const MAX_FALLBACK_SEARCH_ROWS = 18;
 const PULSE_ARROW_SCALE = 0.65;
 const PREVIEW_PULSE_LINE_WIDTH = 2;
 const GUIDE_HEX_RADIUS_FACTOR = 1.04;
+const PRISM_FACET_RADIUS_FACTOR = 0.54;
+const PRISM_INNER_DOT_FACTOR = 0.16;
+const PRISM_FACET_LINE_WIDTH = 2;
+const PRISM_SHOCKWAVE_RADIUS_FACTOR = 3;
 
 const EVEN_ROW_DIRS = Object.freeze([
   Object.freeze({ dr: 0, dc: 1 }),
@@ -420,6 +424,7 @@ export class HexGridBehavior extends ModeBehavior {
       return false;
     }
     const world = engine.physicsWorld;
+    const prismsBefore = world.balls.filter((b) => b.hexPrism);
     // Release initial snap bonds so we snap cleanly onto the exact free lattice cell.
     for (const neighborId of [...snappedBall.bonds]) {
       const nb = world.ballMap.get(neighborId);
@@ -433,7 +438,7 @@ export class HexGridBehavior extends ModeBehavior {
     if (!cell) {
       world.removeBall(snappedBall);
       engine.combo = 0;
-      this.finishHexTurn(engine, false);
+      this.finishHexTurn(engine, false, prismsBefore);
       return true;
     }
 
@@ -473,20 +478,46 @@ export class HexGridBehavior extends ModeBehavior {
     if (totalDestroyed === 0) {
       engine.combo = 0;
     }
-    this.finishHexTurn(engine, totalDestroyed > 0);
+    this.finishHexTurn(engine, totalDestroyed > 0, prismsBefore);
     return true;
   }
 
-  finishHexTurn(engine, madeMatch) {
+  finishHexTurn(engine, madeMatch, prismsBefore = []) {
     const dropped = engine.detachAndRewardAvalanche();
+    const clearedPrisms = prismsBefore.filter((b) => !engine.physicsWorld.ballMap.has(b.id));
     engine.settleTurnResonance(madeMatch || dropped > 0);
 
     if (engine.physicsWorld.balls.length === 0) {
       this.advanceClearedWave(engine);
-    } else if (!madeMatch && dropped === 0) {
-      engine.modeState.shotsUntilDescent = Math.max(0, engine.modeState.shotsUntilDescent - 1);
-      if (engine.modeState.shotsUntilDescent <= 0) {
-        this.descendCeilingRow(engine);
+    } else {
+      if (!madeMatch && dropped === 0) {
+        engine.modeState.shotsUntilDescent = Math.max(0, engine.modeState.shotsUntilDescent - 1);
+        if (engine.modeState.shotsUntilDescent <= 0) {
+          this.descendCeilingRow(engine);
+        }
+      }
+      if (clearedPrisms.length > 0 && engine.isRunPlaying()) {
+        const cfg = engine.modesConfig.hexGrid;
+        const pts = clearedPrisms.length * cfg.prismBonusPoints;
+        const delay = clearedPrisms.length * cfg.prismDescentDelay;
+        const maxBuffer = (engine.modeState.descentCadence || cfg.shotsPerDescentBase) + cfg.prismMaxBuffer;
+        engine.addScore(pts);
+        engine.modeState.shotsUntilDescent = Math.min(maxBuffer, engine.modeState.shotsUntilDescent + delay);
+        engine.audioManager.playEffect?.('overcharge');
+        for (const prism of clearedPrisms) {
+          engine.particleSystem.spawnShockwave(
+            prism.x,
+            prism.y,
+            engine.gameConfig.theme.overchargePopupColor,
+            prism.radius * PRISM_SHOCKWAVE_RADIUS_FACTOR
+          );
+        }
+        engine.particleSystem.spawnFloatingText(
+          engine.gameConfig.canvas.logicalWidth * MATH_CONSTANTS.HALF,
+          cfg.topMargin + engine.gameConfig.canvas.wavePopupOffsetY,
+          t('gameplay.feedback.hexGrid.prismShattered', { points: pts, delay }),
+          engine.gameConfig.theme.overchargePopupColor
+        );
       }
     }
 
@@ -551,6 +582,7 @@ export class HexGridBehavior extends ModeBehavior {
     }
 
     const topCols = getColsForRow(0, engine.modeState.rowParityOffset, cfg);
+    const prismCol = Math.floor(engine.random() * topCols);
     for (let col = 0; col < topCols; col++) {
       const pos = hexCellToWorld(0, col, engine.modeState.rowParityOffset, cfg);
       const colorId = this.pickNonMatchingGridColor(engine, 0, col);
@@ -563,6 +595,7 @@ export class HexGridBehavior extends ModeBehavior {
       });
       ball.hexRow = 0;
       ball.hexCol = col;
+      ball.hexPrism = col === prismCol;
       engine.physicsWorld.addBall(ball);
     }
 
@@ -601,7 +634,8 @@ export class HexGridBehavior extends ModeBehavior {
       pulsesTriggered: state.pulsesTriggered ?? 0,
       cells: engine.physicsWorld.balls.map((b) => ({
         row: Number.isInteger(b.hexRow) ? b.hexRow : 0,
-        col: Number.isInteger(b.hexCol) ? b.hexCol : 0
+        col: Number.isInteger(b.hexCol) ? b.hexCol : 0,
+        prism: b.hexPrism ? 1 : 0
       }))
     };
   }
@@ -636,6 +670,7 @@ export class HexGridBehavior extends ModeBehavior {
       if (cell && Number.isInteger(cell.row) && Number.isInteger(cell.col)) {
         balls[i].hexRow = cell.row;
         balls[i].hexCol = cell.col;
+        balls[i].hexPrism = Boolean(cell.prism);
       } else {
         const row = Math.max(0, Math.round((balls[i].y - cfg.topMargin) / cfg.rowHeight));
         const shiftX = getRowParity(row, engine.modeState.rowParityOffset) === 1
@@ -671,6 +706,28 @@ export class HexGridBehavior extends ModeBehavior {
   }
 
   drawOverlay(ctx, engine, renderer, theme) {
+    const prismBalls = engine.physicsWorld.balls.filter((b) => b.hexPrism);
+    if (prismBalls.length > 0) {
+      ctx.save();
+      ctx.strokeStyle = theme.anchorCoreColor;
+      ctx.fillStyle = theme.targetHighlightColor;
+      ctx.lineWidth = PRISM_FACET_LINE_WIDTH;
+      for (const ball of prismBalls) {
+        const d = ball.radius * PRISM_FACET_RADIUS_FACTOR;
+        ctx.beginPath();
+        ctx.moveTo(ball.x, ball.y - d);
+        ctx.lineTo(ball.x + d, ball.y);
+        ctx.lineTo(ball.x, ball.y + d);
+        ctx.lineTo(ball.x - d, ball.y);
+        ctx.closePath();
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.arc(ball.x, ball.y, ball.radius * PRISM_INNER_DOT_FACTOR, 0, MATH_CONSTANTS.TWO_PI);
+        ctx.fill();
+      }
+      ctx.restore();
+    }
+
     if (
       !engine.isRunPlaying()
       || engine.physicsWorld.projectile

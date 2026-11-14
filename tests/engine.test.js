@@ -23,6 +23,7 @@ import { StorageManager } from '../src/core/StorageManager.js';
 import { Ball } from '../src/entities/Ball.js';
 import { Obstacle } from '../src/entities/Obstacle.js';
 import { GameEngine } from '../src/game/GameEngine.js';
+import { getOccupiedPlatformIndices } from '../src/game/EngineTurnResolution.js';
 import { GAME_MODES, GAME_STATES, SPECIAL_TYPES, CLUSTER_MODIFIERS, OBSTACLE_TYPES, WAVE_TYPES } from '../src/core/Constants.js';
 import { getSagSpec } from '../src/game/SagMeter.js';
 import { applyWorldGeometry } from '../src/core/WorldGeometry.js';
@@ -1469,4 +1470,91 @@ test('Phase 2 bounty events emit only on genuine Survival/BossRush/Flux/Campaign
   engine.evaluateRoundEnd();
   assert.equal(engine.state, GAME_STATES.VICTORY);
   assert.equal(recorded.some(([k]) => k === 'campaign_level_cleared'), true);
+});
+
+test('Cascade Drop applies polarity-signed lateral drift with preview parity and awards Shelf Clear Surge bonuses', () => {
+  const engine = createTestEngine();
+  engine.startCascadeMode();
+  assert.equal(engine.physicsWorld.projectileLateralDrift, gameConfig.cascade.polarityDriftPerStep);
+
+  // Isolate empty well to verify pure polarity-signed lateral drift and preview/flight parity.
+  for (const b of [...engine.physicsWorld.balls]) {
+    engine.physicsWorld.removeBall(b);
+  }
+  engine.physicsWorld.obstacles = [];
+  engine.currentBall.colorId = ballsConfig.standardColors.find((c) => c.polarity > 0).id;
+  engine.isPolarityFlipped = false;
+
+  const launcher = engine.getLauncherSpec();
+  const angle = -Math.PI * 0.5;
+  engine.updateAimFromAngle(angle);
+  const previewPos = engine.aimPoints.map((p) => ({ ...p }));
+  const lastPos = previewPos[previewPos.length - 1];
+  assert.ok(lastPos.x > launcher.x + 5, 'Positive polarity drifts rightward up the well');
+
+  // Negative-polarity sphere drifts leftward when unflipped.
+  engine.currentBall.colorId = ballsConfig.standardColors.find((c) => c.polarity < 0).id;
+  engine.updateAimFromAngle(angle);
+  const previewNeg = engine.aimPoints.map((p) => ({ ...p }));
+  assert.ok(previewNeg[previewNeg.length - 1].x < launcher.x - 5, 'Negative polarity drifts leftward when unflipped');
+
+  engine.currentBall.colorId = ballsConfig.standardColors.find((c) => c.polarity > 0).id;
+  engine.togglePolarityFlip();
+  engine.updateAimFromAngle(angle);
+  const previewFlipped = engine.aimPoints.map((p) => ({ ...p }));
+  const lastFlipped = previewFlipped[previewFlipped.length - 1];
+  assert.ok(lastFlipped.x < launcher.x - 5, 'Polarity flip reverses Cascade lateral drift leftward');
+
+  engine.shoot();
+  const proj = engine.physicsWorld.projectile;
+  engine.physicsWorld.stepProjectile(1 / physicsConfig.simulation.substeps, {});
+  assert.ok(Math.abs(proj.x - previewFlipped[1].x) < 1e-9);
+  assert.ok(Math.abs(proj.y - previewFlipped[1].y) < 1e-9);
+  engine.physicsWorld.projectile = null;
+
+  // Shelf Clear Surge: clearing a platform grants +150 * clearedShelves * cascadeWave pts and +1 drop buffer.
+  const shelf = new Obstacle(
+    {
+      type: OBSTACLE_TYPES.PLATFORM,
+      x: 220,
+      y: 420,
+      width: 140,
+      height: 16
+    },
+    obstaclesConfig
+  );
+  engine.physicsWorld.obstacles = [shelf];
+  const r = physicsConfig.ball.radius;
+  const restingBall = new Ball({
+    x: 220,
+    y: 420 - 8 - r,
+    radius: r,
+    colorId: engine.activePalette[0],
+    isAnchor: false
+  });
+  // Keep an unrelated anchor so clearing the shelf does not trigger an all-clear wave reset.
+  const topAnchor = new Ball({
+    x: 100,
+    y: 120,
+    radius: r,
+    colorId: engine.activePalette[1],
+    isAnchor: true
+  });
+  engine.physicsWorld.addBall(restingBall);
+  engine.physicsWorld.addBall(topAnchor);
+
+  engine.cascadeOccupiedPlatforms = getOccupiedPlatformIndices(engine.physicsWorld);
+  assert.equal(engine.cascadeOccupiedPlatforms.has(0), true);
+
+  engine.cascadeWave = 2;
+  engine.cascadeTurnsUntilDrop = 3;
+  const scoreBefore = engine.score;
+  engine.physicsWorld.removeBall(restingBall);
+  engine.handlePostTurnCleanup(true);
+
+  const expectedBonus = gameConfig.cascade.shelfClearBonus * 1 * 2;
+  assert.equal(engine.score, scoreBefore + expectedBonus);
+  // Turn decrements 3 -> 2, then Shelf Clear Surge adds +1 -> 3 (capped at shotsBeforeDrop + 1).
+  assert.equal(engine.cascadeTurnsUntilDrop, 3);
+  assert.equal(engine.cascadeOccupiedPlatforms.size, 0);
 });

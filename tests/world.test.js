@@ -206,7 +206,7 @@ test('The Survival grid fits between the walls', () => {
   assertFitsWorld(engine.physicsWorld, 'Survival');
 });
 
-test('The Hex Grid, Orbital, Pinball and Convoy boards fit between the walls', () => {
+test('The Hex Grid, Orbital, Pinball, Convoy and Slingshot boards fit between the walls', () => {
   const engine = createEngine();
   engine.startHexGridMode();
   assertFitsWorld(engine.physicsWorld, 'Hex Grid');
@@ -217,6 +217,34 @@ test('The Hex Grid, Orbital, Pinball and Convoy boards fit between the walls', (
   for (let stage = 1; stage <= 6; stage++) {
     engine.startPinballMode(stage);
     assertFitsWorld(engine.physicsWorld, `Pinball stage ${stage}`);
+  }
+
+  for (let stage = 1; stage <= 6; stage++) {
+    engine.startSlingshotMode(stage);
+    assertFitsWorld(engine.physicsWorld, `Slingshot stage ${stage}`);
+    for (const well of engine.modeState?.wells || []) {
+      assert.ok(well.x - well.coreRadius >= gameConfig.canvas.wallMargin, `Slingshot stage ${stage} well left fit`);
+      assert.ok(
+        well.x + well.coreRadius <= gameConfig.canvas.logicalWidth - gameConfig.canvas.wallMargin,
+        `Slingshot stage ${stage} well right fit`
+      );
+    }
+  }
+
+  const narrow = applyWorldGeometry(structuredClone(loadJson('./configs/game.json')));
+  narrow.canvas.logicalWidth = NARROW_WORLD_WIDTH;
+  applyWorldGeometry(narrow);
+  const narrowEngine = createEngine(narrow);
+  for (let stage = 1; stage <= 6; stage++) {
+    narrowEngine.startSlingshotMode(stage);
+    assertFitsWorld(narrowEngine.physicsWorld, `Narrow Slingshot stage ${stage}`, narrow.canvas);
+    for (const well of narrowEngine.modeState?.wells || []) {
+      assert.ok(well.x - well.coreRadius >= narrow.canvas.wallMargin, `Narrow Slingshot stage ${stage} well left fit`);
+      assert.ok(
+        well.x + well.coreRadius <= narrow.canvas.logicalWidth - narrow.canvas.wallMargin,
+        `Narrow Slingshot stage ${stage} well right fit`
+      );
+    }
   }
 
   engine.startConvoyMode();

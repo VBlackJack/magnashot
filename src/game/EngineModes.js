@@ -28,6 +28,7 @@ import { SeededRandom } from '../core/SeededRandom.js';
 import { Ball } from '../entities/Ball.js';
 import { Obstacle } from '../entities/Obstacle.js';
 import { reportBountyEvent } from './Bounties.js';
+import { getOccupiedPlatformIndices } from './EngineTurnResolution.js';
 import { generateFluxStage } from './layouts/FluxStageGenerator.js';
 import {
   shiftObstacleDefsX,
@@ -421,6 +422,7 @@ export const engineModeMethods = {
     this.blitzWaveTimerFrames = blitzCfg.waveIntervalFrames;
     this.blitzIdleFrames = 0;
     this.blitzBonusFramesEarned = 0;
+    this.blitzHitStreak = 0;
     this.specialInventory = { ...blitzCfg.initialSpecialCounts };
     this.activePalette = this.ballsConfig.standardColors
       .slice(0, this.gameConfig.endless.paletteCount)
@@ -571,6 +573,7 @@ export const engineModeMethods = {
     this.physicsWorld.clear();
     this.particleSystem.clear();
     this.physicsWorld.gravityMultiplier = cascadeCfg.gravityMultiplier;
+    this.physicsWorld.projectileLateralDrift = cascadeCfg.polarityDriftPerStep || 0;
 
     for (const platDef of cascadeCfg.platforms || []) {
       this.physicsWorld.obstacles.push(
@@ -606,6 +609,7 @@ export const engineModeMethods = {
       this.spawnCascadeDropWave(0);
     }
     this.physicsWorld.rebuildInitialBonds();
+    this.cascadeOccupiedPlatforms = getOccupiedPlatformIndices(this.physicsWorld);
     this.currentBall = this.createRandomLauncherBall();
     this.nextBall = this.createRandomLauncherBall();
     this.fillUpcomingColors();
@@ -1098,6 +1102,24 @@ export const engineModeMethods = {
     this.updateAimFromAngle(spec.defaultAngle);
     this.refreshDiscovery();
     this.levelIntro = maybeBuildArcadeModeIntro(this, GAME_MODES.MERGE);
+    this.notifyUI();
+  },
+
+  startSlingshotMode(stage = 1) {
+    this.resetRunState(GAME_MODES.SLINGSHOT);
+    this.specialInventory = Object.fromEntries(Object.values(SPECIAL_TYPES).map((type) => [type, 0]));
+    this.audioManager.stopAll();
+    this.particleSystem.clear();
+    const behavior = this.getModeBehavior();
+    behavior.setupMode(this, { stage });
+    this.currentBall = this.createRandomLauncherBall();
+    this.nextBall = this.createRandomLauncherBall();
+    this.fillUpcomingColors();
+    this.state = GAME_STATES.PLAYING;
+    const spec = this.getLauncherSpec();
+    this.updateAimFromAngle(spec.defaultAngle);
+    this.refreshDiscovery();
+    this.levelIntro = maybeBuildArcadeModeIntro(this, GAME_MODES.SLINGSHOT);
     this.notifyUI();
   },
 };

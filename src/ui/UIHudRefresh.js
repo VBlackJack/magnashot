@@ -446,8 +446,10 @@ export const uiHudRefreshMethods = {
     // One-shot extras (an unlocked achievement, a cleared Flux stage) must not replay
     // when refresh is re-run with lastExtra (language change, input mode change, shop
     // purchase): they are read from this call only.
-    const { oneShot: { unlockedAchievementIds, fluxStageCleared, classicStageCleared, fluxPerkChosen }, persistentExtra } =
-      splitRefreshExtra(extra);
+    const {
+      oneShot: { unlockedAchievementIds, fluxStageCleared, classicStageCleared, slingshotStageCleared, fluxPerkChosen },
+      persistentExtra
+    } = splitRefreshExtra(extra);
     this.lastExtra = persistentExtra;
     const magnetarView = engine.getMagnetarView?.() ?? null;
     setTextIfChanged(this.elements.scoreValue, formatNumber(engine.score));
@@ -555,6 +557,8 @@ export const uiHudRefreshMethods = {
       bestScore = this.storageManager.getConvoyHighScore?.() || 0;
     } else if (engine.mode === GAME_MODES.MERGE) {
       bestScore = this.storageManager.getMergeHighScore?.() || 0;
+    } else if (engine.mode === GAME_MODES.SLINGSHOT) {
+      bestScore = this.storageManager.getSlingshotHighScore?.() || 0;
     } else {
       bestScore = this.storageManager.getEndlessHighScore();
     }
@@ -706,6 +710,25 @@ export const uiHudRefreshMethods = {
         this.elements.modeBanner,
         t('hud.stats.mode.pinball', {
           stage: formatNumber(engine.pinballStage || 1),
+          cores: formatNumber(remainingCores)
+        })
+      );
+      if (this.elements.shotsLabel) {
+        setTextIfChanged(this.elements.shotsLabel, t('hud.stats.shots.label'));
+      }
+      setTextIfChanged(this.elements.shotsValue, formatNumber(engine.shotsRemaining));
+      this.elements.shotsValue.classList.toggle('warning', engine.shotsRemaining <= warningShotsThreshold);
+      if (this.elements.starProgress) {
+        this.elements.starProgress.classList.add('hidden');
+      }
+    } else if (engine.mode === GAME_MODES.SLINGSHOT) {
+      const remainingCores = Array.isArray(engine.physicsWorld?.balls)
+        ? engine.physicsWorld.balls.reduce((sum, b) => sum + (b.slingshotCore ? 1 : 0), 0)
+        : 0;
+      setTextIfChanged(
+        this.elements.modeBanner,
+        t('hud.stats.mode.slingshot', {
+          stage: formatNumber(engine.slingshotStage || 1),
           cores: formatNumber(remainingCores)
         })
       );
@@ -992,6 +1015,10 @@ export const uiHudRefreshMethods = {
 
     if (classicStageCleared) {
       this.announce(t('hud.announcer.round.classicStageCleared', { stage: classicStageCleared }));
+    }
+
+    if (slingshotStageCleared) {
+      this.announce(t('hud.announcer.round.slingshotStageCleared', { stage: slingshotStageCleared }));
     }
 
     if (fluxPerkChosen) {

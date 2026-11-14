@@ -54,7 +54,8 @@ export const GAME_MODES = Object.freeze({
   ORBITAL: 'orbital',
   PINBALL: 'pinball',
   CONVOY: 'convoy',
-  MERGE: 'merge'
+  MERGE: 'merge',
+  SLINGSHOT: 'slingshot'
 });
 
 export const OBJECTIVE_TYPES = Object.freeze({
@@ -135,6 +136,13 @@ export const PINBALL_ALLOWED_SPECIALS = Object.freeze([
   SPECIAL_TYPES.BOMB,
   SPECIAL_TYPES.LIGHTNING,
   SPECIAL_TYPES.ANVIL,
+  SPECIAL_TYPES.ROCKET
+]);
+
+export const SLINGSHOT_ALLOWED_SPECIALS = Object.freeze([
+  SPECIAL_TYPES.BOMB,
+  SPECIAL_TYPES.LIGHTNING,
+  SPECIAL_TYPES.RAINBOW,
   SPECIAL_TYPES.ROCKET
 ]);
 

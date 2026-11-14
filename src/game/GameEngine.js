@@ -46,7 +46,7 @@ import { engineDiscoveryMethods } from './EngineDiscovery.js';
 import { engineControlsMethods } from './EngineControls.js';
 import { engineVersusMethods } from './EngineVersus.js';
 import { engineMagnetarMethods } from './EngineMagnetar.js';
-import { engineTurnResolutionMethods } from './EngineTurnResolution.js';
+import { engineTurnResolutionMethods, getOccupiedPlatformIndices } from './EngineTurnResolution.js';
 import { engineRoundFlowMethods } from './EngineRoundFlow.js';
 import { engineProgressMethods } from './EngineProgress.js';
 import { engineGhostDuelMethods } from './EngineGhostDuel.js';
@@ -261,11 +261,14 @@ export class GameEngine {
     this.blitzWaveTimerFrames = 0;
     this.blitzIdleFrames = 0;
     this.blitzBonusFramesEarned = 0;
+    this.blitzHitStreak = 0;
     this.bossRushWave = 1;
     this.cascadeWave = 1;
     this.cascadeTurnsUntilDrop = 0;
+    this.cascadeOccupiedPlatforms = new Set();
     this.modeState = null;
     this.pinballStage = 1;
+    this.slingshotStage = 1;
     this.mergeDropX = gameConfig.canvas.logicalWidth * MATH_CONSTANTS.HALF;
     this.mergeBestTier = 1;
 
@@ -338,13 +341,14 @@ export class GameEngine {
     return this.getModeBehavior().isSpecialTypeAllowed(specialType, this);
   }
 
-  /** True for modes where every shot spends a limited reserve (Campaign, Flux, Puzzle and Pinball). */
+  /** True for modes where every shot spends a limited reserve (Campaign, Flux, Puzzle, Pinball and Slingshot). */
   usesShotBudget() {
     return (
       this.mode === GAME_MODES.CAMPAIGN
       || this.mode === GAME_MODES.FLUX
       || this.mode === GAME_MODES.PUZZLE
       || this.mode === GAME_MODES.PINBALL
+      || this.mode === GAME_MODES.SLINGSHOT
     );
   }
 
@@ -516,6 +520,8 @@ export class GameEngine {
         return { metric: RUN_BEST_METRICS.STAGE, current: this.classicStage };
       case GAME_MODES.PINBALL:
         return { metric: RUN_BEST_METRICS.STAGE, current: this.pinballStage };
+      case GAME_MODES.SLINGSHOT:
+        return { metric: RUN_BEST_METRICS.STAGE, current: this.slingshotStage };
       case GAME_MODES.BOSS_RUSH:
         return { metric: RUN_BEST_METRICS.WAVE, current: this.bossRushWave };
       case GAME_MODES.HEX_GRID:
@@ -574,6 +580,8 @@ export class GameEngine {
       best = storage.getConvoyBestWave?.() || 0;
     } else if (this.mode === GAME_MODES.MERGE) {
       best = storage.getMergeHighScore?.() || 0;
+    } else if (this.mode === GAME_MODES.SLINGSHOT) {
+      best = storage.getSlingshotBestStage?.() || 0;
     }
     this.runBestBaseline = { metric: measured.metric, best };
     return this.runBestBaseline;
@@ -699,6 +707,9 @@ export class GameEngine {
         'mergeTiers',
         Math.max(this.mergeBestTier, this.storageManager.getMergeBestTier?.() || 0)
       );
+    } else if (this.mode === GAME_MODES.SLINGSHOT) {
+      this.storageManager.setSlingshotRecord?.(this.score, this.slingshotStage);
+      this.unlockAchievementTiers('slingshotStages', this.slingshotStage);
     }
   }
 
@@ -890,11 +901,14 @@ export class GameEngine {
     this.blitzWaveTimerFrames = 0;
     this.blitzIdleFrames = 0;
     this.blitzBonusFramesEarned = 0;
+    this.blitzHitStreak = 0;
     this.bossRushWave = 1;
     this.cascadeWave = 1;
     this.cascadeTurnsUntilDrop = 0;
+    this.cascadeOccupiedPlatforms = new Set();
     this.modeState = null;
     this.pinballStage = 1;
+    this.slingshotStage = 1;
     this.mergeDropX = this.gameConfig.canvas.logicalWidth * MATH_CONSTANTS.HALF;
     this.mergeBestTier = 1;
     this.physicsWorld.gravityMultiplier = 1.0;
@@ -1406,6 +1420,9 @@ export class GameEngine {
     if (behavior.fire(this)) {
       return;
     }
+    if (this.mode === GAME_MODES.CASCADE) {
+      this.cascadeOccupiedPlatforms = getOccupiedPlatformIndices(this.physicsWorld);
+    }
     // The previous shot has settled: this is the state it left behind.
     this.sampleShotTimeline();
     this.evaluateGhostShot();
@@ -1745,6 +1762,8 @@ export class GameEngine {
       this.startConvoyMode();
     } else if (this.mode === GAME_MODES.MERGE) {
       this.startMergeMode();
+    } else if (this.mode === GAME_MODES.SLINGSHOT) {
+      this.startSlingshotMode(1);
     } else {
       this.startEndlessMode();
     }

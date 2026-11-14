@@ -1112,6 +1112,29 @@ export class StorageManager {
     }
   }
 
+  getSlingshotHighScore() {
+    const key = this.storageConfig?.keys?.slingshotHighScore;
+    return key ? this.readNonNegativeInt(key) : 0;
+  }
+
+  getSlingshotBestStage() {
+    const key = this.storageConfig?.keys?.slingshotBestStage;
+    return key ? this.readNonNegativeInt(key) : 0;
+  }
+
+  setSlingshotRecord(score, stage) {
+    const scoreKey = this.storageConfig?.keys?.slingshotHighScore;
+    const stageKey = this.storageConfig?.keys?.slingshotBestStage;
+    const cleanScore = Math.max(0, Math.floor(Number(score) || 0));
+    const cleanStage = Math.max(0, Math.floor(Number(stage) || 0));
+    if (scoreKey && cleanScore > this.getSlingshotHighScore()) {
+      this.safeSetItem(scoreKey, cleanScore);
+    }
+    if (stageKey && cleanStage > this.getSlingshotBestStage()) {
+      this.safeSetItem(stageKey, cleanStage);
+    }
+  }
+
   /** @returns {string[]} Configured versus CPU tiers, easiest first. */
   getVersusTiers() {
     const tiers = this.versusConfig?.records?.tiers;

@@ -243,6 +243,7 @@ export class UIManager {
       btnModeOrbital: document.getElementById('btn-mode-orbital'),
       btnModeConvoy: document.getElementById('btn-mode-convoy'),
       btnModeMerge: document.getElementById('btn-mode-merge'),
+      btnModeSlingshot: document.getElementById('btn-mode-slingshot'),
       btnModeVersus: document.getElementById('btn-mode-versus'),
       arcadeBestEndless: document.getElementById('arcade-best-endless'),
       arcadeBestFlux: document.getElementById('arcade-best-flux'),
@@ -256,6 +257,7 @@ export class UIManager {
       arcadeBestOrbital: document.getElementById('arcade-best-orbital'),
       arcadeBestConvoy: document.getElementById('arcade-best-convoy'),
       arcadeBestMerge: document.getElementById('arcade-best-merge'),
+      arcadeBestSlingshot: document.getElementById('arcade-best-slingshot'),
       arcadeBestVersus: document.getElementById('arcade-best-versus'),
       puzzleStagesStrip: document.getElementById('puzzle-stages-strip'),
       levelsStarsSummary: document.getElementById('levels-stars-summary'),
@@ -1361,6 +1363,13 @@ export class UIManager {
       return t('modals.gameOver.stats.pinballSummary', {
         stage: formatNumber(engine.pinballStage || 1),
         best: formatNumber(Math.max(engine.pinballStage || 1, this.storageManager.getPinballBestStage?.() || 1)),
+        coins: formatNumber(summary?.earnedCoins || 0)
+      });
+    }
+    if (engine.mode === GAME_MODES.SLINGSHOT) {
+      return t('modals.gameOver.stats.slingshotSummary', {
+        stage: formatNumber(engine.slingshotStage || 1),
+        best: formatNumber(Math.max(engine.slingshotStage || 1, this.storageManager.getSlingshotBestStage?.() || 1)),
         coins: formatNumber(summary?.earnedCoins || 0)
       });
     }

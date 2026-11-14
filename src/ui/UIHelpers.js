@@ -149,7 +149,8 @@ export const MODE_BUTTON_KEYS = Object.freeze({
   [GAME_MODES.PINBALL]: ['btnModePinball'],
   [GAME_MODES.ORBITAL]: ['btnModeOrbital'],
   [GAME_MODES.CONVOY]: ['btnModeConvoy'],
-  [GAME_MODES.MERGE]: ['btnModeMerge']
+  [GAME_MODES.MERGE]: ['btnModeMerge'],
+  [GAME_MODES.SLINGSHOT]: ['btnModeSlingshot']
 });
 
 /** Modal texts (pause instructions, perk choice subtitle) that have one wording per input mode. */
@@ -309,8 +310,11 @@ export const INPUT_ARIA_HINTS = Object.freeze([{ elementId: 'game-canvas', key: 
  * @returns {{oneShot: object, persistentExtra: object}} The two halves.
  */
 export function splitRefreshExtra(extra) {
-  const { unlockedAchievementIds, fluxStageCleared, classicStageCleared, fluxPerkChosen, ...persistentExtra } = extra;
-  return { oneShot: { unlockedAchievementIds, fluxStageCleared, classicStageCleared, fluxPerkChosen }, persistentExtra };
+  const { unlockedAchievementIds, fluxStageCleared, classicStageCleared, slingshotStageCleared, fluxPerkChosen, ...persistentExtra } = extra;
+  return {
+    oneShot: { unlockedAchievementIds, fluxStageCleared, classicStageCleared, slingshotStageCleared, fluxPerkChosen },
+    persistentExtra
+  };
 }
 
 /** Default star ceiling when no scoring config is passed to resolveNextCampaignTarget. */
@@ -656,6 +660,7 @@ export const MODE_NAME_KEYS = Object.freeze({
   [GAME_MODES.ORBITAL]: 'modals.levelSelect.arcade.orbital',
   [GAME_MODES.CONVOY]: 'modals.levelSelect.arcade.convoy',
   [GAME_MODES.MERGE]: 'modals.levelSelect.arcade.merge',
+  [GAME_MODES.SLINGSHOT]: 'modals.levelSelect.arcade.slingshot',
   [GAME_MODES.VERSUS]: 'versus.mode.name',
   [WEEKLY_ACCESS_KEY]: 'app.nav.button.weekly'
 });
@@ -737,6 +742,12 @@ export const ARCADE_CARD_SPECS = Object.freeze({
     best: 'arcadeBestMerge',
     titleKey: 'modals.levelSelect.arcade.merge',
     descKey: 'modals.levelSelect.arcade.mergeDesc'
+  }),
+  [GAME_MODES.SLINGSHOT]: Object.freeze({
+    card: 'btnModeSlingshot',
+    best: 'arcadeBestSlingshot',
+    titleKey: 'modals.levelSelect.arcade.slingshot',
+    descKey: 'modals.levelSelect.arcade.slingshotDesc'
   }),
   [GAME_MODES.VERSUS]: Object.freeze({
     card: 'btnModeVersus',

@@ -441,6 +441,14 @@ function buildMergeShareText({ tier, bestTier, score, url }) {
   ].join(LINE_SEPARATOR);
 }
 
+function buildSlingshotShareText({ stage, score, url }) {
+  return [
+    t('share.slingshot.header'),
+    t('share.slingshot.stats', { stage: formatNumber(stage ?? 1), score: formatNumber(score) }),
+    url
+  ].join(LINE_SEPARATOR);
+}
+
 /**
  * Builds the shareable result of a run in the mode it was played. The campaign never
  * shares, so it is rejected like any unknown mode.
@@ -480,6 +488,8 @@ export function buildShareText(run, shareConfig) {
       return buildConvoyShareText(run);
     case GAME_MODES.MERGE:
       return buildMergeShareText(run);
+    case GAME_MODES.SLINGSHOT:
+      return buildSlingshotShareText(run);
     default:
       throw new RangeError(`No shareable result for game mode "${run.mode}"`);
   }

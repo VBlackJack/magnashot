@@ -159,7 +159,8 @@
         "orbital": "Orbital 360 • Vague {{wave}}",
         "pinball": "Pinball • Étape {{stage}} (⚡ {{cores}})",
         "convoy": "Convoi • Vague {{wave}}",
-        "merge": "Fusion • Calibre {{tier}}"
+        "merge": "Fusion • Calibre {{tier}}",
+        "slingshot": "Fronde • Étape {{stage}} (✦ {{cores}})"
       },
       "shots": {
         "label": "Tirs restants",
@@ -333,7 +334,8 @@
         "withNearMiss": "{{result}} {{nearMiss}}.",
         "gameOver": "Partie terminée. {{reason}} Score : {{score}}.",
         "fluxStageCleared": "Forme {{stage}} vidée. La forme suivante arrive.",
-        "classicStageCleared": "Étape {{stage}} terminée. L'étape suivante est prête."
+        "classicStageCleared": "Étape {{stage}} terminée. L'étape suivante est prête.",
+        "slingshotStageCleared": "Étape {{stage}} terminée. La constellation suivante est prête."
       },
       "hints": {
         "reset": "Les indices de découverte s'afficheront de nouveau."
@@ -412,7 +414,8 @@
         "orbital": "Orbital 360 : orbitez autour du noyau sans gravité et guidez les chutes vers les arcs collecteurs sans franchir l'anneau.",
         "pinball": "Pinball : allumez tous les Noyaux dorés avant d'épuiser vos tirs. Rattrapez votre bille dans le panier pour +1 tir.",
         "convoy": "Convoi : brisez la file avant le vortex. Les polarités opposées rappellent les segments en arrière pour créer des réactions.",
-        "merge": "Bassin Fusion : fusionnez les calibres identiques. Inversez la polarité pour attirer les paires et secouez dès que prête."
+        "merge": "Bassin Fusion : fusionnez les calibres identiques. Inversez la polarité pour attirer les paires et secouez dès que prête.",
+        "slingshot": "Fronde Magnétique : courbez vos tirs autour des Puits Dipôles (+ / -) pour briser chaque Noyau Radiant. Inversez la polarité (F) en vol dans l'anneau d'un puits pour un Fouet Magnétique."
       }
     },
     "ghost": {
@@ -499,7 +502,8 @@
       },
       "blitz": {
         "autoFire": "TIR AUTO !",
-        "timeBonus": "+{{seconds}}s BLITZ !"
+        "timeBonus": "+{{seconds}}s BLITZ !",
+        "fever": "FIÈVRE x{{streak}} ! +{{points}}"
       },
       "bossRush": {
         "overchargeStrike": "SURCHARGE ! -1 BOUCLIER",
@@ -549,8 +553,12 @@
         "down": "MAGNETAR TERRASSÉ ! +{{points}}"
       },
       "resonance": "Résonance !",
+      "cascade": {
+        "shelfCleared": "PALIER VIDÉ ! +{{points}}"
+      },
       "hexGrid": {
         "pulse": "IMPULSION HEX ! +{{points}}",
+        "prismShattered": "PRISME BRISÉ ! +{{points}} • +{{delay}} tours",
         "waveCleared": "GRILLE VIDÉE ! +{{points}}"
       },
       "orbital": {
@@ -563,7 +571,14 @@
       },
       "convoy": {
         "snapback": "RAPPEL MAGNÉTIQUE ! +{{points}}",
+        "chainSnapback": "RAPPEL EN CHAÎNE x{{chain}} ! +{{points}}",
         "waveCleared": "CONVOI DÉTRUIT ! +{{points}}"
+      },
+      "slingshot": {
+        "whip": "FOUET MAGNÉTIQUE !",
+        "whipCore": "FOUET RADIANT ! +{{points}}",
+        "coreShattered": "NOYAU RADIANT ! +{{points}}",
+        "stageCleared": "CONSTELLATION VIDÉE ! +{{points}}"
       },
       "merge": {
         "fused": "CALIBRE {{tier}} ! +{{points}}",
@@ -894,6 +909,8 @@
         "merge": "Fusion en Bassin",
         "mergeDesc": "12 calibres • Rail de lâcher • Onde de choc de fusion • Secousse",
         "mergeRecord": "Calibre {{tier}} • Record : {{score}}",
+        "slingshot": "Fronde Magnétique",
+        "slingshotDesc": "Puits dipôles • Tirs courbés d'adresse • Fouet de polarité en vol",
         "masteredBadge": ", Maîtrisé"
       },
       "jumpCurrent": "Niveau en cours",
@@ -958,7 +975,7 @@
         "stock": "En stock : {{count}}",
         "buy": "+1 ({{cost}} ⬡)",
         "unavailable": "Aucune manche en cours",
-        "unavailableHint": "Lancez une manche (Campagne, Survie, Défi du Jour, Flux, Blitz, Boss Rush ou Cascade) pour acheter des munitions.",
+        "unavailableHint": "Lancez une manche (Campagne, Survie, Défi du Jour, Flux, Blitz, Boss Rush, Cascade ou Fronde) pour acheter des munitions.",
         "puzzleLocked": "Dotation fixe",
         "puzzleLockedHint": "Les niveaux Puzzle utilisent une dotation fixe de sphères spéciales.",
         "puristLocked": "Règles pures",
@@ -1189,7 +1206,7 @@
             "hexGrid": {
               "icon": "⬡",
               "name": "Grille Hex (Ancrage Rigide)",
-              "description": "Vos tirs filent droit sans courbure et s'ancrent sur une grille hexagonale fixe. Inversez la polarité (F) avant de tirer pour déclencher une impulsion d'une case à l'impact."
+              "description": "Vos tirs filent droit sans courbure et s'ancrent sur une grille hexagonale fixe. Inversez la polarité (F) avant de tirer pour une impulsion d'une case, et brisez les Cellules Prisme pour retarder la descente."
             },
             "pinball": {
               "icon": "🎱",
@@ -1204,12 +1221,17 @@
             "convoy": {
               "icon": "🐍",
               "name": "Convoi sur Rail (Rappel Magnétique)",
-              "description": "Une tourelle centrale à 360° tire dans un convoi continu avançant vers un vortex. Ouvrir une brèche entre couleurs identiques ou pôles opposés rappelle violemment l'avant en combo."
+              "description": "Une tourelle centrale à 360° tire dans un convoi continu avançant vers un vortex. Ouvrir des brèches entre couleurs identiques ou pôles opposés déclenche des Rappels en Chaîne qui repoussent le convoi."
             },
             "merge": {
               "icon": "🫧",
               "name": "Fusion en Bassin (12 Calibres)",
               "description": "Lâchez vos billes depuis un rail supérieur dans un bassin Classique, Étroit ou à Plots. Deux calibres identiques fusionnent (1 à 12) avec une onde de choc tandis que la ligne de débordement descend sous la pression. La Polarité rapproche les calibres identiques, et la Secousse se recharge après quelques lâchers ou chaînes."
+            },
+            "slingshot": {
+              "icon": "🏹",
+              "name": "Fronde Magnétique (Puits Dipôles)",
+              "description": "Courbez vos tirs autour de Puits Dipôles (+ / -) pour contourner les déflecteurs et briser les Noyaux Radiants. Inversez la polarité (F) avant le tir pour inverser la courbe, ou en vol dans l'anneau pointillé pour un Fouet Magnétique."
             }
           }
         },
@@ -1434,6 +1456,18 @@
           "mergeTiersGold": {
             "name": "Alchimiste de Fusion III",
             "description": "Fusionner jusqu'au Calibre {{target}} en Fusion en Bassin."
+          },
+          "slingshotStages": {
+            "name": "Maître de la Fronde",
+            "description": "Atteindre l'Étape {{target}} en Fronde Magnétique."
+          },
+          "slingshotStagesSilver": {
+            "name": "Maître de la Fronde II",
+            "description": "Atteindre l'Étape {{target}} en Fronde Magnétique."
+          },
+          "slingshotStagesGold": {
+            "name": "Maître de la Fronde III",
+            "description": "Atteindre l'Étape {{target}} en Fronde Magnétique."
           }
         },
         "tier": {
@@ -1468,7 +1502,7 @@
         },
         "startingShots": {
           "name": "Réserve de Projectiles",
-          "description": "Ajoute +{{shots}} sphères au début de chaque manche en Campagne, Mode Flux et Pinball par rang."
+          "description": "Ajoute +{{shots}} sphères au début de chaque manche en Campagne, Mode Flux, Pinball et Fronde par rang."
         },
         "collectorMagnet": {
           "name": "Aimant Collecteur",
@@ -1479,6 +1513,7 @@
         "convoyNote": "Visée, explosion et surcharge restent actifs ici ; Réserve de Projectiles et Aimant Collecteur ne s'appliquent pas en Convoi.",
         "orbitalNote": "Visée, explosion, surcharge et Aimant Collecteur (arcs élargis) restent actifs ici ; Réserve de Projectiles ne s'applique pas.",
         "pinballNote": "Les 5 améliorations restent actives ici ; Aimant Collecteur élargit le panier mobile et ajoute de la Surcharge à chaque capture au lieu des points de bac.",
+        "slingshotNote": "Les 5 améliorations restent actives ici ; Aimant Collecteur élargit la zone de Fouet Magnétique autour des Puits Dipôles et renforce les bacs.",
         "arcadeShotlessNote": "Visée, explosion, surcharge et aimant restent actifs ici ; Réserve de Projectiles ne s'applique qu'aux modes à budget de tirs."
       },
       "feedback": {
@@ -1538,6 +1573,7 @@
         "puzzleSummary": "Niveau Puzzle : {{stage}} / {{total}}",
         "classicSummary": "Étape atteinte : {{stage}} (record : {{best}}) • Pièces : +{{coins}} ⬡",
         "pinballSummary": "Étape Pinball : {{stage}} (record : {{best}}) • Pièces : +{{coins}} ⬡",
+        "slingshotSummary": "Étape Fronde : {{stage}} (record : {{best}}) • Pièces : +{{coins}} ⬡",
         "mergeSummary": "Calibre atteint : {{tier}} (record : {{best}}) • Pièces : +{{coins}} ⬡"
       },
       "button": {
@@ -1621,6 +1657,7 @@
           "touch": "Polarité & Secousse : touchez 🧲 pour rapprocher les calibres identiques, ou touchez Secousse quand elle est prête"
         },
         "mergeTip": "Astuce : deux calibres identiques fusionnent au rang suivant. Utilisez la Secousse quand elle est prête pour projeter la pile vers le côté le plus vide !",
+        "slingshotTip": "Astuce : inversez la polarité (F ou 🧲) avant de tirer pour inverser la courbe des Puits Dipôles, ou en plein vol dans l'anneau pointillé pour un Fouet Magnétique !",
         "pad": "Manette : stick gauche pour viser (stick droit pour affiner), bouton du bas ou gâchette droite pour tirer, bouton de gauche pour échanger, bouton du haut pour inverser la polarité, boutons de tranche pour les sphères spéciales, Start pour la pause"
       },
       "button": {
@@ -1818,6 +1855,7 @@
           "convoy_snapbacks": { "title": "Déclencher {{target}} jonctions en Convoi" },
           "orbital_catches": { "title": "Capter {{target}} sphères dans les arcs orbitaux" },
           "merge_fusions": { "title": "Fusionner {{target}} sphères en Bassin de Fusion" },
+          "slingshot_cores": { "title": "Briser {{target}} Noyaux Radiants en Fronde" },
           "hex_waves": { "title": "Terminer {{target}} vagues en Grille Hexa" },
           "endless_waves": { "title": "Terminer {{target}} vagues en Survie" },
           "flux_stages": { "title": "Terminer {{target}} formes en Mode Flux" },
@@ -1857,6 +1895,7 @@
         "orbital": "🪐",
         "convoy": "🐍",
         "merge": "🫧",
+        "slingshot": "🏹",
         "versus": "⚔"
       }
     }
@@ -2066,6 +2105,10 @@
     "merge": {
       "header": "MagnaShot - Fusion en Bassin",
       "stats": "Calibre {{tier}} - {{score}} pts"
+    },
+    "slingshot": {
+      "header": "MagnaShot - Fronde Magnétique",
+      "stats": "Étape {{stage}} - {{score}} pts"
     }
   },
   "stats": {

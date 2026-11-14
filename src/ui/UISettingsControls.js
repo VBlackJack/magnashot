@@ -769,7 +769,9 @@ export const uiSettingsControlMethods = {
             ? engine.classicStage
             : engine.mode === GAME_MODES.PINBALL
               ? engine.pinballStage
-              : engine.fluxStage,
+              : engine.mode === GAME_MODES.SLINGSHOT
+                ? engine.slingshotStage
+                : engine.fluxStage,
         tier: engine.mergeBestTier,
         drops: engine.classicRailDropsTotal ?? 0,
         puzzleStage: engine.currentPuzzleStage,

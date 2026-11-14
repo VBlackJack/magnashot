@@ -329,6 +329,7 @@ const DEFAULT_MASTERY = Object.freeze({
   orbitalWave: 5,
   convoyWave: 5,
   mergeTier: 7,
+  slingshotStage: 4,
   versusHardWins: 1
 });
 const MASTERED_CLASS = 'is-mastered';
@@ -402,6 +403,7 @@ export function resolveModeMastery(storage, gameConfig) {
     [GAME_MODES.ORBITAL]: (storage.getOrbitalBestWave?.() || 0) >= m.orbitalWave,
     [GAME_MODES.CONVOY]: (storage.getConvoyBestWave?.() || 0) >= m.convoyWave,
     [GAME_MODES.MERGE]: bestMergeTier >= m.mergeTier,
+    [GAME_MODES.SLINGSHOT]: (storage.getSlingshotBestStage?.() || 0) >= m.slingshotStage,
     [GAME_MODES.VERSUS]: (versusRecords.hard?.w ?? versusRecords.hard?.won ?? 0) >= m.versusHardWins
   };
 }
@@ -533,6 +535,13 @@ export const uiPlayHubMethods = {
       t('modals.levelSelect.arcade.mergeRecord', {
         tier: formatNumber(Math.max(DEFAULT_STAGE, bestMergeTier || 1)),
         score: formatNumber(bestMergeScore)
+      })
+    );
+    setTextIfChanged(
+      els.arcadeBestSlingshot,
+      t('modals.levelSelect.arcade.pinballRecord', {
+        stage: formatNumber(Math.max(DEFAULT_STAGE, storage.getSlingshotBestStage?.() || 1)),
+        score: formatNumber(storage.getSlingshotHighScore?.() || 0)
       })
     );
     writeRewardChip(els.dailyReward, this.describeDailyRewardChip());

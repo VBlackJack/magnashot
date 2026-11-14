@@ -41,7 +41,8 @@ const ARCADE_INTRO_MODES = new Set([
   GAME_MODES.ORBITAL,
   GAME_MODES.PINBALL,
   GAME_MODES.CONVOY,
-  GAME_MODES.MERGE
+  GAME_MODES.MERGE,
+  GAME_MODES.SLINGSHOT
 ]);
 
 /** Methods of GameEngine that belong to this domain, installed on its prototype. */

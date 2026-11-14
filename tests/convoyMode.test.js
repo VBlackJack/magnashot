@@ -262,3 +262,60 @@ test('Convoy drawUnderlay highlights attracted Snapback gaps along LUT without m
   assert.deepEqual(engine.physicsWorld.balls.map((b) => b.id), originalOrder);
   assert.ok(strokes >= 3 && pathPoints > 4, 'draws rail, LUT snapback bridge, and singularity vortex');
 });
+
+test('Convoy Chain Snapback Surge escalates chain multiplier, pushes surviving spheres back on chain >= 2, and round-trips in RunSnapshot', () => {
+  const engine = createEngine();
+  engine.startConvoyMode();
+  const cfg = modesConfig.convoy;
+  const lut = convoyBehavior.getTrackLut(engine, engine.modeState.trackId);
+
+  engine.physicsWorld.balls = [];
+  engine.physicsWorld.ballMap.clear();
+  engine.modeState.spawnRemaining = 0;
+
+  const makeBall = (s, colorId) => {
+    const b = new Ball({ x: lut.xs[0], y: lut.ys[0], radius: physicsConfig.ball.radius, colorId, isAnchor: true });
+    b.convoyS = s;
+    engine.physicsWorld.addBall(b);
+    return b;
+  };
+
+  // Build two nested same-color snapback groups plus a surviving lead sphere at s = 300.
+  makeBall(60, 'amber');
+  const firstImpact = makeBall(60 + cfg.ballSpacing, 'crimson');
+  makeBall(60 + cfg.ballSpacing * 2, 'crimson');
+  makeBall(60 + cfg.ballSpacing * 3, 'crimson');
+  const secondImpact = makeBall(60 + cfg.ballSpacing * 4, 'amber');
+  makeBall(60 + cfg.ballSpacing * 5, 'amber');
+  const survivor = makeBall(360, 'cobalt');
+  convoyBehavior.sortAndSyncConvoy(engine, lut);
+
+  // Chain 1: base snapback bonus (chainMultiplier = 1), no chain pushback yet.
+  engine.combo = 0;
+  convoyBehavior.resolveSnapbackCollision(engine, firstImpact, lut);
+  assert.equal(engine.modeState.snapbackChain, 1);
+  assert.equal(survivor.convoyS, 360);
+
+  // Close the gap between the two amber spheres so they form a 3-cluster with a third amber sphere, then resolve Chain 2.
+  const extraAmber = makeBall(60 + cfg.ballSpacing * 2, 'amber');
+  secondImpact.convoyS = 60 + cfg.ballSpacing;
+  engine.physicsWorld.balls.find((b) => b.colorId === 'amber' && b !== secondImpact && b !== extraAmber && b.convoyS > 60).convoyS =
+    60 + cfg.ballSpacing * 3;
+  convoyBehavior.sortAndSyncConvoy(engine, lut);
+
+  const scoreBeforeChain2 = engine.score;
+  engine.combo = 0;
+  convoyBehavior.resolveSnapbackCollision(engine, secondImpact, lut);
+  assert.equal(engine.modeState.snapbackChain, 2);
+  const expectedChain2Bonus = Math.round(cfg.snapbackBonusPoints * (1 + cfg.chainBonusStep));
+  assert.ok(engine.score >= scoreBeforeChain2 + expectedChain2Bonus);
+  assert.equal(survivor.convoyS, 360 - cfg.chainPushbackPx);
+
+  // Snapshot preserves snapbackChain.
+  engine.hasFiredInRound = true;
+  engine.saveRunSnapshot({ force: true });
+  const restored = createEngine();
+  restored.storageManager = engine.storageManager;
+  assert.equal(restored.restoreSavedRun(), true);
+  assert.equal(restored.modeState.snapbackChain, 2);
+});

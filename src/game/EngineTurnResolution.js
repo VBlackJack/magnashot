@@ -27,6 +27,44 @@ import { DISCOVERY_INTERACTIONS } from './Discovery.js';
 import { applyTurn, SAG_STEPS } from './SagMeter.js';
 import { reportBountyEvent } from './Bounties.js';
 
+/**
+ * Indices of active one-way Platform obstacles currently supporting at least one non-anchor
+ * cluster sphere. Mirrors PhysicsWorld.isSupportedByPlatform so shelf-clear checks match physics.
+ * @param {import('../physics/PhysicsWorld.js').PhysicsWorld} world
+ * @returns {Set<number>}
+ */
+export function getOccupiedPlatformIndices(world) {
+  const occupied = new Set();
+  if (!world) {
+    return occupied;
+  }
+  const defaultRadius = world.physicsConfig.ball.radius;
+  const tol = world.physicsConfig.simulation.platformSupportTolerancePx;
+  for (let idx = 0; idx < world.obstacles.length; idx++) {
+    const obs = world.obstacles[idx];
+    if (obs.disabled || obs.type !== OBSTACLE_TYPES.PLATFORM) {
+      continue;
+    }
+    const shelfTopY = obs.y - obs.height * MATH_CONSTANTS.HALF;
+    for (const ball of world.balls) {
+      if (ball.isAnchor) {
+        continue;
+      }
+      const r = ball.radius || defaultRadius;
+      const halfW = obs.width * MATH_CONSTANTS.HALF + r * MATH_CONSTANTS.HALF;
+      if (Math.abs(ball.x - obs.x) > halfW) {
+        continue;
+      }
+      const ballBottom = ball.y + r;
+      if (ballBottom >= shelfTopY - tol && ballBottom <= shelfTopY + obs.height + r) {
+        occupied.add(idx);
+        break;
+      }
+    }
+  }
+  return occupied;
+}
+
 /** Methods of GameEngine that belong to this domain, installed on its prototype. */
 export const engineTurnResolutionMethods = {
   /**
@@ -872,21 +910,80 @@ export const engineTurnResolutionMethods = {
 
     if (this.isSurvivalMode() || this.mode === GAME_MODES.CLASSIC) {
       this.resolveSagTurn({ removed: madeMatch, dropped, frozen: wasFrozen });
-    } else if (this.mode === GAME_MODES.CASCADE && !wasFrozen) {
-      this.cascadeTurnsUntilDrop--;
-      if (this.cascadeTurnsUntilDrop <= 0) {
+    } else if (this.mode === GAME_MODES.BLITZ) {
+      const blitzCfg = this.gameConfig.blitz;
+      if (madeMatch || dropped > 0) {
+        this.blitzHitStreak = (this.blitzHitStreak || 0) + 1;
+        if (blitzCfg.feverStreakTurns > 0 && this.blitzHitStreak % blitzCfg.feverStreakTurns === 0) {
+          const feverPts = (blitzCfg.feverBonusPoints || 0) * Math.max(1, this.waveCount);
+          if (feverPts > 0) {
+            this.addScore(feverPts);
+          }
+          const earned = this.blitzBonusFramesEarned || 0;
+          const maxBonus = blitzCfg.maxBonusDurationFrames || 0;
+          const grantFrames = Math.min(blitzCfg.feverTimeBonusFrames || 0, Math.max(0, maxBonus - earned));
+          if (grantFrames > 0) {
+            this.blitzFramesRemaining += grantFrames;
+            this.blitzBonusFramesEarned = earned + grantFrames;
+          }
+          this.audioManager?.playEffect('blitzTimeBonus');
+          const launcherSpec = this.getLauncherSpec();
+          this.particleSystem.spawnFloatingText(
+            launcherSpec.x,
+            launcherSpec.y + this.gameConfig.canvas.launcherPopupOffsetY,
+            t('gameplay.feedback.blitz.fever', { streak: this.blitzHitStreak, points: feverPts }),
+            this.gameConfig.theme.overchargePopupColor
+          );
+        }
+      } else {
+        this.blitzHitStreak = 0;
+      }
+    } else if (this.mode === GAME_MODES.CASCADE) {
+      const cascadeCfg = this.gameConfig.cascade;
+      const nowOccupied = getOccupiedPlatformIndices(this.physicsWorld);
+      let clearedShelves = 0;
+      if (this.cascadeOccupiedPlatforms instanceof Set) {
+        for (const prevIdx of this.cascadeOccupiedPlatforms) {
+          if (!nowOccupied.has(prevIdx)) {
+            clearedShelves++;
+          }
+        }
+      }
+      if (!wasFrozen) {
+        this.cascadeTurnsUntilDrop--;
+      }
+      if (clearedShelves > 0) {
+        const shelfBonus = (cascadeCfg.shelfClearBonus || 0) * clearedShelves * Math.max(1, this.cascadeWave);
+        if (shelfBonus > 0) {
+          this.addScore(shelfBonus);
+        }
+        this.cascadeTurnsUntilDrop = Math.min(
+          cascadeCfg.shotsBeforeDrop + 1,
+          this.cascadeTurnsUntilDrop + clearedShelves
+        );
+        this.audioManager?.playEffect('overcharge');
+        const launcherSpec = this.getLauncherSpec();
+        this.particleSystem.spawnFloatingText(
+          launcherSpec.x,
+          launcherSpec.y + this.gameConfig.canvas.launcherPopupOffsetY,
+          t('gameplay.feedback.cascade.shelfCleared', { points: shelfBonus }),
+          this.gameConfig.theme.overchargePopupColor
+        );
+      }
+      if (!wasFrozen && this.cascadeTurnsUntilDrop <= 0) {
         this.cascadeWave++;
         this.waveCount = this.cascadeWave;
         this.spawnCascadeDropWave(0);
         this.refreshStaleLauncherColors();
-        this.cascadeTurnsUntilDrop = this.gameConfig.cascade.shotsBeforeDrop;
+        this.cascadeTurnsUntilDrop = cascadeCfg.shotsBeforeDrop;
         this.particleSystem.spawnFloatingText(
           this.gameConfig.canvas.logicalWidth * MATH_CONSTANTS.HALF,
-          this.gameConfig.cascade.startY + this.gameConfig.canvas.wavePopupOffsetY,
+          cascadeCfg.startY + this.gameConfig.canvas.wavePopupOffsetY,
           t('gameplay.feedback.wave.incoming'),
           this.gameConfig.theme.wavePopupColor
         );
       }
+      this.cascadeOccupiedPlatforms = getOccupiedPlatformIndices(this.physicsWorld);
     }
 
     this.advanceMagnetarTurn();
