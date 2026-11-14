@@ -257,6 +257,7 @@ export function writeRewardChip(chip, reward) {
 
 /**
  * Renders the 3 daily session bounties inside #play-bounties-list without innerHTML.
+ * Each unfinished contract renders as an interactive button that launches or resumes its mode.
  * @param {HTMLElement|null|undefined} listEl - Container <ul> element.
  * @param {{items?: Array<object>}|null|undefined} state - Storage bounties state.
  */
@@ -266,26 +267,52 @@ function renderDailyBounties(listEl, state) {
   }
   const items = Array.isArray(state?.items) ? state.items : [];
   listEl.replaceChildren();
-  for (const item of items) {
+  for (let index = 0; index < items.length; index++) {
+    const item = items[index];
+    const completed = Boolean(item.completed);
+    const target = Math.max(1, Number(item.target) || 1);
+    const progress = completed ? target : Math.max(0, Math.min(target, Number(item.progress) || 0));
+    const pct = Math.round((progress / target) * FULL_PERCENT);
+
     const li = document.createElement('li');
-    li.className = item.completed ? 'play-bounty-row is-done' : 'play-bounty-row';
+    li.className = completed ? 'play-bounty-row is-done' : 'play-bounty-row';
+
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.id = `play-bounty-${index}`;
+    btn.className = 'play-bounty-btn';
+    btn.dataset.bountyId = String(item.id || '');
+    btn.dataset.bountyEvent = String(item.eventKey || '');
+    btn.dataset.bountyMode = typeof item.mode === 'string' && item.mode ? item.mode : '';
+    btn.disabled = completed;
+
     const titleSpan = document.createElement('span');
     titleSpan.className = 'play-bounty-title';
     titleSpan.textContent = t(`modals.play.bounties.items.${item.id}.title`, {
-      target: formatNumber(item.target)
+      target: formatNumber(target)
     });
     const progSpan = document.createElement('span');
     progSpan.className = 'play-bounty-progress';
-    progSpan.textContent = item.completed
+    progSpan.textContent = completed
       ? t('modals.play.bounties.done')
       : t('modals.play.bounties.progress', {
-          progress: formatNumber(item.progress),
-          target: formatNumber(item.target)
+          progress: formatNumber(progress),
+          target: formatNumber(target)
         });
     const rewardSpan = document.createElement('span');
     rewardSpan.className = 'play-bounty-reward';
     rewardSpan.textContent = t('modals.play.bounties.reward', { coins: formatNumber(item.coins) });
-    li.append(titleSpan, progSpan, rewardSpan);
+
+    const meterSpan = document.createElement('span');
+    meterSpan.className = 'play-bounty-meter';
+    meterSpan.setAttribute('aria-hidden', 'true');
+    const meterFill = document.createElement('span');
+    meterFill.className = 'play-bounty-meter-fill';
+    meterFill.style.width = `${pct}%`;
+    meterSpan.append(meterFill);
+
+    btn.append(titleSpan, progSpan, rewardSpan, meterSpan);
+    li.append(btn);
     listEl.append(li);
   }
 }

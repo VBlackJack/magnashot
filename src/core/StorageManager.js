@@ -1807,13 +1807,32 @@ export class StorageManager {
   }
 
   /**
-   * Returns today's normalized daily bounties state (3 seeded entries and their progress).
+   * Returns today's normalized daily bounties state (3 seeded entries filtered by unlocked modes
+   * on first roll of the day and persisted so mid-day mode unlocks do not overwrite progress).
    * @param {string} [dateKey] - UTC date key (`YYYY-MM-DD`).
    */
   getDailyBountiesState(dateKey = SeededRandom.getTodayDateKey()) {
     const key = this.storageConfig?.keys?.bounties;
     const raw = key ? this.readJsonObject(key) : null;
-    return normalizeBountiesState(raw, this.bountiesConfig || {}, dateKey);
+    const access = this.getModeAccess();
+    const unlockedModes = new Set(
+      Object.entries(access)
+        .filter(([, entry]) => Boolean(entry?.unlocked))
+        .map(([mode]) => mode)
+    );
+    const normalized = normalizeBountiesState(raw, this.bountiesConfig || {}, dateKey, {
+      unlockedModes: unlockedModes.size > 0 ? unlockedModes : null
+    });
+    if (key && normalized.items.length > 0) {
+      const storedIds = raw?.dateKey === dateKey && Array.isArray(raw.items)
+        ? raw.items.map((item) => item?.id).join(',')
+        : '';
+      const nextIds = normalized.items.map((item) => item.id).join(',');
+      if (storedIds !== nextIds) {
+        this.safeSetItem(key, JSON.stringify(normalized));
+      }
+    }
+    return normalized;
   }
 
   /**

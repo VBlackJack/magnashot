@@ -20,25 +20,47 @@ import { SeededRandom } from '../core/SeededRandom.js';
 
 const BOUNTY_SEED_SUFFIX = ':bounties';
 
-/**
- * Picks the deterministic list of daily bounties for the given UTC date key.
- * @param {object} bountiesConfig - Bounties configuration from game.json.
- * @param {string} [dateKey] - UTC date key (`YYYY-MM-DD`).
- * @returns {Array<{id: string, eventKey: string, target: number, coins: number, mode: string|null}>}
- */
-export function pickDailyBounties(bountiesConfig, dateKey = SeededRandom.getTodayDateKey()) {
-  const catalog = Array.isArray(bountiesConfig?.catalog) ? bountiesConfig.catalog : [];
-  const count = Math.max(0, Math.min(catalog.length, Math.floor(Number(bountiesConfig?.dailyCount) || 0)));
-  if (count === 0) {
-    return [];
-  }
-  const pool = catalog.map((entry) => ({
+function normalizeCatalogEntry(entry) {
+  return {
     id: String(entry.id),
     eventKey: String(entry.eventKey),
     target: Math.max(1, Math.floor(Number(entry.target) || 1)),
     coins: Math.max(0, Math.floor(Number(entry.coins) || 0)),
     mode: typeof entry.mode === 'string' && entry.mode ? entry.mode : null
-  }));
+  };
+}
+
+function toUnlockedModeSet(unlockedModes) {
+  if (unlockedModes instanceof Set) {
+    return unlockedModes;
+  }
+  if (Array.isArray(unlockedModes)) {
+    return new Set(unlockedModes);
+  }
+  return null;
+}
+
+/**
+ * Picks the deterministic list of daily bounties for the given UTC date key.
+ * When `options.unlockedModes` is provided, mode-specific contracts whose mode is still locked
+ * are skipped so players only receive contracts they can complete right away.
+ * @param {object} bountiesConfig - Bounties configuration from game.json.
+ * @param {string} [dateKey] - UTC date key (`YYYY-MM-DD`).
+ * @param {{unlockedModes?: Set<string>|string[]|null}} [options] - Optional progression filter.
+ * @returns {Array<{id: string, eventKey: string, target: number, coins: number, mode: string|null}>}
+ */
+export function pickDailyBounties(bountiesConfig, dateKey = SeededRandom.getTodayDateKey(), options = {}) {
+  const catalog = Array.isArray(bountiesConfig?.catalog) ? bountiesConfig.catalog : [];
+  const count = Math.max(0, Math.min(catalog.length, Math.floor(Number(bountiesConfig?.dailyCount) || 0)));
+  if (count === 0) {
+    return [];
+  }
+  const normalizedCatalog = catalog.map(normalizeCatalogEntry);
+  const unlockedSet = toUnlockedModeSet(options?.unlockedModes);
+  const eligible = unlockedSet
+    ? normalizedCatalog.filter((entry) => entry.mode === null || unlockedSet.has(entry.mode))
+    : normalizedCatalog;
+  const pool = (eligible.length > 0 ? eligible : normalizedCatalog).slice();
   const rng = new SeededRandom(SeededRandom.hashString(`${dateKey}${BOUNTY_SEED_SUFFIX}`));
   for (let i = pool.length - 1; i > 0; i--) {
     const j = Math.floor(rng.next() * (i + 1));
@@ -61,32 +83,84 @@ export function pickDailyBounties(bountiesConfig, dateKey = SeededRandom.getToda
 
 /**
  * Normalizes a persisted daily bounties state object for `dateKey`, resetting on roll-over.
+ * Valid stored IDs for `dateKey` are re-hydrated from the canonical catalog and preserved across
+ * mid-day mode unlocks so in-progress or completed contracts never vanish mid-day.
  * @param {object|null} rawState - Parsed JSON object from storage.
  * @param {object} bountiesConfig - Bounties configuration from game.json.
  * @param {string} [dateKey] - UTC date key (`YYYY-MM-DD`).
+ * @param {{unlockedModes?: Set<string>|string[]|null}} [options] - Optional progression filter for fresh rolls.
  * @returns {{dateKey: string, items: Array<{id: string, eventKey: string, target: number, coins: number, mode: string|null, progress: number, completed: boolean}>}}
  */
-export function normalizeBountiesState(rawState, bountiesConfig, dateKey = SeededRandom.getTodayDateKey()) {
-  const picked = pickDailyBounties(bountiesConfig, dateKey);
-  const storedById = new Map();
+export function normalizeBountiesState(
+  rawState,
+  bountiesConfig,
+  dateKey = SeededRandom.getTodayDateKey(),
+  options = {}
+) {
+  const catalog = Array.isArray(bountiesConfig?.catalog) ? bountiesConfig.catalog : [];
+  const count = Math.max(0, Math.min(catalog.length, Math.floor(Number(bountiesConfig?.dailyCount) || 0)));
+  if (count === 0) {
+    return { dateKey, items: [] };
+  }
+  const catalogById = new Map();
+  for (const rawEntry of catalog) {
+    if (rawEntry && typeof rawEntry.id === 'string' && rawEntry.id) {
+      const spec = normalizeCatalogEntry(rawEntry);
+      catalogById.set(spec.id, spec);
+    }
+  }
+  const unlockedSet = toUnlockedModeSet(options?.unlockedModes);
+
+  const items = [];
+  const seenIds = new Set();
+  const seenEvents = new Set();
   if (rawState && rawState.dateKey === dateKey && Array.isArray(rawState.items)) {
-    for (const entry of rawState.items) {
-      if (entry && typeof entry.id === 'string') {
-        storedById.set(entry.id, entry);
+    for (const saved of rawState.items) {
+      if (!saved || typeof saved.id !== 'string') {
+        continue;
+      }
+      const spec = catalogById.get(saved.id);
+      if (!spec || seenIds.has(spec.id) || seenEvents.has(spec.eventKey)) {
+        continue;
+      }
+      const rawProgress = Number.isFinite(Number(saved.progress)) ? Math.floor(Number(saved.progress)) : 0;
+      const progress = Math.max(0, Math.min(spec.target, rawProgress));
+      const completed = Boolean(saved.completed) || progress >= spec.target;
+      if (spec.mode !== null && unlockedSet && !unlockedSet.has(spec.mode) && !completed && progress === 0) {
+        continue;
+      }
+      seenIds.add(spec.id);
+      seenEvents.add(spec.eventKey);
+      items.push({
+        ...spec,
+        progress: completed ? spec.target : progress,
+        completed
+      });
+      if (items.length >= count) {
+        break;
       }
     }
   }
-  const items = picked.map((spec) => {
-    const saved = storedById.get(spec.id);
-    const rawProgress = Number.isFinite(Number(saved?.progress)) ? Math.floor(Number(saved.progress)) : 0;
-    const progress = Math.max(0, Math.min(spec.target, rawProgress));
-    const completed = Boolean(saved?.completed) || progress >= spec.target;
-    return {
-      ...spec,
-      progress: completed ? spec.target : progress,
-      completed
-    };
-  });
+
+  if (items.length < count) {
+    const rolled = pickDailyBounties(bountiesConfig, dateKey, options);
+    for (const spec of rolled) {
+      if (seenIds.has(spec.id) || seenEvents.has(spec.eventKey)) {
+        continue;
+      }
+      seenIds.add(spec.id);
+      seenEvents.add(spec.eventKey);
+      items.push({
+        ...spec,
+        progress: 0,
+        completed: false
+      });
+      if (items.length >= count) {
+        break;
+      }
+    }
+  }
+
   return { dateKey, items };
 }
 

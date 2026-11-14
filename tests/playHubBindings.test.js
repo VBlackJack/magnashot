@@ -50,6 +50,9 @@ function makeElement(name) {
         handler({ target: this, preventDefault() {}, ...event });
       }
     },
+    click() {
+      this.fire('click');
+    },
     listenerCount: (type) => (listeners.get(type) ?? []).length
   };
 }
@@ -557,4 +560,58 @@ test('hideAllModals spends a stale hub two-player opener', () => {
   ui.versusTierOpener = { name: 'hub', isConnected: true };
   ui.hideAllModals();
   assert.equal(ui.versusTierOpener, null);
+});
+
+test('playBountiesList delegates contract clicks across universal, campaign, daily, arcade, incompatible-mode, and disabled states', () => {
+  const { ui, calls, elements, restore } = makeBoundUi({
+    access: {
+      [GAME_MODES.ENDLESS]: { unlocked: true },
+      [GAME_MODES.PINBALL]: { unlocked: true }
+    }
+  });
+  try {
+    ui.isVersusActive = () => false;
+    ui.resumePlayHubRun = () => calls.push(['resumePlayHubRun']);
+    ui.getPlayHubContinueTarget = () => ({ kind: 'play', levelId: 4 });
+    ui.engine.startCampaignLevel = (id) => calls.push(['engine.startCampaignLevel', id]);
+
+    const fireBountyClick = (dataset, disabled = false) => {
+      const btn = {
+        disabled,
+        dataset,
+        closest: (sel) => (sel === '.play-bounty-btn' ? btn : null)
+      };
+      elements.playBountiesList.fire('click', { target: btn });
+    };
+
+    // Disabled (completed) bounty does nothing.
+    fireBountyClick({ bountyMode: 'pinball', bountyEvent: 'pinball_core_lit' }, true);
+    assert.deepEqual(calls, []);
+
+    // Universal avalanche contract while in Survival (compatible) resumes the active run.
+    ui.engine.mode = GAME_MODES.ENDLESS;
+    ui.engine.state = GAME_STATES.PAUSED;
+    fireBountyClick({ bountyMode: '', bountyEvent: 'avalanche_balls' });
+    assert.deepEqual(calls, [['resumePlayHubRun']]);
+
+    // Universal avalanche contract while in Merge Basin (incompatible) falls through to Campaign Continue instead of resuming Merge.
+    calls.length = 0;
+    ui.engine.mode = GAME_MODES.MERGE;
+    fireBountyClick({ bountyMode: '', bountyEvent: 'avalanche_balls' });
+    assert.deepEqual(calls, [['activatePlayHubContinue']]);
+
+    // Campaign contract when all levels 3-starred (kind === 'map') launches getSuggestedLevelId() via confirm gate.
+    calls.length = 0;
+    ui.getPlayHubContinueTarget = () => ({ kind: 'map', levelId: null });
+    fireBountyClick({ bountyMode: GAME_MODES.CAMPAIGN, bountyEvent: 'campaign_level_cleared' });
+    assert.deepEqual(calls, [['confirmGate'], ['hideAllModals'], ['engine.startCampaignLevel', 12]]);
+
+    // Arcade mode contract delegates to its bound Play Hub mode card.
+    calls.length = 0;
+    fireBountyClick({ bountyMode: GAME_MODES.PINBALL, bountyEvent: 'pinball_core_lit' });
+    assert.deepEqual(calls.slice(0, 2), [['resumeIfRunning', GAME_MODES.PINBALL], ['gate', GAME_MODES.PINBALL]]);
+    assert.ok(calls.some((c) => c[0] === 'engine.startPinballMode'));
+  } finally {
+    restore();
+  }
 });

@@ -19,13 +19,14 @@ import { i18n, t } from '../core/I18n.js';
 import { SHOP_TABS } from './WorkshopView.js';
 import { fluxPerkIndexForKey } from './FluxPerkView.js';
 import {
+  ARCADE_CARD_SPECS,
   inputModeForPointerType,
   shouldIgnoreRepeatedKey,
   isBrowserShortcut,
   resolveNextCampaignTarget,
   WEEKLY_ACCESS_KEY
 } from './UIHelpers.js';
-import { PLAY_HUB_DISCLOSURES } from './PlayHubView.js';
+import { CONTINUE_KINDS, PLAY_HUB_DISCLOSURES } from './PlayHubView.js';
 import { STATS_TABS } from './UIStats.js';
 
 const HIDDEN_CLASS = 'hidden';
@@ -129,7 +130,20 @@ export function handleLevelGridKeydown(ui, event) {
   }
 }
 
-/** Play hub: open and close, Campaign card, disclosures and the two-player entry. */
+function canModeProgressBountyEvent(mode, eventKey) {
+  if (eventKey === 'match_group_cleared') {
+    return mode !== GAME_MODES.MERGE && mode !== GAME_MODES.PINBALL;
+  }
+  if (eventKey === 'avalanche_balls') {
+    return mode !== GAME_MODES.MERGE && mode !== GAME_MODES.PINBALL && mode !== GAME_MODES.CONVOY;
+  }
+  if (eventKey === 'overcharge_full') {
+    return mode !== GAME_MODES.MERGE && mode !== GAME_MODES.CLASSIC;
+  }
+  return true;
+}
+
+/** Play hub: open and close, Campaign card, disclosures, bounties and the two-player entry. */
 function bindPlayHubEvents(ui) {
   const els = ui.elements;
   els.btnPlay?.addEventListener('click', () => {
@@ -151,6 +165,55 @@ function bindPlayHubEvents(ui) {
   }
   els.btnVersusLocalHub?.addEventListener('click', () => {
     ui.openPlayHubVersusLocal();
+  });
+  els.playBountiesList?.addEventListener('click', (e) => {
+    const btn = e.target?.closest?.('.play-bounty-btn');
+    if (!btn || btn.disabled) {
+      return;
+    }
+    const mode = btn.dataset.bountyMode || '';
+    const eventKey = btn.dataset.bountyEvent || '';
+    if (!mode) {
+      if (
+        !ui.isVersusActive?.()
+        && (ui.engine.state === GAME_STATES.PLAYING || ui.engine.state === GAME_STATES.PAUSED)
+        && canModeProgressBountyEvent(ui.engine.mode, eventKey)
+      ) {
+        ui.resumePlayHubRun();
+        return;
+      }
+      const target = ui.getPlayHubContinueTarget();
+      if (target.kind !== CONTINUE_KINDS.MAP) {
+        ui.activatePlayHubContinue();
+        return;
+      }
+      els.btnEndless?.click();
+      return;
+    }
+    if (mode === GAME_MODES.CAMPAIGN) {
+      const target = ui.getPlayHubContinueTarget();
+      if (target.kind !== CONTINUE_KINDS.MAP) {
+        ui.activatePlayHubContinue();
+        return;
+      }
+      const fallbackLevel = ui.getSuggestedLevelId();
+      ui.requestDestructiveAction(
+        () => {
+          ui.hideAllModals();
+          ui.engine.startCampaignLevel(fallbackLevel);
+        },
+        () => t('modals.play.campaign.continue', { level: fallbackLevel })
+      );
+      return;
+    }
+    if (mode === GAME_MODES.DAILY) {
+      els.btnDaily?.click();
+      return;
+    }
+    const cardKey = ARCADE_CARD_SPECS[mode]?.card;
+    if (cardKey && els[cardKey]) {
+      els[cardKey].click();
+    }
   });
 }
 

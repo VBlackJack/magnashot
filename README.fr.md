@@ -57,7 +57,7 @@
   - Chaque sphère qui se pose envoie une onde qui fait gonfler l'amas, de lien en lien et plus faiblement à chaque pas, avec un léger tremblement d'écran. L'onde ne change que le dessin des sphères ; le mode mouvements réduits coupe les deux.
   - À la victoire, le score défile et les étoiles gagnées apparaissent une par une ; les deux respectent le mode mouvements réduits. L'écran de victoire indique aussi combien de points manquent pour décrocher l'étoile suivante (ou confirme l'objectif 3★), signale les nouveaux records personnels en Campagne, Survie, Défi du jour et Mode Flux, et l'écran de défaite en Campagne ou Mode Flux précise combien de sphères restaient sur le plateau.
 - **Atelier et Codex** :
-  - Améliorations permanentes (*Visée laser courbée*, *Amplificateur magnétique*, *Condensateur de surcharge*, *Réserve de projectiles*, *Aimant collecteur*), avec notes dédiées expliquant comment les améliorations s'appliquent aux modes sans limite de tirs (*Convoi Magnétique*, *Spin Orbital*).
+  - Améliorations permanentes (*Visée laser courbée*, *Amplificateur magnétique*, *Condensateur de surcharge*, *Réserve de projectiles*, *Aimant collecteur*), avec notes dédiées expliquant comment les améliorations s'appliquent aux modes sans limite de tirs (*Convoi Magnétique*, *Spin Orbital*) et comment *Aimant collecteur* élargit le panier mobile en *Flipper Magnétique*.
   - Recharges de munitions spéciales en cours de partie (cliquer ou presser `1`-`7` sur une sphère spéciale épuisée ouvre cet onglet), **4 styles visuels de sphères à débloquer** (*Classique*, *Cristal*, *Néon*, *Métallique*) avec médaillon d'aperçu visuel, primes et succès avec barres de progression persistantes basées sur vos meilleurs records, regroupés par famille en paliers Bronze, Argent et Or (nouvelles familles pour les formes du Flux et les vagues du Boss Rush), et un **Codex et guide** illustré couvrant modificateurs d'amas, obstacles magnétiques, sphères spéciales, mutateurs du Défi du jour et mécaniques du plateau et du lanceur (*Inversion de polarité*, *Collecteurs magnétiques*, *Jauge de surcharge*).
 - **Accessibilité et confort** :
   - Budget de particules adaptatif selon le temps de trame pour préserver la fluidité lors des pics tout en gardant la lisibilité de jeu, ainsi qu'une pastille d'alerte proactive dans le HUD et une annonce polie si le quota `localStorage` est atteint et empêche d'enregistrer la progression.
@@ -83,7 +83,7 @@
 | :--- | :--- | :--- |
 | **Viser** | Déplacer le pointeur / glisser le doigt | `Gauche` / `Droite` par petits pas (`+ Maj` pour de plus grands) |
 | **Tirer** | Relâcher le pointeur / le doigt | `Entrée` |
-| **Annuler la visée** | Glisser sous l'anneau du lanceur | - |
+| **Annuler la visée** | Glisser sous l'anneau du lanceur (au-dessus du lanceur en Flipper, au-dessus du rail en Bassin de Fusion, ou sur la tourelle centrale en Convoi) | - |
 | **Échanger la sphère** | Cliquer la sphère secondaire ou le bouton **Échanger** | `Espace` |
 | **Inverser la polarité** | Cliquer le bouton **Polarité** | `F` |
 | **Équiper / ranger une sphère spéciale** | Cliquer l'emplacement de la sphère spéciale (cliquer à nouveau pour la ranger) | `1` à `7` |

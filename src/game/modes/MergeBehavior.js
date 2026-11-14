@@ -119,6 +119,7 @@ const MERGE_CHROME = Object.freeze({
 
 /** Pause input hints that the basin words its own way. */
 const MERGE_INPUT_HINT_KEYS = Object.freeze({
+  'modals.pause.instructions.cancel': 'modals.pause.instructions.mergeCancel',
   'modals.pause.instructions.keyboard': 'modals.pause.instructions.mergeKeyboard'
 });
 
@@ -139,7 +140,7 @@ export class MergeBehavior extends ModeBehavior {
       nextOffsetX: cfg.nextOffsetX,
       nextOffsetY: cfg.nextOffsetY,
       compactQueue: true,
-      cancelOffset: 0,
+      cancelOffset: cfg.cancelAboveOffset,
       cancelRadius: 0
     };
   }

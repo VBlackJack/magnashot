@@ -78,6 +78,10 @@ export class PinballBehavior extends ModeBehavior {
     return PINBALL_CHROME;
   }
 
+  getInputHintKey(key) {
+    return key === 'modals.pause.instructions.cancel' ? 'modals.pause.instructions.pinballCancel' : key;
+  }
+
   offersSpecialBalls() {
     return true;
   }

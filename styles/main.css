@@ -1915,18 +1915,42 @@ body {
 }
 
 .play-bounty-row {
+  margin: 0;
+  padding: 0;
+}
+
+.play-bounty-btn {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto auto;
   align-items: center;
-  gap: 8px;
+  gap: 4px 8px;
   padding: 5px 8px;
   border-radius: 8px;
   border: 1px solid var(--border-subtle);
   background: var(--surface-sunken);
+  font: inherit;
   font-size: 0.74rem;
+  color: inherit;
+  text-align: start;
+  cursor: pointer;
+  transition: border-color 0.14s ease, background-color 0.14s ease;
 }
 
-.play-bounty-row.is-done {
+.play-bounty-btn:not(:disabled):hover,
+.play-bounty-btn:not(:disabled):focus-visible {
+  border-color: var(--accent-blue);
+}
+
+.play-bounty-btn:disabled {
+  cursor: default;
+  opacity: 1;
+}
+
+.play-bounty-row.is-done .play-bounty-btn {
   border-color: var(--accent-emerald);
 }
 
@@ -1949,6 +1973,25 @@ body {
   color: var(--text-gold-soft);
   font-weight: 700;
   font-variant-numeric: tabular-nums;
+}
+
+.play-bounty-meter {
+  grid-column: 1 / -1;
+  height: 3px;
+  border-radius: 999px;
+  background: var(--border-subtle);
+  overflow: hidden;
+}
+
+.play-bounty-meter-fill {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--accent-blue);
+}
+
+.play-bounty-row.is-done .play-bounty-meter-fill {
+  background: var(--accent-emerald);
 }
 
 /* Disclosure toggles under a card: full width of the cell, chevron drawn as text. */
@@ -3422,6 +3465,7 @@ body {
   }
   .modal-tab,
   .ammo-buy-btn,
+  .play-bounty-btn,
   .hud-mode-banner,
   .polarity-floating-btn,
   .swap-floating-btn {
@@ -3692,6 +3736,7 @@ body {
   .tutorial-dismiss-btn,
   .flux-seed-input,
   .arcade-mode-card,
+  .play-bounty-btn,
   .play-hub-section,
   .level-tile,
   #levels-detail,

@@ -1478,6 +1478,7 @@
         "puristBaselineNote": "Upgrades are paused in this purist mode.",
         "convoyNote": "Aiming, blast, and overcharge stay active here; Projectile Reserve and Collector Magnet do not apply in Convoy.",
         "orbitalNote": "Aiming, blast, overcharge, and Collector Magnet (wider collector arcs) stay active here; Projectile Reserve does not apply.",
+        "pinballNote": "All 5 upgrades stay active here; Collector Magnet widens the moving catch bucket and adds catch Overcharge instead of bin points.",
         "arcadeShotlessNote": "Aiming, blast, overcharge, and collector upgrades stay active here; Projectile Reserve applies only to shot-limited modes."
       },
       "feedback": {
@@ -1597,6 +1598,18 @@
         "cancel": {
           "pointer": "Cancel a shot: release the click below the launcher",
           "touch": "Cancel a shot: drag back below the launcher before releasing"
+        },
+        "pinballCancel": {
+          "pointer": "Cancel a shot: release the click above the top launcher",
+          "touch": "Cancel a shot: drag above the top launcher before releasing"
+        },
+        "convoyCancel": {
+          "pointer": "Cancel a shot: release the click on the central turret",
+          "touch": "Cancel a shot: drag back onto the central turret before releasing"
+        },
+        "mergeCancel": {
+          "pointer": "Cancel a drop: release the click above the drop rail",
+          "touch": "Cancel a drop: drag above the drop rail before releasing"
         },
         "keyboard": {
           "pointer": "Keyboard & Arsenal: Left/Right to fine-tune aim (Shift: faster), Enter to shoot, F (or 🧲) to invert polarity, 1-7 for Special Spheres",
@@ -1806,6 +1819,11 @@
           "orbital_catches": { "title": "Catch {{target}} Orbiters in Orbital Arcs" },
           "merge_fusions": { "title": "Fuse {{target}} spheres in Merge Basin" },
           "hex_waves": { "title": "Clear {{target}} waves in Hex Grid" },
+          "endless_waves": { "title": "Clear {{target}} waves in Survival" },
+          "flux_stages": { "title": "Clear {{target}} shapes in Flux Mode" },
+          "boss_rush_waves": { "title": "Defeat {{target}} Boss Waves in Boss Rush" },
+          "campaign_levels": { "title": "Clear {{target}} Campaign levels" },
+          "any_groups": { "title": "Clear {{target}} magnetic groups" },
           "any_avalanches": { "title": "Drop {{target}} spheres in Avalanches" },
           "overcharge_bursts": { "title": "Fill Overcharge {{target}} times" },
           "daily_clear": { "title": "Complete a Daily Challenge run" }

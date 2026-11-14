@@ -60,6 +60,7 @@ export const engineTurnResolutionMethods = {
     if (destroyedCount === 0) {
       return 0;
     }
+    reportBountyEvent(this, 'match_group_cleared', 1);
 
     this.combo = Math.min(
       this.combo + scoring.comboIncrement,
