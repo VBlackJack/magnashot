@@ -4,6 +4,8 @@ All notable changes to **MagnaShot** are documented in this file.
 
 ## [Unreleased]
 
+## [1.29.0] - 2026-11-14
+
 ### Added
 - Magnetic Slingshot (`slingshot`, unlocked at Campaign level 18): a 16th game mode built around zero-cluster-gravity curved trick-shot constellations (`SlingshotBehavior.js`, `configs/modes.json`, save schema v9). Signed Dipole Wells (`+` / `-`) bend projectiles with exact `computeAimTrajectory` preview parity; flipping Polarity (`F`) before shooting inverts every well sign and reverses every curve, while flipping mid-flight inside a well's dashed Polarity Whip ring grants a `1.22x` speed surge, Overcharge, and a `1.5x` Radiant Core shatter bonus (`Collector Magnet` widens the whip zone). Includes a 114 BPM procedural music profile, `slingshotWhip` SFX, Bronze/Silver/Gold `slingshotStages` achievements, `slingshot_cores` Daily Contract, Share card, Stats overview, Codex entry, and full `RunSnapshot` persistence.
 - Arcade Mode Evolutions across Cascade, Blitz 90s, Hex Grid, and Magnetic Convoy:
