@@ -29,7 +29,8 @@ export const SAVE_MIGRATIONS = Object.freeze([
   { toVersion: 5, run: (manager) => manager.announceIntroducedModes() },
   { toVersion: 6, run: (manager) => manager.migrateMusicVolumeSteps() },
   { toVersion: 7, run: (manager) => manager.seedPuzzleStageStats() },
-  { toVersion: 8, run: (manager) => manager.announceIntroducedModes() }
+  { toVersion: 8, run: (manager) => manager.announceIntroducedModes() },
+  { toVersion: 9, run: (manager) => manager.announceIntroducedModes() }
 ]);
 export const CURRENT_SAVE_SCHEMA_VERSION = SAVE_MIGRATIONS.at(-1).toVersion;
 

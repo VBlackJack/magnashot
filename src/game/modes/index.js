@@ -27,3 +27,4 @@ export { orbitalBehavior } from './OrbitalBehavior.js';
 export { pinballBehavior } from './PinballBehavior.js';
 export { convoyBehavior } from './ConvoyBehavior.js';
 export { mergeBehavior } from './MergeBehavior.js';
+export { slingshotBehavior } from './SlingshotBehavior.js';

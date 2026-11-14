@@ -27,6 +27,7 @@ import { t } from '../core/I18n.js';
 import { SeededRandom } from '../core/SeededRandom.js';
 import { getSagSpec, getSagPhase, SAG_PHASES } from './SagMeter.js';
 import { reportBountyEvent } from './Bounties.js';
+import { getOccupiedPlatformIndices } from './EngineTurnResolution.js';
 
 /**
  * Stars a Puzzle attempt count allows: the fewer attempts before the first clear, the higher
@@ -494,6 +495,7 @@ export const engineRoundFlowMethods = {
         for (let row = 0; row < cascadeCfg.initialDropRows; row++) {
           this.spawnCascadeDropWave(0);
         }
+        this.cascadeOccupiedPlatforms = getOccupiedPlatformIndices(this.physicsWorld);
         this.refreshStaleLauncherColors();
         this.particleSystem.spawnFloatingText(
           this.gameConfig.canvas.logicalWidth * MATH_CONSTANTS.HALF,
@@ -557,6 +559,8 @@ export const engineRoundFlowMethods = {
       previousBestScore = this.storageManager.getConvoyHighScore?.() || 0;
     } else if (this.mode === GAME_MODES.MERGE) {
       previousBestScore = this.storageManager.getMergeHighScore?.() || 0;
+    } else if (this.mode === GAME_MODES.SLINGSHOT) {
+      previousBestScore = this.storageManager.getSlingshotHighScore?.() || 0;
     }
     // A Daily rematch persists nothing, so it never sets a record.
     const isNewRecord = this.mode !== GAME_MODES.CAMPAIGN && this.mode !== GAME_MODES.PUZZLE && !this.isDailyRematch && previousBestScore > 0 && this.score > previousBestScore;

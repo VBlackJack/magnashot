@@ -4135,7 +4135,7 @@ describe('Progress transfer', () => {
 });
 
 describe('Lot E and audit smoke checks', () => {
-  const allUnlocked = String(GAME_CONFIG.modeUnlocks.campaignLevelCleared.merge + 2);
+  const allUnlocked = String(GAME_CONFIG.modeUnlocks.campaignLevelCleared.slingshot + 2);
   const fullPuzzleStats = JSON.stringify(
     Object.fromEntries(
       GAME_CONFIG.puzzles.map((p) => [String(p.id), { bestScore: 1000, stars: 3, attempts: 1, cleared: true }])
@@ -4159,6 +4159,7 @@ describe('Lot E and audit smoke checks', () => {
       ['#btn-mode-orbital', GAME_MODES.ORBITAL],
       ['#btn-mode-convoy', GAME_MODES.CONVOY],
       ['#btn-mode-merge', GAME_MODES.MERGE],
+      ['#btn-mode-slingshot', GAME_MODES.SLINGSHOT],
       ['#btn-mode-blitz', GAME_MODES.BLITZ]
     ];
     const desktop = await openGame(VIEWPORTS[0], { initStorage: fullProfileStorage });
@@ -4168,6 +4169,25 @@ describe('Lot E and audit smoke checks', () => {
         await desktop.page.click(selector);
         await desktop.page.waitForFunction((expected) => window.__fluxEngine.mode === expected, mode);
         await assertLayoutFits(desktop.page, mode);
+        if (mode === GAME_MODES.SLINGSHOT) {
+          const slingshotCurveDelta = await desktop.page.evaluate(() => {
+            const eng = window.__fluxEngine;
+            eng.updateAimFromAngle(-Math.PI * 0.42);
+            const endBefore = eng.aimPoints[eng.aimPoints.length - 1];
+            return { stage: eng.slingshotStage, endBeforeX: endBefore.x };
+          });
+          assert.equal(slingshotCurveDelta.stage, 1);
+          await desktop.page.keyboard.press('KeyF');
+          const afterFlipX = await desktop.page.evaluate(() => {
+            const eng = window.__fluxEngine;
+            eng.updateAimFromAngle(-Math.PI * 0.42);
+            return eng.aimPoints[eng.aimPoints.length - 1].x;
+          });
+          assert.ok(
+            Math.abs(afterFlipX - slingshotCurveDelta.endBeforeX) > 8,
+            'Pressing Polarity (KeyF) flips Dipole Wells and shifts Magnetic Slingshot aim trajectory'
+          );
+        }
       }
       assert.deepEqual(desktop.errors, []);
     } finally {

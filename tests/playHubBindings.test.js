@@ -109,7 +109,8 @@ function makeBoundUi({ access = {}, engineState = {} } = {}) {
     'startPinballMode',
     'startOrbitalMode',
     'startConvoyMode',
-    'startMergeMode'
+    'startMergeMode',
+    'startSlingshotMode'
   ]) {
     ui.engine[name] = (...args) => calls.push([`engine.${name}`, ...args]);
   }
@@ -224,7 +225,8 @@ test('every mode card tries to resume its running mode first, then starts throug
     ['btnModePinball', GAME_MODES.PINBALL, GAME_MODES.PINBALL, 'engine.startPinballMode'],
     ['btnModeOrbital', GAME_MODES.ORBITAL, GAME_MODES.ORBITAL, 'engine.startOrbitalMode'],
     ['btnModeConvoy', GAME_MODES.CONVOY, GAME_MODES.CONVOY, 'engine.startConvoyMode'],
-    ['btnModeMerge', GAME_MODES.MERGE, GAME_MODES.MERGE, 'engine.startMergeMode']
+    ['btnModeMerge', GAME_MODES.MERGE, GAME_MODES.MERGE, 'engine.startMergeMode'],
+    ['btnModeSlingshot', GAME_MODES.SLINGSHOT, GAME_MODES.SLINGSHOT, 'engine.startSlingshotMode']
   ];
   for (const [key, runKey, gateKey, startCall] of specs) {
     const { ui, calls, elements, restore } = makeBoundUi();

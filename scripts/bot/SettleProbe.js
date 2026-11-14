@@ -95,7 +95,11 @@ const LANE_HEX_DIGITS = 8;
 const FLUX_SETTLE_SEED = 'settle';
 const FLUX_SETTLE_STAGE = 1;
 /** Modes idleSettleMode can settle. */
-export const IDLE_SETTLE_MODES = Object.freeze({ BOSS_RUSH: 'bossRush', CASCADE: 'cascade' });
+export const IDLE_SETTLE_MODES = Object.freeze({
+  BOSS_RUSH: 'bossRush',
+  CASCADE: 'cascade',
+  SLINGSHOT: 'slingshot'
+});
 /** Separator of the ids in the pool hash. */
 const POOL_ID_SEPARATOR = '\n';
 
@@ -210,6 +214,7 @@ function createSettleEngine(configs, fluxShapeTuning) {
     levelsConfig: configs.levels,
     campaignConfig: configs.campaign,
     fluxConfig: configs.flux,
+    modesConfig: configs.modes,
     fluxShapeTuning,
     audioManager: SILENT_AUDIO,
     storageManager,
@@ -323,6 +328,8 @@ export function idleSettleMode(configs, { mode, wave = 1, lcgSeed, frames, extra
       for (let drop = 0; drop < extraDropWaves; drop++) {
         engine.spawnCascadeDropWave();
       }
+    } else if (mode === IDLE_SETTLE_MODES.SLINGSHOT) {
+      engine.startSlingshotMode(wave);
     } else {
       throw new Error(`Unknown idle settle mode: ${mode}`);
     }

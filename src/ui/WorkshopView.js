@@ -33,7 +33,8 @@ const SHOTLESS_NOTE_KEYS = Object.freeze({
 });
 /** Workshop note shown in shot-budget modes that repurpose a specific upgrade. */
 const MODE_UPGRADE_NOTE_KEYS = Object.freeze({
-  [GAME_MODES.PINBALL]: 'modals.shop.upgrades.pinballNote'
+  [GAME_MODES.PINBALL]: 'modals.shop.upgrades.pinballNote',
+  [GAME_MODES.SLINGSHOT]: 'modals.shop.upgrades.slingshotNote'
 });
 export { FULL_PERCENT };
 
@@ -127,6 +128,8 @@ export function computeAchievementProgress(achId, achSpec, isUnlocked, progressC
     rawCurrent = progressContext.convoyWave || 0;
   } else if (familyId === 'mergeTiers') {
     rawCurrent = progressContext.mergeTier || 0;
+  } else if (familyId === 'slingshotStages') {
+    rawCurrent = progressContext.slingshotStage || 0;
   } else if (familyId === 'magnetarsGrounded') {
     rawCurrent = progressContext.magnetarsGrounded || 0;
   } else if (familyId === 'magnetarLandslide') {
@@ -503,6 +506,10 @@ export function renderWorkshopContents() {
       mergeTier: Math.max(
         this.storageManager.getMergeBestTier?.() || 0,
         this.engine.mode === GAME_MODES.MERGE ? this.engine.mergeBestTier || 0 : 0
+      ),
+      slingshotStage: Math.max(
+        this.storageManager.getSlingshotBestStage?.() || 0,
+        this.engine.mode === GAME_MODES.SLINGSHOT ? this.engine.slingshotStage || 0 : 0
       ),
       unlockedLevel: this.storageManager.getUnlockedLevel(),
       campaignLevelCount: this.engine.levelCatalog.count

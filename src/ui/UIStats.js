@@ -404,6 +404,11 @@ export const uiStatsMethods = {
           score: storage.getMergeHighScore?.() ?? 0,
           kind: RECORD_KIND_TIER,
           tier: storage.getMergeBestTier?.() ?? 0
+        },
+        [GAME_MODES.SLINGSHOT]: {
+          score: storage.getSlingshotHighScore?.() ?? 0,
+          kind: RECORD_KIND_CLASSIC_STAGE,
+          stage: storage.getSlingshotBestStage?.() ?? 0
         }
       }
     };

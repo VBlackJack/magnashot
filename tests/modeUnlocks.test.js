@@ -98,7 +98,8 @@ test('every gated mode follows its threshold exactly', () => {
     [GAME_MODES.PINBALL]: 14,
     [GAME_MODES.ORBITAL]: 15,
     [GAME_MODES.CONVOY]: 16,
-    [GAME_MODES.MERGE]: 17
+    [GAME_MODES.MERGE]: 17,
+    [GAME_MODES.SLINGSHOT]: 18
   });
 });
 
@@ -224,7 +225,8 @@ test('classic: unlocks at campaign level 4, right after Survival, and is announc
     [GAME_MODES.PINBALL]: 14,
     [GAME_MODES.ORBITAL]: 15,
     [GAME_MODES.CONVOY]: 16,
-    [GAME_MODES.MERGE]: 17
+    [GAME_MODES.MERGE]: 17,
+    [GAME_MODES.SLINGSHOT]: 18
   });
   assert.deepEqual(cfg.recordKeys[CLASSIC_MODE], ['classicHighScore', 'classicBestStage']);
   assert.equal(resolveModeAccess({}, 3, cfg)[CLASSIC_MODE].unlocked, false);
@@ -238,17 +240,20 @@ test('arcade behavior modes: records only ever rise and a record opens each mode
     manager.setOrbitalRecord(1800, 5);
     manager.setConvoyRecord(2100, 6);
     manager.setMergeRecord(2400, 7);
+    manager.setSlingshotRecord(2700, 4);
     assert.equal(manager.getHexGridBestWave(), 4);
     assert.equal(manager.getPinballBestStage(), 3);
     assert.equal(manager.getOrbitalBestWave(), 5);
     assert.equal(manager.getConvoyBestWave(), 6);
     assert.equal(manager.getMergeBestTier(), 7);
+    assert.equal(manager.getSlingshotBestStage(), 4);
     const access = manager.getModeAccess();
     assert.equal(access[GAME_MODES.HEX_GRID].unlocked, true);
     assert.equal(access[GAME_MODES.PINBALL].unlocked, true);
     assert.equal(access[GAME_MODES.ORBITAL].unlocked, true);
     assert.equal(access[GAME_MODES.CONVOY].unlocked, true);
     assert.equal(access[GAME_MODES.MERGE].unlocked, true);
+    assert.equal(access[GAME_MODES.SLINGSHOT].unlocked, true);
   });
 });
 

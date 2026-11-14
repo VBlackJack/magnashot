@@ -248,6 +248,7 @@ export class ConvoyBehavior extends ModeBehavior {
       spawnRemaining: quota - initialCount,
       freezeTimerSec: 0,
       recoilSpeed: 0,
+      snapbackChain: 0,
       lastSpawnColorId: ''
     };
 
@@ -489,15 +490,26 @@ export class ConvoyBehavior extends ModeBehavior {
     const cluster = world.findColorCluster(impactBall);
     const minMatch = engine.gameConfig.defaults.matchMinCount;
     if (cluster.length >= minMatch) {
-      const pts = cfg.snapbackBonusPoints * Math.max(1, engine.combo + 1);
+      const chain = (engine.modeState.snapbackChain || 0) + 1;
+      engine.modeState.snapbackChain = chain;
+      const chainMultiplier = 1 + (chain - 1) * cfg.chainBonusStep;
+      const pts = Math.round(cfg.snapbackBonusPoints * Math.max(1, engine.combo + 1) * chainMultiplier);
       engine.addScore(pts);
+      const feedbackText = chain >= 2
+        ? t('gameplay.feedback.convoy.chainSnapback', { chain, points: pts })
+        : t('gameplay.feedback.convoy.snapback', { points: pts });
       engine.particleSystem.spawnFloatingText(
         impactBall.x,
         impactBall.y + engine.gameConfig.canvas.floatingTextOffsetY,
-        t('gameplay.feedback.convoy.snapback', { points: pts }),
+        feedbackText,
         engine.gameConfig.theme.chainPopupColor
       );
       engine.resolveColorMatchCluster(cluster, impactBall, true);
+      if (chain >= 2 && cfg.chainPushbackPx > 0) {
+        for (const ball of world.balls) {
+          ball.convoyS = Math.max(0, ball.convoyS - cfg.chainPushbackPx);
+        }
+      }
       this.ensureVisibleConvoyBall(engine, lut);
       this.sortAndSyncConvoy(engine, lut);
       if (world.balls.length === 0 && engine.modeState.spawnRemaining <= 0 && !world.projectile) {
@@ -520,6 +532,7 @@ export class ConvoyBehavior extends ModeBehavior {
     if (!snappedBall || !engine.modeState) {
       return false;
     }
+    engine.modeState.snapbackChain = 0;
     if (snappedBall.specialType) {
       // Special spheres detonate in place without inserting into the train or pushing lead spheres forward
       const prevFreeze = engine.freezeTurnsRemaining;
@@ -673,6 +686,7 @@ export class ConvoyBehavior extends ModeBehavior {
       trackId: state.trackId || engine.modesConfig.convoy.tracks[0],
       spawnRemaining: state.spawnRemaining ?? 0,
       freezeTimerSec: state.freezeTimerSec ?? 0,
+      snapbackChain: state.snapbackChain ?? 0,
       positionsS: engine.physicsWorld.balls.map((b) => (Number.isFinite(b.convoyS) ? b.convoyS : 0))
     };
   }
@@ -707,6 +721,7 @@ export class ConvoyBehavior extends ModeBehavior {
       spawnRemaining: rawState.spawnRemaining,
       freezeTimerSec: Math.max(0, Number(rawState.freezeTimerSec) || 0),
       recoilSpeed: 0,
+      snapbackChain: Math.max(0, Number.parseInt(rawState.snapbackChain, 10) || 0),
       lastSpawnColorId: ''
     };
 

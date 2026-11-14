@@ -18,6 +18,7 @@ import { CLUSTER_MODIFIERS, GAME_MODES, GAME_STATES, SPECIAL_TYPES_ORDER, WAVE_T
 import { Ball } from '../entities/Ball.js';
 import { normalizeShotTimeline } from './ShotTimeline.js';
 import { getSagSpec } from './SagMeter.js';
+import { getOccupiedPlatformIndices } from './EngineTurnResolution.js';
 import { getRegisteredModeBehavior } from './modes/index.js';
 
 /** Shape of a week key such as "2026-W45". */
@@ -70,10 +71,12 @@ const ENGINE_SCALAR_FIELDS = [
   'blitzWaveTimerFrames',
   'blitzIdleFrames',
   'blitzBonusFramesEarned',
+  'blitzHitStreak',
   'bossRushWave',
   'cascadeWave',
   'cascadeTurnsUntilDrop',
   'pinballStage',
+  'slingshotStage',
   'mergeDropX',
   'mergeBestTier'
 ];
@@ -338,6 +341,12 @@ export function isValidRunSnapshot(snapshot, version) {
   if (!behavior.validateModeState(snapshot.modeState ?? null)) {
     return false;
   }
+  if (
+    snapshot.mode === GAME_MODES.SLINGSHOT &&
+    (!Array.isArray(snapshot.balls) || snapshot.modeState.coreFlags.length !== snapshot.balls.length)
+  ) {
+    return false;
+  }
   return (
     Array.isArray(snapshot.balls) &&
     snapshot.balls.length >= minBalls &&
@@ -429,6 +438,8 @@ export function applyRunSnapshot(engine, snapshot) {
     engine.startConvoyMode();
   } else if (snapshot.mode === GAME_MODES.MERGE) {
     engine.startMergeMode();
+  } else if (snapshot.mode === GAME_MODES.SLINGSHOT) {
+    engine.startSlingshotMode(snapshot.engine.slingshotStage || 1);
   } else {
     engine.startEndlessMode();
   }
@@ -534,6 +545,9 @@ export function applyRunSnapshot(engine, snapshot) {
   engine.currentBall = engine.createRandomLauncherBall(snapshot.currentBall.specialType, snapshot.currentBall.colorId);
   engine.nextBall = engine.createRandomLauncherBall(snapshot.nextBall.specialType, snapshot.nextBall.colorId);
   engine.getModeBehavior().restoreModeState(engine, snapshot.modeState ?? null);
+  if (snapshot.mode === GAME_MODES.CASCADE) {
+    engine.cascadeOccupiedPlatforms = getOccupiedPlatformIndices(world);
+  }
   // The restored mode variant determines which record the run started against.
   engine.restoreRunBestBaseline(snapshot.runBestBaseline);
   // Runs saved before the queue existed, or with a damaged one, get a fresh queue.

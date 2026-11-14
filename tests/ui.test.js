@@ -2113,9 +2113,11 @@ test('refresh keeps the one-shot extras out of lastExtra', () => {
     unlockedAchievementIds: ['a1', 'a2'],
     fluxStageCleared: 3,
     classicStageCleared: undefined,
+    slingshotStageCleared: undefined,
     fluxPerkChosen: 'blast'
   });
   assert.equal(splitRefreshExtra({ classicStageCleared: 2 }).oneShot.classicStageCleared, 2);
+  assert.equal(splitRefreshExtra({ slingshotStageCleared: 4 }).oneShot.slingshotStageCleared, 4);
 });
 
 test('Flux perk helpers map keys, values and held perks', async () => {

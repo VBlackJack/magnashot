@@ -313,7 +313,8 @@ const EXPECTED_PROTOTYPE_NAMES = [
   'startOrbitalMode',
   'startPinballMode',
   'startConvoyMode',
-  'startMergeMode'
+  'startMergeMode',
+  'startSlingshotMode'
 ];
 
 test('GameEngine.prototype exposes exactly the same members after the module split', () => {

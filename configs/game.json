@@ -430,6 +430,7 @@
       "orbitalWave": 5,
       "convoyWave": 5,
       "mergeTier": 7,
+      "slingshotStage": 4,
       "versusHardWins": 1
     }
   },
@@ -440,6 +441,7 @@
       { "id": "convoy_snapbacks", "eventKey": "convoy_snapback", "target": 4, "coins": 45, "mode": "convoy" },
       { "id": "orbital_catches", "eventKey": "orbital_arc_catch", "target": 6, "coins": 40, "mode": "orbital" },
       { "id": "merge_fusions", "eventKey": "merge_fusion", "target": 12, "coins": 40, "mode": "merge" },
+      { "id": "slingshot_cores", "eventKey": "slingshot_core_shattered", "target": 6, "coins": 45, "mode": "slingshot" },
       { "id": "hex_waves", "eventKey": "hex_wave_cleared", "target": 3, "coins": 45, "mode": "hex_grid" },
       { "id": "endless_waves", "eventKey": "endless_wave_cleared", "target": 3, "coins": 35, "mode": "endless" },
       { "id": "flux_stages", "eventKey": "flux_stage_cleared", "target": 3, "coins": 40, "mode": "flux" },
@@ -517,6 +519,9 @@
     "autoFireFrames": 180,
     "avalancheTimeBonusMinSpheres": 8,
     "avalancheTimeBonusFrames": 180,
+    "feverStreakTurns": 3,
+    "feverTimeBonusFrames": 120,
+    "feverBonusPoints": 200,
     "maxBonusDurationFrames": 1800,
     "minSpheresBeforeWave": 10,
     "initialRows": 4,
@@ -617,6 +622,8 @@
     "gravityMultiplier": 1.65,
     "overlapRadiusFactor": 1.5,
     "shotsBeforeDrop": 2,
+    "shelfClearBonus": 150,
+    "polarityDriftPerStep": 0.22,
     "dropCountPerWave": 3,
     "initialDropRows": 3,
     "columns": 7,
@@ -1839,6 +1846,27 @@
       "tier": "gold",
       "threshold": 10,
       "rewardCoins": 240
+    },
+    "slingshotStages": {
+      "id": "slingshotStages",
+      "tierOf": "slingshotStages",
+      "tier": "bronze",
+      "threshold": 3,
+      "rewardCoins": 60
+    },
+    "slingshotStagesSilver": {
+      "id": "slingshotStagesSilver",
+      "tierOf": "slingshotStages",
+      "tier": "silver",
+      "threshold": 7,
+      "rewardCoins": 120
+    },
+    "slingshotStagesGold": {
+      "id": "slingshotStagesGold",
+      "tierOf": "slingshotStages",
+      "tier": "gold",
+      "threshold": 12,
+      "rewardCoins": 220
     }
   },
   "onboarding": {
@@ -2215,7 +2243,7 @@
   "modeUnlocks": {
     "order": [
       "campaign", "daily", "endless", "classic", "versus", "puzzle", "blitz", "flux", "cascade", "boss_rush",
-      "hex_grid", "pinball", "orbital", "convoy", "merge"
+      "hex_grid", "pinball", "orbital", "convoy", "merge", "slingshot"
     ],
     "always": ["campaign", "daily"],
     "campaignLevelCleared": {
@@ -2231,7 +2259,8 @@
       "pinball": 14,
       "orbital": 15,
       "convoy": 16,
-      "merge": 17
+      "merge": 17,
+      "slingshot": 18
     },
     "recordKeys": {
       "endless": ["endlessHighScore"],
@@ -2246,7 +2275,8 @@
       "pinball": ["pinballHighScore", "pinballBestStage"],
       "orbital": ["orbitalHighScore", "orbitalBestWave"],
       "convoy": ["convoyHighScore", "convoyBestWave"],
-      "merge": ["mergeHighScore", "mergeBestTier", "mergeShakeHighScore", "mergeShakeBestTier"]
+      "merge": ["mergeHighScore", "mergeBestTier", "mergeShakeHighScore", "mergeShakeBestTier"],
+      "slingshot": ["slingshotHighScore", "slingshotBestStage"]
     },
     "introduced": {
       "classic": 4,
@@ -2255,7 +2285,8 @@
       "pinball": 14,
       "orbital": 15,
       "convoy": 16,
-      "merge": 17
+      "merge": 17,
+      "slingshot": 18
     },
     "stateNew": "new",
     "stateSeen": "seen",
@@ -2267,6 +2298,7 @@
         "hexGridHighScore", "hexGridBestWave", "pinballHighScore", "pinballBestStage",
         "orbitalHighScore", "orbitalBestWave", "convoyHighScore", "convoyBestWave",
         "mergeHighScore", "mergeBestTier", "mergeShakeHighScore", "mergeShakeBestTier",
+        "slingshotHighScore", "slingshotBestStage",
         "dailyBest", "dailyLastPlayedDate", "coins", "upgrades",
         "achievements", "achievementRecords", "unlockedBallStyles", "runSnapshot", "discoveries"
       ],
@@ -2391,6 +2423,8 @@
         "mergeBestTier": "integer",
         "mergeShakeHighScore": "integer",
         "mergeShakeBestTier": "integer",
+        "slingshotHighScore": "integer",
+        "slingshotBestStage": "integer",
         "versusLocalMatches": "integer",
         "dailyBest": "integer",
         "dailyStreak": "integer",
@@ -2464,6 +2498,8 @@
       "mergeShakeBestTier": "merge_shake_best_tier",
       "mergeHighScore": "merge_high_score",
       "mergeBestTier": "merge_best_tier",
+      "slingshotHighScore": "slingshot_high_score",
+      "slingshotBestStage": "slingshot_best_stage",
       "versusRecords": "versus_records",
       "versusLocalMatches": "versus_local_matches",
       "versusTutorialSeen": "versus_tutorial_seen",

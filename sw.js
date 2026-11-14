@@ -107,6 +107,7 @@ const PRECACHE_ASSETS = [
   './src/game/modes/ModeConfig.js',
   './src/game/modes/OrbitalBehavior.js',
   './src/game/modes/PinballBehavior.js',
+  './src/game/modes/SlingshotBehavior.js',
   './src/game/modes/index.js',
   './src/physics/PhysicsWorld.js',
   './src/physics/SpatialHashGrid.js',

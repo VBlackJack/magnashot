@@ -73,6 +73,7 @@ export class PhysicsWorld {
     this.hasBrokenBondThisStep = false;
     this.disableMagneticCurve = false;
     this.projectileGravity = 0;
+    this.projectileLateralDrift = 0;
     this.projectileLaunchSpeedOverride = 0;
     this.disableBounceCap = false;
     this.snapCeilingY = null;
@@ -225,6 +226,7 @@ export class PhysicsWorld {
     this.hasBrokenBondThisStep = false;
     this.disableMagneticCurve = false;
     this.projectileGravity = 0;
+    this.projectileLateralDrift = 0;
     this.projectileLaunchSpeedOverride = 0;
     this.disableBounceCap = false;
     this.snapCeilingY = null;
@@ -1010,6 +1012,25 @@ export class PhysicsWorld {
       this.clampProjectileSpeed(state);
     }
 
+    if (!isAnvil && this.projectileLateralDrift !== 0) {
+      const prevSpeed = Math.hypot(state.vx, state.vy);
+      if (prevSpeed > MATH_CONSTANTS.EPSILON) {
+        const rawPolarity = state.colorId ? this.polarityMap.get(state.colorId) : 0;
+        const ballPolarity = rawPolarity !== 0 && rawPolarity !== undefined ? rawPolarity : 1;
+        const driftSign =
+          ballPolarity *
+          (state.isPolarityFlipped ? -1 : 1) *
+          (this.boardPolarityInverted ? -1 : 1);
+        state.vx += driftSign * this.projectileLateralDrift * dt;
+        const nextSpeed = Math.hypot(state.vx, state.vy);
+        if (nextSpeed > MATH_CONSTANTS.EPSILON) {
+          const scale = prevSpeed / nextSpeed;
+          state.vx *= scale;
+          state.vy *= scale;
+        }
+      }
+    }
+
     if (!isAnvil && !this.disableMagneticCurve && !state.disableMagneticCurve) {
       const attractRange = r * mag.attractionRangeFactor;
       const attractRangeSq = attractRange * attractRange;
@@ -1592,6 +1613,7 @@ export class PhysicsWorld {
       this.boardPolarityInverted,
       this.disableMagneticCurve,
       this.projectileGravity,
+      this.projectileLateralDrift,
       this.projectileLaunchSpeedOverride,
       this.snapCeilingY,
       this.aimReflectOnBallHit,

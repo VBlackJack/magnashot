@@ -701,6 +701,12 @@ export const uiInputBindingMethods = {
       labelKey: 'modals.levelSelect.arcade.merge',
       start: () => this.engine.startMergeMode()
     });
+    bindModeCard(this, this.elements.btnModeSlingshot, {
+      modeKey: GAME_MODES.SLINGSHOT,
+      accessKey: GAME_MODES.SLINGSHOT,
+      labelKey: 'modals.levelSelect.arcade.slingshot',
+      start: () => this.engine.startSlingshotMode()
+    });
 
     this.elements.inputFluxSeed?.addEventListener('keydown', (e) => {
       if (e.key === 'Enter') {

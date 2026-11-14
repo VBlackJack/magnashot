@@ -33,7 +33,8 @@ const configs = {
   levels: loadJson('levels.json'),
   campaign: loadJson('campaign.json'),
   audio: loadJson('audio.json'),
-  flux: loadJson('flux.json')
+  flux: loadJson('flux.json'),
+  modes: loadJson('modes.json')
 };
 // StorageManager reads the shared registry, as the app and the calibration script do.
 for (const [key, value] of Object.entries(configs)) {
@@ -48,6 +49,7 @@ const FRAMES = configs.campaign.generated.calibration.settleFrames;
 const BOSS_RUSH_WAVES = [1];
 // Cascade drop waves stack upward, so the margin rises with each extra wave (case 0 is the lowest).
 const CASCADE_EXTRA_DROP_WAVES = [0, 1, 2, 3];
+const SLINGSHOT_STAGES = [1, 2, 3, 4];
 
 const cases = [
   ...BOSS_RUSH_WAVES.map((wave) => ({ label: `Boss Rush wave ${wave}`, mode: IDLE_SETTLE_MODES.BOSS_RUSH, wave })),
@@ -55,6 +57,11 @@ const cases = [
     label: `Cascade with ${extraDropWaves} extra drop waves`,
     mode: IDLE_SETTLE_MODES.CASCADE,
     extraDropWaves
+  })),
+  ...SLINGSHOT_STAGES.map((wave) => ({
+    label: `Magnetic Slingshot stage ${wave}`,
+    mode: IDLE_SETTLE_MODES.SLINGSHOT,
+    wave
   }))
 ];
 
