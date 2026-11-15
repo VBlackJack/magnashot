@@ -72,6 +72,12 @@
         "musicVolume": "{{volume}}%",
         "musicVolumeAria": "Music volume: {{volume}}%",
         "musicVolumeCaption": "Music: {{volume}}%",
+        "musicPreview": "▶",
+        "musicPreviewStop": "■",
+        "musicPreviewCaption": "Preview",
+        "musicPreviewStopCaption": "Stop",
+        "musicPreviewAria": "Preview Pulse music",
+        "musicPreviewStopAria": "Stop Pulse preview",
         "resonanceOn": "◎",
         "resonanceOff": "○",
         "resonanceOnAria": "Resonance: ON",
@@ -1752,7 +1758,8 @@
         "gameplay": "Gameplay",
         "accessibility": "Accessibility"
       },
-      "vibration": "Vibration (phone and controller)"
+      "vibration": "Vibration (phone and controller)",
+      "musicPreviewOffHint": "Turn sound and music on to hear the Pulse preview."
     },
     "fluxPerk": {
       "title": "Choose a Perk",

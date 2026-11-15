@@ -21,12 +21,29 @@ import { configRegistry } from '../src/core/ConfigRegistry.js';
 import { GAME_MODES } from '../src/core/Constants.js';
 import { StorageManager } from '../src/core/StorageManager.js';
 import { resolveModeAccess, computeNewlyEarned } from '../src/core/ModeUnlocks.js';
+import { applyWorldGeometry } from '../src/core/WorldGeometry.js';
+import { GameEngine } from '../src/game/GameEngine.js';
+import { captureRunSnapshot, applyRunSnapshot } from '../src/game/RunSnapshot.js';
+import { getUtcIsoWeekKey, getWeeklyFluxSeed } from '../src/game/WeeklyFlux.js';
 
 const loadJson = (p) => JSON.parse(fs.readFileSync(p, 'utf8'));
-const gameConfig = loadJson('./configs/game.json');
+const gameConfig = applyWorldGeometry(loadJson('./configs/game.json'));
+const physicsConfig = loadJson('./configs/physics.json');
+const ballsConfig = loadJson('./configs/balls.json');
+const obstaclesConfig = loadJson('./configs/obstacles.json');
+const levelsConfig = loadJson('./configs/levels.json');
+const campaignConfig = loadJson('./configs/campaign.json');
+const campaignTuning = loadJson('./configs/campaignTuning.json');
+const fluxConfig = loadJson('./configs/flux.json');
+const audioConfig = loadJson('./configs/audio.json');
 configRegistry.configs.set('game', gameConfig);
-configRegistry.configs.set('levels', loadJson('./configs/levels.json'));
-configRegistry.configs.set('campaign', loadJson('./configs/campaign.json'));
+configRegistry.configs.set('physics', physicsConfig);
+configRegistry.configs.set('balls', ballsConfig);
+configRegistry.configs.set('obstacles', obstaclesConfig);
+configRegistry.configs.set('levels', levelsConfig);
+configRegistry.configs.set('campaign', campaignConfig);
+configRegistry.configs.set('audio', audioConfig);
+configRegistry.configs.set('flux', fluxConfig);
 
 const cfg = gameConfig.modeUnlocks;
 const { prefix, keys } = gameConfig.storage;
@@ -286,5 +303,71 @@ test('versus: a stored match result opens the mode', () => {
     assert.equal(manager.getModeAccess()[GAME_MODES.VERSUS].unlocked, false);
     manager.recordVersusResult('easy', false);
     assert.equal(manager.getModeAccess()[GAME_MODES.VERSUS].unlocked, true);
+  });
+});
+
+// Weekly Flux opens at a lower campaign level than Flux: playing or restoring it must leave Flux untouched.
+const WEEKLY_UNLOCK_LEVEL = gameConfig.weeklyFlux.unlockAfterCampaignLevel;
+const SHARED_SEED = 'abc123';
+
+const withFluxEngine = (fn) => withManager(
+  (storage) => storage.setItem(`${prefix}${keys.unlockedLevel}`, String(WEEKLY_UNLOCK_LEVEL + 1)),
+  (manager, storage) => {
+    storage.removeItem(UNLOCKS_KEY);
+    manager.memoryFallback.delete(UNLOCKS_KEY);
+    const audioManager = { playEffect: () => {}, stopAll: () => {}, isMuted: () => true, setMuted: () => {} };
+    const engine = new GameEngine({
+      gameConfig, physicsConfig, ballsConfig, obstaclesConfig, levelsConfig, campaignConfig,
+      campaignTuning, fluxConfig, audioManager, storageManager: manager, onStateChange: () => {}
+    });
+    return fn(engine, manager);
+  }
+);
+
+const fluxAccess = (manager) => manager.getModeAccess()[GAME_MODES.FLUX];
+
+test('engine: a Weekly Flux run before Flux unlocks does not mark Flux as seen', () => {
+  withFluxEngine((engine, manager) => {
+    assert.equal(manager.getClearedCampaignLevel(), WEEKLY_UNLOCK_LEVEL);
+    assert.equal(fluxAccess(manager).unlocked, false);
+    engine.startWeeklyFlux();
+    assert.equal(engine.isWeeklyFluxRun, true);
+    assert.equal(fluxAccess(manager).unlocked, false);
+    assert.equal(manager.getModeUnlocks()[GAME_MODES.FLUX], undefined);
+    // Leaving Weekly Flux before firing must not record stage 1 as a Flux unlock either.
+    engine.startCampaignLevel(1);
+    assert.equal(fluxAccess(manager).unlocked, false);
+    assert.equal(manager.getModeUnlocks()[GAME_MODES.FLUX], undefined);
+  });
+});
+
+test('engine: restoring a Weekly Flux snapshot across weeks leaves Flux untouched', () => {
+  withFluxEngine((engine, manager) => {
+    engine.startWeeklyFlux();
+    const snapshot = JSON.parse(JSON.stringify(captureRunSnapshot(engine, manager.getRunSnapshotVersion())));
+    snapshot.weeklyWeekKey = '2025-W01';
+    assert.ok(applyRunSnapshot(engine, snapshot));
+    assert.equal(engine.isWeeklyFluxRun, true);
+    assert.equal(engine.weeklyWeekKey, '2025-W01');
+    assert.equal(fluxAccess(manager).unlocked, false);
+    assert.equal(manager.getModeUnlocks()[GAME_MODES.FLUX], undefined);
+  });
+});
+
+test('engine: a normal or shared Flux run still marks Flux as seen', () => {
+  withFluxEngine((engine, manager) => {
+    engine.startFluxRun();
+    assert.equal(fluxAccess(manager).unlocked, true);
+  });
+  withFluxEngine((engine, manager) => {
+    engine.startFluxRun(SHARED_SEED, { isShared: true });
+    assert.equal(engine.isWeeklyFluxRun, false);
+    assert.equal(fluxAccess(manager).unlocked, true);
+  });
+  withFluxEngine((engine, manager) => {
+    const weekKey = getUtcIsoWeekKey(Date.now());
+    const otherSeed = getWeeklyFluxSeed(weekKey, fluxConfig.seed, `${gameConfig.weeklyFlux.seedSalt}-other`);
+    engine.startFluxRun(otherSeed, { isShared: true });
+    assert.equal(fluxAccess(manager).unlocked, true);
   });
 });

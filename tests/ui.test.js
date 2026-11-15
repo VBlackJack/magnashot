@@ -190,7 +190,9 @@ test('every t() key literal used by the UI exists in both locales', () => {
   assert.deepEqual(missing, []);
 });
 
-const mainCss = readFileSync('./styles/main.css', 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
+const CSS_FILES = ['main.css', 'modals.css', 'responsive.css', 'versus.css'];
+const rawCss = CSS_FILES.map((file) => readFileSync(`./styles/${file}`, 'utf8')).join('\n');
+const mainCss = rawCss.replace(/\/\*[\s\S]*?\*\//g, '');
 
 /** Text of the first block opened by `header`, nested blocks included. */
 function cssBlock(css, header) {
@@ -826,8 +828,7 @@ test('the scroll containers of the level select leave room for the whole focus r
   }
 });
 
-test('every custom property defined in main.css is used somewhere, and every referenced one is defined', () => {
-  const rawCss = readFileSync('./styles/main.css', 'utf8');
+test('every custom property defined in CSS is used somewhere, and every referenced one is defined', () => {
   const consumers = [
     rawCss,
     uiManagerSource,
@@ -841,7 +842,7 @@ test('every custom property defined in main.css is used somewhere, and every ref
   assert.deepEqual(unused, []);
   const referencedInCss = new Set([...mainCss.matchAll(/var\(\s*(--[\w-]+)/g)].map((match) => match[1]));
   const undefinedInCss = [...referencedInCss].filter((name) => !defined.has(name));
-  assert.deepEqual(undefinedInCss, [], 'every var(--*) in styles/main.css must be defined in styles/main.css');
+  assert.deepEqual(undefinedInCss, [], 'every var(--*) in styles/*.css must be defined in styles/*.css');
 });
 
 test('the in-app and the system high contrast themes declare the same tokens', () => {
@@ -2820,8 +2821,7 @@ test('the discovery pulse target maps to the polarity button or one special slot
 });
 
 test('the pulse keeps an outline so it still reads without motion', () => {
-  const css = readFileSync(new URL('../styles/main.css', import.meta.url), 'utf8');
-  const rule = css.match(/\.discovery-pulse\s*\{[^}]*\}/);
+  const rule = rawCss.match(/\.discovery-pulse\s*\{[^}]*\}/);
   assert.ok(rule, 'a .discovery-pulse rule exists');
   assert.match(rule[0], /outline:/);
   assert.match(rule[0], /animation:/);
@@ -2990,9 +2990,8 @@ test('the HUD best-run marker is wired once, in the badges row, without overflow
   assert.match(indexHtml, /id="hud-best-run" class="hud-badge best-run hidden"/);
   assert.match(uiManagerCode, /formatBestRunMarker\(engine\.getRunBestMarker\?\.\(\)\)/);
   assert.doesNotMatch(uiManagerCode, /\$\{bestRunText\}/, 'the phone compact line does not repeat it');
-  const css = readFileSync('./styles/main.css', 'utf8');
-  assert.match(css, /\.hud-badge\.best-run \{[^}]*overflow: hidden;[^}]*text-overflow: ellipsis;/);
-  assert.doesNotMatch(css, /\.hud-badge\.best-run,/, 'the badge stays visible in the phone HUD');
+  assert.match(rawCss, /\.hud-badge\.best-run \{[^}]*overflow: hidden;[^}]*text-overflow: ellipsis;/);
+  assert.doesNotMatch(rawCss, /\.hud-badge\.best-run,/, 'the badge stays visible in the phone HUD');
 });
 
 test('achievements group into tier families and tiers read the family record', () => {
@@ -3130,9 +3129,8 @@ test('a locked tier whose record is already past it asks for a new run, and the 
 });
 
 test('tier colors are defined in every contrast theme', () => {
-  const css = readFileSync('./styles/main.css', 'utf8');
-  const highContrast = css.slice(css.indexOf(':root.high-contrast {'));
-  const moreContrast = css.slice(css.indexOf('@media (prefers-contrast: more)'));
+  const highContrast = rawCss.slice(rawCss.indexOf(':root.high-contrast {'));
+  const moreContrast = rawCss.slice(rawCss.indexOf('@media (prefers-contrast: more)'));
   for (const token of ['--tier-bronze', '--tier-silver']) {
     assert.match(highContrast.slice(0, highContrast.indexOf('}')), new RegExp(token));
     assert.match(moreContrast.slice(0, moreContrast.indexOf('\n  }')), new RegExp(token));

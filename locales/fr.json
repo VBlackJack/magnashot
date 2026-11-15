@@ -72,6 +72,12 @@
         "musicVolume": "{{volume}} %",
         "musicVolumeAria": "Volume de la musique : {{volume}} %",
         "musicVolumeCaption": "Musique : {{volume}} %",
+        "musicPreview": "▶",
+        "musicPreviewStop": "■",
+        "musicPreviewCaption": "Aperçu",
+        "musicPreviewStopCaption": "Stop",
+        "musicPreviewAria": "Écouter un aperçu de la musique Pulse",
+        "musicPreviewStopAria": "Arrêter l'aperçu Pulse",
         "resonanceOn": "◎",
         "resonanceOff": "○",
         "resonanceOnAria": "Résonance : activée",
@@ -1752,7 +1758,8 @@
         "gameplay": "Jeu",
         "accessibility": "Accessibilité"
       },
-      "vibration": "Vibration (téléphone et manette)"
+      "vibration": "Vibration (téléphone et manette)",
+      "musicPreviewOffHint": "Activez le son et la musique pour écouter l'aperçu Pulse."
     },
     "fluxPerk": {
       "title": "Choisissez un atout",

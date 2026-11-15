@@ -71,221 +71,646 @@ export const ENGINE_ROLES = Object.freeze({
   VERSUS: 'versus'
 });
 
-export class GameEngine {
-  constructor({
-    gameConfig,
-    physicsConfig,
-    ballsConfig,
-    obstaclesConfig,
-    levelsConfig,
-    campaignConfig,
-    campaignTuning = null,
-    fluxShapeTuning = null,
-    fluxConfig,
-    modesConfig = null,
-    audioManager,
-    storageManager,
-    onStateChange,
-    role = ENGINE_ROLES.MAIN,
-    seedSource = null
-  }) {
-    this.gameConfig = gameConfig;
-    this.physicsConfig = physicsConfig;
-    this.ballsConfig = ballsConfig;
-    this.obstaclesConfig = obstaclesConfig;
-    this.levelsConfig = levelsConfig;
-    this.fluxConfig = fluxConfig;
-    this.modesConfig = resolveModesConfig(modesConfig);
-    /** Idle settle margins of the generated Flux shapes (configs/fluxShapeTuning.json); null draws every shape. */
-    this.fluxShapeTuning = fluxShapeTuning;
-    this.levelCatalog = new LevelCatalog({
-      levelsConfig,
-      campaignConfig,
-      campaignTuning,
-      fluxConfig,
-      obstaclesConfig,
-      ballRadius: physicsConfig.ball.radius
+const RUN_BEST_READERS = new Map([
+  [GAME_MODES.CLASSIC, (storage) => storage.getClassicBestStage?.()],
+  [GAME_MODES.BOSS_RUSH, (storage) => storage.getBossRushBestWave?.()],
+  [GAME_MODES.ENDLESS, (storage) => storage.getEndlessHighScore?.()],
+  [GAME_MODES.DAILY, (storage, engine) => storage.getDailyHighScore?.(engine.dailySeedKey || SeededRandom.getTodayDateKey())],
+  [GAME_MODES.CASCADE, (storage) => storage.getCascadeHighScore?.()],
+  [GAME_MODES.BLITZ, (storage) => storage.getBlitzHighScore?.()],
+  [GAME_MODES.HEX_GRID, (storage) => storage.getHexGridBestWave?.()],
+  [GAME_MODES.ORBITAL, (storage) => storage.getOrbitalBestWave?.()],
+  [GAME_MODES.PINBALL, (storage) => storage.getPinballBestStage?.()],
+  [GAME_MODES.CONVOY, (storage) => storage.getConvoyBestWave?.()],
+  [GAME_MODES.MERGE, (storage) => storage.getMergeHighScore?.()],
+  [GAME_MODES.SLINGSHOT, (storage) => storage.getSlingshotBestStage?.()]
+]);
+
+const PERSIST_HIGH_SCORE_HANDLERS = new Map([
+  [GAME_MODES.ENDLESS, (engine) => engine.storageManager.setEndlessHighScore(engine.score)],
+  [GAME_MODES.DAILY, (engine) => persistDailyRunHighScore(engine)],
+  [GAME_MODES.FLUX, (engine) => persistFluxRunHighScore(engine)],
+  [GAME_MODES.CLASSIC, (engine) => engine.storageManager.setClassicRecord?.(engine.score, engine.classicStage)],
+  [GAME_MODES.BLITZ, (engine) => engine.storageManager.setBlitzHighScore?.(engine.score)],
+  [GAME_MODES.BOSS_RUSH, (engine) => engine.storageManager.setBossRushRecord?.(engine.score, engine.bossRushWave)],
+  [GAME_MODES.CASCADE, (engine) => engine.storageManager.setCascadeHighScore?.(engine.score)],
+  [GAME_MODES.PUZZLE, (engine) => persistPuzzleRunHighScore(engine)],
+  [GAME_MODES.HEX_GRID, (engine) => persistWaveRecordAndTier(engine, 'setHexGridRecord', 'hexGridWaves')],
+  [GAME_MODES.ORBITAL, (engine) => persistWaveRecordAndTier(engine, 'setOrbitalRecord', 'orbitalWaves')],
+  [GAME_MODES.PINBALL, (engine) => persistStageRecordAndTier(engine, 'setPinballRecord', 'pinballStages', engine.pinballStage)],
+  [GAME_MODES.CONVOY, (engine) => persistWaveRecordAndTier(engine, 'setConvoyRecord', 'convoyWaves')],
+  [GAME_MODES.MERGE, (engine) => persistMergeRunHighScore(engine)],
+  [GAME_MODES.SLINGSHOT, (engine) => persistStageRecordAndTier(engine, 'setSlingshotRecord', 'slingshotStages', engine.slingshotStage)]
+]);
+
+const RESTART_MODE_HANDLERS = new Map([
+  [GAME_MODES.CAMPAIGN, (engine) => engine.startCampaignLevel(engine.currentLevelId)],
+  [GAME_MODES.DAILY, (engine) => engine.startDailyChallenge(engine.dailySeedKey, true, { isRematch: engine.isDailyRematch })],
+  [GAME_MODES.PUZZLE, (engine) => engine.startPuzzleMode(engine.currentPuzzleStage)],
+  [GAME_MODES.BLITZ, (engine) => engine.startBlitzMode()],
+  [GAME_MODES.BOSS_RUSH, (engine) => engine.startBossRushMode(1)],
+  [GAME_MODES.CASCADE, (engine) => engine.startCascadeMode()],
+  [GAME_MODES.CLASSIC, (engine) => engine.startClassicMode(1)],
+  [GAME_MODES.HEX_GRID, (engine) => engine.startHexGridMode()],
+  [GAME_MODES.ORBITAL, (engine) => engine.startOrbitalMode()],
+  [GAME_MODES.PINBALL, (engine) => engine.startPinballMode(1)],
+  [GAME_MODES.CONVOY, (engine) => engine.startConvoyMode()],
+  [GAME_MODES.MERGE, (engine) => engine.startMergeMode()],
+  [GAME_MODES.SLINGSHOT, (engine) => engine.startSlingshotMode(1)]
+]);
+
+function persistDailyRunHighScore(engine) {
+  // A rematch of a past Daily writes no daily high score, streak or history.
+  if (engine.isDailyRematch) {
+    return;
+  }
+  engine.storageManager.setDailyHighScore(engine.score, engine.dailySeedKey);
+  if (engine.hasFiredInRound || engine.runShotsFired > 0) {
+    engine.storageManager.recordDailyResult?.({
+      dateKey: engine.dailySeedKey,
+      score: engine.score,
+      wave: engine.waveCount,
+      mutatorKey: engine.activeMutatorKey,
+      tl: engine.shotTimeline
     });
-    this.audioManager = audioManager;
-    this.storageManager = storageManager;
-    this.onStateChange = onStateChange;
-    this.role = role === ENGINE_ROLES.VERSUS ? ENGINE_ROLES.VERSUS : ENGINE_ROLES.MAIN;
-    /** True when this engine plays a board of a duel (no hints, timeline, ghost or stats). */
-    this.isVersusRole = this.role === ENGINE_ROLES.VERSUS;
-    /** Optional () => number in [0, 1) feeding the unseeded run streams; Math.random when null. */
-    this.seedSource = typeof seedSource === 'function' ? seedSource : null;
+  }
+}
 
-    /** Versus state of a duel board (charges, attack counters); null outside a duel. */
-    this.versus = null;
-    /** Magnetar boss state (Boss Rush, Flux boss stages); null elsewhere (see EngineMagnetar.js). */
-    this.magnetar = null;
-    this.physicsWorld = new PhysicsWorld(physicsConfig, gameConfig, ballsConfig, this.modesConfig);
-    // Daily runs draw avalanche drift from the seeded stream so scores stay reproducible
-    this.physicsWorld.setRandomSource(() => this.random());
-    this.particleSystem = new ParticleSystem(gameConfig.juice);
-    this.isReducedMotion = false;
-    this.animationSpeed = gameConfig.defaults?.animationSpeed ?? 1;
-    if (this.storageManager && typeof this.storageManager.getReducedMotion === 'function') {
-      this.setReducedMotion(this.storageManager.getReducedMotion());
+function persistFluxRunHighScore(engine) {
+  // Do not stamp stage 1 as a personal Flux record (which unlocks Flux) when leaving before playing.
+  if (engine.hasFiredInRound || engine.runShotsFired > 0 || engine.score > 0 || engine.fluxStage > 1) {
+    engine.storageManager.setFluxRecord(engine.score, engine.fluxStage);
+  }
+  if (engine.isWeeklyFluxRun && engine.weeklyWeekKey && (engine.hasFiredInRound || engine.runShotsFired > 0)) {
+    engine.storageManager.setWeeklyFluxBest?.(
+      engine.weeklyWeekKey,
+      engine.fluxSeed,
+      engine.score,
+      engine.fluxStage,
+      engine.shotTimeline
+    );
+  }
+}
+
+function persistPuzzleRunHighScore(engine) {
+  const puzzles = engine.gameConfig.puzzles;
+  const totalPuzzles = puzzles ? puzzles.length || 1 : 1;
+  const reachedStage = engine.state === GAME_STATES.VICTORY && engine.currentPuzzleStage < totalPuzzles
+    ? engine.currentPuzzleStage + 1
+    : engine.currentPuzzleStage;
+  engine.storageManager.setPuzzleRecord?.(engine.score, reachedStage);
+}
+
+function persistWaveRecordAndTier(engine, method, achievementFamily) {
+  engine.storageManager[method]?.(engine.score, engine.waveCount);
+  engine.unlockAchievementTiers(achievementFamily, engine.waveCount);
+}
+
+function persistStageRecordAndTier(engine, method, achievementFamily, stageValue) {
+  engine.storageManager[method]?.(engine.score, stageValue);
+  engine.unlockAchievementTiers(achievementFamily, stageValue);
+}
+
+function persistMergeRunHighScore(engine) {
+  engine.storageManager.setMergeRecord?.(engine.score, engine.mergeBestTier);
+  const storedBest = engine.storageManager.getMergeBestTier ? engine.storageManager.getMergeBestTier() : 0;
+  engine.unlockAchievementTiers('mergeTiers', Math.max(engine.mergeBestTier, storedBest || 0));
+}
+
+function initEngineDependencies(engine, options) {
+  const {
+    gameConfig, physicsConfig, ballsConfig, obstaclesConfig, levelsConfig, campaignConfig,
+    campaignTuning = null, fluxShapeTuning = null, fluxConfig, modesConfig = null,
+    audioManager, storageManager, onStateChange, role = ENGINE_ROLES.MAIN, seedSource = null
+  } = options;
+  engine.gameConfig = gameConfig;
+  engine.physicsConfig = physicsConfig;
+  engine.ballsConfig = ballsConfig;
+  engine.obstaclesConfig = obstaclesConfig;
+  engine.levelsConfig = levelsConfig;
+  engine.fluxConfig = fluxConfig;
+  engine.modesConfig = resolveModesConfig(modesConfig);
+  /** Idle settle margins of the generated Flux shapes (configs/fluxShapeTuning.json); null draws every shape. */
+  engine.fluxShapeTuning = fluxShapeTuning;
+  engine.levelCatalog = new LevelCatalog({
+    levelsConfig, campaignConfig, campaignTuning, fluxConfig, obstaclesConfig,
+    ballRadius: physicsConfig.ball.radius
+  });
+  engine.audioManager = audioManager;
+  engine.storageManager = storageManager;
+  engine.onStateChange = onStateChange;
+  engine.role = role === ENGINE_ROLES.VERSUS ? ENGINE_ROLES.VERSUS : ENGINE_ROLES.MAIN;
+  /** True when this engine plays a board of a duel (no hints, timeline, ghost or stats). */
+  engine.isVersusRole = engine.role === ENGINE_ROLES.VERSUS;
+  /** Optional () => number in [0, 1) feeding the unseeded run streams; Math.random when null. */
+  engine.seedSource = typeof seedSource === 'function' ? seedSource : null;
+  /** Versus state of a duel board (charges, attack counters); null outside a duel. */
+  engine.versus = null;
+  /** Magnetar boss state (Boss Rush, Flux boss stages); null elsewhere (see EngineMagnetar.js). */
+  engine.magnetar = null;
+  engine.physicsWorld = new PhysicsWorld(physicsConfig, gameConfig, ballsConfig, engine.modesConfig);
+  // Daily runs draw avalanche drift from the seeded stream so scores stay reproducible
+  engine.physicsWorld.setRandomSource(() => engine.random());
+  engine.particleSystem = new ParticleSystem(gameConfig.juice);
+  engine.isReducedMotion = false;
+  engine.animationSpeed = gameConfig.defaults?.animationSpeed ?? 1;
+  if (storageManager && typeof storageManager.getReducedMotion === 'function') {
+    engine.setReducedMotion(storageManager.getReducedMotion());
+  }
+  if (storageManager && typeof storageManager.getAnimationSpeed === 'function') {
+    engine.setAnimationSpeed(storageManager.getAnimationSpeed());
+  }
+  engine.specialController = new SpecialBallController(ballsConfig, gameConfig);
+}
+
+function resetRunCounterFields(engine) {
+  engine.score = 0;
+  engine.combo = 0;
+  engine.maxComboInRound = 0;
+  engine.runCoinsEarned = 0;
+  engine.overcharge = 0;
+  engine.sagLevel = 0;
+  engine.railDrops = 0;
+  engine.classicRailDropsTotal = 0;
+  engine.railLowerFrames = 0;
+  engine.classicStage = 0;
+  engine.freezeTurnsRemaining = 0;
+  engine.chainCooldown = 0;
+  engine.pendingRunCoins = 0;
+  // A Boss Rush wave clear waiting for the shot in flight to land.
+  engine.pendingBossRushWave = false;
+  // True for a Flux run started from a shared seed link.
+  engine.isSharedFluxRun = false;
+  engine.runOutcomeRecorded = false;
+  engine.lastRunOutcome = null;
+  engine.runShotsFired = 0;
+  // Weekly Flux: set when the run's seed is the seed of the week it was started in.
+  engine.isWeeklyFluxRun = false;
+  engine.weeklyWeekKey = null;
+  // Outcomes of the shots of a Daily or weekly Flux run (see ShotTimeline.js).
+  engine.shotTimeline = null;
+  // Ghost Duel: the rival run being raced (see EngineGhostDuel.js) and the replay of a past Daily.
+  engine.ghostDuel = null;
+  engine.isDailyRematch = false;
+  engine.beatFrame = 0;
+  engine.turnResonant = false;
+  engine.turnOverchargeEarned = 0;
+  engine.resonanceFlashFrames = 0;
+  engine.botResonanceRoll = null;
+  engine.anvilCrushCount = 0;
+  engine.isCoreFreezeApplied = false;
+  engine.outOfShotsGraceFrames = 0;
+  engine.victoryCelebrationFrames = 0;
+  engine.victorySummary = null;
+  engine.gameOverSummary = null;
+  engine.runBestBaseline = null;
+}
+
+function resetRoundTransientFields(engine) {
+  engine.hitStopFrames = 0;
+  engine.specialSlowMoFrames = 0;
+  engine.specialSlowMoTotalFrames = 0;
+  engine.specialSlowMoMinScale = 1.0;
+  engine.specialSlowMoColor = null;
+  engine.isSteppingPhysics = false;
+  engine.pendingRoundEnd = false;
+  engine.hadDroppingBalls = false;
+  engine.detonationOrigin = null;
+  engine.impactWave = null;
+  engine.hasFiredInRound = false;
+  engine.hasUsedContinue = false;
+  engine.bossesDestroyedInRun = 0;
+  engine.activeDiscoveryId = null;
+  engine.discoveryTurnCount = 0;
+  engine.discoveryShownIds = new Set();
+  engine.isActiveHintLearned = false;
+  engine.isHintShownThisTurn = false;
+  engine.hintReplayQueue = [];
+  engine.isReplayingHints = false;
+  engine.levelIntro = null;
+  engine.levelTutorialKey = null;
+  engine.isAimCancelled = false;
+  engine.isAimLocked = false;
+  engine.aimLockOrigin = null;
+  engine.isPolarityFlipped = false;
+  engine.activeMutatorKey = null;
+  engine.dailySeedKey = null;
+  engine.seededRng = null;
+  engine.scopedRng = null;
+  engine.launcherDrawIndex = 0;
+  engine.specialGrantIndex = 0;
+  engine.specialAmmoBoughtInRun = 0;
+}
+
+function resetModeProgressionFields(engine) {
+  engine.fluxSeed = null;
+  engine.fluxContentVersion = engine.gameConfig.ghostDuel.contentVersion.flux;
+  engine.fluxStage = 0;
+  engine.fluxFamily = null;
+  engine.fluxPreviousFamily = null;
+  engine.fluxShapeIds = [];
+  engine.fluxIsBossStage = false;
+  engine.fluxPerks = {};
+  engine.fluxPerkOffer = null;
+  engine.stageTransitionFrames = 0;
+  engine.stageIntroFrames = 0;
+  engine.currentObjective = OBJECTIVE_TYPES.CLEAR_ALL;
+  engine.targetCoreCount = 0;
+  engine.rescuedCores = 0;
+  engine.currentPuzzleStage = 1;
+  engine.puzzleQueue = [];
+  engine.blitzFramesRemaining = 0;
+  engine.blitzWaveTimerFrames = 0;
+  engine.blitzIdleFrames = 0;
+  engine.blitzBonusFramesEarned = 0;
+  engine.blitzHitStreak = 0;
+  engine.bossRushWave = 1;
+  engine.cascadeWave = 1;
+  engine.cascadeTurnsUntilDrop = 0;
+  engine.cascadeOccupiedPlatforms = new Set();
+  engine.modeState = null;
+  engine.pinballStage = 1;
+  engine.slingshotStage = 1;
+  engine.mergeDropX = engine.gameConfig.canvas.logicalWidth * MATH_CONSTANTS.HALF;
+  engine.mergeBestTier = 1;
+}
+
+function initSessionFields(engine, gameConfig) {
+  engine.mode = GAME_MODES.CAMPAIGN;
+  engine.state = GAME_STATES.READY;
+  engine.currentLevelId = 1;
+  engine.shotsRemaining = 0;
+  engine.waveCount = 1;
+  engine.waveLog = [];
+  engine.endlessRowParity = 0;
+  engine.pendingShots = 0;
+  engine.pendingPlayMs = 0;
+  const stats = engine.storageManager?.getPlayerStats?.();
+  const storedMilestones = stats ? stats.m : null;
+  engine.avalancheMilestoneStamped = Boolean(
+    storedMilestones && (storedMilestones.avalanche !== undefined || storedMilestones.legacy === true)
+  );
+  engine.versusResonanceOption = undefined;
+  engine.isBotResonanceBoard = false;
+  engine.trailFrameCounter = 0;
+  /** Mechanics sharing the hint on screen, kept while that hint stays (read every flight step). */
+  engine.proximityGroupHintId = null;
+  engine.proximityGroup = null;
+  // Levels whose banner already showed in this session, so a retry after a defeat is quiet.
+  engine.introducedLevelIds = new Set();
+  engine.introducedDailySeeds = new Set();
+  engine.introducedModes = new Set();
+  engine.modeIntroReplaySeq = 0;
+  engine.activePalette = [];
+  engine.specialInventory = {};
+  engine.currentBall = null;
+  engine.stashedRegularColorId = null;
+  engine.nextBall = null;
+  engine.aimAngle = -Math.PI * MATH_CONSTANTS.HALF;
+  engine.aimPoints = [];
+  // Colors of the balls queued after nextBall, shown beside the launcher.
+  engine.upcomingColorIds = [];
+  engine.levelStartBallCount = 0;
+  engine.isAimPreviewStale = false;
+  engine.laserBonuses = { distanceBonus: 0, bouncesBonus: 0 };
+  engine.stepCallbacks = null;
+  engine.isRestoringRun = false;
+  void gameConfig;
+}
+
+function handleCollectorBinPass(engine, ball) {
+  if (!engine.isRunPlaying() || engine.getModeBehavior().getRenderChrome(engine).collectorBins === false) {
+    return;
+  }
+  const collectorCfg = engine.gameConfig.scoring.collector;
+  if (!collectorCfg) {
+    return;
+  }
+  const bonusPts = Math.round(engine.getCollectorBonusPoints() * Math.max(1, engine.combo));
+  engine.addScore(bonusPts);
+  engine.addOvercharge(engine.getCollectorOvercharge());
+  engine.particleSystem.spawnFloatingText(
+    ball.x,
+    engine.gameConfig.canvas.logicalHeight - collectorCfg.zoneHeight + engine.gameConfig.canvas.floatingTextOffsetY,
+    t('gameplay.feedback.collector.bin', { points: bonusPts }),
+    engine.gameConfig.theme.avalanchePopupColor
+  );
+}
+
+function handlePortalWarp(engine, entryPortal, exitPortal) {
+  const portalCfg = engine.obstaclesConfig.types.portal;
+  engine.audioManager.playEffect('portal');
+  for (const portal of [entryPortal, exitPortal]) {
+    engine.particleSystem.spawnBurst(portal.x, portal.y, portalCfg.ringColor, portalCfg.burstCount, portalCfg.burstSpeed);
+  }
+  engine.particleSystem.spawnFloatingText(
+    exitPortal.x,
+    exitPortal.y + engine.gameConfig.canvas.floatingTextOffsetY,
+    t('gameplay.feedback.portal.warp'),
+    engine.gameConfig.theme.portalPopupColor
+  );
+}
+
+function handleAnvilCrush(engine, target) {
+  const anvilSpecs = engine.ballsConfig.specialTypes.anvil;
+  const { particleSystem } = engine;
+  particleSystem.spawnExplosion?.(target.x, target.y, target.radius * anvilSpecs.crushShockwaveFactor, anvilSpecs.highlight);
+  particleSystem.spawnFlash?.(target.x, target.y, anvilSpecs.highlight, target.radius * anvilSpecs.crushFlashRadiusFactor);
+  particleSystem.spawnShockwave(
+    target.x,
+    target.y,
+    anvilSpecs.highlight,
+    target.radius * anvilSpecs.crushShockwaveFactor,
+    { lineWidth: anvilSpecs.crushRingLineWidth }
+  );
+  particleSystem.spawnBurst(target.x, target.y, anvilSpecs.highlight, anvilSpecs.crushBurstCount, anvilSpecs.crushBurstSpeed);
+  const prevOrigin = engine.detonationOrigin;
+  engine.detonationOrigin = engine.physicsWorld.projectile || target;
+  const crushed = engine.destroyClusterBall(target, anvilSpecs.highlight, true);
+  engine.detonationOrigin = prevOrigin;
+  if (crushed) {
+    engine.anvilCrushCount++;
+    engine.addScore(anvilSpecs.pointsPerBall);
+    engine.addOvercharge(engine.gameConfig.scoring.overchargePerMatchedBall);
+    engine.triggerSpecialSlowMo(anvilSpecs.slowMoFrames, anvilSpecs.slowMoTimeScale, anvilSpecs.highlight);
+    engine.audioManager.playEffect('snap');
+  }
+}
+
+function handleAnvilComplete(engine) {
+  const anvilSpecs = engine.ballsConfig.specialTypes.anvil;
+  const juice = engine.gameConfig.juice;
+  const launcherSpec = engine.getLauncherSpec();
+  engine.particleSystem.spawnFloatingText(
+    launcherSpec.x,
+    launcherSpec.y + engine.gameConfig.canvas.anvilPopupOffsetY,
+    t('gameplay.feedback.special.anvil'),
+    anvilSpecs.highlight
+  );
+  engine.particleSystem.addScreenShake(juice.anvilShake, juice.maxShakeOffset);
+  // A versus board never freezes: both boards must keep stepping in lockstep.
+  engine.hitStopFrames = engine.isVersusRole ? 0 : juice.hitStopFramesSpecial;
+  // An anvil that crushed nothing is a miss: it breaks the combo and counts toward the next wave.
+  const madeMatch = engine.anvilCrushCount > 0;
+  if (madeMatch) {
+    engine.triggerSpecialSlowMo(anvilSpecs.slowMoFrames, anvilSpecs.slowMoTimeScale, anvilSpecs.highlight);
+  } else {
+    engine.combo = 0;
+  }
+  const behavior = engine.getModeBehavior();
+  if (typeof behavior.onAnvilSettled === 'function') {
+    behavior.onAnvilSettled(engine, madeMatch);
+  } else {
+    engine.handlePostTurnCleanup(madeMatch);
+  }
+}
+
+function handleSingularityCapture(engine, capturedBall, singularityObs) {
+  if (!engine.isRunPlaying()) {
+    return;
+  }
+  const singCfg = engine.obstaclesConfig.types.singularity;
+  const baseDropPts = engine.gameConfig.scoring.droppedBallPoints;
+  const bonusPts = Math.round(baseDropPts * singularityObs.scoreMultiplier * Math.max(1, engine.combo));
+  engine.addScore(bonusPts);
+  engine.addOvercharge(singularityObs.bonusOvercharge);
+  engine.audioManager.playEffect('portal');
+  engine.particleSystem.spawnBurst(
+    singularityObs.x,
+    singularityObs.y,
+    singCfg.ringColor,
+    singCfg.burstCount,
+    singCfg.burstSpeed
+  );
+  engine.particleSystem.spawnFloatingText(
+    singularityObs.x,
+    singularityObs.y + engine.gameConfig.canvas.floatingTextOffsetY,
+    t('gameplay.feedback.singularity.absorbed', { points: bonusPts }),
+    engine.gameConfig.theme.singularityPopupColor
+  );
+  engine.notifyUI();
+  void capturedBall;
+}
+
+function launchPreparedProjectile(engine) {
+  const ballCfg = engine.physicsConfig.ball;
+  const launcherSpec = engine.getLauncherSpec();
+  const projectile = engine.currentBall;
+  engine.levelIntro = null;
+  engine.isHintShownThisTurn = false;
+  engine.recordDiscoveryInteraction(DISCOVERY_INTERACTIONS.SHOT);
+  if (projectile.specialType) {
+    engine.recordDiscoveryInteraction(DISCOVERY_INTERACTIONS.USE, projectile.specialType);
+  }
+  projectile.isProjectile = true;
+  projectile.isPolarityFlipped = engine.isPolarityFlipped;
+  engine.markResonantShot(projectile);
+  projectile.x = launcherSpec.x;
+  projectile.y = launcherSpec.y;
+  projectile.savePreviousPosition();
+  const baseSpeed = engine.physicsWorld.projectileLaunchSpeedOverride > 0
+    ? engine.physicsWorld.projectileLaunchSpeedOverride
+    : ballCfg.projectileSpeed;
+  const speed = projectile.specialType === SPECIAL_TYPES.ANVIL ? ballCfg.anvilSpeed : baseSpeed;
+  projectile.vx = Math.cos(engine.aimAngle) * speed;
+  projectile.vy = Math.sin(engine.aimAngle) * speed;
+  engine.physicsWorld.projectile = projectile;
+  engine.anvilCrushCount = 0;
+  engine.stashedRegularColorId = null;
+  engine.currentBall = engine.nextBall;
+  const upcoming = engine.takeUpcomingBall();
+  engine.nextBall = engine.createRandomLauncherBall(upcoming.specialType, upcoming.colorId);
+}
+
+function finalizeFiredProjectile(engine) {
+  if (engine.usesShotBudget()) {
+    engine.shotsRemaining = Math.max(0, engine.shotsRemaining - 1);
+  }
+  engine.blitzIdleFrames = 0;
+  if (engine.mode === GAME_MODES.PUZZLE && !engine.hasFiredInRound) {
+    // An attempt is the first shot of a round; a restored round already carries the flag.
+    engine.storageManager.recordPuzzleAttempt?.(engine.currentPuzzleStage);
+  }
+  engine.hasFiredInRound = true;
+  engine.physicsWorld.allowTensionBreak = true;
+  engine.audioManager.playEffect('shoot');
+  engine.updateAimFromAngle(engine.aimAngle);
+  engine.notifyUI();
+}
+
+function advanceFrameTimers(engine) {
+  const isFirstPlayedFrame = engine.beatFrame === 0;
+  engine.beatFrame += engine.getBeatAdvance();
+  if (isFirstPlayedFrame) {
+    engine.announceResonanceDisabled();
+  }
+  if (engine.resonanceFlashFrames > 0) {
+    engine.resonanceFlashFrames--;
+  }
+  const simCfg = engine.physicsConfig.simulation;
+  engine.countPlayTimeForStats(simCfg ? simCfg.fixedStepMs || 0 : 0);
+  if (engine.railLowerFrames > 0) {
+    engine.railLowerFrames--;
+  }
+}
+
+function updateSlowMoAndProjectileTrail(engine, juice, theme) {
+  if (engine.specialSlowMoFrames > 0) {
+    // Countdown never runs slower than one frame per step (free aiming time in Blitz).
+    engine.specialSlowMoFrames = Math.max(0, engine.specialSlowMoFrames - Math.max(1, engine.animationSpeed));
+    if (engine.specialSlowMoFrames <= 0) {
+      engine.specialSlowMoTotalFrames = 0;
+      engine.specialSlowMoMinScale = 1.0;
+      engine.specialSlowMoColor = null;
     }
-    if (this.storageManager && typeof this.storageManager.getAnimationSpeed === 'function') {
-      this.setAnimationSpeed(this.storageManager.getAnimationSpeed());
+  }
+  const p = engine.physicsWorld.projectile;
+  if (!p) {
+    return;
+  }
+  engine.trackDiscoveryProximity(p);
+  engine.trailFrameCounter++;
+  if (engine.trailFrameCounter < juice.trailSpawnInterval) {
+    return;
+  }
+  engine.trailFrameCounter = 0;
+  const palette = p.specialType
+    ? engine.ballsConfig.specialTypes[p.specialType]
+    : (
+      engine.ballsConfig.standardColors.find((c) => c.id === p.colorId)
+      || engine.modesConfig.merge.tiers.find((c) => c.id === p.colorId)
+    );
+  engine.particleSystem.spawnTrail(p.x, p.y, p.radius, palette ? palette.highlight : theme.defaultTrailColor);
+}
+
+function executePhysicsStepAndPostHooks(engine, juice) {
+  const simCfg = engine.physicsConfig.simulation;
+  const dtSec = (simCfg ? simCfg.fixedStepMs || FALLBACK_FIXED_STEP_MS : FALLBACK_FIXED_STEP_MS) / MS_PER_SECOND;
+  const behavior = engine.getModeBehavior();
+  behavior.onBeforePhysicsStep(engine, dtSec);
+  if (!engine.isRunPlaying()) {
+    engine.particleSystem.update(juice.shakeDecay);
+    return false;
+  }
+  if (engine.versus) {
+    engine.stepVersusBefore();
+  }
+  const flyingProjectile = engine.physicsWorld.projectile;
+  engine.isSteppingPhysics = true;
+  try {
+    engine.physicsWorld.step(engine.getStepCallbacks());
+  } finally {
+    engine.isSteppingPhysics = false;
+  }
+  behavior.onAfterPhysicsStep(engine, dtSec);
+  if (engine.versus) {
+    engine.stepVersusAfter(flyingProjectile);
+  }
+  if (engine.magnetar) {
+    engine.stepMagnetarAfter(flyingProjectile);
+  }
+  if (engine.pendingRoundEnd || (engine.pendingBossRushWave && !engine.physicsWorld.projectile)) {
+    engine.evaluateRoundEnd();
+  }
+  return true;
+}
+
+function syncBrokenBondsAndDroppingBalls(engine) {
+  if (engine.physicsWorld.hasBrokenBondThisStep) {
+    engine.physicsWorld.hasBrokenBondThisStep = false;
+    engine.detachAndRewardAvalanche();
+    engine.refreshMoorings();
+    engine.discardBetweenTurnsCoreFreeze();
+    // A board cleared by a bond break must not end the round with the shot frozen mid-air.
+    const isShotHoldingRoundEnd = Boolean(engine.physicsWorld.projectile) && engine.isClearBasedMode();
+    if (!isShotHoldingRoundEnd) {
+      engine.evaluateRoundEnd();
     }
-    this.specialController = new SpecialBallController(ballsConfig, gameConfig);
+    engine.saveRunSnapshot();
+    engine.notifyUI();
+  }
+  // Falling balls still pay score and overcharge until they land: save once the last is gone.
+  const hasDroppingBalls = engine.physicsWorld.droppingBalls.length > 0;
+  if (engine.hadDroppingBalls && !hasDroppingBalls) {
+    engine.saveRunSnapshot();
+  }
+  engine.hadDroppingBalls = hasDroppingBalls;
+}
 
-    this.mode = GAME_MODES.CAMPAIGN;
-    this.state = GAME_STATES.READY;
-    this.currentLevelId = 1;
-    this.score = 0;
-    this.combo = 0;
-    this.maxComboInRound = 0;
-    this.runCoinsEarned = 0;
-    this.overcharge = 0;
-    this.shotsRemaining = 0;
-    this.waveCount = 1;
-    this.waveLog = [];
-    this.endlessRowParity = 0;
-    // Sag meter: whiffs so far toward the next step, plus the Classic rail state.
-    this.sagLevel = 0;
-    this.railDrops = 0;
-    this.classicRailDropsTotal = 0;
-    this.railLowerFrames = 0;
-    this.classicStage = 0;
-    this.freezeTurnsRemaining = 0;
-    this.chainCooldown = 0;
-    this.pendingRunCoins = 0;
-    // A Boss Rush wave clear waiting for the shot in flight to land.
-    this.pendingBossRushWave = false;
-    // True for a Flux run started from a shared seed link.
-    this.isSharedFluxRun = false;
-    // Local stats: the run is counted once, shots and play time are buffered then flushed.
-    this.runOutcomeRecorded = false;
-    this.lastRunOutcome = null;
-    this.runShotsFired = 0;
-    this.pendingShots = 0;
-    this.pendingPlayMs = 0;
-    // Set once the first-avalanche milestone is stored, or hidden anyway (legacy profile).
-    const storedMilestones = this.storageManager?.getPlayerStats?.()?.m;
-    this.avalancheMilestoneStamped = storedMilestones?.avalanche !== undefined || storedMilestones?.legacy === true;
-    // Weekly Flux: set when the run's seed is the seed of the week it was started in.
-    this.isWeeklyFluxRun = false;
-    this.weeklyWeekKey = null;
-    // Outcomes of the shots of a Daily or weekly Flux run (see ShotTimeline.js).
-    this.shotTimeline = null;
-    // Ghost Duel: the rival run being raced (see EngineGhostDuel.js) and the replay of a past Daily.
-    this.ghostDuel = null;
-    this.isDailyRematch = false;
-    // Pulse: the beat clock (update() calls while PLAYING), the Resonance of the turn in
-    // progress and the Overcharge it earned, the launcher flash, and the duel-only controls
-    // (the match option and the CPU roll; see EnginePulse.js).
-    this.beatFrame = 0;
-    this.turnResonant = false;
-    this.turnOverchargeEarned = 0;
-    this.resonanceFlashFrames = 0;
-    this.versusResonanceOption = undefined;
-    this.isBotResonanceBoard = false;
-    this.botResonanceRoll = null;
-    this.anvilCrushCount = 0;
-    this.isCoreFreezeApplied = false;
-    this.outOfShotsGraceFrames = 0;
-    this.victoryCelebrationFrames = 0;
-    this.victorySummary = null;
-    this.gameOverSummary = null;
-    this.runBestBaseline = null;
-    this.hitStopFrames = 0;
-    this.specialSlowMoFrames = 0;
-    this.specialSlowMoTotalFrames = 0;
-    this.specialSlowMoMinScale = 1.0;
-    this.specialSlowMoColor = null;
-    this.isSteppingPhysics = false;
-    this.pendingRoundEnd = false;
-    this.hadDroppingBalls = false;
-    this.detonationOrigin = null;
-    this.impactWave = null;
-    this.trailFrameCounter = 0;
-    this.hasFiredInRound = false;
-    this.hasUsedContinue = false;
-    this.bossesDestroyedInRun = 0;
-    this.activeDiscoveryId = null;
-    this.discoveryTurnCount = 0;
-    // Run-scoped and tolerant in snapshots: hints shown without being learned, the hint
-    // being replayed from the HUD, and the first-play banner of a campaign level.
-    this.discoveryShownIds = new Set();
-    this.isActiveHintLearned = false;
-    this.isHintShownThisTurn = false;
-    this.hintReplayQueue = [];
-    this.isReplayingHints = false;
-    this.levelIntro = null;
-    /** Mechanics sharing the hint on screen, kept while that hint stays (read every flight step). */
-    this.proximityGroupHintId = null;
-    this.proximityGroup = null;
-    // Levels whose banner already showed in this session, so a retry after a defeat is quiet.
-    this.introducedLevelIds = new Set();
-    this.introducedDailySeeds = new Set();
-    this.introducedModes = new Set();
-    this.modeIntroReplaySeq = 0;
-    this.levelTutorialKey = null;
-    this.isAimCancelled = false;
-    this.isAimLocked = false;
-    this.aimLockOrigin = null;
-    this.isPolarityFlipped = false;
-    this.activeMutatorKey = null;
-    this.dailySeedKey = null;
-    this.seededRng = null;
-    this.scopedRng = null;
-    this.launcherDrawIndex = 0;
-    this.specialGrantIndex = 0;
-    this.specialAmmoBoughtInRun = 0;
-    this.fluxSeed = null;
-    this.fluxContentVersion = this.gameConfig.ghostDuel.contentVersion.flux;
-    this.fluxStage = 0;
-    this.sagLevel = 0;
-    this.railDrops = 0;
-    this.classicRailDropsTotal = 0;
-    this.railLowerFrames = 0;
-    this.classicStage = 0;
-    this.fluxFamily = null;
-    this.fluxPreviousFamily = null;
-    this.fluxShapeIds = [];
-    this.fluxIsBossStage = false;
-    this.fluxPerks = {};
-    this.fluxPerkOffer = null;
-    this.stageTransitionFrames = 0;
-    this.stageIntroFrames = 0;
-    this.currentObjective = OBJECTIVE_TYPES.CLEAR_ALL;
-    this.targetCoreCount = 0;
-    this.rescuedCores = 0;
-    this.currentPuzzleStage = 1;
-    this.puzzleQueue = [];
-    this.blitzFramesRemaining = 0;
-    this.blitzWaveTimerFrames = 0;
-    this.blitzIdleFrames = 0;
-    this.blitzBonusFramesEarned = 0;
-    this.blitzHitStreak = 0;
-    this.bossRushWave = 1;
-    this.cascadeWave = 1;
-    this.cascadeTurnsUntilDrop = 0;
-    this.cascadeOccupiedPlatforms = new Set();
-    this.modeState = null;
-    this.pinballStage = 1;
-    this.slingshotStage = 1;
-    this.mergeDropX = gameConfig.canvas.logicalWidth * MATH_CONSTANTS.HALF;
-    this.mergeBestTier = 1;
+function updateBetweenShotsState(engine) {
+  if (engine.physicsWorld.projectile) {
+    return;
+  }
+  // Preview recomputes once per render frame through refreshAimPreview instead of per fixed step.
+  engine.isAimPreviewStale = true;
+  if (!engine.hasFiredInRound) {
+    engine.physicsWorld.pendingChainCandidateIds.clear();
+  } else {
+    engine.chainCooldown++;
+    if (engine.chainCooldown >= engine.physicsConfig.simulation.chainCheckCooldownFrames) {
+      engine.chainCooldown = 0;
+      engine.evaluateAutomaticChainReactions();
+      engine.discardBetweenTurnsCoreFreeze();
+    }
+  }
+  if (engine.outOfShotsGraceFrames > 0) {
+    engine.outOfShotsGraceFrames--;
+    if (engine.isObjectiveCleared()) {
+      engine.outOfShotsGraceFrames = 0;
+      engine.evaluateRoundEnd();
+    } else if (engine.outOfShotsGraceFrames === 0) {
+      engine.triggerGameOver(GAME_OVER_REASONS.OUT_OF_SHOTS);
+    }
+  }
+}
 
-    this.activePalette = [];
-    this.specialInventory = {};
-    this.currentBall = null;
-    this.stashedRegularColorId = null;
-    this.nextBall = null;
-    this.aimAngle = -Math.PI * MATH_CONSTANTS.HALF;
-    this.aimPoints = [];
-    // Colors of the balls queued after nextBall, shown beside the launcher.
-    this.upcomingColorIds = [];
-    this.levelStartBallCount = 0;
-    this.isAimPreviewStale = false;
-    this.laserBonuses = { distanceBonus: 0, bouncesBonus: 0 };
-    this.stepCallbacks = null;
-    this.isRestoringRun = false;
+function stepBlitzUpdate(engine, juice, theme) {
+  const blitzCfg = engine.gameConfig.blitz;
+  engine.blitzFramesRemaining = Math.max(0, engine.blitzFramesRemaining - 1);
+  if (engine.blitzFramesRemaining <= 0) {
+    engine.particleSystem.update(juice.shakeDecay);
+    engine.triggerGameOver(GAME_OVER_REASONS.TIME_UP);
+    return false;
+  }
+  if (engine.blitzFramesRemaining % blitzCfg.framesPerSecond === 0) {
+    const secondsLeft = Math.ceil(engine.blitzFramesRemaining / blitzCfg.framesPerSecond);
+    if (secondsLeft > 0 && secondsLeft <= blitzCfg.urgentAudioSeconds) {
+      engine.audioManager.playEffect('blitzTick');
+    }
+    engine.notifyUI();
+  }
+  engine.blitzWaveTimerFrames--;
+  if (engine.blitzWaveTimerFrames <= 0 || engine.physicsWorld.balls.length < blitzCfg.minSpheresBeforeWave) {
+    engine.blitzWaveTimerFrames = blitzCfg.waveIntervalFrames;
+    engine.spawnEndlessWave();
+    engine.refreshStaleLauncherColors();
+    engine.saveRunSnapshot();
+    engine.notifyUI();
+  }
+  if (!engine.physicsWorld.projectile && engine.physicsWorld.droppingBalls.length === 0) {
+    engine.blitzIdleFrames++;
+    if (engine.blitzIdleFrames >= blitzCfg.autoFireFrames) {
+      engine.blitzIdleFrames = 0;
+      const canvasCfg = engine.gameConfig.canvas;
+      engine.particleSystem.spawnFloatingText(
+        canvasCfg.launcherX,
+        canvasCfg.launcherY + canvasCfg.launcherPopupOffsetY,
+        t('gameplay.feedback.blitz.autoFire'),
+        theme.wavePopupColor
+      );
+      engine.shoot();
+    }
+  }
+  return true;
+}
+
+export class GameEngine {
+  constructor(options) {
+    initEngineDependencies(this, options);
+    resetRunCounterFields(this);
+    resetRoundTransientFields(this);
+    resetModeProgressionFields(this);
+    initSessionFields(this, options.gameConfig);
     this.seedDiscoveriesFromProgress();
   }
 
@@ -553,35 +978,14 @@ export class GameEngine {
       return null;
     }
     const storage = this.storageManager;
-    let best = 0;
-    if (this.mode === GAME_MODES.FLUX && this.isWeeklyFluxRun) {
-      best = storage.getWeeklyFluxBest?.(this.weeklyWeekKey)?.stage || 0;
-    } else if (this.mode === GAME_MODES.FLUX) {
-      best = storage.getFluxBestStage?.() || 0;
-    } else if (this.mode === GAME_MODES.CLASSIC) {
-      best = storage.getClassicBestStage?.() || 0;
-    } else if (this.mode === GAME_MODES.BOSS_RUSH) {
-      best = storage.getBossRushBestWave?.() || 0;
-    } else if (this.mode === GAME_MODES.ENDLESS) {
-      best = storage.getEndlessHighScore?.() || 0;
-    } else if (this.mode === GAME_MODES.DAILY) {
-      best = storage.getDailyHighScore?.(this.dailySeedKey || SeededRandom.getTodayDateKey()) || 0;
-    } else if (this.mode === GAME_MODES.CASCADE) {
-      best = storage.getCascadeHighScore?.() || 0;
-    } else if (this.mode === GAME_MODES.BLITZ) {
-      best = storage.getBlitzHighScore?.() || 0;
-    } else if (this.mode === GAME_MODES.HEX_GRID) {
-      best = storage.getHexGridBestWave?.() || 0;
-    } else if (this.mode === GAME_MODES.ORBITAL) {
-      best = storage.getOrbitalBestWave?.() || 0;
-    } else if (this.mode === GAME_MODES.PINBALL) {
-      best = storage.getPinballBestStage?.() || 0;
-    } else if (this.mode === GAME_MODES.CONVOY) {
-      best = storage.getConvoyBestWave?.() || 0;
-    } else if (this.mode === GAME_MODES.MERGE) {
-      best = storage.getMergeHighScore?.() || 0;
-    } else if (this.mode === GAME_MODES.SLINGSHOT) {
-      best = storage.getSlingshotBestStage?.() || 0;
+    let best;
+    if (this.mode === GAME_MODES.FLUX) {
+      best = this.isWeeklyFluxRun
+        ? storage.getWeeklyFluxBest?.(this.weeklyWeekKey)?.stage || 0
+        : storage.getFluxBestStage?.() || 0;
+    } else {
+      const reader = RUN_BEST_READERS.get(this.mode);
+      best = reader ? reader(storage, this) || 0 : 0;
     }
     this.runBestBaseline = { metric: measured.metric, best };
     return this.runBestBaseline;
@@ -647,69 +1051,9 @@ export class GameEngine {
   persistRunHighScore() {
     // The record in storage moves with the run: keep the one the run started against.
     this.getRunBestBaseline();
-    if (this.mode === GAME_MODES.ENDLESS) {
-      this.storageManager.setEndlessHighScore(this.score);
-    } else if (this.mode === GAME_MODES.DAILY) {
-      // A rematch of a past Daily writes no daily high score, streak or history.
-      if (this.isDailyRematch) {
-        return;
-      }
-      this.storageManager.setDailyHighScore(this.score, this.dailySeedKey);
-      if (this.hasFiredInRound || this.runShotsFired > 0) {
-        this.storageManager.recordDailyResult?.({
-          dateKey: this.dailySeedKey,
-          score: this.score,
-          wave: this.waveCount,
-          mutatorKey: this.activeMutatorKey,
-          tl: this.shotTimeline
-        });
-      }
-    } else if (this.mode === GAME_MODES.FLUX) {
-      this.storageManager.setFluxRecord(this.score, this.fluxStage);
-      if (this.isWeeklyFluxRun && this.weeklyWeekKey && (this.hasFiredInRound || this.runShotsFired > 0)) {
-        this.storageManager.setWeeklyFluxBest?.(
-          this.weeklyWeekKey,
-          this.fluxSeed,
-          this.score,
-          this.fluxStage,
-          this.shotTimeline
-        );
-      }
-    } else if (this.mode === GAME_MODES.CLASSIC) {
-      this.storageManager.setClassicRecord?.(this.score, this.classicStage);
-    } else if (this.mode === GAME_MODES.BLITZ) {
-      this.storageManager.setBlitzHighScore?.(this.score);
-    } else if (this.mode === GAME_MODES.BOSS_RUSH) {
-      this.storageManager.setBossRushRecord?.(this.score, this.bossRushWave);
-    } else if (this.mode === GAME_MODES.CASCADE) {
-      this.storageManager.setCascadeHighScore?.(this.score);
-    } else if (this.mode === GAME_MODES.PUZZLE) {
-      const totalPuzzles = this.gameConfig.puzzles?.length || 1;
-      const reachedStage = this.state === GAME_STATES.VICTORY && this.currentPuzzleStage < totalPuzzles
-        ? this.currentPuzzleStage + 1
-        : this.currentPuzzleStage;
-      this.storageManager.setPuzzleRecord?.(this.score, reachedStage);
-    } else if (this.mode === GAME_MODES.HEX_GRID) {
-      this.storageManager.setHexGridRecord?.(this.score, this.waveCount);
-      this.unlockAchievementTiers('hexGridWaves', this.waveCount);
-    } else if (this.mode === GAME_MODES.ORBITAL) {
-      this.storageManager.setOrbitalRecord?.(this.score, this.waveCount);
-      this.unlockAchievementTiers('orbitalWaves', this.waveCount);
-    } else if (this.mode === GAME_MODES.PINBALL) {
-      this.storageManager.setPinballRecord?.(this.score, this.pinballStage);
-      this.unlockAchievementTiers('pinballStages', this.pinballStage);
-    } else if (this.mode === GAME_MODES.CONVOY) {
-      this.storageManager.setConvoyRecord?.(this.score, this.waveCount);
-      this.unlockAchievementTiers('convoyWaves', this.waveCount);
-    } else if (this.mode === GAME_MODES.MERGE) {
-      this.storageManager.setMergeRecord?.(this.score, this.mergeBestTier);
-      this.unlockAchievementTiers(
-        'mergeTiers',
-        Math.max(this.mergeBestTier, this.storageManager.getMergeBestTier?.() || 0)
-      );
-    } else if (this.mode === GAME_MODES.SLINGSHOT) {
-      this.storageManager.setSlingshotRecord?.(this.score, this.slingshotStage);
-      this.unlockAchievementTiers('slingshotStages', this.slingshotStage);
+    const handler = PERSIST_HIGH_SCORE_HANDLERS.get(this.mode);
+    if (handler) {
+      handler(this);
     }
   }
 
@@ -800,117 +1144,29 @@ export class GameEngine {
   /**
    * Saves the outgoing run's high score, then resets every per-run counter shared by all modes.
    * @param {string} mode - Game mode of the run being started.
+   * @param {{markModeSeen?: boolean}} [options] - markModeSeen false keeps the mode's unlock
+   *   state untouched (a Weekly Flux run, playable before Flux itself unlocks).
    */
-  resetRunState(mode) {
+  resetRunState(mode, { markModeSeen = true } = {}) {
     this.persistRunHighScore();
     this.recordAbandonedRun();
-    this.storageManager.ensureModeUnlocked?.(mode);
+    if (markModeSeen) {
+      this.storageManager.ensureModeUnlocked?.(mode);
+    }
     this.flushPendingRunCoins();
     this.storageManager.clearRunSnapshot();
     this.mode = mode;
-    this.runBestBaseline = null;
-    this.runOutcomeRecorded = false;
-    this.lastRunOutcome = null;
-    this.runShotsFired = 0;
-    this.isWeeklyFluxRun = false;
-    this.weeklyWeekKey = null;
-    this.shotTimeline = null;
-    this.ghostDuel = null;
     // startVersusBoard sets the versus state again after this reset.
     this.versus = null;
     this.clearMagnetar();
-    this.isDailyRematch = false;
-    this.beatFrame = 0;
     this.refreshPulseSettings();
-    this.turnResonant = false;
-    this.turnOverchargeEarned = 0;
-    this.resonanceFlashFrames = 0;
-    this.botResonanceRoll = null;
     // clear() keeps the tilt: a run must not start leaning from the previous run's last reading.
     this.physicsWorld.tiltFactor = 0;
-    this.score = 0;
-    this.combo = 0;
-    this.maxComboInRound = 0;
-    this.runCoinsEarned = 0;
-    this.overcharge = 0;
-    this.freezeTurnsRemaining = 0;
-    this.chainCooldown = 0;
-    this.pendingRunCoins = 0;
-    // A Boss Rush wave clear waiting for the shot in flight to land.
-    this.pendingBossRushWave = false;
-    // True for a Flux run started from a shared seed link.
-    this.isSharedFluxRun = false;
-    this.anvilCrushCount = 0;
-    this.isCoreFreezeApplied = false;
-    this.outOfShotsGraceFrames = 0;
-    this.victoryCelebrationFrames = 0;
-    this.victorySummary = null;
-    this.gameOverSummary = null;
-    this.hitStopFrames = 0;
-    this.specialSlowMoFrames = 0;
-    this.specialSlowMoTotalFrames = 0;
-    this.specialSlowMoMinScale = 1.0;
-    this.specialSlowMoColor = null;
-    this.isSteppingPhysics = false;
-    this.pendingRoundEnd = false;
-    this.hadDroppingBalls = false;
-    this.detonationOrigin = null;
-    this.impactWave = null;
-    this.hasFiredInRound = false;
-    this.hasUsedContinue = false;
-    this.bossesDestroyedInRun = 0;
-    this.activeDiscoveryId = null;
-    this.discoveryTurnCount = 0;
-    this.discoveryShownIds = new Set();
-    this.isActiveHintLearned = false;
-    this.isHintShownThisTurn = false;
-    this.hintReplayQueue = [];
-    this.isReplayingHints = false;
-    this.levelIntro = null;
-    this.levelTutorialKey = null;
-    this.isAimCancelled = false;
-    this.isAimLocked = false;
-    this.aimLockOrigin = null;
-    this.isPolarityFlipped = false;
-    this.activeMutatorKey = null;
-    this.dailySeedKey = null;
-    this.seededRng = null;
-    this.scopedRng = null;
+    resetRunCounterFields(this);
+    resetRoundTransientFields(this);
+    resetModeProgressionFields(this);
     this.waveLog = [];
     this.stashedRegularColorId = null;
-    this.launcherDrawIndex = 0;
-    this.specialGrantIndex = 0;
-    this.specialAmmoBoughtInRun = 0;
-    this.fluxSeed = null;
-    this.fluxContentVersion = this.gameConfig.ghostDuel.contentVersion.flux;
-    this.fluxStage = 0;
-    this.fluxFamily = null;
-    this.fluxPreviousFamily = null;
-    this.fluxShapeIds = [];
-    this.fluxIsBossStage = false;
-    this.fluxPerks = {};
-    this.fluxPerkOffer = null;
-    this.stageTransitionFrames = 0;
-    this.stageIntroFrames = 0;
-    this.currentObjective = OBJECTIVE_TYPES.CLEAR_ALL;
-    this.targetCoreCount = 0;
-    this.rescuedCores = 0;
-    this.currentPuzzleStage = 1;
-    this.puzzleQueue = [];
-    this.blitzFramesRemaining = 0;
-    this.blitzWaveTimerFrames = 0;
-    this.blitzIdleFrames = 0;
-    this.blitzBonusFramesEarned = 0;
-    this.blitzHitStreak = 0;
-    this.bossRushWave = 1;
-    this.cascadeWave = 1;
-    this.cascadeTurnsUntilDrop = 0;
-    this.cascadeOccupiedPlatforms = new Set();
-    this.modeState = null;
-    this.pinballStage = 1;
-    this.slingshotStage = 1;
-    this.mergeDropX = this.gameConfig.canvas.logicalWidth * MATH_CONSTANTS.HALF;
-    this.mergeBestTier = 1;
     this.physicsWorld.gravityMultiplier = 1.0;
     this.physicsWorld.magnetismMultiplier = 1.0;
     this.physicsWorld.rotorSpeedMultiplier = 1.0;
@@ -1242,127 +1498,16 @@ export class GameEngine {
     this.stepCallbacks = {
       onBounce: (x, y) => {
         this.audioManager.playEffect('bounce');
-        this.particleSystem.spawnBurst(
-          x,
-          y,
-          theme.bounceParticleColor,
-          juice.bounceBurstCount,
-          juice.bounceBurstSpeed
-        );
+        this.particleSystem.spawnBurst(x, y, theme.bounceParticleColor, juice.bounceBurstCount, juice.bounceBurstSpeed);
         this.crackWallAt(x, y);
       },
       onBallDroppedOut: (ball) => {
         this.particleSystem.splashLiquid(ball.x / this.gameConfig.canvas.logicalWidth, ball.vy);
       },
-      onCollectorBinPass: (ball) => {
-        if (!this.isRunPlaying() || this.getModeBehavior().getRenderChrome(this).collectorBins === false) {
-          return;
-        }
-        const collectorCfg = this.gameConfig.scoring.collector;
-        if (!collectorCfg) {
-          return;
-        }
-        const bonusPts = Math.round(this.getCollectorBonusPoints() * Math.max(1, this.combo));
-        this.addScore(bonusPts);
-        this.addOvercharge(this.getCollectorOvercharge());
-        this.particleSystem.spawnFloatingText(
-          ball.x,
-          this.gameConfig.canvas.logicalHeight - collectorCfg.zoneHeight + this.gameConfig.canvas.floatingTextOffsetY,
-          t('gameplay.feedback.collector.bin', { points: bonusPts }),
-          this.gameConfig.theme.avalanchePopupColor
-        );
-      },
-      onPortalWarp: (entryPortal, exitPortal) => {
-        const portalCfg = this.obstaclesConfig.types.portal;
-        this.audioManager.playEffect('portal');
-        this.particleSystem.spawnBurst(
-          entryPortal.x,
-          entryPortal.y,
-          portalCfg.ringColor,
-          portalCfg.burstCount,
-          portalCfg.burstSpeed
-        );
-        this.particleSystem.spawnBurst(
-          exitPortal.x,
-          exitPortal.y,
-          portalCfg.ringColor,
-          portalCfg.burstCount,
-          portalCfg.burstSpeed
-        );
-        this.particleSystem.spawnFloatingText(
-          exitPortal.x,
-          exitPortal.y + this.gameConfig.canvas.floatingTextOffsetY,
-          t('gameplay.feedback.portal.warp'),
-          theme.portalPopupColor
-        );
-      },
-      onAnvilCrush: (target) => {
-        const anvilSpecs = this.ballsConfig.specialTypes.anvil;
-        this.particleSystem.spawnExplosion?.(
-          target.x,
-          target.y,
-          target.radius * anvilSpecs.crushShockwaveFactor,
-          anvilSpecs.highlight
-        );
-        this.particleSystem.spawnFlash?.(
-          target.x,
-          target.y,
-          anvilSpecs.highlight,
-          target.radius * anvilSpecs.crushFlashRadiusFactor
-        );
-        this.particleSystem.spawnShockwave(
-          target.x,
-          target.y,
-          anvilSpecs.highlight,
-          target.radius * anvilSpecs.crushShockwaveFactor,
-          { lineWidth: anvilSpecs.crushRingLineWidth }
-        );
-        this.particleSystem.spawnBurst(
-          target.x,
-          target.y,
-          anvilSpecs.highlight,
-          anvilSpecs.crushBurstCount,
-          anvilSpecs.crushBurstSpeed
-        );
-        const prevOrigin = this.detonationOrigin;
-        this.detonationOrigin = this.physicsWorld.projectile || target;
-        const crushed = this.destroyClusterBall(target, anvilSpecs.highlight, true);
-        this.detonationOrigin = prevOrigin;
-        if (crushed) {
-          this.anvilCrushCount++;
-          this.addScore(anvilSpecs.pointsPerBall);
-          this.addOvercharge(this.gameConfig.scoring.overchargePerMatchedBall);
-          this.triggerSpecialSlowMo(anvilSpecs.slowMoFrames, anvilSpecs.slowMoTimeScale, anvilSpecs.highlight);
-          this.audioManager.playEffect('snap');
-        }
-      },
-      onAnvilComplete: () => {
-        const anvilSpecs = this.ballsConfig.specialTypes.anvil;
-        const canvasCfg = this.gameConfig.canvas;
-        const launcherSpec = this.getLauncherSpec();
-        this.particleSystem.spawnFloatingText(
-          launcherSpec.x,
-          launcherSpec.y + canvasCfg.anvilPopupOffsetY,
-          t('gameplay.feedback.special.anvil'),
-          anvilSpecs.highlight
-        );
-        this.particleSystem.addScreenShake(juice.anvilShake, juice.maxShakeOffset);
-        // A versus board never freezes: both boards must keep stepping in lockstep.
-        this.hitStopFrames = this.isVersusRole ? 0 : juice.hitStopFramesSpecial;
-        // An anvil that crushed nothing is a miss: it breaks the combo and counts toward the next wave.
-        const madeMatch = this.anvilCrushCount > 0;
-        if (madeMatch) {
-          this.triggerSpecialSlowMo(anvilSpecs.slowMoFrames, anvilSpecs.slowMoTimeScale, anvilSpecs.highlight);
-        } else {
-          this.combo = 0;
-        }
-        const behavior = this.getModeBehavior();
-        if (typeof behavior.onAnvilSettled === 'function') {
-          behavior.onAnvilSettled(this, madeMatch);
-        } else {
-          this.handlePostTurnCleanup(madeMatch);
-        }
-      },
+      onCollectorBinPass: (ball) => handleCollectorBinPass(this, ball),
+      onPortalWarp: (entryPortal, exitPortal) => handlePortalWarp(this, entryPortal, exitPortal),
+      onAnvilCrush: (target) => handleAnvilCrush(this, target),
+      onAnvilComplete: () => handleAnvilComplete(this),
       onProjectileSnapped: (snappedBall, hitTarget, impactVx, impactVy) => {
         if (this.getModeBehavior().onProjectileSettled(this, { snappedBall, hitTarget, impactVx, impactVy })) {
           return;
@@ -1373,31 +1518,7 @@ export class GameEngine {
         this.combo = 0;
         this.handlePostTurnCleanup(false);
       },
-      onSingularityCapture: (capturedBall, singularityObs) => {
-        if (!this.isRunPlaying()) {
-          return;
-        }
-        const singCfg = this.obstaclesConfig.types.singularity;
-        const baseDropPts = this.gameConfig.scoring.droppedBallPoints;
-        const bonusPts = Math.round(baseDropPts * singularityObs.scoreMultiplier * Math.max(1, this.combo));
-        this.addScore(bonusPts);
-        this.addOvercharge(singularityObs.bonusOvercharge);
-        this.audioManager.playEffect('portal');
-        this.particleSystem.spawnBurst(
-          singularityObs.x,
-          singularityObs.y,
-          singCfg.ringColor,
-          singCfg.burstCount,
-          singCfg.burstSpeed
-        );
-        this.particleSystem.spawnFloatingText(
-          singularityObs.x,
-          singularityObs.y + this.gameConfig.canvas.floatingTextOffsetY,
-          t('gameplay.feedback.singularity.absorbed', { points: bonusPts }),
-          this.gameConfig.theme.singularityPopupColor
-        );
-        this.notifyUI();
-      }
+      onSingularityCapture: (capturedBall, singularityObs) => handleSingularityCapture(this, capturedBall, singularityObs)
     };
     return this.stepCallbacks;
   }
@@ -1414,10 +1535,7 @@ export class GameEngine {
       return;
     }
     const behavior = this.getModeBehavior();
-    if (behavior.canFire(this) === false) {
-      return;
-    }
-    if (behavior.fire(this)) {
+    if (behavior.canFire(this) === false || behavior.fire(this)) {
       return;
     }
     if (this.mode === GAME_MODES.CASCADE) {
@@ -1428,53 +1546,8 @@ export class GameEngine {
     this.evaluateGhostShot();
     this.countShotForStats();
     this.beginVersusTurn(this.currentBall);
-    const ballCfg = this.physicsConfig.ball;
-    const launcherSpec = this.getLauncherSpec();
-    const projectile = this.currentBall;
-    this.levelIntro = null;
-    this.isHintShownThisTurn = false;
-    this.recordDiscoveryInteraction(DISCOVERY_INTERACTIONS.SHOT);
-    if (projectile.specialType) {
-      this.recordDiscoveryInteraction(DISCOVERY_INTERACTIONS.USE, projectile.specialType);
-    }
-    projectile.isProjectile = true;
-    projectile.isPolarityFlipped = this.isPolarityFlipped;
-    this.markResonantShot(projectile);
-    projectile.x = launcherSpec.x;
-    projectile.y = launcherSpec.y;
-    projectile.savePreviousPosition();
-
-    const baseSpeed = this.physicsWorld.projectileLaunchSpeedOverride > 0
-      ? this.physicsWorld.projectileLaunchSpeedOverride
-      : ballCfg.projectileSpeed;
-    const speed = projectile.specialType === SPECIAL_TYPES.ANVIL
-      ? ballCfg.anvilSpeed
-      : baseSpeed;
-
-    projectile.vx = Math.cos(this.aimAngle) * speed;
-    projectile.vy = Math.sin(this.aimAngle) * speed;
-
-    this.physicsWorld.projectile = projectile;
-    this.anvilCrushCount = 0;
-    this.stashedRegularColorId = null;
-    this.currentBall = this.nextBall;
-    const upcoming = this.takeUpcomingBall();
-    this.nextBall = this.createRandomLauncherBall(upcoming.specialType, upcoming.colorId);
-
-    if (this.usesShotBudget()) {
-      this.shotsRemaining = Math.max(0, this.shotsRemaining - 1);
-    }
-
-    this.blitzIdleFrames = 0;
-    if (this.mode === GAME_MODES.PUZZLE && !this.hasFiredInRound) {
-      // An attempt is the first shot of a round; a restored round already carries the flag.
-      this.storageManager.recordPuzzleAttempt?.(this.currentPuzzleStage);
-    }
-    this.hasFiredInRound = true;
-    this.physicsWorld.allowTensionBreak = true;
-    this.audioManager.playEffect('shoot');
-    this.updateAimFromAngle(this.aimAngle);
-    this.notifyUI();
+    launchPreparedProjectile(this);
+    finalizeFiredProjectile(this);
   }
 
   update() {
@@ -1485,20 +1558,11 @@ export class GameEngine {
     if (this.state !== GAME_STATES.PLAYING) {
       return;
     }
-    const isFirstPlayedFrame = this.beatFrame === 0;
-    this.beatFrame += this.getBeatAdvance();
-    if (isFirstPlayedFrame) {
-      this.announceResonanceDisabled();
-    }
-    if (this.resonanceFlashFrames > 0) {
-      this.resonanceFlashFrames--;
-    }
-    this.countPlayTimeForStats(this.physicsConfig.simulation?.fixedStepMs || 0);
-    if (this.railLowerFrames > 0) {
-      this.railLowerFrames--;
-    }
+    advanceFrameTimers(this);
+    const theme = this.gameConfig.theme;
+    const juice = this.gameConfig.juice;
     if (this.isAwaitingPerk()) {
-      this.particleSystem.update(this.gameConfig.juice.shakeDecay);
+      this.particleSystem.update(juice.shakeDecay);
       return;
     }
     if (this.stageTransitionFrames > 0) {
@@ -1508,12 +1572,7 @@ export class GameEngine {
     if (this.stageIntroFrames > 0) {
       this.stageIntroFrames--;
     }
-
-    const theme = this.gameConfig.theme;
-    const juice = this.gameConfig.juice;
-
     this.updateImpactWave();
-
     if (this.isVersusRole) {
       // Both boards of a duel must keep stepping in lockstep: no hit-stop freeze.
       this.hitStopFrames = 0;
@@ -1523,163 +1582,19 @@ export class GameEngine {
       this.particleSystem.updateShakeOnly(juice.shakeDecay);
       return;
     }
-
-    if (this.specialSlowMoFrames > 0) {
-      // Slow animation speeds must not stretch the slow motion in real time (free aiming
-      // time in Blitz): the countdown never runs slower than one frame per step.
-      this.specialSlowMoFrames = Math.max(0, this.specialSlowMoFrames - Math.max(1, this.animationSpeed));
-      if (this.specialSlowMoFrames <= 0) {
-        this.specialSlowMoTotalFrames = 0;
-        this.specialSlowMoMinScale = 1.0;
-        this.specialSlowMoColor = null;
-      }
+    updateSlowMoAndProjectileTrail(this, juice, theme);
+    if (!executePhysicsStepAndPostHooks(this, juice)) {
+      return;
     }
-
-    if (this.physicsWorld.projectile) {
-      this.trackDiscoveryProximity(this.physicsWorld.projectile);
-      this.trailFrameCounter++;
-      if (this.trailFrameCounter >= juice.trailSpawnInterval) {
-        this.trailFrameCounter = 0;
-        const p = this.physicsWorld.projectile;
-        const palette = p.specialType
-          ? this.ballsConfig.specialTypes[p.specialType]
-          : (
-            this.ballsConfig.standardColors.find((c) => c.id === p.colorId)
-            || this.modesConfig.merge.tiers.find((c) => c.id === p.colorId)
-          );
-        this.particleSystem.spawnTrail(
-          p.x,
-          p.y,
-          p.radius,
-          palette ? palette.highlight : theme.defaultTrailColor
-        );
-      }
-    }
-
-    const dtSec = (this.physicsConfig.simulation?.fixedStepMs || FALLBACK_FIXED_STEP_MS) / MS_PER_SECOND;
-    const behavior = this.getModeBehavior();
-    behavior.onBeforePhysicsStep(this, dtSec);
+    syncBrokenBondsAndDroppingBalls(this);
     if (!this.isRunPlaying()) {
       this.particleSystem.update(juice.shakeDecay);
       return;
     }
-
-    // Step callbacks must not tear the world down mid-step: a round end they trigger
-    // (an overcharge strike on the boss) is deferred until the step has returned.
-    if (this.versus) {
-      this.stepVersusBefore();
-    }
-    const flyingProjectile = this.physicsWorld.projectile;
-    this.isSteppingPhysics = true;
-    try {
-      this.physicsWorld.step(this.getStepCallbacks());
-    } finally {
-      this.isSteppingPhysics = false;
-    }
-    behavior.onAfterPhysicsStep(this, dtSec);
-    if (this.versus) {
-      this.stepVersusAfter(flyingProjectile);
-    }
-    if (this.magnetar) {
-      this.stepMagnetarAfter(flyingProjectile);
-    }
-    if (this.pendingRoundEnd || (this.pendingBossRushWave && !this.physicsWorld.projectile)) {
-      this.evaluateRoundEnd();
-    }
-
-    if (this.physicsWorld.hasBrokenBondThisStep) {
-      this.physicsWorld.hasBrokenBondThisStep = false;
-      this.detachAndRewardAvalanche();
-      this.refreshMoorings();
-      this.discardBetweenTurnsCoreFreeze();
-      // A board cleared by a bond break must not end the round with the shot frozen
-      // mid-air: the post-turn cleanup of that shot comes back to evaluateRoundEnd.
-      const isShotHoldingRoundEnd = Boolean(this.physicsWorld.projectile) && this.isClearBasedMode();
-      if (!isShotHoldingRoundEnd) {
-        this.evaluateRoundEnd();
-      }
-      this.saveRunSnapshot();
-      this.notifyUI();
-    }
-
-    // Falling balls still pay score and overcharge until they land: store the run once
-    // the last one is gone, so a reload cannot lose those rewards.
-    const hasDroppingBalls = this.physicsWorld.droppingBalls.length > 0;
-    if (this.hadDroppingBalls && !hasDroppingBalls) {
-      this.saveRunSnapshot();
-    }
-    this.hadDroppingBalls = hasDroppingBalls;
-
-    if (!this.isRunPlaying()) {
-      this.particleSystem.update(juice.shakeDecay);
+    updateBetweenShotsState(this);
+    if (this.mode === GAME_MODES.BLITZ && this.isRunPlaying() && !stepBlitzUpdate(this, juice, theme)) {
       return;
     }
-
-    if (!this.physicsWorld.projectile) {
-      // The board moved, but the preview is only drawn once per frame: the game loop
-      // recomputes it through refreshAimPreview instead of once per fixed step.
-      this.isAimPreviewStale = true;
-      if (!this.hasFiredInRound) {
-        this.physicsWorld.pendingChainCandidateIds.clear();
-      } else {
-        this.chainCooldown++;
-        if (this.chainCooldown >= this.physicsConfig.simulation.chainCheckCooldownFrames) {
-          this.chainCooldown = 0;
-          this.evaluateAutomaticChainReactions();
-          this.discardBetweenTurnsCoreFreeze();
-        }
-      }
-
-      if (this.outOfShotsGraceFrames > 0) {
-        this.outOfShotsGraceFrames--;
-        if (this.isObjectiveCleared()) {
-          this.outOfShotsGraceFrames = 0;
-          this.evaluateRoundEnd();
-        } else if (this.outOfShotsGraceFrames === 0) {
-          this.triggerGameOver(GAME_OVER_REASONS.OUT_OF_SHOTS);
-        }
-      }
-    }
-
-    if (this.mode === GAME_MODES.BLITZ && this.isRunPlaying()) {
-      const blitzCfg = this.gameConfig.blitz;
-      this.blitzFramesRemaining = Math.max(0, this.blitzFramesRemaining - 1);
-      if (this.blitzFramesRemaining <= 0) {
-        this.particleSystem.update(juice.shakeDecay);
-        this.triggerGameOver(GAME_OVER_REASONS.TIME_UP);
-        return;
-      }
-      if (this.blitzFramesRemaining % blitzCfg.framesPerSecond === 0) {
-        const secondsLeft = Math.ceil(this.blitzFramesRemaining / blitzCfg.framesPerSecond);
-        if (secondsLeft > 0 && secondsLeft <= blitzCfg.urgentAudioSeconds) {
-          this.audioManager.playEffect('blitzTick');
-        }
-        this.notifyUI();
-      }
-      this.blitzWaveTimerFrames--;
-      if (this.blitzWaveTimerFrames <= 0 || this.physicsWorld.balls.length < blitzCfg.minSpheresBeforeWave) {
-        this.blitzWaveTimerFrames = blitzCfg.waveIntervalFrames;
-        this.spawnEndlessWave();
-        this.refreshStaleLauncherColors();
-        this.saveRunSnapshot();
-        this.notifyUI();
-      }
-      if (!this.physicsWorld.projectile && this.physicsWorld.droppingBalls.length === 0) {
-        this.blitzIdleFrames++;
-        if (this.blitzIdleFrames >= blitzCfg.autoFireFrames) {
-          this.blitzIdleFrames = 0;
-          const canvasCfg = this.gameConfig.canvas;
-          this.particleSystem.spawnFloatingText(
-            canvasCfg.launcherX,
-            canvasCfg.launcherY + canvasCfg.launcherPopupOffsetY,
-            t('gameplay.feedback.blitz.autoFire'),
-            theme.wavePopupColor
-          );
-          this.shoot();
-        }
-      }
-    }
-
     this.particleSystem.update(juice.shakeDecay);
     this.checkDangerLineBreach();
   }
@@ -1726,46 +1641,27 @@ export class GameEngine {
   restartCurrent() {
     // A restart on the same board keeps the ghost; any other start clears it (resetRunState).
     const ghost = this.ghostDuel?.ghost ?? null;
-    if (this.mode === GAME_MODES.CAMPAIGN) {
-      this.startCampaignLevel(this.currentLevelId);
-    } else if (this.mode === GAME_MODES.DAILY) {
-      this.startDailyChallenge(this.dailySeedKey, true, { isRematch: this.isDailyRematch });
-    } else if (this.mode === GAME_MODES.FLUX && ghost) {
-      // Same board, same shapes: a duel replayed on older shapes restarts on them.
-      this.startFluxRun(this.fluxSeed, {
-        isShared: true,
-        isRestart: true,
-        weekKey: this.weeklyWeekKey ?? undefined,
-        contentVersion: this.fluxContentVersion
-      });
-    } else if (this.mode === GAME_MODES.FLUX && this.isWeeklyFluxRun) {
-      this.startWeeklyFlux({ isRestart: true });
-    } else if (this.mode === GAME_MODES.FLUX) {
-      this.startFluxRun();
-    } else if (this.mode === GAME_MODES.PUZZLE) {
-      this.startPuzzleMode(this.currentPuzzleStage);
-    } else if (this.mode === GAME_MODES.BLITZ) {
-      this.startBlitzMode();
-    } else if (this.mode === GAME_MODES.BOSS_RUSH) {
-      this.startBossRushMode(1);
-    } else if (this.mode === GAME_MODES.CASCADE) {
-      this.startCascadeMode();
-    } else if (this.mode === GAME_MODES.CLASSIC) {
-      this.startClassicMode(1);
-    } else if (this.mode === GAME_MODES.HEX_GRID) {
-      this.startHexGridMode();
-    } else if (this.mode === GAME_MODES.ORBITAL) {
-      this.startOrbitalMode();
-    } else if (this.mode === GAME_MODES.PINBALL) {
-      this.startPinballMode(1);
-    } else if (this.mode === GAME_MODES.CONVOY) {
-      this.startConvoyMode();
-    } else if (this.mode === GAME_MODES.MERGE) {
-      this.startMergeMode();
-    } else if (this.mode === GAME_MODES.SLINGSHOT) {
-      this.startSlingshotMode(1);
+    if (this.mode === GAME_MODES.FLUX) {
+      if (ghost) {
+        // Same board, same shapes: a duel replayed on older shapes restarts on them.
+        this.startFluxRun(this.fluxSeed, {
+          isShared: true,
+          isRestart: true,
+          weekKey: this.weeklyWeekKey ?? undefined,
+          contentVersion: this.fluxContentVersion
+        });
+      } else if (this.isWeeklyFluxRun) {
+        this.startWeeklyFlux({ isRestart: true });
+      } else {
+        this.startFluxRun();
+      }
     } else {
-      this.startEndlessMode();
+      const handler = RESTART_MODE_HANDLERS.get(this.mode);
+      if (handler) {
+        handler(this);
+      } else {
+        this.startEndlessMode();
+      }
     }
     if (ghost) {
       this.attachGhost(ghost);

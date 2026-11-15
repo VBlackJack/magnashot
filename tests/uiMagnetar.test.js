@@ -37,7 +37,7 @@ const ballsConfig = JSON.parse(readText('../configs/balls.json'));
 const en = JSON.parse(readText('../locales/en.json'));
 const fr = JSON.parse(readText('../locales/fr.json'));
 const html = readText('../index.html');
-const css = readText('../styles/main.css');
+const css = ['main.css', 'modals.css', 'responsive.css', 'versus.css'].map((f) => readText(`../styles/${f}`)).join('\n');
 
 function fakeElement(initialClasses = []) {
   const classes = new Set(initialClasses);

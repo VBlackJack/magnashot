@@ -36,7 +36,7 @@ const modesConfig = readJson('../configs/modes.json');
 const en = readJson('../locales/en.json');
 const fr = readJson('../locales/fr.json');
 const html = readText('../index.html');
-const css = readText('../styles/main.css');
+const css = ['main.css', 'modals.css', 'responsive.css', 'versus.css'].map((f) => readText(`../styles/${f}`)).join('\n');
 const swSource = readText('../sw.js');
 
 function fakeClassList(initial = []) {

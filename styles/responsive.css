@@ -1,0 +1,1445 @@
+/*
+ * Copyright 2026 Julien Bombled
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+
+
+/* Short viewports: tighter modal chrome so more of the content fits. */
+@media (max-height: 500px) {
+  .modal-card {
+    padding: 14px 16px;
+    gap: 8px;
+  }
+  .modal-title {
+    font-size: 1.15rem;
+  }
+  .modal-actions {
+    margin-top: 0;
+  }
+  .instructions-list {
+    padding: 10px;
+    gap: 4px;
+    font-size: 0.8rem;
+  }
+  .pause-settings-row {
+    margin-bottom: 0;
+  }
+}
+
+/* Compact chrome shared by portrait phones and landscape phones. */
+@media (max-width: 680px), (orientation: landscape) and (max-height: 500px) {
+  :root {
+    --shell-pad-y: 4px;
+    --shell-pad-x: 6px;
+    --shell-gap: 4px;
+    --dock-height: var(--touch-target);
+    --stage-column-gap: 4px;
+    --stage-gap: 4px;
+  }
+  .nav-btn {
+    padding: 4px 8px;
+    min-height: var(--touch-target);
+    min-width: var(--touch-target);
+    font-size: 0.7rem;
+    line-height: 1.15;
+  }
+  .nav-btn.icon-btn {
+    min-width: var(--touch-target);
+    min-height: var(--touch-target);
+  }
+  .nav-modes .nav-btn {
+    /* Automatic minimum (longest word) so labels wrap between words, never inside one. */
+    min-width: auto;
+    padding: 4px 5px;
+    text-align: center;
+    white-space: normal;
+    text-wrap: balance;
+  }
+  .hud-bar {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    padding: 4px 8px;
+    gap: 2px 4px;
+  }
+  .hud-menu-btn {
+    grid-column: 1;
+    grid-row: 1;
+    justify-self: start;
+  }
+  .hud-center-info {
+    grid-column: 2 / -1;
+    grid-row: 1;
+    order: -1;
+    flex-direction: row;
+    justify-content: center;
+    gap: 6px;
+  }
+  .hud-mode-banner {
+    font-size: 0.75rem;
+  }
+  .hud-label {
+    font-size: 0.65rem;
+    letter-spacing: 0.02em;
+  }
+  .hud-value {
+    font-size: 0.92rem;
+  }
+  .hud-subvalue {
+    font-size: 0.62rem;
+  }
+  .polarity-floating-btn,
+  .swap-floating-btn {
+    min-height: var(--touch-target);
+    padding: 4px 8px;
+    font-size: 0.74rem;
+  }
+  .powerups-panel {
+    padding: 5px 6px;
+    gap: 4px;
+  }
+  .overcharge-widget {
+    gap: 2px;
+    padding: 4px 6px;
+  }
+  .overcharge-header {
+    font-size: 0.65rem;
+  }
+  .overcharge-track {
+    height: 6px;
+  }
+  .powerups-header {
+    display: none;
+  }
+  .powerups-bar {
+    display: grid;
+    gap: 4px;
+    width: 100%;
+  }
+  .powerup-btn {
+    padding: 4px;
+    min-height: var(--touch-target);
+    min-width: var(--touch-target);
+    justify-content: center;
+    gap: 4px;
+  }
+  .powerup-icon {
+    width: 22px;
+    height: 22px;
+    font-size: 0.75rem;
+  }
+  .powerup-name {
+    display: none;
+  }
+  .powerup-key {
+    display: none;
+  }
+  .powerup-count {
+    font-size: 0.75rem;
+    padding: 1px 6px;
+  }
+  .modal-tab {
+    min-height: var(--touch-target);
+    padding: 4px 6px;
+    font-size: 0.78rem;
+  }
+}
+
+/*
+ * Portrait phones: the board takes the full width, a one-line HUD sits above it and
+ * a single control row below it (launcher buttons and special balls). The slide-in
+ * burger menu holds navigation, settings and the stats the compact HUD drops.
+ */
+@media (max-width: 680px) {
+  :root {
+    --shell-pad-x: 0px;
+    --shell-pad-y: 0px;
+    --shell-gap: 0px;
+    --stage-reserve-x: 0px;
+    /* Room for a short name under each control icon. */
+    --control-row-height: calc(var(--touch-target) + 14px);
+    --overcharge-line-height: 4px;
+    --overcharge-row-height: 14px;
+    --overcharge-reserve: calc(var(--overcharge-row-height) + var(--stage-column-gap));
+    --powerups-reserve: calc(var(--control-row-height) + var(--stage-column-gap));
+    --stage-reserve-y: calc(
+      var(--control-row-height) + var(--overcharge-reserve) + var(--powerups-reserve) + var(--stage-column-gap) +
+        var(--canvas-border)
+    );
+  }
+
+  /* The hint sits where the thumb aims: it steps aside while the finger is down. */
+  .canvas-wrapper:has(> #game-canvas:active) .tutorial-banner {
+    opacity: 0;
+  }
+  .canvas-wrapper:has(> #game-canvas:active) .level-intro-banner {
+    opacity: 0;
+  }
+  /* The control row has no room for a sentence; the empty slots speak for themselves. */
+  .powerups-empty {
+    display: none;
+  }
+  .drawer-stats {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 10px 8px;
+    padding: 12px;
+    background: var(--surface-sunken);
+    border: 1px solid var(--border-subtle);
+    border-radius: 12px;
+  }
+  .nav-controls .nav-btn {
+    font-size: 0.85rem;
+    padding: 6px 8px;
+  }
+
+  /* One-line HUD: menu button, score, shots, live badges and fullscreen button. */
+  .hud-bar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0 max(4px, env(safe-area-inset-right)) 0 max(4px, env(safe-area-inset-left));
+    border-width: 0 0 1px;
+    border-radius: 0;
+  }
+  .hud-stat-box {
+    flex-direction: row;
+    align-items: baseline;
+    gap: 6px;
+  }
+  .hud-stat-shots .sag-meter {
+    min-width: 44px;
+    flex: 1 1 44px;
+    align-self: center;
+    margin-top: 0;
+  }
+  .hud-stat-coins,
+  .hud-stat-best,
+  .hud-mode-banner,
+  .hud-stat-score .hud-subvalue {
+    display: none;
+  }
+  /* The round, coins and best score the one-line HUD drops, on a second line. */
+  .hud-bar {
+    flex-wrap: wrap;
+    row-gap: 0;
+  }
+  .hud-compact-info {
+    display: block;
+    flex: 1 1 100%;
+    order: 10;
+    margin: 0;
+    padding: 0 0 4px;
+    font-size: 0.72rem;
+    color: var(--text-muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .hud-center-info {
+    order: 0;
+    margin-left: auto;
+  }
+  .hud-value {
+    font-size: 1.05rem;
+  }
+
+  /*
+   * Board, overcharge line, launcher controls and special spheres stack cleanly into
+   * separate rows so every touch button keeps at least 44px width and legible labels.
+   */
+  .stage-container {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr);
+    row-gap: var(--stage-column-gap);
+    align-items: stretch;
+    justify-items: stretch;
+  }
+  .stage-container:has(.overcharge-widget.hidden) {
+    --overcharge-reserve: 0px;
+  }
+  .stage-container:has(.powerups-bar.hidden) {
+    --powerups-reserve: 0px;
+  }
+  .stage-column,
+  .powerups-panel {
+    display: contents;
+  }
+  .canvas-area {
+    order: 1;
+  }
+  .canvas-wrapper {
+    border-width: 1px 0;
+    border-radius: 0;
+  }
+  /* One labelled line: name, gauge, percentage. */
+  .overcharge-widget {
+    order: 2;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 6px;
+    height: var(--overcharge-row-height);
+    padding: 0 max(8px, env(safe-area-inset-right)) 0 max(8px, env(safe-area-inset-left));
+    background: none;
+    border: none;
+    border-radius: 0;
+    font-size: 0.62rem;
+    line-height: 1;
+  }
+  .overcharge-header {
+    display: contents;
+  }
+  #hud-overcharge-pct {
+    order: 2;
+  }
+  .powerups-header {
+    display: none;
+  }
+  .overcharge-track {
+    order: 1;
+    flex: 1 1 auto;
+    height: var(--overcharge-line-height);
+  }
+  .launcher-controls-dock {
+    order: 3;
+    display: flex;
+    justify-content: center;
+    align-items: stretch;
+    gap: 6px;
+    height: auto;
+    padding: 0 max(4px, env(safe-area-inset-right)) 0 max(4px, env(safe-area-inset-left));
+  }
+  .powerups-bar {
+    order: 4;
+    display: grid;
+    grid-template-columns: repeat(7, minmax(var(--touch-target), 1fr));
+    gap: 3px;
+    padding: 0 max(4px, env(safe-area-inset-right)) 0 max(4px, env(safe-area-inset-left));
+  }
+  .polarity-floating-btn,
+  .swap-floating-btn,
+  .powerup-btn {
+    min-width: var(--touch-target);
+    min-height: var(--control-row-height);
+    padding: 2px 3px;
+  }
+  .polarity-floating-btn,
+  .swap-floating-btn {
+    flex: 1 1 0;
+    max-width: 180px;
+  }
+  .powerup-btn {
+    flex-direction: column;
+    gap: 1px;
+  }
+  .powerup-count {
+    padding: 0 5px;
+    font-size: 0.7rem;
+  }
+  .launcher-icon {
+    font-size: 1.2rem;
+  }
+  /* Touch screens show no tooltip: each control names itself under its icon. */
+  .launcher-caption,
+  .powerup-name {
+    display: block;
+    flex: none;
+    max-width: 100%;
+    font-size: 0.6rem;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    /* Tall enough for a capital accent (Échanger): overflow hidden would clip it otherwise. */
+    line-height: 1.3;
+    padding-top: 0.1em;
+    text-align: center;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .polarity-floating-btn,
+  .swap-floating-btn {
+    flex-direction: column;
+    gap: 2px;
+  }
+  .powerup-btn {
+    padding: 2px 1px;
+  }
+  /* The launcher label stays readable by screen readers; only its pixels go away. */
+  .launcher-text {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+  }
+}
+
+/*
+ * Landscape phones and landscape desktops: HUD on the left, the canvas uses the full
+ * height in the middle, launcher controls and power-ups on the right. Desktop sizes are
+ * adjusted in the block that follows.
+ */
+@media (orientation: landscape) and (max-height: 500px),
+  (orientation: landscape) and (min-width: 900px) and (min-aspect-ratio: 4/3) {
+  :root {
+    --dock-width: 88px;
+    --powerups-width: 104px;
+    --stage-gap: 6px;
+    --shell-gap: 6px;
+    --shell-pad-x: 8px;
+    /* Board width from the full viewport height, so the board can take it all. */
+    --landscape-canvas-width: calc(
+      (100dvh - max(var(--shell-pad-y), env(safe-area-inset-top)) - max(var(--shell-pad-y), env(safe-area-inset-bottom)) -
+          var(--canvas-border)) * var(--canvas-aspect)
+    );
+  }
+  .app-shell {
+    display: grid;
+    max-width: none;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-rows: auto minmax(0, 1fr);
+    align-items: start;
+  }
+  .hud-bar {
+    grid-column: 1;
+    grid-row: 1;
+  }
+  .hud-fullscreen-btn {
+    display: none;
+  }
+  .stage-container {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+    height: 100%;
+    container-type: normal;
+    flex-direction: row;
+    align-items: center;
+    justify-content: flex-end;
+  }
+  .stage-column {
+    flex: 0 0 auto;
+    flex-direction: row;
+    align-items: center;
+    width: auto;
+    height: 100%;
+    container-type: normal;
+  }
+  .canvas-area {
+    flex: 0 0 auto;
+    height: 100%;
+  }
+  #game-canvas {
+    width: var(--landscape-canvas-width);
+  }
+  .launcher-controls-dock {
+    flex-direction: column;
+    justify-content: center;
+    width: var(--dock-width);
+    height: auto;
+    max-width: none;
+    gap: 6px;
+  }
+  .polarity-floating-btn,
+  .swap-floating-btn {
+    flex: 0 0 auto;
+  }
+  .powerups-panel {
+    width: var(--powerups-width);
+    max-width: none;
+    max-height: 100%;
+    overflow-y: auto;
+  }
+  .powerups-bar {
+    grid-template-columns: 1fr;
+  }
+}
+
+/*
+ * Landscape phones only: the board is too narrow to carry overlays, so the tutorial
+ * hint and the equipped-ball banner move to the free space at the bottom of the left
+ * column, at its full width. Fixed positioning escapes the clipping wrapper because
+ * the stage keeps container-type: normal here (a size container would trap it).
+ * The slide-in burger drawer widens to pack the four modes on a single row.
+ */
+@media (orientation: landscape) and (max-height: 500px) {
+  :root {
+    --drawer-width: min(460px, 92vw);
+    /* Gap between the equipped banner and the tutorial hint stacked above it. */
+    --landscape-overlay-stack: 52px;
+    /* Board, launcher dock and power-ups column, with the gaps between them. */
+    --landscape-stage-width: calc(
+      var(--landscape-canvas-width) + var(--canvas-border) + var(--stage-column-gap) + var(--dock-width) +
+        var(--stage-gap) + var(--powerups-width)
+    );
+    /* What the shell leaves to the left column once padding, gap and stage are taken. */
+    --landscape-overlay-width: calc(
+      100dvw - max(var(--shell-pad-x), env(safe-area-inset-left)) - max(var(--shell-pad-x), env(safe-area-inset-right)) -
+        var(--shell-gap) - var(--landscape-stage-width)
+    );
+  }
+  .tutorial-banner,
+  .level-intro-banner,
+  .special-equipped-banner {
+    position: fixed;
+    left: max(var(--shell-pad-x), env(safe-area-inset-left));
+    right: auto;
+    transform: none;
+    width: var(--landscape-overlay-width);
+  }
+  .special-equipped-banner {
+    bottom: max(var(--shell-pad-y), env(safe-area-inset-bottom));
+    max-width: none;
+    white-space: normal;
+    text-overflow: clip;
+    border-radius: 10px;
+  }
+  .tutorial-banner,
+  .level-intro-banner {
+    bottom: calc(max(var(--shell-pad-y), env(safe-area-inset-bottom)) + var(--landscape-overlay-stack));
+  }
+  .nav-modes {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+  .powerups-empty {
+    display: none;
+  }
+}
+
+/*
+ * Landscape desktops and tablets: the board sits in the middle of the window at full
+ * height, between two columns of the same width. The left column holds the burger menu
+ * button and round stats; the right one holds everything used while aiming (overcharge,
+ * special balls, Polarity and Swap), with the launcher controls at the bottom, level
+ * with the launcher. The stage wrappers dissolve into the shell grid (display: contents)
+ * so the canvas, the special balls and the launcher controls share one row of columns.
+ */
+@media (orientation: landscape) and (min-width: 900px) and (min-aspect-ratio: 4/3) and (min-height: 501px) {
+  :root {
+    --side-column-width: clamp(var(--side-column-min), 21vw, var(--side-column-max));
+    --stage-gap: 16px;
+    --shell-gap: 16px;
+    --shell-pad-x: 16px;
+  }
+  .app-shell {
+    max-width: none;
+    grid-template-columns: var(--side-column-width) auto var(--side-column-width);
+    grid-template-rows: auto minmax(0, 1fr) auto;
+    justify-content: center;
+    align-items: stretch;
+    column-gap: var(--stage-gap);
+    row-gap: var(--shell-gap);
+  }
+  .hud-bar {
+    grid-column: 1;
+    grid-row: 1 / span 3;
+    align-self: start;
+    grid-template-columns: var(--touch-target) minmax(0, 1fr) minmax(0, calc(50% - 5px));
+    align-content: start;
+    align-items: start;
+    gap: 18px 10px;
+    padding: 16px 14px;
+  }
+  .hud-menu-btn {
+    grid-column: 1;
+    grid-row: 1;
+    align-self: center;
+  }
+  .hud-center-info {
+    grid-column: 2 / -1;
+    grid-row: 1;
+    align-self: center;
+    align-items: stretch;
+  }
+  .hud-mode-banner {
+    width: 100%;
+    font-size: 0.96rem;
+    text-wrap: balance;
+  }
+  .hud-stat-score,
+  .hud-stat-coins {
+    grid-column: 1 / span 2;
+  }
+  .hud-stat-shots,
+  .hud-stat-best {
+    grid-column: 3;
+  }
+  .hud-stat-score,
+  .hud-stat-shots {
+    gap: 2px;
+  }
+  .hud-stat-score .hud-value,
+  .hud-stat-shots .hud-value {
+    font-size: var(--desktop-hud-primary-size);
+    line-height: 1.1;
+  }
+  .hud-stat-coins .hud-value,
+  .hud-stat-best .hud-value {
+    font-size: var(--desktop-hud-secondary-size);
+  }
+  .hud-label {
+    font-size: 0.78rem;
+  }
+  .hud-subvalue {
+    font-size: 0.9rem;
+    text-align: center;
+  }
+  .star-meter {
+    height: 8px;
+    margin-top: 6px;
+  }
+  .sag-meter {
+    height: 10px;
+    margin-top: 6px;
+  }
+  .stage-container,
+  .stage-column {
+    display: contents;
+  }
+  .canvas-area {
+    grid-column: 2;
+    grid-row: 1 / span 3;
+    height: auto;
+    align-self: center;
+  }
+  #game-canvas {
+    width: min(
+      calc(
+        (100dvh - max(var(--shell-pad-y), env(safe-area-inset-top)) - max(var(--shell-pad-y), env(safe-area-inset-bottom)) -
+            var(--canvas-border)) * var(--canvas-aspect)
+      ),
+      calc(100vw - 2 * var(--shell-pad-x) - 2 * var(--side-column-width) - 2 * var(--stage-gap) - var(--canvas-border))
+    );
+  }
+  .powerups-panel {
+    grid-column: 3;
+    grid-row: 1 / span 2;
+    width: auto;
+    /* Hug the content, but never grow over the Polarity/Swap dock in row 3. */
+    align-self: start;
+    max-height: 100%;
+    min-height: 0;
+    padding: 14px 12px;
+  }
+  .launcher-controls-dock {
+    grid-column: 3;
+    grid-row: 3;
+    width: auto;
+    flex-direction: column;
+    justify-content: flex-end;
+    gap: 8px;
+  }
+  .polarity-floating-btn,
+  .swap-floating-btn {
+    flex: 0 0 auto;
+    min-height: var(--touch-target);
+    font-size: 0.85rem;
+  }
+}
+
+/*
+ * Touch screens of any size (tablets included, not only the compact phone layouts):
+ * every control keeps the 44px minimum. A mouse layout keeps its denser sizes.
+ */
+@media (pointer: coarse) {
+  .nav-btn,
+  .nav-btn.icon-btn,
+  .hud-menu-btn,
+  .powerup-btn,
+  .stats-filter-btn,
+  .hud-badge.quota-warning {
+    min-height: var(--touch-target);
+    min-width: var(--touch-target);
+  }
+  .modal-tab,
+  .ammo-buy-btn,
+  .play-bounty-btn,
+  .hud-mode-banner,
+  .polarity-floating-btn,
+  .swap-floating-btn {
+    min-height: var(--touch-target);
+  }
+  .powerup-key {
+    display: none;
+  }
+}
+
+/*
+ * Portrait phones keep both control rows above the 44px touch minimum: each button keeps
+ * at least 44px on both axes, and the row keeps its taller height for icon captions.
+ */
+@media (pointer: coarse) and (max-width: 680px) {
+  .polarity-floating-btn,
+  .swap-floating-btn,
+  .powerup-btn {
+    min-width: var(--touch-target);
+    min-height: var(--control-row-height);
+  }
+}
+
+/*
+ * Narrow portrait phones (360px wide is common): the two control rows tighten their gaps
+ * and side padding so 44px touch targets and special-sphere captions keep fitting cleanly.
+ */
+@media (max-width: 389px) {
+  .powerups-bar {
+    gap: 2px;
+    padding: 0 max(2px, env(safe-area-inset-right)) 0 max(2px, env(safe-area-inset-left));
+  }
+  .powerup-btn {
+    padding-left: 0;
+    padding-right: 0;
+  }
+  .powerup-name {
+    font-size: 0.56rem;
+  }
+}
+
+/*
+ * High contrast theme: the in-app setting (root class mirrored by the UI) and the
+ * system preference raise the same tokens. Text shades move toward white, borders
+ * and accents get brighter, translucent panels become nearly opaque.
+ */
+:root.high-contrast {
+  --bg-dark: #000000;
+  --bg-glow: #000000;
+  --bg-panel: #05070c;
+  --bg-panel-border: #94a3b8;
+  --text-main: #ffffff;
+  --text-muted: #e2e8f0;
+  --text-secondary: #f1f5f9;
+  --text-soft: #ffffff;
+  --text-gold: #fde68a;
+  --text-gold-soft: #fef3c7;
+  --text-info-soft: #e0f2fe;
+  --text-info-bright: #ffffff;
+  --text-danger-soft: #fee2e2;
+  --text-purple-soft: #f3e8ff;
+  --text-on-accent: #000000;
+  --accent-blue: #7dd3fc;
+  --accent-purple: #d8b4fe;
+  --accent-amber: #fcd34d;
+  --tier-bronze: #e8b27a;
+  --tier-silver: #f1f5f9;
+  --accent-danger: #fca5a5;
+  --accent-emerald: #6ee7b7;
+  --accent-danger-solid: #b91c1c;
+  --focus-ring: #facc15;
+  --surface-raised: #0b1120;
+  --surface-sunken: #000000;
+  --surface-locked: #05070c;
+  --border-subtle: #94a3b8;
+  --border-strong: #cbd5e1;
+  --bg-panel-alpha-85: rgba(5, 7, 12, 0.96);
+  --bg-panel-alpha-90: rgba(5, 7, 12, 0.97);
+  --surface-sunken-alpha-86: rgba(0, 0, 0, 0.94);
+  --surface-sunken-alpha-94: rgba(0, 0, 0, 0.97);
+  --border-subtle-alpha-70: rgba(51, 65, 85, 0.95);
+  --bg-dark-alpha-62: rgba(0, 0, 0, 0.85);
+  --bg-dark-alpha-78: rgba(0, 0, 0, 0.9);
+  --accent-blue-alpha-45: rgba(125, 211, 252, 0.85);
+  --accent-blue-alpha-55: rgba(125, 211, 252, 0.9);
+}
+
+@media (prefers-contrast: more) {
+  :root {
+    --bg-dark: #000000;
+    --bg-glow: #000000;
+    --bg-panel: #05070c;
+    --bg-panel-border: #94a3b8;
+    --text-main: #ffffff;
+    --text-muted: #e2e8f0;
+    --text-secondary: #f1f5f9;
+    --text-soft: #ffffff;
+    --text-gold: #fde68a;
+    --text-gold-soft: #fef3c7;
+    --text-info-soft: #e0f2fe;
+    --text-info-bright: #ffffff;
+    --text-danger-soft: #fee2e2;
+    --text-purple-soft: #f3e8ff;
+    --text-on-accent: #000000;
+    --accent-blue: #7dd3fc;
+    --accent-purple: #d8b4fe;
+    --accent-amber: #fcd34d;
+    --tier-bronze: #e8b27a;
+    --tier-silver: #f1f5f9;
+    --accent-danger: #fca5a5;
+    --accent-emerald: #6ee7b7;
+    --accent-danger-solid: #b91c1c;
+    --focus-ring: #facc15;
+    --surface-raised: #0b1120;
+    --surface-sunken: #000000;
+    --surface-locked: #05070c;
+    --border-subtle: #94a3b8;
+    --border-strong: #cbd5e1;
+    --bg-panel-alpha-85: rgba(5, 7, 12, 0.96);
+    --bg-panel-alpha-90: rgba(5, 7, 12, 0.97);
+    --surface-sunken-alpha-86: rgba(0, 0, 0, 0.94);
+    --surface-sunken-alpha-94: rgba(0, 0, 0, 0.97);
+    --border-subtle-alpha-70: rgba(51, 65, 85, 0.95);
+    --bg-dark-alpha-62: rgba(0, 0, 0, 0.85);
+    --bg-dark-alpha-78: rgba(0, 0, 0, 0.9);
+    --accent-blue-alpha-45: rgba(125, 211, 252, 0.85);
+    --accent-blue-alpha-55: rgba(125, 211, 252, 0.9);
+  }
+}
+
+/* Play hub and campaign map breakpoints, after the shared phone rules they extend. */
+@media (min-width: 681px) {
+  .play-hub-arcade {
+    --play-hub-columns: 3;
+  }
+}
+
+@media (min-width: 900px) {
+  .play-hub-layout {
+    grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+    grid-template-areas:
+      'campaign challenges'
+      'arcade arcade'
+      'duel duel';
+  }
+  .play-hub-campaign {
+    grid-area: campaign;
+  }
+  .play-hub-challenges {
+    grid-area: challenges;
+    --play-hub-columns: 1;
+  }
+  .play-hub-arcade {
+    grid-area: arcade;
+    --play-hub-columns: 4;
+  }
+  .play-hub-duel {
+    grid-area: duel;
+  }
+}
+
+/* Phones: descriptions step aside; a locked card keeps its lock line, clamped to two lines. */
+@media (max-width: 680px), (orientation: landscape) and (max-height: 500px) {
+  .arcade-mode-card .arcade-card-desc {
+    display: none;
+  }
+  .arcade-mode-card.is-locked .arcade-card-desc {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    overflow: hidden;
+  }
+  #levels-detail-desc {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 3;
+    line-clamp: 3;
+    overflow: hidden;
+  }
+}
+
+/* Short landscape: two columns, Campaign and Challenges on the left, Arcade and Duel on the right. */
+@media (orientation: landscape) and (max-height: 500px) {
+  .play-hub-layout {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    grid-template-areas:
+      'campaign arcade'
+      'challenges arcade'
+      'challenges duel';
+    gap: 8px;
+  }
+  .play-hub-section {
+    gap: 6px;
+    padding: 6px 8px;
+  }
+  .play-hub-campaign {
+    grid-area: campaign;
+  }
+  .play-hub-challenges {
+    grid-area: challenges;
+    --play-hub-columns: 2;
+  }
+  .play-hub-arcade {
+    grid-area: arcade;
+    --play-hub-columns: 2;
+  }
+  .play-hub-duel {
+    grid-area: duel;
+    --play-hub-columns: 2;
+  }
+}
+
+/* Phone portrait: the detail panel becomes a footer under the grid, which keeps the free height. */
+@media (max-width: 680px) {
+  .levels-body {
+    flex-direction: column;
+    gap: 8px;
+  }
+  #levels-detail {
+    flex: 0 0 auto;
+    max-height: 40dvh;
+    padding: 8px 10px;
+    gap: 4px;
+  }
+}
+
+/* Short landscape: narrower right column. */
+@media (orientation: landscape) and (max-height: 500px) {
+  .levels-body {
+    --levels-detail-width: 220px;
+    flex-direction: row;
+    gap: 8px;
+  }
+  #levels-detail {
+    flex: 0 0 var(--levels-detail-width);
+    max-height: none;
+    padding: 8px 10px;
+    gap: 4px;
+  }
+}
+
+/*
+ * Forced colors (Windows contrast themes): backgrounds and glows are dropped by the
+ * browser, so controls get an explicit system-colored border, the selected state a
+ * highlight outline, and gradient text falls back to plain text.
+ */
+@media (forced-colors: active) {
+  .nav-btn,
+  .modal-btn,
+  .modal-tab,
+  .stats-filter-btn,
+  .powerup-btn,
+  .polarity-floating-btn,
+  .swap-floating-btn,
+  .hud-menu-btn,
+  .hud-mode-banner,
+  .drawer-close-btn,
+  .tutorial-dismiss-btn,
+  .flux-seed-input,
+  .arcade-mode-card,
+  .play-bounty-btn,
+  .play-hub-section,
+  .level-tile,
+  #levels-detail,
+  #levels-chapter-select,
+  #play-campaign-meter,
+  #daily-reward,
+  #weekly-reward,
+  .puzzle-stage-btn,
+  .codex-card,
+  .ammo-card,
+  .overcharge-track,
+  .star-meter,
+  .sag-meter,
+  .achievement-progress-track,
+  .achievement-tier-badge,
+  .hud-badge.quota-warning,
+  .hud-badge.ghost,
+  .hud-badge.merge-event,
+  .hud-badge.merge-contract,
+  .hud-badge.magnetar,
+  .level-card.unlocked {
+    border: 1px solid ButtonText;
+  }
+  .level-card.locked {
+    color: GrayText;
+    border: 1px dashed GrayText;
+  }
+  .nav-btn.is-locked,
+  .puzzle-stage-btn.locked,
+  .arcade-mode-card.is-locked,
+  .arcade-mode-card.is-locked .arcade-card-desc,
+  .level-tile.locked,
+  .levels-switcher .nav-btn[aria-disabled='true'] {
+    color: GrayText;
+    border: 1px dashed GrayText;
+  }
+  .level-tile.locked .level-tile-number {
+    color: GrayText;
+  }
+  .level-tile[aria-selected='true'],
+  .level-tile[aria-selected='true'] > * {
+    background: Highlight;
+    color: HighlightText;
+    border-color: Highlight;
+  }
+  .level-tile.current {
+    box-shadow: none;
+    outline: 3px dashed ButtonText;
+    outline-offset: 1px;
+  }
+  .level-tile.current::after {
+    background: ButtonText;
+  }
+  .level-tile.current:focus-visible {
+    outline: 3px solid Highlight;
+  }
+  #play-campaign-meter-fill,
+  #levels-chapter-meter-fill {
+    background: Highlight;
+  }
+  .mode-new-badge {
+    border: 1px solid ButtonText;
+    background: Canvas;
+    color: CanvasText;
+  }
+  .nav-btn.active-mode,
+  .arcade-mode-card.active-mode,
+  .arcade-mode-card.is-mastered:not(.is-locked),
+  .play-hub-section.active-mode,
+  .puzzle-stage-btn.active,
+  .modal-tab.active,
+  .stats-filter-btn.active,
+  .powerup-btn.equipped,
+  .polarity-floating-btn.active,
+  .nav-btn.badge-btn.active {
+    outline: 2px solid Highlight;
+    outline-offset: 1px;
+  }
+  button:disabled {
+    color: GrayText;
+    border-color: GrayText;
+  }
+  :focus-visible {
+    outline: 3px solid Highlight;
+    outline-offset: 2px;
+  }
+  .brand-title {
+    background: none;
+    -webkit-text-fill-color: CanvasText;
+  }
+  .overcharge-fill,
+  .star-meter-fill,
+  .sag-meter-fill,
+  .achievement-progress-fill {
+    background: Highlight;
+  }
+  .sag-meter::after {
+    background: repeating-linear-gradient(
+      90deg,
+      transparent 0,
+      transparent calc(100% / var(--sag-size, 1) - 2px),
+      Canvas calc(100% / var(--sag-size, 1) - 2px),
+      Canvas calc(100% / var(--sag-size, 1))
+    );
+  }
+  .pressure-meter::after {
+    content: none;
+  }
+  .sag-meter.warning {
+    border: 1px dashed CanvasText;
+  }
+  .sag-meter.critical {
+    border: 2px solid CanvasText;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+    scroll-behavior: auto !important;
+  }
+  .nav-btn:hover,
+  .hud-mode-banner:hover,
+  .powerup-btn:hover:not(:disabled),
+  .level-card.unlocked:hover,
+  #modal-play .arcade-mode-card:hover:not(.is-locked),
+  .level-tile:not(.locked):hover {
+    transform: none;
+  }
+  .tutorial-banner {
+    transition: none;
+  }
+  .flux-perk-card {
+    transition: none;
+  }
+  .mode-new-badge {
+    animation: none;
+  }
+}
+
+/* In-app "reduced motion" setting, mirrored on the root element by the UI. */
+:root.reduced-motion *,
+:root.reduced-motion *::before,
+:root.reduced-motion *::after {
+  animation: none !important;
+  transition: none !important;
+  scroll-behavior: auto !important;
+}
+
+:root.reduced-motion .nav-btn:hover,
+:root.reduced-motion .hud-mode-banner:hover,
+:root.reduced-motion .powerup-btn:hover:not(:disabled),
+:root.reduced-motion .level-card.unlocked:hover,
+:root.reduced-motion #modal-play .arcade-mode-card:hover:not(.is-locked),
+:root.reduced-motion .level-tile:not(.locked):hover {
+  transform: none;
+}
+
+/* Ghost Duel: card notes, game over line, alias field and the stats section. */
+.duel-card-notes {
+  margin: 0 0 12px;
+  padding-left: 1.2em;
+  color: var(--text-secondary);
+  font-size: var(--caption-font-size);
+  text-align: left;
+}
+
+.modal-stat-line.duel-result {
+  font-weight: 700;
+  color: var(--text-gold-soft);
+}
+
+.settings-duel-name {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.settings-duel-name-label {
+  font-size: var(--caption-font-size);
+  color: var(--text-secondary);
+}
+
+.settings-duel-name-input {
+  text-align: center;
+}
+
+.stats-section-title {
+  margin: 12px 0 4px;
+  font-size: 0.95rem;
+  color: var(--text-gold-soft);
+}
+
+/* Bootstrap / fatal error banner, revealed by main.js when startup or the game loop fails. */
+.bootstrap-error {
+  position: fixed;
+  inset: 16px;
+  z-index: 100;
+  margin: auto;
+  max-width: 480px;
+  max-height: 220px;
+  background: var(--bg-panel);
+  color: var(--text-main);
+  border: 2px solid var(--accent-danger);
+  border-radius: 12px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  gap: 10px;
+}
+
+.bootstrap-error-message {
+  color: var(--text-muted);
+}
+
+/*
+ * Controller support. Glyphs are generic shapes drawn with CSS (no brand artwork): a
+ * four-dot diamond with the used position filled for the face buttons, a thin bar for a
+ * bumper, a taller rounded shape for a trigger and a pill for Start and Select. They show
+ * only while the root carries data-input="gamepad", which also hides the keyboard hints.
+ */
+.pad-glyph,
+.pad-glyphs,
+.pad-only {
+  display: none;
+}
+
+:root[data-input='gamepad'] .pad-glyphs {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 4px;
+  vertical-align: middle;
+}
+
+:root[data-input='gamepad'] .pad-glyph {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  color: var(--text-secondary);
+}
+
+:root[data-input='gamepad'] li.pad-only {
+  display: list-item;
+}
+
+:root[data-input='gamepad'] .key-hint,
+:root[data-input='gamepad'] .powerup-key {
+  display: none;
+}
+
+.pad-face {
+  --pad-dot-off: color-mix(in srgb, currentColor 30%, transparent);
+  --pad-top: var(--pad-dot-off);
+  --pad-right: var(--pad-dot-off);
+  --pad-bottom: var(--pad-dot-off);
+  --pad-left: var(--pad-dot-off);
+  width: 1.35em;
+  height: 1.35em;
+  background:
+    radial-gradient(circle at 50% 16%, var(--pad-top) 0 21%, transparent 23%),
+    radial-gradient(circle at 84% 50%, var(--pad-right) 0 21%, transparent 23%),
+    radial-gradient(circle at 50% 84%, var(--pad-bottom) 0 21%, transparent 23%),
+    radial-gradient(circle at 16% 50%, var(--pad-left) 0 21%, transparent 23%);
+}
+
+.pad-face[data-pos='top'] {
+  --pad-top: currentColor;
+}
+
+.pad-face[data-pos='right'] {
+  --pad-right: currentColor;
+}
+
+.pad-face[data-pos='bottom'] {
+  --pad-bottom: currentColor;
+}
+
+.pad-face[data-pos='left'] {
+  --pad-left: currentColor;
+}
+
+.pad-bumper,
+.pad-trigger,
+.pad-pill {
+  border: 1px solid currentColor;
+  font-size: 0.62rem;
+  font-weight: 700;
+  line-height: 1;
+  padding: 2px 6px;
+}
+
+.pad-bumper {
+  border-radius: 3px;
+  min-width: 2.2em;
+}
+
+.pad-trigger {
+  border-radius: 8px 8px 4px 4px;
+  padding: 4px 6px;
+  min-width: 2.2em;
+}
+
+.pad-pill {
+  border-radius: 999px;
+  padding: 2px 8px;
+}
+
+/* On the launcher buttons the glyph sits in a corner so the label layout never changes. */
+.swap-floating-btn,
+.polarity-floating-btn {
+  position: relative;
+}
+
+.swap-floating-btn > .pad-glyph,
+.polarity-floating-btn > .pad-glyph {
+  position: absolute;
+  top: 3px;
+  right: 4px;
+  font-size: 0.7rem;
+  pointer-events: none;
+}
+
+.pad-focus {
+  outline: 3px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: max(24px, env(safe-area-inset-bottom));
+  transform: translateX(-50%);
+  z-index: 120;
+  max-width: calc(100vw - 32px);
+  padding: 8px 16px;
+  background: var(--bg-panel);
+  color: var(--text-main);
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  font-size: var(--caption-font-size);
+  text-align: center;
+  pointer-events: none;
+}
+
+.settings-controller {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+/* The Settings sections: a rule and an even gap between groups, the heading centred above its controls. */
+.settings-group {
+  --settings-group-gap: 12px;
+  width: 100%;
+  margin-top: var(--settings-group-gap);
+  padding-top: var(--settings-group-gap);
+  border-top: 1px solid var(--border-subtle);
+}
+
+.settings-group:first-of-type {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: 0;
+}
+
+.settings-group > .stats-section-title {
+  margin: 0;
+  text-align: center;
+}
+
+.settings-group .pause-settings-row {
+  margin-bottom: 0;
+}
+
+.settings-group .install-hint {
+  margin: 0;
+}
+
+@media (forced-colors: active) {
+  .settings-group {
+    border-top-color: CanvasText;
+  }
+}
+
+.settings-controller-field {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: var(--touch-target);
+  font-size: var(--caption-font-size);
+  color: var(--text-secondary);
+}
+
+.settings-controller-field input[type='checkbox'] {
+  width: 20px;
+  height: 20px;
+  accent-color: var(--accent-blue);
+}
+
+.settings-controller-select {
+  width: auto;
+  min-width: 120px;
+}
+
+.versus-setup-option {
+  justify-content: center;
+}
+
+/* Rhythm calibration: the ring is sized at its widest and scaled down by the script. */
+.calibrate-stage {
+  --calibrate-stage-size: 160px;
+  --calibrate-core-size: 94px;
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: var(--calibrate-stage-size);
+  height: var(--calibrate-stage-size);
+  margin: 12px auto;
+}
+
+.calibrate-core {
+  width: var(--calibrate-core-size);
+  height: var(--calibrate-core-size);
+  border-radius: 50%;
+  background: var(--surface-raised);
+  border: 2px solid var(--accent-blue);
+}
+
+.calibrate-ring {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 2px dashed var(--accent-blue);
+  transform-origin: center;
+  pointer-events: none;
+}
+
+.calibrate-ring[data-window='true'] {
+  border-style: solid;
+  border-width: 5px;
+}
+
+.calibrate-ring.is-idle {
+  opacity: 0.35;
+  transform: scale(1);
+}
+
+:root.high-contrast .calibrate-ring,
+:root.high-contrast .calibrate-core {
+  border-color: var(--text-bright);
+}
+
+.calibrate-tap {
+  display: block;
+  width: 100%;
+  min-height: calc(var(--touch-target) * 1.4);
+  touch-action: manipulation;
+}
+
+@media (forced-colors: active) {
+  .calibrate-ring,
+  .calibrate-core {
+    border-color: CanvasText;
+  }
+}
+
+@media (forced-colors: active) {
+  .pad-face {
+    forced-color-adjust: none;
+    --pad-dot-off: GrayText;
+    color: CanvasText;
+  }
+  .pad-face[data-pos='top'],
+  .pad-face[data-pos='right'],
+  .pad-face[data-pos='bottom'],
+  .pad-face[data-pos='left'] {
+    --pad-top: GrayText;
+    --pad-right: GrayText;
+    --pad-bottom: GrayText;
+    --pad-left: GrayText;
+  }
+  .pad-face[data-pos='top'] {
+    --pad-top: CanvasText;
+  }
+  .pad-face[data-pos='right'] {
+    --pad-right: CanvasText;
+  }
+  .pad-face[data-pos='bottom'] {
+    --pad-bottom: CanvasText;
+  }
+  .pad-face[data-pos='left'] {
+    --pad-left: CanvasText;
+  }
+  .pad-focus {
+    outline: 3px solid Highlight;
+    outline-offset: 2px;
+  }
+  .toast {
+    border-color: CanvasText;
+  }
+}
