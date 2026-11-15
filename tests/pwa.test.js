@@ -170,3 +170,15 @@ test('Content-Security-Policy does not allow inline styles', () => {
   assert.ok(styleSrc, 'style-src directive is present');
   assert.ok(!styleSrc.includes('unsafe-inline'));
 });
+
+test('Manifest icon paths and drawer brand mark exist on disk', () => {
+  const manifest = JSON.parse(readFileSync(join(REPO_ROOT, 'manifest.webmanifest'), 'utf8'));
+  assert.ok(Array.isArray(manifest.icons) && manifest.icons.length > 0);
+  for (const icon of manifest.icons) {
+    assert.ok(existsSync(join(REPO_ROOT, icon.src)), `missing manifest icon: ${icon.src}`);
+  }
+  const html = readFileSync(join(REPO_ROOT, 'index.html'), 'utf8');
+  assert.match(html, /class="brand-mark"/);
+  assert.ok(existsSync(join(REPO_ROOT, 'icons/logo-mark.svg')));
+  assert.ok(existsSync(join(REPO_ROOT, 'icons/logo-banner.svg')));
+});
