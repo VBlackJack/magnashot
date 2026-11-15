@@ -570,6 +570,17 @@
   text-align: left;
 }
 
+.play-hub-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.play-hub-header .modal-title {
+  margin: 0;
+}
+
 .play-hub-layout {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
@@ -607,6 +618,10 @@
   grid-template-columns: repeat(var(--play-hub-columns), minmax(0, 1fr));
   gap: 6px;
   align-items: stretch;
+}
+
+.play-hub-arcade .play-hub-grid {
+  align-items: start;
 }
 
 .play-hub-subhead {
@@ -678,10 +693,11 @@
   position: relative;
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
-  align-content: center;
+  align-content: start;
+  gap: 2px 0;
   min-width: 0;
   min-height: var(--touch-target);
-  padding: 6px 10px;
+  padding: 8px 10px;
   overflow-wrap: anywhere;
   white-space: normal;
   transition: transform 0.12s ease, border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
@@ -711,11 +727,10 @@
 }
 
 #modal-play .arcade-mode-card .mode-mastery-meter {
-  position: absolute;
-  left: 8px;
-  right: 8px;
-  bottom: 2px;
-  height: 2px;
+  grid-column: 2;
+  width: 100%;
+  height: 4px;
+  margin-top: 4px;
   border-radius: 999px;
   background: var(--border-subtle);
   overflow: hidden;
@@ -746,7 +761,7 @@
 
 #modal-play .arcade-mode-card > .arcade-card-icon {
   grid-column: 1;
-  grid-row: 1 / span 3;
+  grid-row: 1 / span 4;
   align-self: center;
   margin-inline-end: 8px;
   font-size: 1.1rem;
