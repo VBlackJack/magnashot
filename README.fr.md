@@ -160,7 +160,7 @@ Chaque joueur choisit son périphérique dans le salon, et appuyer sur une touch
 ## Pulse : musique et Résonance
 
 - **Musique** : une partition procédurale originale, synthétisée dans le navigateur, avec son propre tempo, sa tonalité et sa suite d'accords pour chacun des seize modes (Bassin de Fusion à 88 BPM jusqu'à Blitz à 132). Elle ne joue que pendant une partie en cours : ouvrir un menu, mettre en pause, perdre ou gagner la fait s'estomper, et aucune musique ne joue dans les menus. Elle suit la pression sur le plateau : un nappage et une basse au repos, puis un arpège, des charleys plus chargés et un filtre qui s'ouvre quand la jauge d'affaissement se remplit, que l'amas approche de la ligne de danger ou que des charges se rapprochent de votre plateau. Elle n'utilise jamais les flux aléatoires d'une partie. La musique démarre après votre premier toucher ou appui sur une touche (les navigateurs refusent le son avant).
-- **Réglages** : le bouton **Son** coupe toujours tout. **Musique** active ou coupe la partition (les effets continuent) et **Volume de la musique** passe en boucle par 20, 40, 60, 80 et 100 pour cent (le bouton Musique seul coupe la partition). Tout est conservé localement. Les Réglages sont regroupés en quatre sections : **Audio**, **Jeu**, **Accessibilité** et **Manette**.
+- **Réglages** : le bouton **Son** coupe toujours tout. **Musique** active ou coupe la partition (les effets continuent), **Volume de la musique** passe en boucle par 20, 40, 60, 80 et 100 pour cent (le bouton Musique seul coupe la partition) et **Aperçu musical** joue un court extrait en direct dans les Réglages même lorsque la partie est en pause. Tout est conservé localement. Les Réglages sont regroupés en quatre sections : **Audio**, **Jeu**, **Accessibilité** et **Manette**.
 - **Résonance** : un tir lâché à 5 images du temps (à peu près un douzième de seconde, jamais plus de 12 pour cent du temps) est **Résonant**. Un anneau de temps autour du lanceur se resserre sur lui à chaque temps ; fenêtre ouverte, l'anneau devient plein et épais, en dehors il est fin et en pointillés, si bien que le repère ne dépend jamais de la couleur seule. Un tir Résonant fait flasher le lanceur, affiche "Résonance !" et joue un court arpège.
   - **Déblocage** : la Résonance se débloque après le niveau 5 de la campagne, dans tous les modes solo où la Surcharge s'applique. Un indice l'explique la première fois qu'elle s'applique, et le Codex gagne une entrée **Résonance**. Les plateaux du Duel de polarité l'ont toujours. Les modes **Puriste**, **Puzzle**, **Grille Hex** et **Bassin de Fusion** n'en ont pas. La musique joue dès le début dans tous les cas.
   - **Modes solo** : si le tour d'un tir Résonant fait au moins une combinaison ou fait tomber au moins une sphère, toute la Surcharge gagnée ce tour est multipliée par 1,5. Un tir à vide ne rapporte rien de plus.
@@ -176,7 +176,7 @@ Le code suit une architecture en modules ES sans dépendance, avec une séparati
 
 ```text
 ├── configs/                  # Données externalisées : jeu, physique, sphères, obstacles, audio, modes, niveaux, campagne et Mode Flux
-├── icons/                    # Logo (emblème et bannière SVG) et icônes PWA (SVG, SVG maskable, PNG 192 px et 512 px)
+├── icons/                    # Logo (emblème et bannière SVG), og-card.png et icônes PWA (SVG, SVG maskable, PNG 192 px et 512 px)
 ├── locales/                  # Dictionnaires de traduction (fr.json, en.json)
 ├── scripts/
 │   ├── calibrate-campaign.mjs# Outil en ligne de commande de calibration hors ligne de la campagne
@@ -280,7 +280,7 @@ Le code suit une architecture en modules ES sans dépendance, avec une séparati
 │       ├── UISettingsControls.js # Module de UIManager : commandes des réglages, Partager et compte à rebours du Défi du jour
 │       ├── UIStats.js        # Module de UIManager : fenêtre Mes statistiques (vue d'ensemble, historique du Défi du jour, copie)
 │       └── WorkshopView.js   # Améliorations, munitions spéciales en manche et barres de progression des succès
-├── styles/main.css           # Mise en page adaptative et jetons de design
+├── styles/                   # Feuilles CSS modulaires : jetons/HUD (main.css), dialogues (modals.css), responsive.css, Duel (versus.css)
 ├── eslint.config.js          # Configuration plate ESLint 10 avec garde-fous de complexité et de longueur de fonction
 ├── index.html                # Squelette de l'application et bandeau d'erreur de démarrage statique
 ├── manifest.webmanifest      # Manifeste PWA
