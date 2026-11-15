@@ -30,7 +30,7 @@ import {
   pickMostLeftLevels,
   buildPlayerStatsText,
   splitPlayTime
-} from '../src/game/PlayerStats.js';
+} from '../src/core/PlayerStats.js';
 
 const loadJson = (p) => JSON.parse(fs.readFileSync(p, 'utf8'));
 const gameConfig = loadJson('./configs/game.json');

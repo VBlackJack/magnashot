@@ -19,7 +19,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { configRegistry } from '../src/core/ConfigRegistry.js';
 import { StorageManager } from '../src/core/StorageManager.js';
-import { createShotTimeline, appendTimelineSample, markTimelineComplete } from '../src/game/ShotTimeline.js';
+import { createShotTimeline, appendTimelineSample, markTimelineComplete } from '../src/core/ShotTimeline.js';
 
 const loadJson = (p) => JSON.parse(fs.readFileSync(p, 'utf8'));
 const gameConfig = loadJson('./configs/game.json');

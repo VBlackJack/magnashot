@@ -16,7 +16,7 @@
 
 import { CLUSTER_MODIFIERS, GAME_MODES, GAME_STATES, SPECIAL_TYPES_ORDER, WAVE_TYPES } from '../core/Constants.js';
 import { Ball } from '../entities/Ball.js';
-import { normalizeShotTimeline } from './ShotTimeline.js';
+import { normalizeShotTimeline } from '../core/ShotTimeline.js';
 import { getSagSpec } from './SagMeter.js';
 import { getOccupiedPlatformIndices } from './EngineTurnResolution.js';
 import { getRegisteredModeBehavior } from './modes/index.js';

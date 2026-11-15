@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-import { GAME_MODES, INPUT_MODES } from '../core/Constants.js';
+import { GAME_MODES, INPUT_MODES, LAUNCHER_POSTURES } from '../core/Constants.js';
 import { FULL_PERCENT } from './WorkshopView.js';
 import { i18n, t, formatNumber } from '../core/I18n.js';
 import { SeededRandom } from '../core/SeededRandom.js';
@@ -634,9 +634,25 @@ export const uiSettingsControlMethods = {
   },
 
   updateAimState(engine) {
-    if (this.elements.cancelAimBanner) {
-      this.elements.cancelAimBanner.classList.toggle('hidden', !engine.isAimCancelled);
+    const banner = this.elements.cancelAimBanner;
+    if (!banner) {
+      return;
     }
+    const posture = engine.getLauncherSpec?.()?.posture;
+    const isDropRail = posture === LAUNCHER_POSTURES.DROP_RAIL;
+    const cssPosture =
+      isDropRail || posture === LAUNCHER_POSTURES.DOWNWARD
+        ? 'top'
+        : posture === LAUNCHER_POSTURES.OMNI_360
+          ? 'center'
+          : 'bottom';
+    const labelKey = isDropRail ? 'hud.launcher.cancel.dropHint' : 'hud.launcher.cancel.hint';
+    setAttributeIfChanged(banner, 'data-posture', cssPosture);
+    if (banner.dataset && banner.dataset.i18n !== labelKey) {
+      banner.dataset.i18n = labelKey;
+    }
+    setTextIfChanged(banner, t(labelKey));
+    banner.classList.toggle('hidden', !engine.isAimCancelled);
   },
 
   updateLanguageButton() {

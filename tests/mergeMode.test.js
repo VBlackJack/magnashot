@@ -38,7 +38,7 @@ import { GameEngine } from '../src/game/GameEngine.js';
 import { mergeBehavior } from '../src/game/modes/MergeBehavior.js';
 import { getMergeEventLocaleId } from '../src/game/modes/MergeEvents.js';
 import { getMergeContractPluralKey } from '../src/game/modes/MergeContracts.js';
-import { resolveModesConfig } from '../src/game/modes/ModeConfig.js';
+import { resolveModesConfig } from '../src/core/ModeConfig.js';
 import { uiHudRefreshMethods } from '../src/ui/UIHudRefresh.js';
 
 const loadJson = (p) => JSON.parse(fs.readFileSync(p, 'utf8'));
@@ -501,25 +501,31 @@ test('Pause shows a Basin tip instead of the anchors and rotors tip', () => {
   assert.equal(campaign.getModeBehavior().getPauseTipKey(), 'modals.pause.instructions.physics');
 });
 
-test('Pause words the keyboard line for the basin and leaves the other hints alone', () => {
+test('Pause words aim, swap, cancel, and keyboard hints for the basin and leaves unrelated keys alone', () => {
   const engine = createEngine();
   engine.startMergeMode();
   const behavior = engine.getModeBehavior();
-  const generic = 'modals.pause.instructions.keyboard';
-  const key = behavior.getInputHintKey(generic);
-  assert.notEqual(key, generic);
-  for (const locale of ['en', 'fr']) {
-    i18n.currentLocale = locale;
-    for (const inputMode of ['pointer', 'touch']) {
-      assert.notEqual(i18n.t(`${key}.${inputMode}`), `${key}.${inputMode}`, `${locale} ${inputMode} wording exists`);
+  for (const generic of [
+    'modals.pause.instructions.aim',
+    'modals.pause.instructions.swap',
+    'modals.pause.instructions.cancel',
+    'modals.pause.instructions.keyboard'
+  ]) {
+    const key = behavior.getInputHintKey(generic);
+    assert.notEqual(key, generic, `${generic} uses a basin-specific wording`);
+    for (const locale of ['en', 'fr']) {
+      i18n.currentLocale = locale;
+      for (const inputMode of ['pointer', 'touch']) {
+        assert.notEqual(i18n.t(`${key}.${inputMode}`), `${key}.${inputMode}`, `${locale} ${key}.${inputMode} exists`);
+      }
     }
   }
   i18n.currentLocale = 'en';
-  assert.equal(behavior.getInputHintKey('modals.pause.instructions.aim'), 'modals.pause.instructions.aim');
+  assert.equal(behavior.getInputHintKey('modals.pause.instructions.physics'), 'modals.pause.instructions.physics');
 
   const campaign = createEngine();
   campaign.mode = GAME_MODES.CAMPAIGN;
-  assert.equal(campaign.getModeBehavior().getInputHintKey(generic), generic);
+  assert.equal(campaign.getModeBehavior().getInputHintKey('modals.pause.instructions.keyboard'), 'modals.pause.instructions.keyboard');
 });
 
 /** Builds the same seeded pile twice, then runs it with and without a polarity flip. */

@@ -57,7 +57,8 @@ import { applyWorldGeometry } from '../src/core/WorldGeometry.js';
 import { StorageManager } from '../src/core/StorageManager.js';
 import { LevelCatalog, LEVEL_FORMATS } from '../src/game/LevelCatalog.js';
 import { t } from '../src/core/I18n.js';
-import { formatAchievementDescription, groupAchievementTiers } from '../src/ui/WorkshopView.js';
+import { buildCodexPane } from '../src/ui/CodexView.js';
+import { formatAchievementDescription, groupAchievementTiers, renderWorkshopContents } from '../src/ui/WorkshopView.js';
 import { syncFluxPerkModal } from '../src/ui/FluxPerkView.js';
 import { parseFluxSeedInput, stripFluxSeedFromUrl } from '../src/game/DailyShare.js';
 
@@ -519,12 +520,197 @@ function cssDeclarations(block) {
 /** Numeric value of a CSS length written in px, e.g. "5px" -> 5. */
 const pxValue = (text) => Number.parseFloat(String(text).trim().replace(/px$/, ''));
 
+/** Minimal DOM node helper for behavioral UI tests running under Node. */
+function makeUiDomNode(tag = 'div', initialClasses = []) {
+  const classes = new Set(initialClasses);
+  const attributes = new Map();
+  const listeners = new Map();
+  const node = {
+    tagName: tag.toUpperCase(),
+    ownText: '',
+    disabled: false,
+    className: initialClasses.join(' '),
+    dataset: {},
+    style: { setProperty: () => {} },
+    children: [],
+    classList: {
+      add: (...names) => names.forEach((n) => classes.add(n)),
+      remove: (...names) => names.forEach((n) => classes.delete(n)),
+      contains: (n) => classes.has(n),
+      toggle: (n, force) => (force === undefined
+        ? (classes.has(n) ? (classes.delete(n), false) : (classes.add(n), true))
+        : (force ? classes.add(n) : classes.delete(n), Boolean(force)))
+    },
+    get textContent() {
+      return this.ownText + this.children.map((c) => (typeof c === 'string' ? c : c.textContent)).join('');
+    },
+    set textContent(value) {
+      this.ownText = String(value);
+      this.children = [];
+    },
+    setAttribute(k, v) {
+      attributes.set(k, String(v));
+    },
+    getAttribute(k) {
+      return attributes.get(k) ?? null;
+    },
+    removeAttribute(k) {
+      attributes.delete(k);
+    },
+    addEventListener(type, fn) {
+      listeners.set(type, fn);
+    },
+    click() {
+      return listeners.get('click')?.();
+    },
+    append(...nodes) {
+      this.children.push(...nodes);
+    },
+    appendChild(child) {
+      this.children.push(child);
+      return child;
+    },
+    replaceChildren(...nodes) {
+      this.ownText = '';
+      this.children = [...nodes];
+    },
+    closest: () => null,
+    focus: () => {},
+    querySelector(selector) {
+      const targetClass = selector.startsWith('.') ? selector.slice(1) : null;
+      const queue = [...this.children];
+      while (queue.length > 0) {
+        const cur = queue.shift();
+        if (!cur || typeof cur === 'string') {
+          continue;
+        }
+        if (targetClass && cur.className.split(/\s+/).includes(targetClass)) {
+          return cur;
+        }
+        queue.push(...(cur.children || []));
+      }
+      return null;
+    }
+  };
+  return node;
+}
+
+function makeRefreshUiHarness(explicitElements = {}, storageOverrides = {}) {
+  const ui = Object.create(UIManager.prototype);
+  ui.gameConfig = gameConfig;
+  ui.ballsConfig = loadJson('./configs/balls.json');
+  ui.announced = [];
+  ui.announce = (msg) => ui.announced.push(msg);
+  ui.prevEngineState = GAME_STATES.PLAYING;
+  ui.storageManager = {
+    getCoins: () => 0,
+    getLevelStats: () => ({}),
+    getEndlessHighScore: () => 0,
+    getBlitzHighScore: () => 0,
+    getDailyHighScore: () => 0,
+    getFluxHighScore: () => 0,
+    hasQuotaExceeded: () => false,
+    getDailyStreak: () => 0,
+    getDailyStreakGrace: () => null,
+    getPuzzleBestStage: () => 1,
+    getPuzzleStageStats: () => ({}),
+    getUnlockedLevel: () => 1,
+    getActiveBallStyle: () => 'classic',
+    getUpgradeLevel: () => 0,
+    getUpgradeCost: () => 100,
+    getTotalStars: () => 0,
+    isBallStyleUnlocked: () => true,
+    getUnlockedAchievements: () => ({}),
+    getAchievementRecords: () => ({}),
+    ...storageOverrides
+  };
+  const baseElements = {
+    modalPause: makeUiDomNode('div', ['hidden']),
+    modalFluxPerk: makeUiDomNode('div', ['hidden']),
+    modalVictory: makeUiDomNode('div', ['hidden']),
+    modalGameOver: makeUiDomNode('div', ['hidden']),
+    appDrawer: makeUiDomNode('div', ['hidden']),
+    overchargeFill: makeUiDomNode('div'),
+    starProgress: makeUiDomNode('div', ['hidden']),
+    starGlyphs: makeUiDomNode('span'),
+    starCount: makeUiDomNode('span'),
+    starNext: makeUiDomNode('span'),
+    modeBanner: makeUiDomNode('button'),
+    swapBtn: makeUiDomNode('button'),
+    shotsLabel: makeUiDomNode('span'),
+    shotsValue: makeUiDomNode('span'),
+    ...explicitElements
+  };
+  ui.elements = new Proxy(baseElements, {
+    get(target, prop) {
+      if (!(prop in target)) {
+        target[prop] = makeUiDomNode('div', ['hidden']);
+      }
+      return target[prop];
+    }
+  });
+  ui.getModeAccess = () => ({});
+  ui.refreshModeLocks = () => {};
+  ui.getAffordableUpgradeCount = () => 0;
+  ui.setLauncherButton = () => {};
+  ui.updateTiltButton = () => {};
+  ui.syncShopAmmoAvailability = () => {};
+  ui.updatePowerupButtons = () => {};
+  ui.updateDiscoveryPulse = () => {};
+  ui.updateHintReplayButton = () => {};
+  ui.updateLevelIntro = () => {};
+  ui.updateAimState = () => {};
+  ui.stopDailyCountdown = () => {};
+  ui.refreshGhostBadge = () => false;
+  ui.isDuelCardOpen = () => false;
+  ui.syncDrawerStats = () => {};
+  ui.syncModalInertState = () => {};
+  ui.closeDrawer = () => {};
+  ui.isRunHeldByUi = () => false;
+  ui.isAnyOverlayModalOpen = () => false;
+  ui.getOverlayModals = () => [];
+  ui.formatLevelName = (lvl) => lvl.name;
+  ui.refreshMergeShakeControls = () => {};
+  ui.updateStarMeter = () => {};
+  ui.renderStarGlyphs = UIManager.prototype.renderStarGlyphs;
+  return ui;
+}
+
 test('the HUD stars are read as a count, not as glyphs', () => {
   const progress = elementMarkup(indexHtml, 'hud-star-progress');
   assert.match(progress, /<span id="hud-star-glyphs"[^>]*aria-hidden="true"/);
   assert.match(progress, /<span id="hud-star-count" class="visually-hidden"><\/span>/);
-  assert.match(uiManagerCode, /starCount:\s*document\.getElementById\('hud-star-count'\)/);
-  assert.match(uiManagerCode, /this\.elements\.starCount,\s*t\('hud\.stats\.score\.starsAria'/);
+  const previousLocale = i18n.currentLocale;
+  const previousDocument = globalThis.document;
+  i18n.dictionaries.set('en', loadJson('./locales/en.json'));
+  i18n.currentLocale = 'en';
+  globalThis.document = { createElement: (tag) => makeUiDomNode(tag) };
+  try {
+    const ui = makeRefreshUiHarness();
+    const campaignEngine = {
+      mode: GAME_MODES.CAMPAIGN,
+      state: GAME_STATES.PLAYING,
+      currentLevelId: 1,
+      score: 2000,
+      overcharge: 0,
+      shotsRemaining: 8,
+      combo: 0,
+      freezeTurnsRemaining: 0,
+      levelCatalog: { summarize: () => ({ id: 1, name: 'Awakening', nameKey: null }) },
+      offersSpecialBalls: () => false,
+      getStarThresholds: () => [1000, 3000, 6000],
+      computeStars: (score) => (score >= 6000 ? 3 : score >= 3000 ? 2 : score >= 1000 ? 1 : 0),
+      getSagState: () => ({ active: false }),
+      getMagnetarView: () => null
+    };
+    ui.engine = campaignEngine;
+    ui.refresh(campaignEngine);
+    assert.equal(ui.elements.starGlyphs.textContent, '★☆☆');
+    assert.equal(ui.elements.starCount.textContent, t('hud.stats.score.starsAria', { stars: '1', maxStars: '3' }));
+  } finally {
+    i18n.currentLocale = previousLocale;
+    globalThis.document = previousDocument;
+  }
   for (const lang of SUPPORTED) {
     const score = loadJson(`./locales/${lang}.json`).hud.stats.score;
     assert.deepEqual(placeholdersOf(score.starsAria), ['maxStars', 'stars']);
@@ -943,11 +1129,90 @@ test('Pause modal exposes the Change mode button, Pause nav button exposes Esc t
   assert.match(pauseModal, /id="btn-levels-pause"[^>]*aria-haspopup="dialog"[^>]*data-i18n="modals\.play\.changeMode"/);
   const pauseNav = elementMarkup(indexHtml, 'btn-pause');
   assert.match(pauseNav, /data-i18n-title="app\.nav\.button\.pauseTooltip"/);
-  assert.match(uiManagerCode, /this\.engine\.applyUpgradePurchase\(upgradeKey\)/);
-  assert.match(uiManagerCode, /modals\.shop\.feedback\.upgradePurchased/);
-  assert.match(uiManagerCode, /modals\.shop\.feedback\.ammoPurchased/);
-  assert.match(uiManagerCode, /modals\.levelSelect\.card\.ariaLocked/);
-  assert.match(uiManagerCode, /modals\.levelSelect\.cardLockedHint/);
+  const previousLocale = i18n.currentLocale;
+  const previousDocument = globalThis.document;
+  i18n.dictionaries.set('en', loadJson('./locales/en.json'));
+  i18n.currentLocale = 'en';
+  globalThis.document = { createElement: (tag) => makeUiDomNode(tag) };
+  try {
+    const appliedUpgrades = [];
+    const lockedHints = [];
+    const upgradeKeys = Object.keys(gameConfig.upgrades);
+    const firstUpgrade = upgradeKeys[0];
+    const specialKey = SPECIAL_TYPES_ORDER[0];
+    const shopGrid = makeUiDomNode('div');
+    const shopAmmoGrid = makeUiDomNode('div');
+    const ui = makeRefreshUiHarness(
+      { shopGrid, shopAmmoGrid, shopStylesGrid: makeUiDomNode('div'), achievementsGrid: makeUiDomNode('div'), shopBalance: makeUiDomNode('div') },
+      {
+        getCoins: () => 50000,
+        getUpgradeLevel: () => 0,
+        purchaseUpgrade: () => true,
+        getUnlockedLevel: () => 1,
+        getLevelStats: () => ({}),
+        isBallStyleUnlocked: () => true,
+        getUnlockedAchievements: () => ({}),
+        getAchievementRecords: () => ({})
+      }
+    );
+    ui.engine = {
+      mode: GAME_MODES.CAMPAIGN,
+      state: GAME_STATES.PLAYING,
+      currentLevelId: 1,
+      levelCatalog: { count: 10, summarize: (id) => ({ id, name: `Level ${id}`, chapter: 1 }) },
+      areUpgradesNeutralised: () => false,
+      specialInventory: { [specialKey]: 0 },
+      offersSpecialBalls: () => true,
+      canBuyUpgrade: () => true,
+      applyUpgradePurchase: (key) => appliedUpgrades.push(key),
+      buySpecialAmmo: (type) => {
+        ui.engine.specialInventory[type] += 1;
+        return true;
+      }
+    };
+    ui.audioManager = { playEffect: () => {} };
+    ui.isRunActive = () => true;
+    ui.rerenderShopKeepingFocus = () => {};
+    ui.refresh = () => {};
+    ui.showLockedLevelHint = (lvl, key) => lockedHints.push({ lvl, key });
+
+    renderWorkshopContents.call(ui);
+    const buyUpgradeBtn = shopGrid.querySelector('.modal-btn');
+    assert.ok(buyUpgradeBtn);
+    buyUpgradeBtn.click();
+    assert.deepEqual(appliedUpgrades, [firstUpgrade]);
+    assert.equal(
+      ui.announced[0],
+      t('modals.shop.feedback.upgradePurchased', {
+        name: t(`modals.shop.upgrades.${firstUpgrade}.name`),
+        level: '1',
+        maxLevel: String(gameConfig.upgrades[firstUpgrade].maxLevel)
+      })
+    );
+
+    const buyAmmoBtn = shopAmmoGrid.querySelector('.ammo-buy-btn');
+    assert.ok(buyAmmoBtn);
+    buyAmmoBtn.click();
+    assert.equal(ui.engine.specialInventory[specialKey], 1);
+    assert.equal(ui.announced.length, 2);
+
+    const lockedTile = ui.createLevelTile(
+      { id: 4, name: 'Locked', isLandmark: false, chapter: 1 },
+      { isUnlocked: false, isCurrent: false, stat: {}, maxStars: 3 }
+    );
+    assert.equal(lockedTile.getAttribute('aria-disabled'), 'true');
+    assert.equal(
+      lockedTile.getAttribute('aria-label'),
+      t('modals.levelSelect.card.ariaLocked', { id: 4, name: 'Locked', previous: 3 })
+    );
+
+    ui.levelsSelectedId = 4;
+    ui.playSelectedLevel();
+    assert.deepEqual(lockedHints, [{ lvl: 3, key: 'modals.levelSelect.cardLockedHint' }]);
+  } finally {
+    i18n.currentLocale = previousLocale;
+    globalThis.document = previousDocument;
+  }
   for (const lang of SUPPORTED) {
     const locale = loadJson(`./locales/${lang}.json`);
     assert.ok(locale.app.nav.button.pauseTooltip);
@@ -1280,16 +1545,55 @@ test('Graphical audit guards: collector labels, floating-text clamping, Antimagn
   assert.match(rendererCode, /gameplay\.feedback\.collector\.slotLabel/, 'drawCollectorBins renders localized slot bonus');
   assert.match(rendererCode, /ctx\.measureText\?\.\(ft\.text\)\?\.width/, 'drawParticles measures floating text width to prevent horizontal clipping');
   assert.match(rendererCode, /if \(cfg\.outerColor\)/, 'drawObstacles renders outerColor and ringColor on Antimagnet');
-  assert.match(
-    uiManagerCode,
-    /const isSwapLocked = engine\.mode === GAME_MODES\.PUZZLE;\s*this\.elements\.swapBtn\.disabled = isSwapLocked;/,
-    'UIManager disables #btn-swap-ball for the whole Puzzle run'
-  );
-  assert.match(
-    uiManagerCode,
-    /const badgeColor = obsSpec\?\.ringColor \|\| obsSpec\?\.borderColor \|\| obsSpec\?\.coreColor \|\| obsSpec\?\.beamColor;/,
-    'CodexView colors obstacle badges from obstacles.json'
-  );
+  const previousLocale = i18n.currentLocale;
+  const previousDocument = globalThis.document;
+  i18n.dictionaries.set('en', loadJson('./locales/en.json'));
+  i18n.currentLocale = 'en';
+  globalThis.document = { createElement: (tag) => makeUiDomNode(tag) };
+  try {
+    const obstaclesConfig = loadJson('./configs/obstacles.json');
+    const codexPane = makeUiDomNode('div');
+    const ui = makeRefreshUiHarness({ codexPane });
+    ui.obstaclesConfig = obstaclesConfig;
+
+    const puzzleEngine = {
+      mode: GAME_MODES.PUZZLE,
+      state: GAME_STATES.PLAYING,
+      currentPuzzleStage: 1,
+      score: 0,
+      overcharge: 0,
+      shotsRemaining: 5,
+      combo: 0,
+      freezeTurnsRemaining: 0,
+      offersSpecialBalls: () => false,
+      getStarThresholds: () => [500, 1000, 1500],
+      computeStars: () => 0,
+      getSagState: () => ({ active: false }),
+      getMagnetarView: () => null
+    };
+    ui.engine = puzzleEngine;
+    ui.refresh(puzzleEngine);
+    assert.equal(ui.elements.swapBtn.disabled, true, 'UIManager disables #btn-swap-ball for the whole Puzzle run');
+
+    const campaignEngine = {
+      ...puzzleEngine,
+      mode: GAME_MODES.CAMPAIGN,
+      currentLevelId: 1,
+      levelCatalog: { summarize: () => ({ id: 1, name: 'Awakening', nameKey: null }) }
+    };
+    ui.engine = campaignEngine;
+    ui.refresh(campaignEngine);
+    assert.equal(ui.elements.swapBtn.disabled, false);
+
+    buildCodexPane.call(ui);
+    const obstacleCards = codexPane.children[3]?.children || [];
+    const expectedObstacleColor = obstaclesConfig.types[Object.keys(obstaclesConfig.types)[0]];
+    assert.ok(obstacleCards.length > 0 && (expectedObstacleColor.ringColor || expectedObstacleColor.borderColor || expectedObstacleColor.coreColor || expectedObstacleColor.beamColor));
+    assert.ok(codexPane.textContent.includes(t('modals.shop.codex.mechanicsTitle')));
+  } finally {
+    i18n.currentLocale = previousLocale;
+    globalThis.document = previousDocument;
+  }
   const forcedBlock = cssBlock(mainCss, '@media (forced-colors: active)');
   for (const selector of ['.overcharge-track', '.star-meter', '.achievement-progress-track', '.codex-card', '.ammo-card']) {
     assert.ok(forcedBlock.includes(selector), `${selector} has an explicit border in forced-colors mode`);
@@ -1303,31 +1607,52 @@ test('Graphical audit guards: collector labels, floating-text clamping, Antimagn
 });
 
 test('UX audit guards: Blitz HUD wave banner, locked Puzzle aria-disabled hint, touch Pause polarity/arsenal instruction, Codex mechanics, and Level Select initial focus', () => {
-  assert.match(
-    uiManagerCode,
-    /t\('hud\.stats\.mode\.blitz',\s*\{\s*wave:\s*formatNumber\(engine\.waveCount\)\s*\}\)/,
-    'Blitz HUD mode banner shows the current wave while the shots box shows the countdown timer'
-  );
-  assert.match(
-    uiManagerCode,
-    /btn\.setAttribute\('aria-disabled',\s*'true'\)/,
-    'Locked Puzzle stage buttons use aria-disabled="true" so keyboard and touch users receive a hint'
-  );
-  assert.match(
-    uiManagerCode,
-    /this\.showLockedLevelHint\(requiredStage,\s*'modals\.levelSelect\.arcade\.puzzleStageLocked'\)/,
-    'Clicking a locked Puzzle stage reveals the polite hint banner'
-  );
-  assert.match(
-    uiManagerCode,
-    /setAttributeIfChanged\(\s*this\.elements\.modeBanner,\s*'aria-label'/,
-    '#hud-mode-banner updates its aria-label with the switchHint action'
-  );
-  assert.match(
-    uiManagerCode,
-    /modals\.shop\.codex\.mechanicsTitle/,
-    'Codex renders the Board & Launcher Mechanics section'
-  );
+  const previousLocale = i18n.currentLocale;
+  const previousDocument = globalThis.document;
+  i18n.dictionaries.set('en', loadJson('./locales/en.json'));
+  i18n.currentLocale = 'en';
+  globalThis.document = { createElement: (tag) => makeUiDomNode(tag) };
+  try {
+    const puzzleStrip = makeUiDomNode('div');
+    const codexPane = makeUiDomNode('div');
+    const lockedHints = [];
+    const ui = makeRefreshUiHarness(
+      { puzzleStagesStrip: puzzleStrip, codexPane },
+      { getPuzzleBestStage: () => 1, getPuzzleStageStats: () => ({}) }
+    );
+    ui.obstaclesConfig = loadJson('./configs/obstacles.json');
+    ui.showLockedLevelHint = (requiredStage, key) => lockedHints.push({ requiredStage, key });
+
+    const blitzEngine = {
+      mode: GAME_MODES.BLITZ,
+      state: GAME_STATES.PLAYING,
+      waveCount: 3,
+      blitzFramesRemaining: gameConfig.blitz.framesPerSecond * 45,
+      score: 0,
+      overcharge: 0,
+      combo: 0,
+      freezeTurnsRemaining: 0,
+      offersSpecialBalls: () => true,
+      getSagState: () => ({ active: false }),
+      getMagnetarView: () => null
+    };
+    ui.engine = blitzEngine;
+    ui.refresh(blitzEngine);
+    assert.equal(ui.elements.modeBanner.textContent, t('hud.stats.mode.blitz', { wave: '3' }));
+    assert.ok(ui.elements.modeBanner.getAttribute('aria-label').includes(t('hud.stats.mode.switchHint')));
+
+    ui.renderPuzzleStagesStrip();
+    const lockedPuzzleBtn = puzzleStrip.children[1];
+    assert.equal(lockedPuzzleBtn.getAttribute('aria-disabled'), 'true');
+    lockedPuzzleBtn.click();
+    assert.deepEqual(lockedHints, [{ requiredStage: 1, key: 'modals.levelSelect.arcade.puzzleStageLocked' }]);
+
+    buildCodexPane.call(ui);
+    assert.ok(codexPane.textContent.includes(t('modals.shop.codex.mechanicsTitle')));
+  } finally {
+    i18n.currentLocale = previousLocale;
+    globalThis.document = previousDocument;
+  }
 
   for (const lang of SUPPORTED) {
     const locale = loadJson(`./locales/${lang}.json`);
@@ -2709,8 +3034,6 @@ test('every achievement id has an English and French name and description, and t
   }
 });
 
-const workshopViewCode = readFileSync('./src/ui/WorkshopView.js', 'utf8');
-
 test('every achievement description takes its goal from {{target}} and holds no other number', () => {
   for (const locale of ['en', 'fr']) {
     const { items } = loadJson(`./locales/${locale}.json`).modals.shop.achievements;
@@ -2724,9 +3047,11 @@ test('every achievement description takes its goal from {{target}} and holds no 
 
 test('achievement descriptions render the configured threshold', () => {
   const previous = i18n.currentLocale;
+  const previousDoc = globalThis.document;
   try {
     i18n.dictionaries.set('en', loadJson('./locales/en.json'));
     i18n.currentLocale = 'en';
+    globalThis.document = { createElement: (tag) => makeUiDomNode(tag) };
     const spec = gameConfig.achievements.comboMasterSilver;
     assert.equal(
       formatAchievementDescription('comboMasterSilver', spec),
@@ -2736,16 +3061,68 @@ test('achievement descriptions render the configured threshold', () => {
       formatAchievementDescription('bossSlayerSilver', gameConfig.achievements.bossSlayerSilver),
       /in a single run/
     );
+    const achievementsGrid = makeUiDomNode('div');
+    const ui = makeRefreshUiHarness({ achievementsGrid, shopGrid: makeUiDomNode('div'), shopBalance: makeUiDomNode('div') });
+    ui.engine = { mode: GAME_MODES.CAMPAIGN, levelCatalog: { count: 1 }, areUpgradesNeutralised: () => false, specialInventory: {} };
+    renderWorkshopContents.call(ui);
+    const families = groupAchievementTiers(Object.entries(gameConfig.achievements));
+    const comboFamily = families.find((f) => f.familyId === 'comboMaster');
+    const comboCard = achievementsGrid.children.find((card) => card.dataset.family === 'comboMaster');
+    assert.equal(
+      comboCard.querySelector('.level-card-desc').textContent,
+      formatAchievementDescription(comboFamily.tiers[0].id, comboFamily.tiers[0].spec)
+    );
   } finally {
     i18n.currentLocale = previous;
+    globalThis.document = previousDoc;
   }
-  assert.match(workshopViewCode, /formatAchievementDescription\(shown\.id, shown\.spec\)/);
 });
 
 test('a locked tier whose record is already past it asks for a new run, and the tier list needs 2+ tiers', () => {
-  assert.match(workshopViewCode, /const isRecordPastTarget = !isComplete && !shown\.spec\.cumulative && current >= target;/);
-  assert.match(workshopViewCode, /t\('modals\.shop\.achievements\.reachAgain'\)/);
-  assert.match(workshopViewCode, /if \(tiers\.length > 1\) \{\s*tierRow = document\.createElement\('div'\);/);
+  const previous = i18n.currentLocale;
+  const previousDoc = globalThis.document;
+  try {
+    i18n.dictionaries.set('en', loadJson('./locales/en.json'));
+    i18n.currentLocale = 'en';
+    globalThis.document = { createElement: (tag) => makeUiDomNode(tag) };
+    const achievementsGrid = makeUiDomNode('div');
+    const ui = makeRefreshUiHarness(
+      { achievementsGrid, shopGrid: makeUiDomNode('div'), shopBalance: makeUiDomNode('div') },
+      {
+        getUnlockedAchievements: () => ({ comboMasterBronze: true, comboMasterSilver: true }),
+        getAchievementRecords: () => ({ maxCombo: gameConfig.achievements.comboMasterGold.threshold + 5 })
+      }
+    );
+    ui.engine = { mode: GAME_MODES.CAMPAIGN, levelCatalog: { count: 1 }, areUpgradesNeutralised: () => false, specialInventory: {} };
+    renderWorkshopContents.call(ui);
+    const soloAchKey = Object.keys(gameConfig.achievements)[0];
+    const uiSolo = makeRefreshUiHarness({ achievementsGrid, shopGrid: makeUiDomNode('div'), shopBalance: makeUiDomNode('div') });
+    uiSolo.gameConfig = { ...gameConfig, achievements: { [soloAchKey]: gameConfig.achievements[soloAchKey] } };
+    uiSolo.engine = { mode: GAME_MODES.CAMPAIGN, levelCatalog: { count: 1 }, areUpgradesNeutralised: () => false, specialInventory: {} };
+    renderWorkshopContents.call(uiSolo);
+    assert.equal(achievementsGrid.children[0].querySelector('.achievement-tiers'), null, 'single-tier family omits tier list');
+
+    const families = groupAchievementTiers(Object.entries(gameConfig.achievements));
+    const comboFamily = families.find((f) => f.familyId === 'comboMaster');
+    const unlockedCombo = Object.fromEntries(comboFamily.tiers.slice(0, -1).map((tier) => [tier.id, true]));
+    const goldCombo = comboFamily.tiers.at(-1);
+    const uiGold = makeRefreshUiHarness(
+      { achievementsGrid, shopGrid: makeUiDomNode('div'), shopBalance: makeUiDomNode('div') },
+      {
+        getUnlockedAchievements: () => unlockedCombo,
+        getAchievementRecords: () => ({ maxCombo: (goldCombo.spec.threshold || 1) + 5 })
+      }
+    );
+    uiGold.engine = { mode: GAME_MODES.CAMPAIGN, levelCatalog: { count: 1 }, areUpgradesNeutralised: () => false, specialInventory: {} };
+    renderWorkshopContents.call(uiGold);
+    const comboCard = achievementsGrid.children.find((card) => card.dataset.family === 'comboMaster');
+    assert.ok(comboCard.querySelector('.achievement-tiers'), 'multi-tier family renders tier list');
+    assert.equal(comboCard.querySelector('.achievement-progress-text').textContent, t('modals.shop.achievements.reachAgain'));
+    assert.equal(comboCard.querySelector('.achievement-progress-fill').style.width, '0%');
+  } finally {
+    i18n.currentLocale = previous;
+    globalThis.document = previousDoc;
+  }
   for (const locale of ['en', 'fr']) {
     assert.ok(loadJson(`./locales/${locale}.json`).modals.shop.achievements.reachAgain);
   }
@@ -2793,6 +3170,7 @@ test('Daily mutator intro banner, completed chapter summary, and collectorMagnet
 
     assert.match(uiManagerCode, /modals\.levelSelect\.chapters\.optionLocked/);
     assert.match(uiManagerCode, /modals\.levelSelect\.chapters\.starsCompleted/);
+    const workshopViewCode = readFileSync('./src/ui/WorkshopView.js', 'utf8');
     assert.match(workshopViewCode, /points:\s*formatNumber\(spec\.pointsBonusPerLevel \|\| 0\)/);
     assert.match(workshopViewCode, /overcharge:\s*formatNumber\(spec\.overchargeBonusPerLevel \|\| 0\)/);
   } finally {
@@ -3305,5 +3683,118 @@ test('i18n.onChange live-refreshes open Play Hub, Workshop/Codex, and Campaign M
     assert.match(onChangeSlice, /modals\.levelSelect\.starsTotal/);
   } finally {
     i18n.currentLocale = previousLocale;
+  }
+});
+
+test('cancel-aim banner maps posture placement and Merge drop wording', () => {
+  const previousLocale = i18n.currentLocale;
+  try {
+    i18n.dictionaries.set('en', loadJson('./locales/en.json'));
+    i18n.dictionaries.set('fr', loadJson('./locales/fr.json'));
+    i18n.currentLocale = 'en';
+
+    const banner = fakeElement('hidden');
+    const attrs = new Map();
+    const classes = new Set(['hidden']);
+    banner.dataset = {};
+    banner.classList = {
+      add: (name) => classes.add(name),
+      remove: (name) => classes.delete(name),
+      contains: (name) => classes.has(name),
+      toggle: (name, force) => (force === undefined ? (classes.has(name) ? (classes.delete(name), false) : (classes.add(name), true)) : force ? (classes.add(name), true) : (classes.delete(name), false))
+    };
+    banner.getAttribute = (name) => attrs.get(name) ?? null;
+    banner.setAttribute = (name, value) => attrs.set(name, String(value));
+    const ui = Object.create(UIManager.prototype);
+    ui.elements = { cancelAimBanner: banner };
+
+    ui.updateAimState({ isAimCancelled: true, getLauncherSpec: () => ({ posture: 'upward' }) });
+    assert.equal(banner.classList.contains('hidden'), false);
+    assert.equal(banner.getAttribute('data-posture'), 'bottom');
+    assert.equal(banner.dataset.i18n, 'hud.launcher.cancel.hint');
+    assert.equal(banner.textContent, t('hud.launcher.cancel.hint'));
+
+    ui.updateAimState({ isAimCancelled: true, getLauncherSpec: () => ({ posture: 'downward' }) });
+    assert.equal(banner.getAttribute('data-posture'), 'top');
+    assert.equal(banner.dataset.i18n, 'hud.launcher.cancel.hint');
+
+    ui.updateAimState({ isAimCancelled: true, getLauncherSpec: () => ({ posture: 'omni360' }) });
+    assert.equal(banner.getAttribute('data-posture'), 'center');
+    assert.equal(banner.dataset.i18n, 'hud.launcher.cancel.hint');
+
+    ui.updateAimState({ isAimCancelled: true, getLauncherSpec: () => ({ posture: 'dropRail' }) });
+    assert.equal(banner.getAttribute('data-posture'), 'top');
+    assert.equal(banner.dataset.i18n, 'hud.launcher.cancel.dropHint');
+    assert.equal(banner.textContent, t('hud.launcher.cancel.dropHint'));
+
+    ui.updateAimState({ isAimCancelled: false, getLauncherSpec: () => ({ posture: 'dropRail' }) });
+    assert.equal(banner.classList.contains('hidden'), true);
+  } finally {
+    i18n.currentLocale = previousLocale;
+  }
+});
+
+test('desktop P, M, and W shortcuts open Pause, Play Hub, and Workshop on QWERTY and AZERTY during single-player play', () => {
+  const prevDoc = globalThis.document;
+  let paused = 0;
+  let playOpened = 0;
+  let shopOpened = 0;
+  let isCelebrating = false;
+  let isPauseTop = false;
+  let anyModalOpen = false;
+  let engineState = 'playing';
+
+  const ui = Object.create(UIManager.prototype);
+  ui.setInputMode = () => {};
+  ui.isDrawerOpen = false;
+  ui.isAnyModalOpen = () => anyModalOpen;
+  ui.isPauseDialogTop = () => isPauseTop;
+  ui.isFluxPerkModalTop = () => false;
+  ui.getSceneController = () => null;
+  ui.openPlayHub = () => {
+    playOpened += 1;
+  };
+  ui.openShopModal = () => {
+    shopOpened += 1;
+  };
+  ui.engine = {
+    get state() {
+      return engineState;
+    },
+    isVictoryCelebrating: () => isCelebrating,
+    togglePause() {
+      paused += 1;
+    }
+  };
+  globalThis.document = { activeElement: null, body: {}, documentElement: {} };
+
+  try {
+    ui.handleKeyDown({ key: 'p', code: 'KeyP', repeat: false, preventDefault() {} });
+    ui.handleKeyDown({ key: 'm', code: 'Semicolon', repeat: false, preventDefault() {} });
+    ui.handleKeyDown({ key: 'w', code: 'KeyZ', repeat: false, preventDefault() {} });
+    assert.equal(paused, 1, 'P pauses');
+    assert.equal(playOpened, 1, 'M opens Play Hub even when physical code is AZERTY Semicolon');
+    assert.equal(shopOpened, 1, 'W opens Workshop even when physical code is AZERTY KeyZ');
+
+    // Held-down repeat does not re-trigger.
+    ui.handleKeyDown({ key: 'w', code: 'KeyZ', repeat: true, preventDefault() {} });
+    assert.equal(shopOpened, 1, 'repeated W is ignored');
+
+    // When Pause is on top, P unpauses cleanly.
+    anyModalOpen = true;
+    isPauseTop = true;
+    engineState = 'paused';
+    ui.handleKeyDown({ key: 'p', code: 'KeyP', repeat: false, preventDefault() {} });
+    assert.equal(paused, 2, 'P toggles Pause back off when Pause dialog is on top');
+
+    // Blocked during victory celebration or modals other than Pause.
+    isPauseTop = false;
+    anyModalOpen = false;
+    engineState = 'playing';
+    isCelebrating = true;
+    ui.handleKeyDown({ key: 'm', code: 'KeyM', repeat: false, preventDefault() {} });
+    assert.equal(playOpened, 1, 'shortcuts stay disabled during victory celebration');
+  } finally {
+    globalThis.document = prevDoc;
   }
 });

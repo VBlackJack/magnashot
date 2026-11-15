@@ -21,7 +21,7 @@ export {
   getRegisteredModeBehavior,
   registerModeBehavior
 } from './ModeBehavior.js';
-export { DEFAULT_MODES_CONFIG, resolveModesConfig } from './ModeConfig.js';
+export { DEFAULT_MODES_CONFIG, resolveModesConfig } from '../../core/ModeConfig.js';
 export { hexGridBehavior } from './HexGridBehavior.js';
 export { orbitalBehavior } from './OrbitalBehavior.js';
 export { pinballBehavior } from './PinballBehavior.js';

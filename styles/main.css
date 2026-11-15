@@ -242,6 +242,7 @@ body {
 }
 
 .brand-title {
+  margin: 0;
   font-size: 1.35rem;
   font-weight: 800;
   letter-spacing: 0.08em;
@@ -985,6 +986,8 @@ body {
   bottom: 44px;
   left: 50%;
   transform: translateX(-50%);
+  width: max-content;
+  max-width: 94%;
   background: var(--danger-deep-alpha-92);
   color: var(--text-danger-soft);
   border: 1px solid var(--accent-danger);
@@ -992,8 +995,21 @@ body {
   padding: 5px 14px;
   font-size: 0.76rem;
   font-weight: 700;
+  text-align: center;
+  line-height: 1.2;
   pointer-events: none;
-  white-space: nowrap;
+  white-space: normal;
+}
+
+.cancel-aim-banner[data-posture='top'] {
+  top: 14px;
+  bottom: auto;
+}
+
+.cancel-aim-banner[data-posture='center'] {
+  top: 50%;
+  bottom: auto;
+  transform: translate(-50%, -50%);
 }
 
 .powerups-panel {
@@ -2515,6 +2531,18 @@ body {
   color: var(--text-muted);
 }
 
+.flux-seed-input[aria-invalid='true'] {
+  border-color: var(--accent-danger);
+}
+
+.flux-seed-error {
+  flex: 1 0 100%;
+  margin: 2px 0 0;
+  font-size: var(--caption-font-size);
+  line-height: var(--caption-line-height);
+  color: var(--text-danger-soft);
+}
+
 .level-format-badge {
   display: inline-block;
   margin-left: 4px;
@@ -2967,8 +2995,11 @@ body {
     --control-row-height: calc(var(--touch-target) + 14px);
     --overcharge-line-height: 4px;
     --overcharge-row-height: 14px;
+    --overcharge-reserve: calc(var(--overcharge-row-height) + var(--stage-column-gap));
+    --powerups-reserve: calc(var(--control-row-height) + var(--stage-column-gap));
     --stage-reserve-y: calc(
-      var(--control-row-height) + var(--overcharge-row-height) + 2 * var(--stage-column-gap) + var(--canvas-border)
+      var(--control-row-height) + var(--overcharge-reserve) + var(--powerups-reserve) + var(--stage-column-gap) +
+        var(--canvas-border)
     );
   }
 
@@ -3049,27 +3080,29 @@ body {
   }
 
   /*
-   * Board, overcharge line and control row share one grid: the wrappers around the
-   * launcher buttons and special balls step aside so all nine buttons (Swap, Polarity and
-   * the seven special balls) sit in one row.
+   * Board, overcharge line, launcher controls and special spheres stack cleanly into
+   * separate rows so every touch button keeps at least 44px width and legible labels.
    */
   .stage-container {
     display: grid;
-    grid-template-columns: repeat(9, minmax(0, 1fr));
-    grid-template-rows: minmax(0, 1fr) auto auto;
-    gap: var(--stage-column-gap) 3px;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr);
+    row-gap: var(--stage-column-gap);
     align-items: stretch;
     justify-items: stretch;
   }
+  .stage-container:has(.overcharge-widget.hidden) {
+    --overcharge-reserve: 0px;
+  }
+  .stage-container:has(.powerups-bar.hidden) {
+    --powerups-reserve: 0px;
+  }
   .stage-column,
-  .launcher-controls-dock,
-  .powerups-panel,
-  .powerups-bar {
+  .powerups-panel {
     display: contents;
   }
   .canvas-area {
-    grid-column: 1 / -1;
-    grid-row: 1;
+    order: 1;
   }
   .canvas-wrapper {
     border-width: 1px 0;
@@ -3077,8 +3110,7 @@ body {
   }
   /* One labelled line: name, gauge, percentage. */
   .overcharge-widget {
-    grid-column: 1 / -1;
-    grid-row: 2;
+    order: 2;
     display: flex;
     flex-direction: row;
     align-items: center;
@@ -3105,37 +3137,33 @@ body {
     flex: 1 1 auto;
     height: var(--overcharge-line-height);
   }
+  .launcher-controls-dock {
+    order: 3;
+    display: flex;
+    justify-content: center;
+    align-items: stretch;
+    gap: 6px;
+    height: auto;
+    padding: 0 max(4px, env(safe-area-inset-right)) 0 max(4px, env(safe-area-inset-left));
+  }
+  .powerups-bar {
+    order: 4;
+    display: grid;
+    grid-template-columns: repeat(7, minmax(var(--touch-target), 1fr));
+    gap: 3px;
+    padding: 0 max(4px, env(safe-area-inset-right)) 0 max(4px, env(safe-area-inset-left));
+  }
   .polarity-floating-btn,
   .swap-floating-btn,
   .powerup-btn {
-    grid-row: 3;
-    min-width: 0;
+    min-width: var(--touch-target);
     min-height: var(--control-row-height);
-    padding: 2px;
+    padding: 2px 3px;
   }
-  #btn-merge-shake {
-    grid-column: span 2;
-  }
-  .polarity-floating-btn {
-    margin-left: max(4px, env(safe-area-inset-left));
-  }
-  .powerup-btn:last-child {
-    margin-right: max(4px, env(safe-area-inset-right));
-  }
-  .stage-container:has(.powerups-bar.hidden) .launcher-controls-dock {
-    grid-column: 1 / -1;
-    grid-row: 3;
-    display: flex;
-    justify-content: center;
-    gap: 8px;
-    padding: 0 max(8px, env(safe-area-inset-left));
-  }
-  .stage-container:has(.powerups-bar.hidden) .polarity-floating-btn,
-  .stage-container:has(.powerups-bar.hidden) .swap-floating-btn {
+  .polarity-floating-btn,
+  .swap-floating-btn {
     flex: 1 1 0;
-    max-width: 140px;
-    margin-left: 0;
-    margin-right: 0;
+    max-width: 180px;
   }
   .powerup-btn {
     flex-direction: column;
@@ -3154,7 +3182,7 @@ body {
     display: block;
     flex: none;
     max-width: 100%;
-    font-size: 0.52rem;
+    font-size: 0.6rem;
     font-weight: 600;
     letter-spacing: -0.02em;
     /* Tall enough for a capital accent (Échanger): overflow hidden would clip it otherwise. */
@@ -3170,8 +3198,6 @@ body {
     flex-direction: column;
     gap: 2px;
   }
-  .polarity-floating-btn,
-  .swap-floating-btn,
   .powerup-btn {
     padding: 2px 1px;
   }
@@ -3477,42 +3503,33 @@ body {
 }
 
 /*
- * Portrait phones keep their single control row over the touch minimum above: the nine
- * buttons share the screen width, so none may ask for 44px of it, and the row keeps its
- * own height, which is taller (room for a caption under each icon).
+ * Portrait phones keep both control rows above the 44px touch minimum: each button keeps
+ * at least 44px on both axes, and the row keeps its taller height for icon captions.
  */
 @media (pointer: coarse) and (max-width: 680px) {
   .polarity-floating-btn,
   .swap-floating-btn,
   .powerup-btn {
-    min-width: 0;
+    min-width: var(--touch-target);
     min-height: var(--control-row-height);
   }
 }
 
 /*
- * Narrow portrait phones (360px wide is common): the control row gives up most of its
- * column gap and its side padding, so the longest captions keep their full width.
+ * Narrow portrait phones (360px wide is common): the two control rows tighten their gaps
+ * and side padding so 44px touch targets and special-sphere captions keep fitting cleanly.
  */
 @media (max-width: 389px) {
-  .stage-container {
-    column-gap: 1px;
+  .powerups-bar {
+    gap: 2px;
+    padding: 0 max(2px, env(safe-area-inset-right)) 0 max(2px, env(safe-area-inset-left));
   }
-  .polarity-floating-btn {
-    margin-left: max(2px, env(safe-area-inset-left));
-  }
-  .powerup-btn:last-child {
-    margin-right: max(2px, env(safe-area-inset-right));
-  }
-  .polarity-floating-btn,
-  .swap-floating-btn,
   .powerup-btn {
     padding-left: 0;
     padding-right: 0;
   }
-  .launcher-caption,
   .powerup-name {
-    font-size: 0.48rem;
+    font-size: 0.56rem;
   }
 }
 

@@ -261,7 +261,8 @@
         }
       },
       "cancel": {
-        "hint": "Relâcher ici pour annuler le tir"
+        "hint": "Relâcher ici pour annuler le tir",
+        "dropHint": "Relâcher ici pour annuler le lâcher"
       },
       "specialEquipped": {
         "hint": "{{icon}} {{name}} : {{desc}} ({{unequip}})",
@@ -1627,9 +1628,17 @@
           "pointer": "Viser et tirer : déplacez la souris, cliquez pour tirer",
           "touch": "Viser et tirer : glissez le doigt sur le plateau, relâchez pour tirer"
         },
+        "mergeAim": {
+          "pointer": "Placer et lâcher : déplacez la souris sur le rail, cliquez pour lâcher",
+          "touch": "Placer et lâcher : glissez sur le bassin, relâchez pour lâcher"
+        },
         "swap": {
           "pointer": "Changer de sphère : clic sur le chargeur ou Espace",
           "touch": "Changer de sphère : touchez le chargeur ou le bouton Échanger"
+        },
+        "mergeSwap": {
+          "pointer": "Changer de sphère : cliquez sur la sphère suivante ou appuyez sur Espace",
+          "touch": "Changer de sphère : touchez la sphère suivante ou le bouton Échanger"
         },
         "cancel": {
           "pointer": "Annuler un tir : relâchez le clic sous le lanceur",
@@ -1648,12 +1657,12 @@
           "touch": "Annuler un lâcher : glissez le doigt au-dessus du rail avant de relâcher"
         },
         "keyboard": {
-          "pointer": "Clavier & Arsenal : Flèches pour affiner la visée (Maj : plus vite), Entrée pour tirer, F (ou 🧲) pour inverser la polarité, 1-7 pour les sphères spéciales",
+          "pointer": "Clavier et raccourcis : Flèches pour affiner la visée (Maj : plus vite), Entrée pour tirer, Espace pour échanger, F (ou 🧲) pour inverser la polarité, 1-7 pour les sphères spéciales, P pour Pause, M pour Jouer, W pour Atelier",
           "touch": "Polarité & Arsenal : touchez 🧲 pour inverser la façon dont les sphères attirent votre tir (il courbe de l'autre côté), ou sélectionnez une sphère spéciale chargée par la Surcharge"
         },
         "physics": "Astuce : Détachez les ancres ou déséquilibrez les rotors pour créer des réactions en chaîne !",
         "mergeKeyboard": {
-          "pointer": "Clavier : Flèches gauche/droite pour déplacer le rail, Entrée pour lâcher, F (ou 🧲) pour rapprocher les calibres identiques, G pour secouer le bassin",
+          "pointer": "Clavier : Flèches gauche/droite pour déplacer le rail, Entrée pour lâcher, F (ou 🧲) pour rapprocher les calibres identiques, G pour secouer le bassin, P pour Pause, M pour Jouer, W pour Atelier",
           "touch": "Polarité & Secousse : touchez 🧲 pour rapprocher les calibres identiques, ou touchez Secousse quand elle est prête"
         },
         "mergeTip": "Astuce : deux calibres identiques fusionnent au rang suivant. Utilisez la Secousse quand elle est prête pour projeter la pile vers le côté le plus vide !",
@@ -2296,7 +2305,14 @@
       "title": "Match en pause",
       "resume": "Reprendre",
       "restart": "Relancer le match",
-      "quit": "Quitter"
+      "quit": "Quitter",
+      "confirm": {
+        "title": "Abandonner le duel en cours ?",
+        "restartMessage": "Relancer en cours de match abandonne le duel actuel et compte comme un abandon.",
+        "quitMessage": "Quitter en cours de match abandonne le duel actuel et compte comme un abandon.",
+        "localRestartMessage": "Relancer en cours de match réinitialise le score du duel local.",
+        "localQuitMessage": "Quitter en cours de match met fin au duel local en cours."
+      }
     },
     "result": {
       "wonTitle": "Match gagné",

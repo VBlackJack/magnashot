@@ -14,7 +14,10 @@
  * limitations under the License.
  */
 
+import { countCampaignLevels } from '../core/ConfigRegistry.js';
 import { generateFluxStage } from './layouts/FluxStageGenerator.js';
+
+export { countCampaignLevels };
 
 /** Separator between the seed prefix, the level number and the seed variant. */
 const LEVEL_SEED_SEPARATOR = '-';
@@ -53,16 +56,6 @@ const BOARD_REQUIREMENTS = Object.freeze({ EVERY_MECHANIC: 'everyMechanic' });
 
 const clamp01 = (value) => Math.min(1, Math.max(0, value));
 const lerp = ([min, max], ratio) => min + (max - min) * ratio;
-
-/**
- * Number of campaign levels: the authored ones, then the generated ones.
- * @param {object} levelsConfig - configs/levels.json.
- * @param {object} campaignConfig - configs/campaign.json.
- * @returns {number}
- */
-export function countCampaignLevels(levelsConfig, campaignConfig) {
-  return levelsConfig.levels.length + campaignConfig.generated.count;
-}
 
 /**
  * Where a generated level sits in the campaign, and how hard it is. Difficulty climbs over

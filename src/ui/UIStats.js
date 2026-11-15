@@ -24,7 +24,7 @@ import {
   pickHardestLevels,
   pickMostLeftLevels,
   splitPlayTime
-} from '../game/PlayerStats.js';
+} from '../core/PlayerStats.js';
 import { MODE_NAME_KEYS, plainModeName, revealLiveRegion, scheduleNextFrame, setTextIfChanged } from './UIHelpers.js';
 
 /** The two tabs of the stats window. */

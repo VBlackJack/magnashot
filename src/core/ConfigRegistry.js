@@ -106,3 +106,13 @@ class ConfigRegistry {
 }
 
 export const configRegistry = new ConfigRegistry();
+
+/**
+ * Number of campaign levels: the authored ones, then the generated ones.
+ * @param {object} levelsConfig - configs/levels.json.
+ * @param {object} campaignConfig - configs/campaign.json.
+ * @returns {number}
+ */
+export function countCampaignLevels(levelsConfig, campaignConfig) {
+  return levelsConfig.levels.length + campaignConfig.generated.count;
+}

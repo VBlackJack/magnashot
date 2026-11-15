@@ -18,12 +18,12 @@ import { configRegistry } from './ConfigRegistry.js';
 import { BALL_STYLES } from './Constants.js';
 import { installMethods } from './installMethods.js';
 import { SeededRandom } from './SeededRandom.js';
-import { countCampaignLevels } from '../game/LevelCatalog.js';
-import { resolveModeAccess, computeNewlyEarned, getNewState, getSeenState } from '../game/ModeUnlocks.js';
-import { sanitizeAlias } from '../game/GhostCodec.js';
-import { normalizeShotTimeline } from '../game/ShotTimeline.js';
-import { normalizePlayerStats, applyPlayerStatsDelta } from '../game/PlayerStats.js';
-import { advanceBountiesState, normalizeBountiesState } from '../game/Bounties.js';
+import { countCampaignLevels } from './ConfigRegistry.js';
+import { resolveModeAccess, computeNewlyEarned, getNewState, getSeenState } from './ModeUnlocks.js';
+import { sanitizeAlias } from './AliasSanitizer.js';
+import { normalizeShotTimeline } from './ShotTimeline.js';
+import { normalizePlayerStats, applyPlayerStatsDelta } from './PlayerStats.js';
+import { advanceBountiesState, normalizeBountiesState } from './BountiesStore.js';
 import { SAVE_MIGRATIONS, CURRENT_SAVE_SCHEMA_VERSION, storageMigrationMethods } from './StorageMigrations.js';
 
 export { SAVE_MIGRATIONS, CURRENT_SAVE_SCHEMA_VERSION };
@@ -1811,7 +1811,7 @@ export class StorageManager {
   }
 
   /**
-   * Adds an additive delta to the stored statistics (see src/game/PlayerStats.js).
+   * Adds an additive delta to the stored statistics (see src/core/PlayerStats.js).
    * @param {object} delta - Additive delta.
    * @param {number} [nowMs] - Time used as `since` the first time stats are written.
    * @returns {object} The stored statistics.

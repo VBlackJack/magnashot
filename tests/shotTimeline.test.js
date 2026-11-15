@@ -22,7 +22,7 @@ import {
   appendTimelineSample,
   markTimelineComplete,
   normalizeShotTimeline
-} from '../src/game/ShotTimeline.js';
+} from '../src/core/ShotTimeline.js';
 
 const cfg = JSON.parse(fs.readFileSync('./configs/game.json', 'utf8')).shotTimeline;
 const SCORE_PER_SHOT = 10;

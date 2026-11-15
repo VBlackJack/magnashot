@@ -267,6 +267,7 @@ export const uiLevelSelectMethods = {
       return;
     }
     revealLiveRegion({ region: hintEl, textElement: hintEl, text, schedule: scheduleNextFrame });
+    hintEl.scrollIntoView?.({ block: 'nearest', inline: 'nearest' });
   },
 
   syncLevelsFilterButton() {

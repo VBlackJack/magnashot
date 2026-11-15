@@ -32,10 +32,40 @@ import {
   scheduleNextFrame,
   setTextIfChanged,
   setAttributeIfChanged,
+  syncFluxSeedValidationError,
   isModeUnlocked,
   describeModeLock,
   WEEKLY_ACCESS_KEY
 } from './UIHelpers.js';
+
+const DEFAULT_CONFIRM_TITLE_KEY = 'modals.confirm.title.main';
+const DEFAULT_CONFIRM_MESSAGE_KEY = 'modals.confirm.message';
+
+function syncConfirmCopy(ui) {
+  const copy = ui.pendingConfirmCopy;
+  setTextIfChanged(ui.elements?.modalConfirmTitle, t(copy?.titleKey || DEFAULT_CONFIRM_TITLE_KEY));
+  setTextIfChanged(ui.elements?.modalConfirmMessage, t(copy?.messageKey || DEFAULT_CONFIRM_MESSAGE_KEY));
+}
+
+function shouldConfirmRunLoss(ui, always) {
+  const engine = ui.engine;
+  const holdsStageProgress =
+    (engine.mode === GAME_MODES.CLASSIC && engine.classicStage > 1) ||
+    (engine.mode === GAME_MODES.FLUX && engine.fluxStage > 1) ||
+    (engine.mode === GAME_MODES.PINBALL && engine.pinballStage > 1) ||
+    (engine.mode === GAME_MODES.SLINGSHOT && engine.slingshotStage > 1) ||
+    (engine.mode === GAME_MODES.MERGE && (engine.mergeBestTier > 1 || engine.waveCount > 1)) ||
+    ((engine.mode === GAME_MODES.CONVOY ||
+      engine.mode === GAME_MODES.HEX_GRID ||
+      engine.mode === GAME_MODES.ORBITAL ||
+      engine.mode === GAME_MODES.BOSS_RUSH ||
+      engine.mode === GAME_MODES.CASCADE ||
+      engine.mode === GAME_MODES.ENDLESS) &&
+      engine.waveCount > 1);
+  const allowsEmptyBoard = Boolean(engine.getModeBehavior?.()?.allowsEmptyBoardSnapshot?.());
+  const runHasBalls = ui.isRunActive() && (engine.physicsWorld.balls.length > 0 || allowsEmptyBoard);
+  return runHasBalls && (always || holdsStageProgress || engine.hasFiredInRound);
+}
 
 /**
  * Gives a button its label and keeps data-i18n in step, so a language switch keeps the
@@ -52,6 +82,37 @@ function setButtonLabelKey(button, labelKey) {
 }
 
 /** Methods installed on UIManager.prototype by UIManager.js. */
+function openConfirmationModal(
+  ui,
+  actionCallback,
+  confirmLabelResolver = null,
+  { pauseEngine = true, titleKey = null, messageKey = null } = {}
+) {
+  if (!ui.elements?.modalConfirm) {
+    actionCallback();
+    return;
+  }
+  ui.pendingConfirmCallback = actionCallback;
+  ui.pendingConfirmLabelResolver = confirmLabelResolver;
+  ui.pendingConfirmCopy = titleKey || messageKey ? { titleKey, messageKey } : null;
+  ui.updateConfirmButtonLabel();
+  // Over another dialog, its opener is where focus returns when the Confirm closes.
+  ui.stackedModalOpener = ui.isAnyModalOpen() ? document.activeElement : null;
+  ui.saveLastFocusedElement();
+  // The run holds still while the player decides, as under the menu dialogs.
+  if (pauseEngine && ui.engine.state === GAME_STATES.PLAYING) {
+    ui.confirmPausedRun = true;
+    ui.engine.state = GAME_STATES.PAUSED;
+  }
+  ui.elements.modalConfirm.classList.remove('hidden');
+  ui.syncModalInertState();
+  if (ui.elements.btnConfirmNo) {
+    ui.elements.btnConfirmNo.focus();
+  }
+}
+
+export { openConfirmationModal };
+
 export const uiModalMethods = {
   /** True when the Flux perk choice is open and is the dialog on top. */
   isFluxPerkModalTop() {
@@ -60,49 +121,15 @@ export const uiModalMethods = {
   },
 
   requestDestructiveAction(actionCallback, confirmLabelResolver = null, { always = false } = {}) {
-    // `always` guards a run that holds progress before the first shot (a restored Flux run between shapes).
-    // Past the first Flux shape the run holds cleared shapes and perks, whether or not a shot was fired.
-    const holdsStageProgress =
-      (this.engine.mode === GAME_MODES.CLASSIC && this.engine.classicStage > 1) ||
-      (this.engine.mode === GAME_MODES.FLUX && this.engine.fluxStage > 1) ||
-      (this.engine.mode === GAME_MODES.PINBALL && this.engine.pinballStage > 1) ||
-      (this.engine.mode === GAME_MODES.SLINGSHOT && this.engine.slingshotStage > 1) ||
-      (this.engine.mode === GAME_MODES.MERGE && (this.engine.mergeBestTier > 1 || this.engine.waveCount > 1)) ||
-      ((this.engine.mode === GAME_MODES.CONVOY ||
-        this.engine.mode === GAME_MODES.HEX_GRID ||
-        this.engine.mode === GAME_MODES.ORBITAL ||
-        this.engine.mode === GAME_MODES.BOSS_RUSH ||
-        this.engine.mode === GAME_MODES.CASCADE ||
-        this.engine.mode === GAME_MODES.ENDLESS) &&
-        this.engine.waveCount > 1);
-    const allowsEmptyBoard = Boolean(this.engine.getModeBehavior?.()?.allowsEmptyBoardSnapshot?.());
-    const runHasBalls = this.isRunActive() && (this.engine.physicsWorld.balls.length > 0 || allowsEmptyBoard);
-    const isMidRound = runHasBalls && (always || holdsStageProgress || this.engine.hasFiredInRound);
-
-    if (!isMidRound || !this.elements.modalConfirm) {
+    if (!shouldConfirmRunLoss(this, always)) {
       actionCallback();
       return;
     }
-
-    this.pendingConfirmCallback = actionCallback;
-    this.pendingConfirmLabelResolver = confirmLabelResolver;
-    this.updateConfirmButtonLabel();
-    // Over another dialog, its opener is where focus returns when the Confirm closes.
-    this.stackedModalOpener = this.isAnyModalOpen() ? document.activeElement : null;
-    this.saveLastFocusedElement();
-    // The run holds still while the player decides, as under the menu dialogs.
-    if (this.engine.state === GAME_STATES.PLAYING) {
-      this.confirmPausedRun = true;
-      this.engine.state = GAME_STATES.PAUSED;
-    }
-    this.elements.modalConfirm.classList.remove('hidden');
-    this.syncModalInertState();
-    if (this.elements.btnConfirmNo) {
-      this.elements.btnConfirmNo.focus();
-    }
+    openConfirmationModal(this, actionCallback, confirmLabelResolver);
   },
 
   updateConfirmButtonLabel() {
+    syncConfirmCopy(this);
     if (!this.elements?.btnConfirmYes) {
       return;
     }
@@ -118,6 +145,7 @@ export const uiModalMethods = {
   dismissConfirm() {
     this.pendingConfirmCallback = null;
     this.pendingConfirmLabelResolver = null;
+    this.pendingConfirmCopy = null;
     this.updateConfirmButtonLabel();
     if (this.confirmPausedRun) {
       this.confirmPausedRun = false;
@@ -236,6 +264,7 @@ export const uiModalMethods = {
       return;
     }
     revealLiveRegion({ region: hintEl, textElement: hintEl, text: lock.hint, schedule: scheduleNextFrame });
+    hintEl.scrollIntoView?.({ block: 'nearest', inline: 'nearest' });
   },
 
   /**
@@ -282,17 +311,22 @@ export const uiModalMethods = {
     const seedConfig = this.engine.fluxConfig?.seed;
     const seed = parseFluxSeedInput(input.value, seedConfig);
     if (!seed) {
+      const errorText = t('modals.levelSelect.fluxSeed.invalidHint', { length: seedConfig?.length });
+      syncFluxSeedValidationError(this.elements, errorText);
       const hintEl = this.elements?.playHubHint;
       if (hintEl) {
         revealLiveRegion({
           region: hintEl,
           textElement: hintEl,
-          text: t('modals.levelSelect.fluxSeed.invalidHint', { length: seedConfig?.length }),
+          text: errorText,
           schedule: scheduleNextFrame
         });
       }
+      this.elements?.fluxSeedError?.scrollIntoView?.({ block: 'nearest', inline: 'nearest' });
+      input.focus?.();
       return;
     }
+    syncFluxSeedValidationError(this.elements);
     this.elements.playHubHint?.classList.add('hidden');
     this.requestDestructiveAction(
       () => {
@@ -546,6 +580,7 @@ export const uiModalMethods = {
     }
     if (modalElement === this.elements.modalPlay) {
       this.elements.playHubHint?.classList.add('hidden');
+      syncFluxSeedValidationError(this.elements);
     }
     if (modalElement === this.elements.modalStats) {
       // Opened over the Daily game over: focus returns to its History button.
@@ -558,7 +593,7 @@ export const uiModalMethods = {
       this.isAnyOverlayModalOpen() ||
       Boolean(this.elements.modalConfirm && !this.elements.modalConfirm.classList.contains('hidden'));
 
-    if (!otherOverlayStillOpen && !this.isDrawerOpen) {
+    if (!otherOverlayStillOpen && !this.isDrawerOpen && !this.versus) {
       if (this.autoPausedByOverlay && this.engine.state === GAME_STATES.PAUSED) {
         this.autoPausedByOverlay = false;
         this.engine.state = GAME_STATES.PLAYING;
@@ -598,9 +633,12 @@ export const uiModalMethods = {
     this.confirmPausedRun = false;
     this.pendingConfirmCallback = null;
     this.pendingConfirmLabelResolver = null;
+    this.pendingConfirmCopy = null;
+    this.updateConfirmButtonLabel?.();
     this.stopDailyCountdown();
     this.elements.levelsChapterHint?.classList.add('hidden');
     this.elements.playHubHint?.classList.add('hidden');
+    syncFluxSeedValidationError(this.elements);
     for (const modal of this.getModalsByPriority()) {
       modal.classList.add('hidden');
     }

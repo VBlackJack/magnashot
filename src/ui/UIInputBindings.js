@@ -24,6 +24,7 @@ import {
   shouldIgnoreRepeatedKey,
   isBrowserShortcut,
   resolveNextCampaignTarget,
+  syncFluxSeedValidationError,
   WEEKLY_ACCESS_KEY
 } from './UIHelpers.js';
 import { CONTINUE_KINDS, PLAY_HUB_DISCLOSURES } from './PlayHubView.js';
@@ -84,6 +85,21 @@ export function handleLevelGridClick(ui, event) {
   }
 }
 
+const GRID_EDGE_OR_PAGE_ACTIONS = Object.freeze({
+  Home: (ui) => selectEdgeLevelTile(ui, true),
+  End: (ui) => selectEdgeLevelTile(ui, false),
+  PageUp: (ui) => ui.stepLevelChapter(-CHAPTER_STEP, { focus: true }),
+  PageDown: (ui) => ui.stepLevelChapter(CHAPTER_STEP, { focus: true })
+});
+
+function selectEdgeLevelTile(ui, isFirst) {
+  const tiles = Array.from(ui.elements.levelsGrid.children).filter((child) => child.dataset?.levelId !== undefined);
+  const edge = isFirst ? tiles[0] : tiles.at(-1);
+  if (edge) {
+    ui.selectLevelTile(Number(edge.dataset.levelId), { focus: true });
+  }
+}
+
 /**
  * Keys on the campaign map grid (A22): arrows move the selection and the focus with it, Home and
  * End jump to the ends, PageUp and PageDown change chapter (focus lands on the new selected tile,
@@ -100,33 +116,20 @@ export function handleLevelGridKeydown(ui, event) {
     ui.moveLevelTileFocus(arrow.dx, arrow.dy, { wrapRows: true })?.focus();
     return;
   }
-  switch (event.key) {
-    case 'Home':
-    case 'End': {
-      event.preventDefault();
-      const tiles = Array.from(ui.elements.levelsGrid.children).filter((child) => child.dataset?.levelId !== undefined);
-      const edge = event.key === 'Home' ? tiles[0] : tiles.at(-1);
-      if (edge) {
-        ui.selectLevelTile(Number(edge.dataset.levelId), { focus: true });
-      }
-      break;
+  const edgeOrPage = GRID_EDGE_OR_PAGE_ACTIONS[event.key];
+  if (edgeOrPage) {
+    event.preventDefault();
+    edgeOrPage(ui);
+    return;
+  }
+  if (event.key === 'Enter' || event.key === 'NumpadEnter') {
+    // Enter plays; swallowing it keeps the button from also firing a click.
+    event.preventDefault();
+    const levelId = Number(tile.dataset.levelId);
+    if (levelId !== ui.levelsSelectedId) {
+      ui.selectLevelTile(levelId);
     }
-    case 'PageUp':
-    case 'PageDown':
-      event.preventDefault();
-      ui.stepLevelChapter(event.key === 'PageUp' ? -CHAPTER_STEP : CHAPTER_STEP, { focus: true });
-      break;
-    case 'Enter':
-    case 'NumpadEnter':
-      // Enter plays; swallowing it keeps the button from also firing a click.
-      event.preventDefault();
-      if (Number(tile.dataset.levelId) !== ui.levelsSelectedId) {
-        ui.selectLevelTile(Number(tile.dataset.levelId));
-      }
-      ui.playSelectedLevel();
-      break;
-    default:
-      break;
+    ui.playSelectedLevel();
   }
 }
 
@@ -141,6 +144,50 @@ function canModeProgressBountyEvent(mode, eventKey) {
     return mode !== GAME_MODES.MERGE && mode !== GAME_MODES.CLASSIC;
   }
   return true;
+}
+
+function activateBountyWithFallback(ui, fallbackAction) {
+  const target = ui.getPlayHubContinueTarget();
+  if (target.kind !== CONTINUE_KINDS.MAP) {
+    ui.activatePlayHubContinue();
+    return;
+  }
+  fallbackAction();
+}
+
+function triggerFreeBountyRun(ui, eventKey) {
+  const isPlayableState = ui.engine.state === GAME_STATES.PLAYING || ui.engine.state === GAME_STATES.PAUSED;
+  if (!ui.isVersusActive?.() && isPlayableState && canModeProgressBountyEvent(ui.engine.mode, eventKey)) {
+    ui.resumePlayHubRun();
+    return;
+  }
+  activateBountyWithFallback(ui, () => ui.elements.btnEndless?.click());
+}
+
+function handleBountyButtonClick(ui, e) {
+  const btn = e.target?.closest?.('.play-bounty-btn');
+  if (!btn || btn.disabled) {
+    return;
+  }
+  const mode = btn.dataset.bountyMode || '';
+  if (!mode) {
+    triggerFreeBountyRun(ui, btn.dataset.bountyEvent || '');
+    return;
+  }
+  if (mode === GAME_MODES.CAMPAIGN) {
+    activateBountyWithFallback(ui, () => {
+      const fallbackLevel = ui.getSuggestedLevelId();
+      ui.requestDestructiveAction(() => {
+        ui.hideAllModals();
+        ui.engine.startCampaignLevel(fallbackLevel);
+      }, () => t('modals.play.campaign.continue', { level: fallbackLevel }));
+    });
+    return;
+  }
+  const cardKey = mode === GAME_MODES.DAILY ? 'btnDaily' : ARCADE_CARD_SPECS[mode]?.card;
+  if (cardKey) {
+    ui.elements[cardKey]?.click();
+  }
 }
 
 /** Play hub: open and close, Campaign card, disclosures, bounties and the two-player entry. */
@@ -166,55 +213,7 @@ function bindPlayHubEvents(ui) {
   els.btnVersusLocalHub?.addEventListener('click', () => {
     ui.openPlayHubVersusLocal();
   });
-  els.playBountiesList?.addEventListener('click', (e) => {
-    const btn = e.target?.closest?.('.play-bounty-btn');
-    if (!btn || btn.disabled) {
-      return;
-    }
-    const mode = btn.dataset.bountyMode || '';
-    const eventKey = btn.dataset.bountyEvent || '';
-    if (!mode) {
-      if (
-        !ui.isVersusActive?.()
-        && (ui.engine.state === GAME_STATES.PLAYING || ui.engine.state === GAME_STATES.PAUSED)
-        && canModeProgressBountyEvent(ui.engine.mode, eventKey)
-      ) {
-        ui.resumePlayHubRun();
-        return;
-      }
-      const target = ui.getPlayHubContinueTarget();
-      if (target.kind !== CONTINUE_KINDS.MAP) {
-        ui.activatePlayHubContinue();
-        return;
-      }
-      els.btnEndless?.click();
-      return;
-    }
-    if (mode === GAME_MODES.CAMPAIGN) {
-      const target = ui.getPlayHubContinueTarget();
-      if (target.kind !== CONTINUE_KINDS.MAP) {
-        ui.activatePlayHubContinue();
-        return;
-      }
-      const fallbackLevel = ui.getSuggestedLevelId();
-      ui.requestDestructiveAction(
-        () => {
-          ui.hideAllModals();
-          ui.engine.startCampaignLevel(fallbackLevel);
-        },
-        () => t('modals.play.campaign.continue', { level: fallbackLevel })
-      );
-      return;
-    }
-    if (mode === GAME_MODES.DAILY) {
-      els.btnDaily?.click();
-      return;
-    }
-    const cardKey = ARCADE_CARD_SPECS[mode]?.card;
-    if (cardKey && els[cardKey]) {
-      els[cardKey].click();
-    }
-  });
+  els.playBountiesList?.addEventListener('click', (e) => handleBountyButtonClick(ui, e));
 }
 
 /** Campaign map: chapter switcher, jump, filter, the tile grid (one delegated listener) and the detail Play. */
@@ -252,6 +251,516 @@ function bindCampaignMapEvents(ui) {
   els.btnCloseLevels.addEventListener('click', () => {
     ui.closeOverlayModal(els.modalLevels);
   });
+}
+
+const MODE_CARD_BINDINGS = Object.freeze([
+  ['btnEndless', GAME_MODES.ENDLESS, GAME_MODES.ENDLESS, 'app.nav.button.endless', (ui) => ui.engine.startEndlessMode()],
+  ['btnDaily', GAME_MODES.DAILY, null, 'app.nav.button.daily', (ui) => ui.engine.startDailyChallenge()],
+  ['btnFlux', GAME_MODES.FLUX, GAME_MODES.FLUX, 'app.nav.button.flux', (ui) => ui.engine.startFluxRun()],
+  ['btnWeekly', WEEKLY_ACCESS_KEY, WEEKLY_ACCESS_KEY, 'app.nav.button.weekly', (ui) => ui.startWeeklyFluxRun()],
+  ['btnModePuzzle', GAME_MODES.PUZZLE, GAME_MODES.PUZZLE, 'modals.levelSelect.arcade.puzzle', (ui) => ui.engine.startPuzzleMode(ui.getSuggestedPuzzleStage())],
+  ['btnModeBlitz', GAME_MODES.BLITZ, GAME_MODES.BLITZ, 'modals.levelSelect.arcade.blitz', (ui) => ui.engine.startBlitzMode()],
+  ['btnModeBossRush', GAME_MODES.BOSS_RUSH, GAME_MODES.BOSS_RUSH, 'modals.levelSelect.arcade.bossRush', (ui) => ui.engine.startBossRushMode()],
+  ['btnModeCascade', GAME_MODES.CASCADE, GAME_MODES.CASCADE, 'modals.levelSelect.arcade.cascade', (ui) => ui.engine.startCascadeMode()],
+  ['btnModeHexGrid', GAME_MODES.HEX_GRID, GAME_MODES.HEX_GRID, 'modals.levelSelect.arcade.hexGrid', (ui) => ui.engine.startHexGridMode()],
+  ['btnModePinball', GAME_MODES.PINBALL, GAME_MODES.PINBALL, 'modals.levelSelect.arcade.pinball', (ui) => ui.engine.startPinballMode()],
+  ['btnModeOrbital', GAME_MODES.ORBITAL, GAME_MODES.ORBITAL, 'modals.levelSelect.arcade.orbital', (ui) => ui.engine.startOrbitalMode()],
+  ['btnModeConvoy', GAME_MODES.CONVOY, GAME_MODES.CONVOY, 'modals.levelSelect.arcade.convoy', (ui) => ui.engine.startConvoyMode()],
+  ['btnModeMerge', GAME_MODES.MERGE, GAME_MODES.MERGE, 'modals.levelSelect.arcade.merge', (ui) => ui.engine.startMergeMode()],
+  ['btnModeSlingshot', GAME_MODES.SLINGSHOT, GAME_MODES.SLINGSHOT, 'modals.levelSelect.arcade.slingshot', (ui) => ui.engine.startSlingshotMode()]
+]);
+
+const OVERLAY_DISMISS_KEYS = ['modalPlay', 'modalLevels', 'modalShop', 'modalSettings', 'modalStats'];
+
+/** @this {import('./UIManager.js').UIManager} */
+function bindAllModeCards() {
+  bindModeCard(this, this.elements.btnModeClassic, {
+    modeKey: GAME_MODES.CLASSIC,
+    accessKey: GAME_MODES.CLASSIC,
+    labelKey: 'modals.levelSelect.arcade.classic',
+    start: () => this.engine.startClassicMode()
+  });
+  for (const [elementKey, modeKey, accessKey, labelKey, start] of MODE_CARD_BINDINGS) {
+    bindModeCard(this, this.elements[elementKey], {
+      modeKey,
+      accessKey,
+      labelKey,
+      start: () => start(this)
+    });
+  }
+}
+
+function openSettingsWithRefresh(ui) {
+  ui.syncInstallControls();
+  ui.progressBackup?.refresh();
+  ui.openOverlayModal(ui.elements.modalSettings, ui.elements.btnCloseSettings);
+}
+
+function bindPreferenceToggles(ui) {
+  const els = ui.elements;
+  els.btnSound.addEventListener('click', () => {
+    const nextMuted = !ui.audioManager.isMuted();
+    ui.audioManager.setMuted(nextMuted);
+    ui.storageManager.setMuted(nextMuted);
+    ui.updateSoundButton();
+  });
+  els.btnContrast?.addEventListener('click', () => {
+    const nextContrast = !ui.storageManager.getHighContrast();
+    ui.storageManager.setHighContrast(nextContrast);
+    ui.renderer?.setHighContrast(nextContrast);
+    ui.updateContrastButton();
+  });
+  els.btnPatterns?.addEventListener('click', () => {
+    const nextPatterns = !ui.storageManager.getColorPatterns();
+    ui.storageManager.setColorPatterns(nextPatterns);
+    ui.renderer?.setColorPatterns(nextPatterns);
+    ui.updatePatternsButton();
+  });
+  els.btnMotion?.addEventListener('click', () => {
+    const nextReduced = !ui.storageManager.getReducedMotion();
+    ui.storageManager.setReducedMotion(nextReduced);
+    if (ui.engine && typeof ui.engine.setReducedMotion === 'function') {
+      ui.engine.setReducedMotion(nextReduced);
+    }
+    if (ui.audioManager && typeof ui.audioManager.setReducedMotion === 'function') {
+      ui.audioManager.setReducedMotion(nextReduced);
+    }
+    ui.updateMotionButton();
+  });
+  els.btnAnimSpeed?.addEventListener('click', () => {
+    ui.cycleAnimationSpeed();
+  });
+  els.btnLang.addEventListener('click', () => {
+    const supported = ui.gameConfig.defaults.supportedLanguages;
+    const current = i18n.getLocale();
+    const nextLang = supported[(supported.indexOf(current) + 1) % supported.length];
+    i18n.setLocale(nextLang);
+    ui.storageManager.setLanguage(nextLang);
+  });
+}
+
+function bindHeaderAndShellControls(ui) {
+  const els = ui.elements;
+  els.btnStats?.addEventListener('click', () => ui.openStatsModal(STATS_TABS.OVERVIEW));
+  els.btnDailyHistoryGameOver?.addEventListener('click', () => ui.openStatsModal(STATS_TABS.DAILY));
+  ui.bindStatsEvents();
+
+  els.btnShop.addEventListener('click', () => ui.openShopModal());
+  els.btnSettings?.addEventListener('click', () => openSettingsWithRefresh(ui));
+  els.quotaBadge?.addEventListener('click', () => openSettingsWithRefresh(ui));
+  els.btnCloseSettings?.addEventListener('click', () => ui.closeOverlayModal(els.modalSettings));
+
+  els.btnRestart.addEventListener('click', () => {
+    ui.requestDestructiveAction(
+      () => {
+        ui.hideAllModals();
+        ui.engine.restartCurrent();
+      },
+      () => t('app.nav.button.restart')
+    );
+  });
+
+  els.btnPause.addEventListener('click', () => {
+    // From the menu, the run is held by the menu pause: turn it into a regular pause so the Pause dialog opens.
+    if (ui.autoPausedByOverlay && ui.engine.state === GAME_STATES.PAUSED) {
+      ui.autoPausedByOverlay = false;
+      ui.engine.state = GAME_STATES.PLAYING;
+    }
+    ui.engine.togglePause();
+  });
+
+  bindPreferenceToggles(ui);
+  document.addEventListener('visibilitychange', () => {
+    ui.handleVisibilityChange();
+    ui.syncMergeShakeGesture?.();
+  });
+}
+
+function bindLauncherAndHintControls(ui) {
+  const els = ui.elements;
+  els.swapBtn.addEventListener('click', () => ui.engine.swapLauncherBalls());
+  els.polarityBtn?.addEventListener('click', () => ui.engine.togglePolarityFlip());
+  els.mergeShakeBtn?.addEventListener('click', () => ui.tryMergeShake());
+  els.hintReplayBtn?.addEventListener('click', () => ui.engine.replayLevelHints?.());
+  els.btnDismissLevelIntro?.addEventListener('click', () => ui.engine.dismissLevelIntro?.());
+  els.btnResetHints?.addEventListener('click', () => {
+    ui.engine.resetDiscoveries();
+    ui.hintsResetConfirmed = true;
+    ui.updateResetHintsFeedback();
+    ui.announce(t('hud.announcer.hints.reset'));
+  });
+  els.btnDismissTutorial?.addEventListener('click', () => ui.engine.dismissDiscovery());
+  els.btnFluxSeedGo?.addEventListener('click', () => ui.submitFluxSeedInput());
+  els.inputFluxSeed?.addEventListener('input', () => {
+    syncFluxSeedValidationError(els);
+  });
+  els.inputFluxSeed?.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      e.stopPropagation();
+      ui.submitFluxSeedInput();
+    }
+  });
+  els.modeBanner?.addEventListener('click', () => ui.openPlayHub());
+  els.modeBanner?.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      ui.openPlayHub();
+    }
+  });
+}
+
+function bindShopTabs(ui) {
+  const shopTabs = ui.getShopTabs();
+  for (let i = 0; i < shopTabs.length; i++) {
+    const { name, el } = shopTabs[i];
+    el.addEventListener('click', () => ui.switchShopTab(name));
+    el.addEventListener('keydown', (e) => {
+      let nextIdx = -1;
+      if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
+        const dir = e.key === 'ArrowRight' ? 1 : -1;
+        nextIdx = (i + dir + shopTabs.length) % shopTabs.length;
+      } else if (e.key === 'Home') {
+        nextIdx = 0;
+      } else if (e.key === 'End') {
+        nextIdx = shopTabs.length - 1;
+      }
+      if (nextIdx >= 0) {
+        e.preventDefault();
+        ui.switchShopTab(shopTabs[nextIdx].name);
+        shopTabs[nextIdx].el.focus();
+      }
+    });
+  }
+}
+
+function bindBackdropDismiss(modalEl, onDismiss) {
+  modalEl?.addEventListener('click', (e) => {
+    if (e.target === modalEl) {
+      onDismiss();
+    }
+  });
+}
+
+function bindModalAndConfirmControls(ui) {
+  const els = ui.elements;
+  if (els.btnConfirmYes && els.btnConfirmNo) {
+    els.btnConfirmYes.addEventListener('click', () => {
+      const cb = ui.pendingConfirmCallback;
+      ui.pendingConfirmCallback = null;
+      ui.pendingConfirmLabelResolver = null;
+      ui.pendingConfirmCopy = null;
+      ui.confirmPausedRun = false;
+      ui.updateConfirmButtonLabel?.();
+      els.modalConfirm.classList.add('hidden');
+      if (cb) {
+        cb();
+      }
+    });
+    els.btnConfirmNo.addEventListener('click', () => ui.dismissConfirm());
+  }
+
+  for (const key of OVERLAY_DISMISS_KEYS) {
+    bindBackdropDismiss(els[key], () => ui.closeOverlayModal(els[key]));
+  }
+  bindBackdropDismiss(els.modalPause, () => {
+    if (ui.engine.state === GAME_STATES.PAUSED) {
+      ui.engine.togglePause();
+    }
+  });
+  bindBackdropDismiss(els.modalConfirm, () => ui.dismissConfirm());
+}
+
+function handleNextLevelClick(ui) {
+  ui.hideAllModals();
+  if (ui.engine.mode === GAME_MODES.PUZZLE) {
+    const totalPuzzles = ui.gameConfig.puzzles?.length || 0;
+    if (ui.engine.currentPuzzleStage < totalPuzzles) {
+      ui.engine.startPuzzleMode(ui.engine.currentPuzzleStage + 1);
+    } else {
+      ui.openPlayHub({ expand: 'puzzle' });
+    }
+    return;
+  }
+  const { targetLevelId } = resolveNextCampaignTarget(
+    ui.engine.currentLevelId,
+    ui.engine.levelCatalog,
+    ui.getVictoryTargetOptions()
+  );
+  if (targetLevelId !== null) {
+    ui.engine.startCampaignLevel(targetLevelId);
+  } else {
+    // The last level is behind: the level select opens on its chapter.
+    ui.openLevelsModal();
+  }
+}
+
+function bindRoundFlowControls(ui) {
+  const els = ui.elements;
+  els.btnCloseShop.addEventListener('click', () => ui.closeOverlayModal(els.modalShop));
+  els.btnPlayLevelModal.addEventListener('click', () => ui.playSelectedLevel());
+  els.btnNextLevel.addEventListener('click', () => handleNextLevelClick(ui));
+  els.btnReplayVictory.addEventListener('click', () => {
+    ui.hideAllModals();
+    ui.engine.restartCurrent();
+  });
+  els.btnLevelsVictory.addEventListener('click', () => {
+    const mode = ui.engine.mode;
+    ui.hideAllModals();
+    if (mode === GAME_MODES.CAMPAIGN) {
+      ui.openLevelsModal();
+    } else {
+      ui.openPlayHub({ expand: mode === GAME_MODES.PUZZLE ? 'puzzle' : undefined });
+    }
+  });
+  els.btnContinueGameOver?.addEventListener('click', () => {
+    if (ui.engine.continueOutOfShots()) {
+      ui.hideAllModals();
+      ui.refresh(ui.engine, ui.lastExtra);
+    }
+  });
+  els.btnRetry.addEventListener('click', () => {
+    ui.hideAllModals();
+    ui.engine.restartCurrent();
+  });
+  els.btnSameSeedGameOver?.addEventListener('click', () => ui.retrySameFluxSeed());
+  els.btnLevelsGameOver.addEventListener('click', () => {
+    ui.hideAllModals();
+    ui.openPlayHub();
+  });
+  els.btnShareGameOver?.addEventListener('click', () => ui.shareRunResult());
+  els.btnResume.addEventListener('click', () => ui.engine.togglePause());
+  els.fluxPerkCards?.addEventListener('click', (e) => {
+    const card = e.target.closest?.('[data-perk-id]');
+    if (card) {
+      ui.engine.chooseFluxPerk(card.dataset.perkId);
+    }
+  });
+  els.btnRestartPause.addEventListener('click', () => {
+    ui.requestDestructiveAction(
+      () => {
+        ui.hideAllModals();
+        ui.engine.restartCurrent();
+      },
+      () => t('app.nav.button.restart')
+    );
+  });
+  els.btnLevelsPause?.addEventListener('click', () => {
+    ui.openPlayHub();
+    els.modalPause.classList.add('hidden');
+    ui.syncModalInertState();
+  });
+  els.btnSettingsPause?.addEventListener('click', () => {
+    openSettingsWithRefresh(ui);
+    els.modalPause.classList.add('hidden');
+    ui.syncModalInertState();
+  });
+}
+
+function bindGlobalWindowListeners(ui) {
+  // Capture phase: the mode must switch even when a handler below stops the event.
+  window.addEventListener(
+    'pointerdown',
+    (e) => ui.setInputMode(inputModeForPointerType(e.pointerType)),
+    { capture: true }
+  );
+  // A window that shrinks or turns while the hub is open may no longer fit two boards.
+  for (const type of ['resize', 'orientationchange']) {
+    window.addEventListener(type, () => {
+      if (ui.isPlayHubOpen()) {
+        ui.syncPlayHubVersusLocal();
+      }
+    });
+  }
+  window.addEventListener('keydown', (e) => ui.handleKeyDown(e));
+  window.addEventListener('keyup', (e) => ui.handleKeyUp(e));
+  window.addEventListener('blur', () => ui.handleWindowBlur());
+}
+
+function isKeyboardInteractiveElementFocused() {
+  const activeEl = document.activeElement;
+  return Boolean(
+    activeEl
+    && activeEl !== document.body
+    && activeEl !== document.documentElement
+    && activeEl.id !== 'game-canvas'
+    && typeof activeEl.matches === 'function'
+    && activeEl.matches(':focus-visible')
+    && typeof activeEl.closest === 'function'
+    && activeEl.closest('button, a, input, select, textarea, [role="button"], [role="tab"]')
+  );
+}
+
+function handleSpecialDigitShortcut(ui, e) {
+  const idx = Number.parseInt(e.code.replace('Digit', ''), 10) - 1;
+  if (idx < 0 || idx >= SPECIAL_TYPES_ORDER.length) {
+    return;
+  }
+  const type = SPECIAL_TYPES_ORDER[idx];
+  if (ui.engine.isSpecialTypeAllowed?.(type) === false) {
+    return;
+  }
+  e.preventDefault();
+  const count = ui.engine.specialInventory?.[type] || 0;
+  const isEquipped = ui.engine.currentBall?.specialType === type;
+  if (count <= 0 && !isEquipped && ui.engine.offersSpecialBalls?.() && ui.canBuySpecialAmmo()) {
+    ui.openShopModal(SHOP_TABS.AMMO);
+  } else {
+    ui.engine.equipSpecialBall(type);
+  }
+}
+
+function tryNonInteractiveActionKey(ui, e, isInteractiveFocused) {
+  if (e.code === 'Space') {
+    if (!isInteractiveFocused) {
+      e.preventDefault();
+      ui.engine.swapLauncherBalls();
+    }
+    return true;
+  }
+  const shakeCode = ui.engine.getMergeShakeRemaining?.() != null ? ui.engine.modesConfig.merge.shake.keyCode : null;
+  if (shakeCode && e.code === shakeCode) {
+    if (!isInteractiveFocused) {
+      e.preventDefault();
+      if (!e.repeat) {
+        ui.tryMergeShake();
+      }
+    }
+    return true;
+  }
+  if (e.code === 'Enter' || e.code === 'NumpadEnter') {
+    if (!isInteractiveFocused) {
+      e.preventDefault();
+      ui.engine.shoot();
+      ui.updateAimState(ui.engine);
+    }
+    return true;
+  }
+  return false;
+}
+
+const DESKTOP_NAV_SHORTCUTS = Object.freeze([
+  { key: 'p', code: 'KeyP', run: (ui) => ui.engine.togglePause() },
+  { key: 'm', code: 'KeyM', run: (ui) => ui.openPlayHub() },
+  { key: 'w', code: 'KeyW', run: (ui) => ui.openShopModal() }
+]);
+
+function isDesktopShortcutMatch(e, key, code) {
+  return (typeof e.key === 'string' && e.key.toLowerCase() === key) || (!e.key && e.code === code);
+}
+
+function handleDesktopNavShortcut(ui, e, isInteractiveFocused) {
+  if (isInteractiveFocused || e.repeat || ui.engine.state !== GAME_STATES.PLAYING || ui.engine.isVictoryCelebrating?.()) {
+    return false;
+  }
+  const shortcut = DESKTOP_NAV_SHORTCUTS.find(({ key, code }) => isDesktopShortcutMatch(e, key, code));
+  if (!shortcut) {
+    return false;
+  }
+  e.preventDefault();
+  shortcut.run(ui);
+  return true;
+}
+
+function handleLauncherGameplayKey(ui, e) {
+  const isInteractiveFocused = isKeyboardInteractiveElementFocused();
+  if (handleDesktopNavShortcut(ui, e, isInteractiveFocused)) {
+    return;
+  }
+  if (tryNonInteractiveActionKey(ui, e, isInteractiveFocused)) {
+    return;
+  }
+  if (e.code === 'KeyF') {
+    e.preventDefault();
+    ui.engine.togglePolarityFlip();
+    return;
+  }
+  if (e.code === 'ArrowLeft' || e.code === 'ArrowRight') {
+    e.preventDefault();
+    const step = e.shiftKey
+      ? ui.gameConfig.canvas.keyboardAimStepRad
+      : ui.gameConfig.canvas.keyboardAimFineStepRad;
+    ui.engine.adjustAimByDelta((e.code === 'ArrowLeft' ? -1 : 1) * step);
+    ui.updateAimState(ui.engine);
+    return;
+  }
+  if (e.code.startsWith('Digit')) {
+    handleSpecialDigitShortcut(ui, e);
+  }
+}
+
+const BACK_UNWIND_MODAL_KEYS = ['modalLevels', 'modalPlay', 'modalShop', 'modalSettings', 'modalStats'];
+
+function dismissTopBackLayer(ui) {
+  if (ui.elements.modalConfirm && !ui.elements.modalConfirm.classList.contains(HIDDEN_CLASS)) {
+    ui.dismissConfirm();
+    return true;
+  }
+  if (ui.isDuelCardOpen()) {
+    ui.dismissDuelCard();
+    return true;
+  }
+  // The Polarity Duel layers (difficulty picker, match pause and result) unwind before anything under them.
+  if (ui.handleVersusBack()) {
+    return true;
+  }
+  if (ui.progressBackup && ui.getActiveTopModal() === ui.elements.modalProgressImport) {
+    ui.progressBackup.dismiss();
+    return true;
+  }
+  if (ui.isCalibrationOpen()) {
+    ui.closeCalibration();
+    return true;
+  }
+  for (const key of BACK_UNWIND_MODAL_KEYS) {
+    const modal = ui.elements[key];
+    if (modal && !modal.classList.contains(HIDDEN_CLASS)) {
+      ui.closeOverlayModal(modal);
+      return true;
+    }
+  }
+  return false;
+}
+
+function tryPauseResumeShortcut(ui, e) {
+  if (e.repeat || isBrowserShortcut(e) || !isDesktopShortcutMatch(e, 'p', 'KeyP') || !ui.isPauseDialogTop?.()) {
+    return false;
+  }
+  e.preventDefault();
+  ui.engine.togglePause();
+  return true;
+}
+
+function handleTabOrOverlayShortcut(ui, e) {
+  if (e.code === 'Tab' && ui.isAnyModalOpen()) {
+    ui.trapModalFocus(e);
+    return true;
+  }
+  if (e.code === 'Tab' && ui.isDrawerOpen) {
+    ui.trapFocusWithin(ui.elements.drawer, e);
+    return true;
+  }
+  if (shouldIgnoreRepeatedKey(e.code, e.repeat)) {
+    ui.swallowRepeatedLocalKey(e);
+    return true;
+  }
+  if (e.code === 'Escape') {
+    ui.handleBackAction();
+    return true;
+  }
+  if (tryPauseResumeShortcut(ui, e)) {
+    return true;
+  }
+  // The perk choice is the top dialog: its digits pick a card and never equip a special ball.
+  if (ui.isFluxPerkModalTop()) {
+    const cardIndex = fluxPerkIndexForKey(e.code, ui.engine.fluxPerkOffer?.length || 0);
+    if (cardIndex >= 0 && !isBrowserShortcut(e)) {
+      e.preventDefault();
+      ui.engine.chooseFluxPerk(ui.engine.fluxPerkOffer[cardIndex]);
+    }
+    return true;
+  }
+  return false;
 }
 
 /** Scenes that can own the gameplay controls. */
@@ -365,489 +874,15 @@ export const uiInputBindingMethods = {
 
   bindEvents() {
     this.bindDrawerEvents();
-
     bindPlayHubEvents(this);
     bindCampaignMapEvents(this);
-
-    bindModeCard(this, this.elements.btnEndless, {
-      modeKey: GAME_MODES.ENDLESS,
-      accessKey: GAME_MODES.ENDLESS,
-      labelKey: 'app.nav.button.endless',
-      start: () => this.engine.startEndlessMode()
-    });
-    bindModeCard(this, this.elements.btnDaily, {
-      modeKey: GAME_MODES.DAILY,
-      accessKey: null,
-      labelKey: 'app.nav.button.daily',
-      start: () => this.engine.startDailyChallenge()
-    });
-    bindModeCard(this, this.elements.btnFlux, {
-      modeKey: GAME_MODES.FLUX,
-      accessKey: GAME_MODES.FLUX,
-      labelKey: 'app.nav.button.flux',
-      start: () => this.engine.startFluxRun()
-    });
-    bindModeCard(this, this.elements.btnWeekly, {
-      modeKey: WEEKLY_ACCESS_KEY,
-      accessKey: WEEKLY_ACCESS_KEY,
-      labelKey: 'app.nav.button.weekly',
-      start: () => this.startWeeklyFluxRun()
-    });
-
-    this.elements.btnStats?.addEventListener('click', () => {
-      this.openStatsModal(STATS_TABS.OVERVIEW);
-    });
-    this.elements.btnDailyHistoryGameOver?.addEventListener('click', () => {
-      this.openStatsModal(STATS_TABS.DAILY);
-    });
-    this.bindStatsEvents();
-
-    this.elements.btnShop.addEventListener('click', () => {
-      this.openShopModal();
-    });
-
-    if (this.elements.btnSettings) {
-      this.elements.btnSettings.addEventListener('click', () => {
-        this.syncInstallControls();
-        this.progressBackup?.refresh();
-        this.openOverlayModal(this.elements.modalSettings, this.elements.btnCloseSettings);
-      });
-    }
-    this.elements.quotaBadge?.addEventListener('click', () => {
-      this.syncInstallControls();
-      this.progressBackup?.refresh();
-      this.openOverlayModal(this.elements.modalSettings, this.elements.btnCloseSettings);
-    });
-    if (this.elements.btnCloseSettings) {
-      this.elements.btnCloseSettings.addEventListener('click', () => {
-        this.closeOverlayModal(this.elements.modalSettings);
-      });
-    }
-
-    this.elements.btnRestart.addEventListener('click', () => {
-      this.requestDestructiveAction(
-        () => {
-          this.hideAllModals();
-          this.engine.restartCurrent();
-        },
-        () => t('app.nav.button.restart')
-      );
-    });
-
-    this.elements.btnPause.addEventListener('click', () => {
-      // From the menu, the run is held by the menu pause: turn it into a regular
-      // pause so the Pause dialog opens.
-      if (this.autoPausedByOverlay && this.engine.state === GAME_STATES.PAUSED) {
-        this.autoPausedByOverlay = false;
-        this.engine.state = GAME_STATES.PLAYING;
-      }
-      this.engine.togglePause();
-    });
-
-    const toggleSound = () => {
-      const nextMuted = !this.audioManager.isMuted();
-      this.audioManager.setMuted(nextMuted);
-      this.storageManager.setMuted(nextMuted);
-      this.updateSoundButton();
-    };
-    this.elements.btnSound.addEventListener('click', toggleSound);
-
-    const toggleContrast = () => {
-      const nextContrast = !this.storageManager.getHighContrast();
-      this.storageManager.setHighContrast(nextContrast);
-      if (this.renderer) {
-        this.renderer.setHighContrast(nextContrast);
-      }
-      this.updateContrastButton();
-    };
-    if (this.elements.btnContrast) {
-      this.elements.btnContrast.addEventListener('click', toggleContrast);
-    }
-
-    const togglePatterns = () => {
-      const nextPatterns = !this.storageManager.getColorPatterns();
-      this.storageManager.setColorPatterns(nextPatterns);
-      if (this.renderer) {
-        this.renderer.setColorPatterns(nextPatterns);
-      }
-      this.updatePatternsButton();
-    };
-    if (this.elements.btnPatterns) {
-      this.elements.btnPatterns.addEventListener('click', togglePatterns);
-    }
-
-    const toggleMotion = () => {
-      const nextReduced = !this.storageManager.getReducedMotion();
-      this.storageManager.setReducedMotion(nextReduced);
-      if (this.engine && typeof this.engine.setReducedMotion === 'function') {
-        this.engine.setReducedMotion(nextReduced);
-      }
-      if (this.audioManager && typeof this.audioManager.setReducedMotion === 'function') {
-        this.audioManager.setReducedMotion(nextReduced);
-      }
-      this.updateMotionButton();
-    };
-    if (this.elements.btnMotion) {
-      this.elements.btnMotion.addEventListener('click', toggleMotion);
-    }
-
-    if (this.elements.btnAnimSpeed) {
-      this.elements.btnAnimSpeed.addEventListener('click', () => {
-        this.cycleAnimationSpeed();
-      });
-    }
-
-    document.addEventListener('visibilitychange', () => {
-      this.handleVisibilityChange();
-      this.syncMergeShakeGesture?.();
-    });
-
-    const toggleLang = () => {
-      const supported = this.gameConfig.defaults.supportedLanguages;
-      const current = i18n.getLocale();
-      const nextIdx = (supported.indexOf(current) + 1) % supported.length;
-      const nextLang = supported[nextIdx];
-      i18n.setLocale(nextLang);
-      this.storageManager.setLanguage(nextLang);
-    };
-    this.elements.btnLang.addEventListener('click', toggleLang);
-
-    this.elements.swapBtn.addEventListener('click', () => {
-      this.engine.swapLauncherBalls();
-    });
-
-    if (this.elements.polarityBtn) {
-      this.elements.polarityBtn.addEventListener('click', () => {
-        this.engine.togglePolarityFlip();
-      });
-    }
-
-    this.elements.mergeShakeBtn?.addEventListener('click', () => this.tryMergeShake());
-
-    this.elements.hintReplayBtn?.addEventListener('click', () => {
-      this.engine.replayLevelHints?.();
-    });
-
-    this.elements.btnDismissLevelIntro?.addEventListener('click', () => {
-      this.engine.dismissLevelIntro?.();
-    });
-
-    if (this.elements.btnResetHints) {
-      this.elements.btnResetHints.addEventListener('click', () => {
-        this.engine.resetDiscoveries();
-        this.hintsResetConfirmed = true;
-        this.updateResetHintsFeedback();
-        this.announce(t('hud.announcer.hints.reset'));
-      });
-    }
-
-    if (this.elements.btnDismissTutorial) {
-      this.elements.btnDismissTutorial.addEventListener('click', () => {
-        this.engine.dismissDiscovery();
-      });
-    }
-
-    const shopTabs = this.getShopTabs();
-    if (shopTabs.length > 0) {
-      for (let i = 0; i < shopTabs.length; i++) {
-        const { name, el } = shopTabs[i];
-        el.addEventListener('click', () => {
-          this.switchShopTab(name);
-        });
-        el.addEventListener('keydown', (e) => {
-          if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
-            e.preventDefault();
-            const dir = e.key === 'ArrowRight' ? 1 : -1;
-            const nextIdx = (i + dir + shopTabs.length) % shopTabs.length;
-            this.switchShopTab(shopTabs[nextIdx].name);
-            shopTabs[nextIdx].el.focus();
-          } else if (e.key === 'Home') {
-            e.preventDefault();
-            this.switchShopTab(shopTabs[0].name);
-            shopTabs[0].el.focus();
-          } else if (e.key === 'End') {
-            e.preventDefault();
-            const last = shopTabs[shopTabs.length - 1];
-            this.switchShopTab(last.name);
-            last.el.focus();
-          }
-        });
-      }
-    }
-
-    if (this.elements.btnConfirmYes && this.elements.btnConfirmNo) {
-      this.elements.btnConfirmYes.addEventListener('click', () => {
-        const cb = this.pendingConfirmCallback;
-        this.pendingConfirmCallback = null;
-        this.pendingConfirmLabelResolver = null;
-        this.confirmPausedRun = false;
-        this.elements.modalConfirm.classList.add('hidden');
-        if (cb) {
-          cb();
-        }
-      });
-      this.elements.btnConfirmNo.addEventListener('click', () => {
-        this.dismissConfirm();
-      });
-    }
-
-    const bindBackdropDismiss = (modalEl, onDismiss) => {
-      if (!modalEl) {
-        return;
-      }
-      modalEl.addEventListener('click', (e) => {
-        if (e.target === modalEl) {
-          onDismiss();
-        }
-      });
-    };
-
-    bindBackdropDismiss(this.elements.modalPlay, () => {
-      this.closeOverlayModal(this.elements.modalPlay);
-    });
-    bindBackdropDismiss(this.elements.modalLevels, () => {
-      this.closeOverlayModal(this.elements.modalLevels);
-    });
-    bindBackdropDismiss(this.elements.modalShop, () => {
-      this.closeOverlayModal(this.elements.modalShop);
-    });
-    bindBackdropDismiss(this.elements.modalSettings, () => {
-      this.closeOverlayModal(this.elements.modalSettings);
-    });
-    bindBackdropDismiss(this.elements.modalStats, () => {
-      this.closeOverlayModal(this.elements.modalStats);
-    });
-    bindBackdropDismiss(this.elements.modalPause, () => {
-      if (this.engine.state === GAME_STATES.PAUSED) {
-        this.engine.togglePause();
-      }
-    });
-    bindBackdropDismiss(this.elements.modalConfirm, () => {
-      this.dismissConfirm();
-    });
-
-    this.elements.btnFluxSeedGo?.addEventListener('click', () => {
-      this.submitFluxSeedInput();
-    });
-
-    this.elements.modeBanner?.addEventListener('click', () => {
-      this.openPlayHub();
-    });
-
-    this.elements.modeBanner?.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter' || e.key === ' ') {
-        e.preventDefault();
-        this.openPlayHub();
-      }
-    });
-
-    bindModeCard(this, this.elements.btnModePuzzle, {
-      modeKey: GAME_MODES.PUZZLE,
-      accessKey: GAME_MODES.PUZZLE,
-      labelKey: 'modals.levelSelect.arcade.puzzle',
-      start: () => this.engine.startPuzzleMode(this.getSuggestedPuzzleStage())
-    });
-    bindModeCard(this, this.elements.btnModeClassic, {
-      modeKey: GAME_MODES.CLASSIC,
-      accessKey: GAME_MODES.CLASSIC,
-      labelKey: 'modals.levelSelect.arcade.classic',
-      start: () => this.engine.startClassicMode()
-    });
-    bindModeCard(this, this.elements.btnModeBlitz, {
-      modeKey: GAME_MODES.BLITZ,
-      accessKey: GAME_MODES.BLITZ,
-      labelKey: 'modals.levelSelect.arcade.blitz',
-      start: () => this.engine.startBlitzMode()
-    });
-    bindModeCard(this, this.elements.btnModeBossRush, {
-      modeKey: GAME_MODES.BOSS_RUSH,
-      accessKey: GAME_MODES.BOSS_RUSH,
-      labelKey: 'modals.levelSelect.arcade.bossRush',
-      start: () => this.engine.startBossRushMode()
-    });
-    bindModeCard(this, this.elements.btnModeCascade, {
-      modeKey: GAME_MODES.CASCADE,
-      accessKey: GAME_MODES.CASCADE,
-      labelKey: 'modals.levelSelect.arcade.cascade',
-      start: () => this.engine.startCascadeMode()
-    });
-    bindModeCard(this, this.elements.btnModeHexGrid, {
-      modeKey: GAME_MODES.HEX_GRID,
-      accessKey: GAME_MODES.HEX_GRID,
-      labelKey: 'modals.levelSelect.arcade.hexGrid',
-      start: () => this.engine.startHexGridMode()
-    });
-    bindModeCard(this, this.elements.btnModePinball, {
-      modeKey: GAME_MODES.PINBALL,
-      accessKey: GAME_MODES.PINBALL,
-      labelKey: 'modals.levelSelect.arcade.pinball',
-      start: () => this.engine.startPinballMode()
-    });
-    bindModeCard(this, this.elements.btnModeOrbital, {
-      modeKey: GAME_MODES.ORBITAL,
-      accessKey: GAME_MODES.ORBITAL,
-      labelKey: 'modals.levelSelect.arcade.orbital',
-      start: () => this.engine.startOrbitalMode()
-    });
-    bindModeCard(this, this.elements.btnModeConvoy, {
-      modeKey: GAME_MODES.CONVOY,
-      accessKey: GAME_MODES.CONVOY,
-      labelKey: 'modals.levelSelect.arcade.convoy',
-      start: () => this.engine.startConvoyMode()
-    });
-    bindModeCard(this, this.elements.btnModeMerge, {
-      modeKey: GAME_MODES.MERGE,
-      accessKey: GAME_MODES.MERGE,
-      labelKey: 'modals.levelSelect.arcade.merge',
-      start: () => this.engine.startMergeMode()
-    });
-    bindModeCard(this, this.elements.btnModeSlingshot, {
-      modeKey: GAME_MODES.SLINGSHOT,
-      accessKey: GAME_MODES.SLINGSHOT,
-      labelKey: 'modals.levelSelect.arcade.slingshot',
-      start: () => this.engine.startSlingshotMode()
-    });
-
-    this.elements.inputFluxSeed?.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') {
-        e.preventDefault();
-        e.stopPropagation();
-        this.submitFluxSeedInput();
-      }
-    });
-
-    this.elements.btnCloseShop.addEventListener('click', () => {
-      this.closeOverlayModal(this.elements.modalShop);
-    });
-
-    this.elements.btnPlayLevelModal.addEventListener('click', () => {
-      this.playSelectedLevel();
-    });
-
-    this.elements.btnNextLevel.addEventListener('click', () => {
-      this.hideAllModals();
-      if (this.engine.mode === GAME_MODES.PUZZLE) {
-        const totalPuzzles = this.gameConfig.puzzles?.length || 0;
-        if (this.engine.currentPuzzleStage < totalPuzzles) {
-          this.engine.startPuzzleMode(this.engine.currentPuzzleStage + 1);
-        } else {
-          this.openPlayHub({ expand: 'puzzle' });
-        }
-        return;
-      }
-      const { targetLevelId } = resolveNextCampaignTarget(
-        this.engine.currentLevelId,
-        this.engine.levelCatalog,
-        this.getVictoryTargetOptions()
-      );
-      if (targetLevelId !== null) {
-        this.engine.startCampaignLevel(targetLevelId);
-      } else {
-        // The last level is behind: the level select opens on its chapter.
-        this.openLevelsModal();
-      }
-    });
-
-    this.elements.btnReplayVictory.addEventListener('click', () => {
-      this.hideAllModals();
-      this.engine.restartCurrent();
-    });
-
-    this.elements.btnLevelsVictory.addEventListener('click', () => {
-      const mode = this.engine.mode;
-      this.hideAllModals();
-      if (mode === GAME_MODES.CAMPAIGN) {
-        this.openLevelsModal();
-      } else {
-        this.openPlayHub({ expand: mode === GAME_MODES.PUZZLE ? 'puzzle' : undefined });
-      }
-    });
-
-    this.elements.btnContinueGameOver?.addEventListener('click', () => {
-      if (this.engine.continueOutOfShots()) {
-        this.hideAllModals();
-        this.refresh(this.engine, this.lastExtra);
-      }
-    });
-
-    this.elements.btnRetry.addEventListener('click', () => {
-      this.hideAllModals();
-      this.engine.restartCurrent();
-    });
-
-    this.elements.btnSameSeedGameOver?.addEventListener('click', () => this.retrySameFluxSeed());
-
-    this.elements.btnLevelsGameOver.addEventListener('click', () => {
-      this.hideAllModals();
-      this.openPlayHub();
-    });
-
-    this.elements.btnShareGameOver?.addEventListener('click', () => {
-      this.shareRunResult();
-    });
-
-    this.elements.btnResume.addEventListener('click', () => {
-      this.engine.togglePause();
-    });
-
-    this.elements.fluxPerkCards?.addEventListener('click', (e) => {
-      const card = e.target.closest?.('[data-perk-id]');
-      if (card) {
-        this.engine.chooseFluxPerk(card.dataset.perkId);
-      }
-    });
-
-    this.elements.btnRestartPause.addEventListener('click', () => {
-      this.requestDestructiveAction(
-        () => {
-          this.hideAllModals();
-          this.engine.restartCurrent();
-        },
-        () => t('app.nav.button.restart')
-      );
-    });
-
-    this.elements.btnLevelsPause?.addEventListener('click', () => {
-      this.openPlayHub();
-      this.elements.modalPause.classList.add('hidden');
-      this.syncModalInertState();
-    });
-
-    this.elements.btnSettingsPause?.addEventListener('click', () => {
-      this.syncInstallControls();
-      this.progressBackup?.refresh();
-      this.openOverlayModal(this.elements.modalSettings, this.elements.btnCloseSettings);
-      this.elements.modalPause.classList.add('hidden');
-      this.syncModalInertState();
-    });
-
-    // Capture phase: the mode must switch even when a handler below stops the event.
-    window.addEventListener(
-      'pointerdown',
-      (e) => {
-        this.setInputMode(inputModeForPointerType(e.pointerType));
-      },
-      { capture: true }
-    );
-
-    // A window that shrinks or turns while the hub is open may no longer fit two boards.
-    for (const type of ['resize', 'orientationchange']) {
-      window.addEventListener(type, () => {
-        if (this.isPlayHubOpen()) {
-          this.syncPlayHubVersusLocal();
-        }
-      });
-    }
-
-    window.addEventListener('keydown', (e) => {
-      this.handleKeyDown(e);
-    });
-    window.addEventListener('keyup', (e) => {
-      this.handleKeyUp(e);
-    });
-    window.addEventListener('blur', () => {
-      this.handleWindowBlur();
-    });
+    bindAllModeCards.call(this);
+    bindHeaderAndShellControls(this);
+    bindLauncherAndHintControls(this);
+    bindShopTabs(this);
+    bindModalAndConfirmControls(this);
+    bindRoundFlowControls(this);
+    bindGlobalWindowListeners(this);
   },
 
   /**
@@ -855,44 +890,7 @@ export const uiInputBindingMethods = {
    * Shared by Escape and the controller's back button.
    */
   handleBackAction() {
-    if (this.elements.modalConfirm && !this.elements.modalConfirm.classList.contains('hidden')) {
-      this.dismissConfirm();
-      return;
-    }
-    if (this.isDuelCardOpen()) {
-      this.dismissDuelCard();
-      return;
-    }
-    // The Polarity Duel layers (difficulty picker, match pause and result) unwind before anything under them.
-    if (this.handleVersusBack()) {
-      return;
-    }
-    if (this.progressBackup && this.getActiveTopModal() === this.elements.modalProgressImport) {
-      this.progressBackup.dismiss();
-      return;
-    }
-    if (this.isCalibrationOpen()) {
-      this.closeCalibration();
-      return;
-    }
-    if (!this.elements.modalLevels.classList.contains(HIDDEN_CLASS)) {
-      this.closeOverlayModal(this.elements.modalLevels);
-      return;
-    }
-    if (this.elements.modalPlay && !this.elements.modalPlay.classList.contains(HIDDEN_CLASS)) {
-      this.closeOverlayModal(this.elements.modalPlay);
-      return;
-    }
-    if (!this.elements.modalShop.classList.contains('hidden')) {
-      this.closeOverlayModal(this.elements.modalShop);
-      return;
-    }
-    if (this.elements.modalSettings && !this.elements.modalSettings.classList.contains('hidden')) {
-      this.closeOverlayModal(this.elements.modalSettings);
-      return;
-    }
-    if (this.elements.modalStats && !this.elements.modalStats.classList.contains('hidden')) {
-      this.closeOverlayModal(this.elements.modalStats);
+    if (dismissTopBackLayer(this)) {
       return;
     }
     if (this.isDrawerOpen) {
@@ -907,109 +905,14 @@ export const uiInputBindingMethods = {
   /** Global keyboard shortcuts: Escape unwinds the topmost layer, the rest steer the run. */
   handleKeyDown(e) {
     this.setInputMode(INPUT_MODES.POINTER);
-    if (e.code === 'Tab' && this.isAnyModalOpen()) {
-      this.trapModalFocus(e);
+    if (handleTabOrOverlayShortcut(this, e) || this.isAnyModalOpen() || this.isDrawerOpen || isBrowserShortcut(e)) {
       return;
     }
-    if (e.code === 'Tab' && this.isDrawerOpen) {
-      this.trapFocusWithin(this.elements.drawer, e);
-      return;
-    }
-
-    if (shouldIgnoreRepeatedKey(e.code, e.repeat)) {
-      this.swallowRepeatedLocalKey(e);
-      return;
-    }
-
-    if (e.code === 'Escape') {
-      this.handleBackAction();
-      return;
-    }
-
-    // The perk choice is the top dialog: its digits pick a card and never equip a special ball.
-    if (this.isFluxPerkModalTop()) {
-      const cardIndex = fluxPerkIndexForKey(e.code, this.engine.fluxPerkOffer?.length || 0);
-      if (cardIndex >= 0 && !isBrowserShortcut(e)) {
-        e.preventDefault();
-        this.engine.chooseFluxPerk(this.engine.fluxPerkOffer[cardIndex]);
-      }
-      return;
-    }
-
-    if (this.isAnyModalOpen()) {
-      return;
-    }
-    if (this.isDrawerOpen) {
-      return;
-    }
-
-    if (isBrowserShortcut(e)) {
-      return;
-    }
-
     const sceneController = this.getSceneController();
     if (sceneController) {
       sceneController.handleGameplayKey(e);
       return;
     }
-
-    const activeEl = document.activeElement;
-    const isKeyboardInteractiveFocused = Boolean(
-      activeEl &&
-        activeEl !== document.body &&
-        activeEl !== document.documentElement &&
-        activeEl.id !== 'game-canvas' &&
-        typeof activeEl.matches === 'function' &&
-        activeEl.matches(':focus-visible') &&
-        typeof activeEl.closest === 'function' &&
-        activeEl.closest('button, a, input, select, textarea, [role="button"], [role="tab"]')
-    );
-
-    if (e.code === 'Space') {
-      if (isKeyboardInteractiveFocused) {
-        return;
-      }
-      e.preventDefault();
-      this.engine.swapLauncherBalls();
-    } else if (this.engine.getMergeShakeRemaining?.() != null && e.code === this.engine.modesConfig.merge.shake.keyCode) {
-      if (!isKeyboardInteractiveFocused) {
-        e.preventDefault();
-        if (!e.repeat) this.tryMergeShake();
-      }
-    } else if (e.code === 'KeyF') {
-      e.preventDefault();
-      this.engine.togglePolarityFlip();
-    } else if (e.code === 'ArrowLeft' || e.code === 'ArrowRight') {
-      e.preventDefault();
-      const step = e.shiftKey
-        ? this.gameConfig.canvas.keyboardAimStepRad
-        : this.gameConfig.canvas.keyboardAimFineStepRad;
-      const dir = e.code === 'ArrowLeft' ? -1 : 1;
-      this.engine.adjustAimByDelta(dir * step);
-      this.updateAimState(this.engine);
-    } else if (e.code === 'Enter' || e.code === 'NumpadEnter') {
-      if (isKeyboardInteractiveFocused) {
-        return;
-      }
-      e.preventDefault();
-      this.engine.shoot();
-      this.updateAimState(this.engine);
-    } else if (e.code.startsWith('Digit')) {
-      const idx = Number.parseInt(e.code.replace('Digit', ''), 10) - 1;
-      if (idx >= 0 && idx < SPECIAL_TYPES_ORDER.length) {
-        const type = SPECIAL_TYPES_ORDER[idx];
-        if (this.engine.isSpecialTypeAllowed?.(type) === false) {
-          return;
-        }
-        e.preventDefault();
-        const count = this.engine.specialInventory?.[type] || 0;
-        const isEquipped = this.engine.currentBall?.specialType === type;
-        if (count <= 0 && !isEquipped && this.engine.offersSpecialBalls?.() && this.canBuySpecialAmmo()) {
-          this.openShopModal(SHOP_TABS.AMMO);
-        } else {
-          this.engine.equipSpecialBall(type);
-        }
-      }
-    }
+    handleLauncherGameplayKey(this, e);
   },
 };

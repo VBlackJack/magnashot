@@ -37,7 +37,7 @@
     <header id="app-drawer" class="top-bar" data-i18n-aria-label="app.drawer.aria.label">
       <div class="drawer-head">
         <div class="brand-group">
-          <h1 class="brand-title" data-i18n="app.header.title.main"></h1>
+          <p class="brand-title" data-i18n="app.header.title.main"></p>
           <span class="brand-subtitle" data-i18n="app.header.subtitle.edition"></span>
         </div>
         <button id="btn-close-drawer" type="button" class="drawer-close-btn" data-i18n-aria-label="app.drawer.button.closeAria" data-i18n-title="app.drawer.button.closeAria"><span aria-hidden="true">✕</span></button>
@@ -123,10 +123,11 @@
     </section>
 
     <main class="stage-container">
+      <h1 class="visually-hidden" data-i18n="app.header.title.main"></h1>
       <div class="stage-column">
         <div class="canvas-area">
           <div class="canvas-wrapper">
-            <canvas id="game-canvas" role="application" tabindex="0"></canvas>
+            <canvas id="game-canvas" role="application" tabindex="0" data-i18n-aria-label="hud.canvas.aria.label.pointer"></canvas>
             <div id="tutorial-banner" class="tutorial-banner hidden" aria-live="polite">
               <span id="tutorial-banner-text"></span>
               <button id="btn-dismiss-tutorial" type="button" class="tutorial-dismiss-btn"><span aria-hidden="true">✕</span></button>
@@ -297,6 +298,7 @@
           <div id="flux-seed-entry" class="flux-seed-entry play-disclosure hidden">
             <input id="input-flux-seed" type="text" class="flux-seed-input" autocomplete="off" spellcheck="false" data-i18n-placeholder="modals.levelSelect.fluxSeed.placeholder" data-i18n-aria-label="modals.levelSelect.fluxSeed.ariaLabel">
             <button id="btn-flux-seed-go" type="button" class="nav-btn badge-btn" data-i18n="modals.levelSelect.fluxSeed.launch"></button>
+            <p id="flux-seed-error" class="flux-seed-error hidden"></p>
           </div>
         </section>
         <section class="play-hub-section play-hub-duel" aria-labelledby="play-section-duel-title">

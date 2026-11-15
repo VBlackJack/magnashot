@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-import { getNewState, getSeenState } from '../game/ModeUnlocks.js';
+import { getNewState, getSeenState } from './ModeUnlocks.js';
 
 /**
  * Ordered save schema migrations. Contract: every step is idempotent and never deletes
