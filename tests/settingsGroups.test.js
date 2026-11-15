@@ -92,7 +92,7 @@ test('the settings modal holds four labelled groups with the Vibration checkbox 
     assert.match(body, new RegExp(`<h3 id="${labelId}" class="stats-section-title" data-i18n="modals\\.settings\\.(groups|controller)\\.[a-z]+"></h3>`));
   }
   const [audio, gameplay, accessibility, controller] = groups.map((g) => g[2]);
-  for (const id of ['btn-sound', 'btn-music', 'btn-music-volume']) {
+  for (const id of ['btn-sound', 'btn-music', 'btn-music-volume', 'btn-music-preview']) {
     assert.ok(audio.includes(`id="${id}"`), id);
   }
   for (const id of ['btn-resonance', 'btn-calibrate', 'btn-tilt', 'btn-reset-hints', 'btn-fullscreen', 'btn-lang', 'input-duel-name']) {

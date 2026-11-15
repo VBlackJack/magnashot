@@ -559,7 +559,7 @@ test('the top bar moves into the boards grid for the landscape mini-view and bac
   ui.placeVersusBar(false);
   assert.equal(bar.parentElement, screen);
   assert.equal(refocused, 2);
-  const css = readFileSync('./styles/main.css', 'utf8');
+  const css = readFileSync('./styles/versus.css', 'utf8');
   assert.match(css, /\.versus-boards > \.versus-bar \{\s*grid-area: bar;/, 'the stylesheet lays the bar out in the side column');
 });
 

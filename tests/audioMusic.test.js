@@ -23,6 +23,7 @@ import { AudioManager } from '../src/core/AudioManager.js';
 import { StorageManager } from '../src/core/StorageManager.js';
 import { createVersusStorageView } from '../src/core/StorageView.js';
 import { GAME_MODES } from '../src/core/Constants.js';
+import { createPulseDriver } from '../src/ui/PulseDriver.js';
 import { UIManager } from '../src/ui/UIManager.js';
 
 const loadJson = (p) => JSON.parse(fs.readFileSync(p, 'utf8'));
@@ -401,7 +402,7 @@ test('setupPulseControls applies the stored music settings to the audio manager'
 
 test('settings rows, locale keys and the precache list carry the Pulse controls', () => {
   const html = fs.readFileSync('./index.html', 'utf8');
-  for (const id of ['btn-music', 'btn-music-volume', 'btn-resonance']) {
+  for (const id of ['btn-music', 'btn-music-volume', 'btn-music-preview', 'btn-resonance']) {
     assert.ok(html.includes(`id="${id}"`), `${id} row present`);
     assert.ok(html.includes(`data-caption-for="${id}"`), `${id} caption present`);
   }
@@ -413,6 +414,10 @@ test('settings rows, locale keys and the precache list carry the Pulse controls'
     'app.nav.button.musicOn', 'app.nav.button.musicOff', 'app.nav.button.musicAria',
     'app.nav.button.musicOnAria', 'app.nav.button.musicOffAria', 'app.nav.button.musicVolume',
     'app.nav.button.musicVolumeAria', 'app.nav.button.musicVolumeCaption',
+    'app.nav.button.musicPreview', 'app.nav.button.musicPreviewStop',
+    'app.nav.button.musicPreviewCaption', 'app.nav.button.musicPreviewStopCaption',
+    'app.nav.button.musicPreviewAria', 'app.nav.button.musicPreviewStopAria',
+    'modals.settings.musicPreviewOffHint',
     'app.nav.button.resonanceOn', 'app.nav.button.resonanceOff', 'app.nav.button.resonanceAria',
     'app.nav.button.resonanceOnAria', 'app.nav.button.resonanceOffAria',
     'app.settings.calibrate.title', 'app.settings.calibrate.intro', 'app.settings.calibrate.tap',
@@ -486,6 +491,70 @@ test('the music engine does not arm its timer while the context is not running',
     audio.ctx.state = 'running';
     audio.music.onContextResumed();
     assert.equal(timers.loopCount(), 1);
+  });
+});
+
+test('previewMusic plays briefly, invokes onEnd after duration and stops on mute or manual stop', () => {
+  withAudio((audio, timers) => {
+    let endedCount = 0;
+    assert.equal(audio.previewMusic({ onEnd: () => { endedCount += 1; } }), true);
+    assert.equal(audio.isPreviewingMusic, true);
+    assert.equal(audio.getMusicState().running, true);
+    assert.equal(audio.getMusicState().modeKey, MUSIC.previewMode);
+    assert.equal(endedCount, 0);
+
+    // Firing only the preview timer stops the preview and notifies the caller.
+    for (const [id, entry] of [...timers.pending.entries()]) {
+      if (entry.ms === MUSIC.previewDurationMs) {
+        timers.pending.delete(id);
+        entry.fn();
+      }
+    }
+    assert.equal(audio.isPreviewingMusic, false);
+    assert.equal(audio.getMusicState().running, false);
+    assert.equal(endedCount, 1);
+
+    // Muting while previewing stops it immediately; disabled music rejects preview.
+    assert.equal(audio.previewMusic({ onEnd: () => { endedCount += 1; } }), true);
+    audio.setMuted(true);
+    assert.equal(audio.isPreviewingMusic, false);
+    assert.equal(endedCount, 2);
+    assert.equal(audio.previewMusic(), false);
+
+    // Unknown mode fails cleanly without arming preview state or timer.
+    audio.setMuted(false);
+    assert.equal(audio.previewMusic({ modeKey: 'unknown_mode_key' }), false);
+    assert.equal(audio.isPreviewingMusic, false);
+    assert.equal(audio.musicPreviewTimer, null);
+  });
+});
+
+test('PulseDriver keeps active music preview alive while Settings/menu pauses playback and hands off on resume', () => {
+  withAudio((audio) => {
+    let isPlaying = false;
+    let endedCount = 0;
+    const engine = {
+      getResonanceMode: () => MODE,
+      getPulseState: () => ({ intensity: 0.4, beatIndex: 0, beatPhase: 0, framesPerBeat: 30 })
+    };
+    const driver = createPulseDriver({
+      audioManager: audio,
+      getLead: () => ({ engine, isPlaying }),
+      driverConfig: { intensityIntervalMs: 100, syncIntervalMs: 100 },
+      fadeSec: MUSIC.endFadeSec
+    });
+
+    assert.equal(audio.previewMusic({ onEnd: () => { endedCount += 1; } }), true);
+    assert.equal(driver.update(16), true, 'preview keeps running while paused/in Settings');
+    assert.equal(audio.isPreviewingMusic, true);
+    assert.equal(audio.getMusicState().running, true);
+    assert.equal(endedCount, 0);
+
+    isPlaying = true;
+    assert.equal(driver.update(120), true, 'resuming live play clears preview state and switches to board mode');
+    assert.equal(audio.isPreviewingMusic, false);
+    assert.equal(endedCount, 1);
+    assert.equal(audio.getMusicState().modeKey, MODE);
   });
 });
 

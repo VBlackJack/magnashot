@@ -30,6 +30,7 @@ import { Obstacle } from '../entities/Obstacle.js';
 import { reportBountyEvent } from './Bounties.js';
 import { getOccupiedPlatformIndices } from './EngineTurnResolution.js';
 import { generateFluxStage } from './layouts/FluxStageGenerator.js';
+import { getUtcIsoWeekKey, getWeeklyFluxSeed } from './WeeklyFlux.js';
 import {
   shiftObstacleDefsX,
   shiftSpecX
@@ -38,6 +39,21 @@ import {
   listLevelMechanics,
   pickNextDiscovery
 } from './Discovery.js';
+
+/**
+ * True when the run targets the current Flux generation and matches the given week's
+ * Weekly Flux seed (current UTC week by default). Such runs open before Flux unlocks, so
+ * starting one must leave the Flux unlock record untouched.
+ */
+const isCurrentWeeklyFluxSeed = (engine, seed, contentVersion, weekKey) => {
+  const currentVersion = engine.gameConfig.ghostDuel.contentVersion.flux;
+  const version = contentVersion ?? currentVersion;
+  if (version !== currentVersion || !seed) {
+    return false;
+  }
+  const effectiveWeek = weekKey ?? getUtcIsoWeekKey(Date.now());
+  return seed === getWeeklyFluxSeed(effectiveWeek, engine.fluxConfig.seed, engine.gameConfig.weeklyFlux.seedSalt);
+};
 
 /** Flux perk ids; the specs (step, maxStacks, icon) live in configs/flux.json. */
 export const FLUX_PERK_IDS = Object.freeze({
@@ -738,7 +754,8 @@ export const engineModeMethods = {
     const currentVersion = this.gameConfig.ghostDuel.contentVersion.flux;
     const version = contentVersion ?? currentVersion;
     const runSeed = seed || this.createFluxSeed();
-    this.initFluxRun(runSeed, version);
+    const markModeSeen = !isCurrentWeeklyFluxSeed(this, runSeed, version, weekKey);
+    this.initFluxRun(runSeed, version, { markModeSeen });
     this.isSharedFluxRun = Boolean(isShared);
     // A run on this week's seed is the weekly run, however it was started, unless it replays
     // older shapes: the weekly board is the current one, so those runs never reach its records.
@@ -760,9 +777,10 @@ export const engineModeMethods = {
    * Rebuilds a saved Flux run at its stage: same seed, same shape, same obstacles. The
    * caller (applyRunSnapshot) then puts the saved balls and counters back.
    * @param {number} [contentVersion] - Generation the run was saved with (the current one by default).
+   * @param {{markModeSeen?: boolean}} [options] - Weekly snapshots pass markModeSeen false.
    */
-  restoreFluxRun(seed, stage, previousFamily, contentVersion = undefined) {
-    this.initFluxRun(seed, contentVersion);
+  restoreFluxRun(seed, stage, previousFamily, contentVersion = undefined, { markModeSeen = true } = {}) {
+    this.initFluxRun(seed, contentVersion, { markModeSeen });
     this.fluxStage = stage;
     this.fluxPreviousFamily = previousFamily;
     this.buildFluxStage({ persist: false });
@@ -785,9 +803,10 @@ export const engineModeMethods = {
    * the one before it when the table is not loaded.
    * @param {string} seed - Run seed.
    * @param {number} [contentVersion] - Generation of the shapes (the current one by default).
+   * @param {{markModeSeen?: boolean}} [options] - Forwarded to resetRunState.
    */
-  initFluxRun(seed, contentVersion = undefined) {
-    this.resetRunState(GAME_MODES.FLUX);
+  initFluxRun(seed, contentVersion = undefined, { markModeSeen = true } = {}) {
+    this.resetRunState(GAME_MODES.FLUX, { markModeSeen });
     const requested = contentVersion ?? this.gameConfig.ghostDuel.contentVersion.flux;
     const sinceVersion = this.fluxConfig.shapeSettle.sinceContentVersion;
     this.fluxContentVersion = requested >= sinceVersion && !this.fluxShapeTuning?.margins

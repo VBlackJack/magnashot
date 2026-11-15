@@ -116,6 +116,198 @@ function confirmVersusPauseAction(ui, kind) {
   });
 }
 
+function createVersusState(ui, options) {
+  const spec = typeof options === 'string' ? { kind: VERSUS_KINDS.CPU, tier: options } : options;
+  const isLocal = spec.kind === VERSUS_KINDS.LOCAL;
+  const hud = new VersusHud(collectVersusHudElements(document));
+  const v = {
+    kind: isLocal ? VERSUS_KINDS.LOCAL : VERSUS_KINDS.CPU,
+    tier: isLocal ? null : spec.tier,
+    slots: isLocal ? spec.slots.map((slot) => ({ ...slot })) : null,
+    riseMultipliers: isLocal ? [...spec.riseMultipliers] : null,
+    kb: isLocal ? createSplitKeyboard(ui.gameConfig.versus.local.keyboard) : null,
+    sceneController: null,
+    tooSmall: false,
+    isTooSmallAnnounced: false,
+    breakFrames: 0,
+    resultGuardTimer: null,
+    hud,
+    controller: null,
+    renderers: [null, null],
+    scene: null,
+    layout: null,
+    phase: SCREEN_PHASES.PLAYING,
+    clock: 0,
+    sinceRefresh: 0,
+    hudDirty: true,
+    isLayoutQueued: false,
+    result: null,
+    queue: null,
+    unbindInput: null,
+    unsubscribe: null,
+    onResize: null
+  };
+  v.queue = ui.createVersusQueue(v);
+  return { v, isLocal };
+}
+
+function initVersusController(ui, v, isLocal) {
+  const matchModeOptions = isLocal
+    ? { mode: 'local', riseMultipliers: v.riseMultipliers, autoAdvance: false }
+    : { mode: 'cpu', playerBoard: PLAYER_BOARD, cpuTier: v.tier, autoAdvance: true };
+  try {
+    v.controller = createVersusMatch({
+      seed: ui.createVersusSeed(),
+      ...matchModeOptions,
+      configs: ui.versusConfigs,
+      storageManager: ui.storageManager,
+      audioManager: ui.audioManager,
+      resonance: ui.readVersusResonanceOption(),
+      onBoardChange: () => {
+        v.hudDirty = true;
+      },
+      onEvent: (event) => ui.handleVersusEvent(event)
+    });
+  } catch (error) {
+    ui.versus = null;
+    throw error;
+  }
+}
+
+function mountVersusScreen(ui, v, isLocal) {
+  const screen = ui.elements.versusScreen;
+  screen.dataset.mode = v.kind;
+  if (isLocal) {
+    const p1Device = v.slots[0] ? v.slots[0].device : null;
+    screen.dataset.p1Mouse = String(Boolean(p1Device && p1Device.type === DEVICE_TYPES.KEYBOARD_MOUSE));
+  }
+  screen.classList.remove(HIDDEN_CLASS);
+  ui.syncModalInertState();
+  v.hud.refreshLabels();
+  ui.layoutVersus();
+  v.unbindInput = isLocal ? ui.bindLocalCanvases(v) : ui.bindCpuCanvas(v);
+  v.onResize = () => ui.scheduleVersusLayout();
+  for (const type of ['resize', 'orientationchange']) {
+    window.addEventListener(type, v.onResize);
+  }
+  if (isLocal) {
+    v.sceneController = ui.createLocalSceneController();
+    ui.setActiveScene(UI_SCENES.VERSUS, v.sceneController);
+  } else {
+    ui.setActiveScene(UI_SCENES.VERSUS, ui.versusSceneController);
+  }
+  ui.refreshVersusHud();
+  // A window too small for two boards opened the pause dialog already: it keeps the focus.
+  if (!ui.isAnyModalOpen()) {
+    ui.elements.versusCanvas0.focus();
+    ui.maybeShowVersusTutorial();
+  }
+}
+
+function teardownVersusResources(v) {
+  v.unsubscribe?.();
+  v.unbindInput?.();
+  v.tutorial?.element.remove?.();
+  v.tutorial = null;
+  v.kb?.releaseAll();
+  clearTimeout(v.resultGuardTimer);
+  for (const type of ['resize', 'orientationchange']) {
+    window.removeEventListener(type, v.onResize);
+  }
+  for (const renderer of v.renderers) {
+    renderer?.dispose();
+  }
+  for (const engine of v.controller.engines) {
+    engine.audioManager?.stopAll?.();
+  }
+}
+
+function resetVersusDom(ui) {
+  const { elements } = ui;
+  elements.versusRoundOverlay?.classList.add(HIDDEN_CLASS);
+  elements.versusScreen.classList.add(HIDDEN_CLASS);
+  for (const modal of [elements.modalDuelPause, elements.modalDuelResult]) {
+    modal?.classList.add(HIDDEN_CLASS);
+  }
+  elements.versusResultShareFallback?.classList.add(HIDDEN_CLASS);
+  delete elements.versusScreen.dataset.mode;
+  delete elements.versusScreen.dataset.p1Mouse;
+  delete elements.versusScreen.dataset.tooSmall;
+  elements.btnVersusRematch?.removeAttribute('aria-disabled');
+}
+
+function isInteractiveControlFocused() {
+  const activeEl = document.activeElement;
+  if (!activeEl || activeEl === document.body) {
+    return false;
+  }
+  return Boolean(
+    typeof activeEl.matches === 'function' &&
+      activeEl.matches(':focus-visible') &&
+      typeof activeEl.closest === 'function' &&
+      activeEl.closest('button, a, input, select, textarea, [role="button"], [role="tab"]')
+  );
+}
+
+function applyVersusDigitKey(e, engine) {
+  const index = Number.parseInt(e.code.replace('Digit', ''), 10) - 1;
+  const type = SPECIAL_TYPES_ORDER[index];
+  if (!type) {
+    return;
+  }
+  const stockCount = engine.specialInventory ? engine.specialInventory[type] || 0 : 0;
+  const currentType = engine.currentBall ? engine.currentBall.specialType : null;
+  if (stockCount > 0 || currentType === type) {
+    e.preventDefault();
+    engine.equipSpecialBall(type);
+  }
+}
+
+function applyVersusPadActions(ui, engine, actions) {
+  for (const action of actions) {
+    if (action === A.SHOOT) {
+      engine.shoot();
+    } else if (action === A.SWAP) {
+      engine.swapLauncherBalls();
+    } else if (action === A.POLARITY) {
+      engine.togglePolarityFlip();
+    } else if (action === A.UNEQUIP) {
+      if (engine.currentBall && engine.currentBall.specialType) {
+        engine.equipSpecialBall(engine.currentBall.specialType);
+      }
+    } else if (action === A.SPECIAL_PREV || action === A.SPECIAL_NEXT) {
+      ui.cycleSpecialBall(action === A.SPECIAL_PREV ? -1 : 1, engine);
+    } else if (action === A.RECENTER) {
+      engine.adjustAimByDelta(-Math.PI * MATH_CONSTANTS.HALF - engine.aimAngle);
+    }
+  }
+}
+
+function handleSingleLocalPad(ui, v, pad) {
+  const board = slotForPad(v.slots, pad.padIndex);
+  if (board < 0) {
+    return false;
+  }
+  if (ui.isVersusTutorialOpen()) {
+    ui.routeVersusTutorialActions(pad.actions);
+    return false;
+  }
+  if (pad.actions.includes(A.PAUSE) || pad.actions.includes(A.MENU)) {
+    ui.pauseVersus();
+    return true;
+  }
+  if (!ui.canControlVersusPlayer()) {
+    return false;
+  }
+  const engine = v.controller.engines[board];
+  if (pad.aimDelta !== 0) {
+    engine.adjustAimByDelta(pad.aimDelta);
+  }
+  applyVersusPadActions(ui, engine, pad.actions);
+  v.hudDirty = true;
+  return false;
+}
+
 export const uiVersusMethods = {
   /** True while the versus screen is open. */
   isVersusActive() {
@@ -316,9 +508,6 @@ export const uiVersusMethods = {
     if (this.versus || !this.versusConfigs || !this.elements.versusScreen) {
       return;
     }
-    const spec = typeof options === 'string' ? { kind: VERSUS_KINDS.CPU, tier: options } : options;
-    const isLocal = spec.kind === VERSUS_KINDS.LOCAL;
-    const tier = isLocal ? null : spec.tier;
     this.hideAllModals();
     if (this.engine.state === GAME_STATES.PLAYING || this.engine.state === GAME_STATES.PAUSED) {
       this.engine.state = GAME_STATES.PAUSED;
@@ -326,83 +515,11 @@ export const uiVersusMethods = {
       this.engine.saveRunSnapshot?.();
     }
     this.storageManager.ensureModeUnlocked?.(GAME_MODES.VERSUS);
-
-    const hud = new VersusHud(collectVersusHudElements(document));
-    const v = {
-      kind: isLocal ? VERSUS_KINDS.LOCAL : VERSUS_KINDS.CPU,
-      tier,
-      slots: isLocal ? spec.slots.map((slot) => ({ ...slot })) : null,
-      riseMultipliers: isLocal ? [...spec.riseMultipliers] : null,
-      kb: isLocal ? createSplitKeyboard(this.gameConfig.versus.local.keyboard) : null,
-      sceneController: null,
-      tooSmall: false,
-      isTooSmallAnnounced: false,
-      breakFrames: 0,
-      resultGuardTimer: null,
-      hud,
-      controller: null,
-      renderers: [null, null],
-      scene: null,
-      layout: null,
-      phase: SCREEN_PHASES.PLAYING,
-      clock: 0,
-      sinceRefresh: 0,
-      hudDirty: true,
-      isLayoutQueued: false,
-      result: null,
-      queue: null,
-      unbindInput: null,
-      unsubscribe: null,
-      onResize: null
-    };
-    v.queue = this.createVersusQueue(v);
+    const { v, isLocal } = createVersusState(this, options);
     // The screen is live before the first round starts so the announcement of round 1 is received.
     this.versus = v;
-    try {
-      v.controller = createVersusMatch({
-        seed: this.createVersusSeed(),
-        ...(isLocal
-          ? { mode: 'local', riseMultipliers: v.riseMultipliers, autoAdvance: false }
-          : { mode: 'cpu', playerBoard: PLAYER_BOARD, cpuTier: tier, autoAdvance: true }),
-        configs: this.versusConfigs,
-        storageManager: this.storageManager,
-        audioManager: this.audioManager,
-        resonance: this.readVersusResonanceOption(),
-        onBoardChange: () => {
-          v.hudDirty = true;
-        },
-        onEvent: (event) => this.handleVersusEvent(event)
-      });
-    } catch (error) {
-      this.versus = null;
-      throw error;
-    }
-
-    this.elements.versusScreen.dataset.mode = v.kind;
-    if (isLocal) {
-      this.elements.versusScreen.dataset.p1Mouse = String(v.slots[0]?.device?.type === DEVICE_TYPES.KEYBOARD_MOUSE);
-    }
-    this.elements.versusScreen.classList.remove(HIDDEN_CLASS);
-    this.syncModalInertState();
-    hud.refreshLabels();
-    this.layoutVersus();
-    v.unbindInput = isLocal ? this.bindLocalCanvases(v) : this.bindCpuCanvas(v);
-    v.onResize = () => this.scheduleVersusLayout();
-    for (const type of ['resize', 'orientationchange']) {
-      window.addEventListener(type, v.onResize);
-    }
-    if (isLocal) {
-      v.sceneController = this.createLocalSceneController();
-      this.setActiveScene(UI_SCENES.VERSUS, v.sceneController);
-    } else {
-      this.setActiveScene(UI_SCENES.VERSUS, this.versusSceneController);
-    }
-    this.refreshVersusHud();
-    // A window too small for two boards opened the pause dialog already: it keeps the focus.
-    if (!this.isAnyModalOpen()) {
-      this.elements.versusCanvas0.focus();
-      this.maybeShowVersusTutorial();
-    }
+    initVersusController(this, v, isLocal);
+    mountVersusScreen(this, v, isLocal);
   },
 
   // ---------------------------------------------------------------------------------------
@@ -514,34 +631,11 @@ export const uiVersusMethods = {
     if (!v) {
       return;
     }
-    v.unsubscribe?.();
-    v.unbindInput?.();
-    v.tutorial?.element.remove?.();
-    v.tutorial = null;
-    v.kb?.releaseAll();
-    clearTimeout(v.resultGuardTimer);
-    for (const type of ['resize', 'orientationchange']) {
-      window.removeEventListener(type, v.onResize);
-    }
-    for (const renderer of v.renderers) {
-      renderer?.dispose();
-    }
-    for (const engine of v.controller.engines) {
-      engine.audioManager?.stopAll?.();
-    }
+    teardownVersusResources(v);
     this.versus = null;
     this.versusScene = null;
     this.setActiveScene(UI_SCENES.MAIN);
-    this.elements.versusRoundOverlay?.classList.add(HIDDEN_CLASS);
-    this.elements.versusScreen.classList.add(HIDDEN_CLASS);
-    for (const modal of [this.elements.modalDuelPause, this.elements.modalDuelResult]) {
-      modal?.classList.add(HIDDEN_CLASS);
-    }
-    this.elements.versusResultShareFallback?.classList.add(HIDDEN_CLASS);
-    delete this.elements.versusScreen.dataset.mode;
-    delete this.elements.versusScreen.dataset.p1Mouse;
-    delete this.elements.versusScreen.dataset.tooSmall;
-    this.elements.btnVersusRematch?.removeAttribute('aria-disabled');
+    resetVersusDom(this);
     // The run held when the screen opened is shown again; its Pause dialog is what the player sees.
     this.autoPausedByOverlay = false;
     this.syncModalInertState();
@@ -1296,21 +1390,11 @@ export const uiVersusMethods = {
       return;
     }
     const engine = this.versus.controller.engines[PLAYER_BOARD];
-    const activeEl = document.activeElement;
-    const isButtonFocused = Boolean(
-      activeEl &&
-        activeEl !== document.body &&
-        typeof activeEl.matches === 'function' &&
-        activeEl.matches(':focus-visible') &&
-        typeof activeEl.closest === 'function' &&
-        activeEl.closest('button, a, input, select, textarea, [role="button"], [role="tab"]')
-    );
+    const isButtonFocused = isInteractiveControlFocused();
     const canvasCfg = this.gameConfig.canvas;
-    if (e.code === 'Space') {
-      if (!isButtonFocused) {
-        e.preventDefault();
-        engine.swapLauncherBalls();
-      }
+    if (e.code === 'Space' && !isButtonFocused) {
+      e.preventDefault();
+      engine.swapLauncherBalls();
     } else if (e.code === 'KeyF') {
       e.preventDefault();
       engine.togglePolarityFlip();
@@ -1318,19 +1402,11 @@ export const uiVersusMethods = {
       e.preventDefault();
       const step = e.shiftKey ? canvasCfg.keyboardAimStepRad : canvasCfg.keyboardAimFineStepRad;
       engine.adjustAimByDelta((e.code === 'ArrowLeft' ? -1 : 1) * step);
-    } else if (e.code === 'Enter' || e.code === 'NumpadEnter') {
-      if (!isButtonFocused) {
-        e.preventDefault();
-        engine.shoot();
-      }
+    } else if ((e.code === 'Enter' || e.code === 'NumpadEnter') && !isButtonFocused) {
+      e.preventDefault();
+      engine.shoot();
     } else if (e.code.startsWith('Digit')) {
-      const index = Number.parseInt(e.code.replace('Digit', ''), 10) - 1;
-      const type = SPECIAL_TYPES_ORDER[index];
-      const isStocked = (engine.specialInventory?.[type] || 0) > 0 || engine.currentBall?.specialType === type;
-      if (type && isStocked) {
-        e.preventDefault();
-        engine.equipSpecialBall(type);
-      }
+      applyVersusDigitKey(e, engine);
     }
     this.versus.hudDirty = true;
     this.refreshVersusPlayerControls();
@@ -1350,39 +1426,11 @@ export const uiVersusMethods = {
     if (aimDelta !== 0 && this.inputMode === INPUT_MODES.GAMEPAD) {
       engine.adjustAimByDelta(aimDelta);
     }
-    for (const action of actions) {
-      switch (action) {
-        case A.SHOOT:
-          engine.shoot();
-          break;
-        case A.SWAP:
-          engine.swapLauncherBalls();
-          break;
-        case A.POLARITY:
-          engine.togglePolarityFlip();
-          break;
-        case A.UNEQUIP:
-          if (engine.currentBall?.specialType) {
-            engine.equipSpecialBall(engine.currentBall.specialType);
-          }
-          break;
-        case A.SPECIAL_PREV:
-          this.cycleSpecialBall(-1, engine);
-          break;
-        case A.SPECIAL_NEXT:
-          this.cycleSpecialBall(1, engine);
-          break;
-        case A.PAUSE:
-        case A.MENU:
-          this.pauseVersus();
-          return;
-        case A.RECENTER:
-          engine.adjustAimByDelta(-Math.PI * MATH_CONSTANTS.HALF - engine.aimAngle);
-          break;
-        default:
-          break;
-      }
+    if (actions.includes(A.PAUSE) || actions.includes(A.MENU)) {
+      this.pauseVersus();
+      return;
     }
+    applyVersusPadActions(this, engine, actions);
     this.versus.hudDirty = true;
     if (actions.length > 0) {
       this.refreshVersusPlayerControls();
@@ -1481,55 +1529,9 @@ export const uiVersusMethods = {
       return;
     }
     for (const pad of results.pads) {
-      const board = slotForPad(v.slots, pad.padIndex);
-      if (board < 0) {
-        continue;
-      }
-      if (this.isVersusTutorialOpen()) {
-        this.routeVersusTutorialActions(pad.actions);
-        continue;
-      }
-      if (pad.actions.includes(A.PAUSE) || pad.actions.includes(A.MENU)) {
-        this.pauseVersus();
+      if (handleSingleLocalPad(this, v, pad)) {
         return;
       }
-      if (!this.canControlVersusPlayer()) {
-        continue;
-      }
-      const engine = v.controller.engines[board];
-      if (pad.aimDelta !== 0) {
-        engine.adjustAimByDelta(pad.aimDelta);
-      }
-      for (const action of pad.actions) {
-        switch (action) {
-          case A.SHOOT:
-            engine.shoot();
-            break;
-          case A.SWAP:
-            engine.swapLauncherBalls();
-            break;
-          case A.POLARITY:
-            engine.togglePolarityFlip();
-            break;
-          case A.UNEQUIP:
-            if (engine.currentBall?.specialType) {
-              engine.equipSpecialBall(engine.currentBall.specialType);
-            }
-            break;
-          case A.SPECIAL_PREV:
-            this.cycleSpecialBall(-1, engine);
-            break;
-          case A.SPECIAL_NEXT:
-            this.cycleSpecialBall(1, engine);
-            break;
-          case A.RECENTER:
-            engine.adjustAimByDelta(-Math.PI * MATH_CONSTANTS.HALF - engine.aimAngle);
-            break;
-          default:
-            break;
-        }
-      }
-      v.hudDirty = true;
     }
     this.refreshVersusPlayerControls();
   },

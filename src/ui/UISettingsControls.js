@@ -183,6 +183,41 @@ export function createShakeDetector(config) {
 }
 
 /** Methods installed on UIManager.prototype by UIManager.js. */
+/** Refreshes the Settings Pulse audio preview button and caption to match current playback state. */
+function syncMusicPreviewButton(ui) {
+  const btn = ui.elements?.btnMusicPreview;
+  if (!btn) {
+    return;
+  }
+  const previewing = Boolean(ui.audioManager?.isPreviewingMusic);
+  const label = t(previewing ? 'app.nav.button.musicPreviewStop' : 'app.nav.button.musicPreview');
+  const ariaLabel = t(previewing ? 'app.nav.button.musicPreviewStopAria' : 'app.nav.button.musicPreviewAria');
+  const caption = t(previewing ? 'app.nav.button.musicPreviewStopCaption' : 'app.nav.button.musicPreviewCaption');
+  ui.applyToggleState([btn], { label, ariaLabel, tooltip: ariaLabel, pressed: previewing });
+  const doc = typeof document === 'undefined' ? null : document;
+  setTextIfChanged(doc?.querySelector(`[data-caption-for="${btn.id}"]`), caption);
+}
+
+/** Plays or stops a short Pulse music audition from Settings. */
+function toggleMusicPreview(ui) {
+  const audio = ui.audioManager;
+  if (!audio) {
+    return;
+  }
+  if (audio.isPreviewingMusic) {
+    audio.stopMusicPreview?.();
+    syncMusicPreviewButton(ui);
+    return;
+  }
+  const started = audio.previewMusic?.({ onEnd: () => syncMusicPreviewButton(ui) });
+  if (!started) {
+    const hint = t('modals.settings.musicPreviewOffHint');
+    ui.showToast?.(hint);
+    ui.announce?.(hint);
+  }
+  syncMusicPreviewButton(ui);
+}
+
 export const uiSettingsControlMethods = {
   /**
    * Toggle buttons keep a stable accessible name and expose their state
@@ -209,6 +244,7 @@ export const uiSettingsControlMethods = {
       tooltip: t(isMuted ? 'app.nav.button.soundOffAria' : 'app.nav.button.soundOnAria'),
       pressed: !isMuted
     });
+    syncMusicPreviewButton(this);
   },
 
   updateContrastButton() {
@@ -496,11 +532,15 @@ export const uiSettingsControlMethods = {
     this.elements.btnMusicVolume?.addEventListener('click', () => {
       this.cycleMusicVolume();
     });
+    this.elements.btnMusicPreview?.addEventListener('click', () => {
+      toggleMusicPreview(this);
+    });
     this.elements.btnResonance?.addEventListener('click', () => {
       this.toggleResonance();
     });
     this.updateMusicButton();
     this.updateMusicVolumeButton();
+    syncMusicPreviewButton(this);
     this.updateResonanceButton();
   },
 
@@ -509,6 +549,7 @@ export const uiSettingsControlMethods = {
     this.storageManager.setMusicEnabled(next);
     this.audioManager.setMusicEnabled?.(next);
     this.updateMusicButton();
+    syncMusicPreviewButton(this);
   },
 
   updateMusicButton() {
@@ -547,6 +588,7 @@ export const uiSettingsControlMethods = {
     btn.title = ariaLabel;
     btn.classList?.toggle?.('active', volume !== defaultVolume);
     setTextIfChanged(document.querySelector(`[data-caption-for="${btn.id}"]`), caption);
+    syncMusicPreviewButton(this);
   },
 
   toggleResonance() {

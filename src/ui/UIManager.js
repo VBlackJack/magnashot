@@ -111,6 +111,626 @@ export {
   computeTiltShare
 } from './UIHelpers.js';
 
+function cacheHudElements() {
+  return {
+    appShell: document.querySelector('.app-shell'),
+    canvasWrapper: document.querySelector('.canvas-wrapper'),
+    gameCanvas: document.getElementById('game-canvas'),
+    scoreValue: document.getElementById('hud-score-value'),
+    starProgress: document.getElementById('hud-star-progress'),
+    starGlyphs: document.getElementById('hud-star-glyphs'),
+    starCount: document.getElementById('hud-star-count'),
+    starNext: document.getElementById('hud-star-next'),
+    starMeter: document.getElementById('hud-star-meter'),
+    starMeterFill: document.getElementById('hud-star-meter-fill'),
+    sagMeter: document.getElementById('hud-sag-meter'),
+    sagMeterFill: document.getElementById('hud-sag-meter-fill'),
+    pressureMeter: document.getElementById('hud-pressure-meter'),
+    pressureMeterFill: document.getElementById('hud-pressure-meter-fill'),
+    highScoreValue: document.getElementById('hud-best-value'),
+    coinsValue: document.getElementById('hud-coins-value'),
+    overchargePct: document.getElementById('hud-overcharge-pct'),
+    overchargeFill: document.getElementById('hud-overcharge-fill'),
+    modeBanner: document.getElementById('hud-mode-banner'),
+    compactInfo: document.getElementById('hud-compact-info'),
+    shotsLabel: document.getElementById('hud-shots-label'),
+    shotsValue: document.getElementById('hud-shots-value'),
+    comboBadge: document.getElementById('hud-combo-badge'),
+    mergeEventBadge: document.getElementById('hud-merge-event'),
+    mergeContractBadge: document.getElementById('hud-merge-contract'),
+    frozenBadge: document.getElementById('hud-frozen-badge'),
+    magnetarTelegraph: document.getElementById('hud-magnetar-telegraph'),
+    quotaBadge: document.getElementById('hud-quota-badge'),
+    bestRunBadge: document.getElementById('hud-best-run'),
+    hudGhost: document.getElementById('hud-ghost'),
+    powerupsContainer: document.getElementById('powerups-bar'),
+    powerupsHeader: document.getElementById('powerups-header'),
+    powerupsEmpty: document.getElementById('powerups-empty'),
+    srAnnouncer: document.getElementById('sr-announcer'),
+    toast: document.getElementById('toast')
+  };
+}
+
+function cacheControlAndDrawerElements() {
+  return {
+    btnPlay: document.getElementById('btn-play'),
+    playNewBadge: document.getElementById('play-new-badge'),
+    btnEndless: document.getElementById('btn-endless'),
+    btnDaily: document.getElementById('btn-daily'),
+    btnFlux: document.getElementById('btn-flux'),
+    btnWeekly: document.getElementById('btn-weekly'),
+    btnStats: document.getElementById('btn-stats'),
+    btnShop: document.getElementById('btn-shop'),
+    btnRestart: document.getElementById('btn-restart'),
+    btnPause: document.getElementById('btn-pause'),
+    btnSound: document.getElementById('btn-sound'),
+    btnContrast: document.getElementById('btn-contrast'),
+    btnPatterns: document.getElementById('btn-patterns'),
+    btnTilt: document.getElementById('btn-tilt'),
+    btnMergeShakeGesture: document.getElementById('btn-merge-shake-gesture'),
+    mergeShakeGestureStatus: document.getElementById('merge-shake-gesture-status'),
+    btnMotion: document.getElementById('btn-motion'),
+    btnAnimSpeed: document.getElementById('btn-anim-speed'),
+    btnMusic: document.getElementById('btn-music'),
+    btnMusicVolume: document.getElementById('btn-music-volume'),
+    btnMusicPreview: document.getElementById('btn-music-preview'),
+    btnResonance: document.getElementById('btn-resonance'),
+    btnCalibrate: document.getElementById('btn-calibrate'),
+    modalCalibrate: document.getElementById('modal-calibrate'),
+    btnCalibrateTap: document.getElementById('btn-calibrate-tap'),
+    btnCalibrateReset: document.getElementById('btn-calibrate-reset'),
+    btnCalibrateDone: document.getElementById('btn-calibrate-done'),
+    calibrateRing: document.getElementById('calibrate-ring'),
+    calibrateIntro: document.getElementById('calibrate-intro'),
+    calibrateProgress: document.getElementById('calibrate-progress'),
+    calibrateResult: document.getElementById('calibrate-result'),
+    btnFullscreen: document.getElementById('btn-fullscreen'),
+    btnFullscreenHud: document.getElementById('btn-fullscreen-hud'),
+    btnResetHints: document.getElementById('btn-reset-hints'),
+    btnLang: document.getElementById('btn-lang'),
+    swapBtn: document.getElementById('btn-swap-ball'),
+    polarityBtn: document.getElementById('btn-polarity'),
+    mergeShakeBtn: document.getElementById('btn-merge-shake'),
+    hintReplayBtn: document.getElementById('btn-hint-replay'),
+    levelIntroBanner: document.getElementById('level-intro-banner'),
+    levelIntroText: document.getElementById('level-intro-text'),
+    btnDismissLevelIntro: document.getElementById('btn-dismiss-level-intro'),
+    drawer: document.getElementById('app-drawer'),
+    drawerBackdrop: document.getElementById('drawer-backdrop'),
+    btnMenu: document.getElementById('btn-menu'),
+    btnCloseDrawer: document.getElementById('btn-close-drawer'),
+    hudBar: document.querySelector('.hud-bar'),
+    stageContainer: document.querySelector('.stage-container'),
+    drawerMode: document.getElementById('drawer-mode'),
+    drawerStarProgress: document.getElementById('drawer-star-progress'),
+    drawerCoins: document.getElementById('drawer-coins'),
+    drawerBest: document.getElementById('drawer-best'),
+    drawerOvercharge: document.getElementById('drawer-overcharge'),
+    tutorialBanner: document.getElementById('tutorial-banner'),
+    tutorialBannerText: document.getElementById('tutorial-banner-text'),
+    btnDismissTutorial: document.getElementById('btn-dismiss-tutorial'),
+    specialEquippedBanner: document.getElementById('special-equipped-banner'),
+    cancelAimBanner: document.getElementById('cancel-aim-banner')
+  };
+}
+
+function cachePlayAndLevelsElements() {
+  return {
+    modalPlay: document.getElementById('modal-play'),
+    btnClosePlay: document.getElementById('btn-close-play'),
+    playHubHint: document.getElementById('play-hub-hint'),
+    btnCampaignContinue: document.getElementById('btn-campaign-continue'),
+    btnCampaignMap: document.getElementById('btn-campaign-map'),
+    playCampaignSummary: document.getElementById('play-campaign-summary'),
+    playCampaignMeter: document.getElementById('play-campaign-meter'),
+    playCampaignMeterFill: document.getElementById('play-campaign-meter-fill'),
+    dailyReward: document.getElementById('daily-reward'),
+    weeklyReward: document.getElementById('weekly-reward'),
+    playBountiesList: document.getElementById('play-bounties-list'),
+    btnPuzzleStagesToggle: document.getElementById('btn-puzzle-stages-toggle'),
+    btnFluxSeedToggle: document.getElementById('btn-flux-seed-toggle'),
+    fluxSeedEntry: document.getElementById('flux-seed-entry'),
+    btnVersusLocalHub: document.getElementById('btn-versus-local-hub'),
+    versusLocalHubHint: document.getElementById('versus-local-hub-hint'),
+    modalLevels: document.getElementById('modal-levels'),
+    btnModeClassic: document.getElementById('btn-mode-classic'),
+    btnModePuzzle: document.getElementById('btn-mode-puzzle'),
+    btnModeBlitz: document.getElementById('btn-mode-blitz'),
+    btnModeBossRush: document.getElementById('btn-mode-boss-rush'),
+    btnModeCascade: document.getElementById('btn-mode-cascade'),
+    btnModeHexGrid: document.getElementById('btn-mode-hex-grid'),
+    btnModePinball: document.getElementById('btn-mode-pinball'),
+    btnModeOrbital: document.getElementById('btn-mode-orbital'),
+    btnModeConvoy: document.getElementById('btn-mode-convoy'),
+    btnModeMerge: document.getElementById('btn-mode-merge'),
+    btnModeSlingshot: document.getElementById('btn-mode-slingshot'),
+    btnModeVersus: document.getElementById('btn-mode-versus'),
+    arcadeBestEndless: document.getElementById('arcade-best-endless'),
+    arcadeBestFlux: document.getElementById('arcade-best-flux'),
+    arcadeBestClassic: document.getElementById('arcade-best-classic'),
+    arcadeBestPuzzle: document.getElementById('arcade-best-puzzle'),
+    arcadeBestBlitz: document.getElementById('arcade-best-blitz'),
+    arcadeBestBossRush: document.getElementById('arcade-best-boss-rush'),
+    arcadeBestCascade: document.getElementById('arcade-best-cascade'),
+    arcadeBestHexGrid: document.getElementById('arcade-best-hex-grid'),
+    arcadeBestPinball: document.getElementById('arcade-best-pinball'),
+    arcadeBestOrbital: document.getElementById('arcade-best-orbital'),
+    arcadeBestConvoy: document.getElementById('arcade-best-convoy'),
+    arcadeBestMerge: document.getElementById('arcade-best-merge'),
+    arcadeBestSlingshot: document.getElementById('arcade-best-slingshot'),
+    arcadeBestVersus: document.getElementById('arcade-best-versus'),
+    puzzleStagesStrip: document.getElementById('puzzle-stages-strip'),
+    levelsStarsSummary: document.getElementById('levels-stars-summary'),
+    btnLevelsFilterIncomplete: document.getElementById('btn-levels-filter-incomplete'),
+    inputFluxSeed: document.getElementById('input-flux-seed'),
+    btnFluxSeedGo: document.getElementById('btn-flux-seed-go'),
+    fluxSeedError: document.getElementById('flux-seed-error'),
+    btnChapterPrev: document.getElementById('btn-chapter-prev'),
+    levelsChapterSelect: document.getElementById('levels-chapter-select'),
+    btnChapterNext: document.getElementById('btn-chapter-next'),
+    levelsChapterProgress: document.getElementById('levels-chapter-progress'),
+    levelsChapterMeterFill: document.getElementById('levels-chapter-meter-fill'),
+    btnLevelsJumpCurrent: document.getElementById('btn-levels-jump-current'),
+    levelsChapterHint: document.getElementById('levels-chapter-hint'),
+    levelsGrid: document.getElementById('levels-grid'),
+    levelsDetail: document.getElementById('levels-detail'),
+    levelsDetailHeader: document.getElementById('levels-detail-header'),
+    levelsDetailTitle: document.getElementById('levels-detail-title'),
+    levelsDetailBadge: document.getElementById('levels-detail-badge'),
+    levelsDetailDesc: document.getElementById('levels-detail-desc'),
+    levelsDetailStars: document.getElementById('levels-detail-stars'),
+    levelsDetailBest: document.getElementById('levels-detail-best'),
+    levelsDetailLock: document.getElementById('levels-detail-lock'),
+    btnCloseLevels: document.getElementById('btn-close-levels'),
+    btnPlayLevelModal: document.getElementById('btn-play-level-modal')
+  };
+}
+
+function cacheShopAndModalElements() {
+  return {
+    modalShop: document.getElementById('modal-shop'),
+    shopBalance: document.getElementById('shop-balance'),
+    tabShopUpgrades: document.getElementById('tab-shop-upgrades'),
+    tabShopAmmo: document.getElementById('tab-shop-ammo'),
+    shopAmmoPane: document.getElementById('shop-ammo-pane'),
+    tabShopStyles: document.getElementById('tab-shop-styles'),
+    shopStylesPane: document.getElementById('shop-styles-pane'),
+    shopStylesGrid: document.getElementById('shop-styles-grid'),
+    tabShopAchievements: document.getElementById('tab-shop-achievements'),
+    tabShopCodex: document.getElementById('tab-shop-codex'),
+    shopUpgradesPane: document.getElementById('shop-upgrades-pane'),
+    shopGrid: document.getElementById('shop-grid'),
+    shopAmmoGrid: document.getElementById('shop-ammo-grid'),
+    achievementsGrid: document.getElementById('achievements-grid'),
+    codexPane: document.getElementById('codex-pane'),
+    btnCloseShop: document.getElementById('btn-close-shop'),
+    modalVictory: document.getElementById('modal-victory'),
+    victoryUnlock: document.getElementById('victory-unlock'),
+    victoryScore: document.getElementById('victory-score'),
+    victoryBonus: document.getElementById('victory-bonus'),
+    victoryStars: document.getElementById('victory-stars'),
+    victoryNextStar: document.getElementById('victory-next-star'),
+    btnNextLevel: document.getElementById('btn-next-level'),
+    btnReplayVictory: document.getElementById('btn-replay-victory'),
+    btnLevelsVictory: document.getElementById('btn-levels-victory'),
+    modalGameOver: document.getElementById('modal-gameover'),
+    gameOverReason: document.getElementById('gameover-reason'),
+    gameOverScore: document.getElementById('gameover-score'),
+    gameOverBest: document.getElementById('gameover-best'),
+    gameoverRemaining: document.getElementById('gameover-remaining'),
+    gameOverStage: document.getElementById('gameover-stage'),
+    gameOverNearMiss: document.getElementById('gameover-near-miss'),
+    gameOverDuel: document.getElementById('gameover-duel'),
+    gameOverDailyNext: document.getElementById('gameover-daily-next'),
+    btnContinueGameOver: document.getElementById('btn-continue-gameover'),
+    btnRetry: document.getElementById('btn-retry'),
+    btnSameSeedGameOver: document.getElementById('btn-same-seed-gameover'),
+    btnLevelsGameOver: document.getElementById('btn-levels-gameover'),
+    btnShareGameOver: document.getElementById('btn-share-gameover'),
+    btnDailyHistoryGameOver: document.getElementById('btn-daily-history-gameover'),
+    gameOverShareFallback: document.getElementById('gameover-share-fallback'),
+    gameOverShareText: document.getElementById('gameover-share-text'),
+    modalPause: document.getElementById('modal-pause'),
+    modalFluxPerk: document.getElementById('modal-flux-perk'),
+    fluxPerkCards: document.getElementById('flux-perk-cards'),
+    hudPerks: document.getElementById('hud-perks'),
+    drawerPerks: document.getElementById('drawer-perks'),
+    drawerPerksStat: document.getElementById('drawer-perks-stat'),
+    pauseLevelTip: document.getElementById('pause-level-tip'),
+    pauseInstructionTip: document.getElementById('pause-instruction-tip'),
+    btnResume: document.getElementById('btn-resume'),
+    btnRestartPause: document.getElementById('btn-restart-pause'),
+    btnLevelsPause: document.getElementById('btn-levels-pause'),
+    btnSettingsPause: document.getElementById('btn-settings-pause'),
+    btnSettings: document.getElementById('btn-settings'),
+    modalSettings: document.getElementById('modal-settings'),
+    modalProgressImport: document.getElementById('modal-progress-import'),
+    btnCloseSettings: document.getElementById('btn-close-settings'),
+    btnInstall: document.getElementById('btn-install'),
+    installIosHint: document.getElementById('install-ios-hint'),
+    modalConfirm: document.getElementById('modal-confirm'),
+    modalConfirmTitle: document.getElementById('modal-confirm-title'),
+    modalConfirmMessage: document.getElementById('modal-confirm-message'),
+    btnConfirmYes: document.getElementById('btn-confirm-yes'),
+    btnConfirmNo: document.getElementById('btn-confirm-no')
+  };
+}
+
+function cacheStatsAndGamepadElements() {
+  return {
+    modalStats: document.getElementById('modal-stats'),
+    tabStatsOverview: document.getElementById('tab-stats-overview'),
+    tabStatsDaily: document.getElementById('tab-stats-daily'),
+    statsOverviewPane: document.getElementById('stats-overview-pane'),
+    statsDailyPane: document.getElementById('stats-daily-pane'),
+    statsSince: document.getElementById('stats-since'),
+    statsOverviewEmpty: document.getElementById('stats-overview-empty'),
+    statsOverviewList: document.getElementById('stats-overview-list'),
+    statsCampaignList: document.getElementById('stats-campaign-list'),
+    statsDailySummary: document.getElementById('stats-daily-summary'),
+    statsDailyEmpty: document.getElementById('stats-daily-empty'),
+    statsDailyWrap: document.getElementById('stats-daily-wrap'),
+    statsDailyCaption: document.getElementById('stats-daily-caption'),
+    statsDailyBody: document.getElementById('stats-daily-body'),
+    statsCopyFeedback: document.getElementById('stats-copy-feedback'),
+    statsCopyFallback: document.getElementById('stats-copy-fallback'),
+    statsCopyText: document.getElementById('stats-copy-text'),
+    btnCopyStats: document.getElementById('btn-copy-stats'),
+    btnCloseStats: document.getElementById('btn-close-stats'),
+    modalDuel: document.getElementById('modal-duel'),
+    duelCardSummary: document.getElementById('duel-card-summary'),
+    duelCardNotes: document.getElementById('duel-card-notes'),
+    btnDuelAccept: document.getElementById('btn-duel-accept'),
+    btnDuelDecline: document.getElementById('btn-duel-decline'),
+    btnDuelOk: document.getElementById('btn-duel-ok'),
+    inputDuelName: document.getElementById('input-duel-name'),
+    statsDuelsRecord: document.getElementById('stats-duels-record'),
+    statsDuelsFilters: document.getElementById('stats-duels-filters'),
+    btnDuelsFilterAll: document.getElementById('btn-duels-filter-all'),
+    btnDuelsFilterDaily: document.getElementById('btn-duels-filter-daily'),
+    btnDuelsFilterFlux: document.getElementById('btn-duels-filter-flux'),
+    statsDuelsEmpty: document.getElementById('stats-duels-empty'),
+    statsDuelsList: document.getElementById('stats-duels-list'),
+    inputGamepadEnabled: document.getElementById('input-gamepad-enabled'),
+    selectGamepadDeadzone: document.getElementById('select-gamepad-deadzone'),
+    selectGamepadAimSpeed: document.getElementById('select-gamepad-aim-speed'),
+    inputGamepadInvertX: document.getElementById('input-gamepad-invert-x'),
+    settingsControllerFields: document.getElementById('settings-controller-fields'),
+    settingsControllerNoPad: document.getElementById('settings-controller-nopad')
+  };
+}
+
+function cacheVersusElements() {
+  return {
+    modalVersusTiers: document.getElementById('modal-versus-tiers'),
+    versusTierList: document.getElementById('versus-tier-list'),
+    versusTierHint: document.getElementById('versus-tier-hint'),
+    versusResonanceOption: document.getElementById('input-versus-resonance'),
+    btnVersusTiersBack: document.getElementById('btn-versus-tiers-back'),
+    btnVersusLocal: document.getElementById('btn-versus-local'),
+    versusLocalEntryHint: document.getElementById('versus-local-entry-hint'),
+    modalVersusLocal: document.getElementById('modal-versus-local'),
+    btnVersusLocalStart: document.getElementById('btn-versus-local-start'),
+    btnVersusLocalBack: document.getElementById('btn-versus-local-back'),
+    versusLocalNeedTwo: document.getElementById('versus-local-need-two'),
+    versusLocalLive: document.getElementById('versus-local-live'),
+    versusScreen: document.getElementById('versus-screen'),
+    versusBoards: document.querySelector('#versus-screen .versus-boards'),
+    versusBar: document.querySelector('#versus-screen .versus-bar'),
+    versusCanvas0: document.getElementById('versus-canvas-0'),
+    versusCanvas1: document.getElementById('versus-canvas-1'),
+    versusHud0: document.getElementById('versus-hud-0'),
+    versusHud1: document.getElementById('versus-hud-1'),
+    versusRoundOverlay: document.getElementById('versus-round-overlay'),
+    btnVersusPause: document.getElementById('btn-versus-pause'),
+    btnVersusSwap: document.getElementById('btn-versus-swap'),
+    btnVersusPolarity: document.getElementById('btn-versus-polarity'),
+    btnVersusSwap1: document.getElementById('btn-versus-swap-1'),
+    btnVersusPolarity1: document.getElementById('btn-versus-polarity-1'),
+    versusPauseSizeHint: document.getElementById('versus-pause-size-hint'),
+    versusPausePadHint: document.getElementById('versus-pause-pad-hint'),
+    modalDuelPause: document.getElementById('modal-duel-pause'),
+    btnVersusResume: document.getElementById('btn-versus-resume'),
+    btnVersusRestart: document.getElementById('btn-versus-restart'),
+    btnVersusQuit: document.getElementById('btn-versus-quit'),
+    modalDuelResult: document.getElementById('modal-duel-result'),
+    versusResultTitle: document.getElementById('modal-duel-result-title'),
+    versusResultScore: document.getElementById('versus-result-score'),
+    versusResultTier: document.getElementById('versus-result-tier'),
+    versusResultNeutralised: document.getElementById('versus-result-neutralised'),
+    versusResultPulses: document.getElementById('versus-result-pulses'),
+    versusResultNeutralisedB: document.getElementById('versus-result-neutralised-b'),
+    versusResultPulsesB: document.getElementById('versus-result-pulses-b'),
+    btnVersusChangePlayers: document.getElementById('btn-versus-change-players'),
+    versusResultShareFallback: document.getElementById('versus-result-share-fallback'),
+    versusResultShareText: document.getElementById('versus-result-share-text'),
+    btnVersusRematch: document.getElementById('btn-versus-rematch'),
+    btnVersusShare: document.getElementById('btn-versus-share'),
+    btnVersusBack: document.getElementById('btn-versus-back')
+  };
+}
+
+function collectUiElements() {
+  return Object.assign(
+    cacheHudElements(),
+    cacheControlAndDrawerElements(),
+    cachePlayAndLevelsElements(),
+    cacheShopAndModalElements(),
+    cacheStatsAndGamepadElements(),
+    cacheVersusElements()
+  );
+}
+
+function initUiRuntimeState(ui, engine, renderer) {
+  ui.pendingAnnouncements = [];
+  ui.isAnnouncementScheduled = false;
+  ui.lastExtra = {};
+  ui.pendingConfirmCallback = null;
+  ui.pendingConfirmLabelResolver = null;
+  ui.confirmPausedRun = false;
+  ui.isSharing = false;
+  ui.shareCopied = false;
+  ui.hintsResetConfirmed = false;
+  ui.dailyCountdownTimer = null;
+  ui.activeShopTab = SHOP_TABS.UPGRADES;
+  // The deferred install prompt, kept until the player asks for it from Settings.
+  ui.installPromptEvent = null;
+  ui.levelsChapterIndex = 0;
+  ui.levelsSelectedId = null;
+  ui.levelsFilterIncomplete = false;
+  ui.autoPausedByOverlay = false;
+  ui.lastFocusedElement = null;
+  ui.wasAnyModalOpen = false;
+  ui.stackedModalOpener = null;
+  // The button the duel tier picker hands focus back to when the hub opened it (null: default).
+  ui.versusTierOpener = null;
+  // Pulse: the music driver (built on the first frame) and the rhythm calibration in progress.
+  ui.pulseDriver = null;
+  ui.calibration = null;
+  ui.calibrationFrameId = null;
+  ui.calibrationPressHandled = false;
+  ui.calibrationClickEnabled = false;
+  ui.prevEngineState = null;
+  ui.isVictoryModalRevealed = false;
+  ui.isVictoryPresented = false;
+  ui.victoryStarsLabel = null;
+  ui.scoreCountUpFrame = null;
+  ui.inputMode = ui.detectInitialInputMode();
+  ui.gamepadInput = null;
+  ui.padFocusEl = null;
+  ui.toastTimer = null;
+  ui.isDrawerOpen = false;
+  ui.drawerStarParts = null;
+  ui.activeStatsTab = STATS_TABS.OVERVIEW;
+  ui.statsOpener = null;
+  ui.statsCopied = false;
+  ui.duelCardRead = null;
+  ui.duelCardAtStake = false;
+  ui.ghostLastSide = null;
+  ui.challengeUrl = null;
+  // The versus screen (null while closed), the scene the game loop drives, and what the UI
+  // routes the gameplay controls to while the screen is open.
+  ui.versus = null;
+  ui.versusScene = null;
+  ui.versusSeedCounter = 0;
+  // The two-player lobby (slots, handicaps) and its key names; created when the lobby is bound.
+  ui.versusLocal = null;
+  ui.mainScene = { boards: [{ engine, renderer }] };
+  ui.versusSceneController = {
+    handleGameplayKey: (event) => ui.handleVersusGameplayKey(event),
+    handleGamepadActions: (actions, aimDelta) => ui.handleVersusGamepadActions(actions, aimDelta),
+    pause: () => ui.pauseVersus()
+  };
+}
+
+function handleInactiveLevelIntro(ui, engine, banner, intro) {
+  // A Puzzle intro that never got its turn behind a discovery card: the first shot came first,
+  // so the goal is still announced to screen readers before the intro is forgotten.
+  if (!intro && ui.deferredPuzzleIntro && engine.state === GAME_STATES.PLAYING && engine.hasFiredInRound) {
+    ui.announce(buildLevelIntroText({ ...ui.deferredPuzzleIntro, fairPlay: null }, t));
+  }
+  if (!intro) {
+    ui.deferredPuzzleIntro = null;
+  }
+  banner.classList.add('hidden');
+  ui.levelIntroShotsAtShow = null;
+  ui.levelIntroRunShotsAtShow = null;
+}
+
+function shouldDismissIntroByShotProgress(ui, engine, banner) {
+  const usesShots = engine.usesShotBudget ? engine.usesShotBudget() : true;
+  if (usesShots) {
+    if (ui.levelIntroShotsAtShow === null || ui.levelIntroShotsAtShow === undefined) {
+      ui.levelIntroShotsAtShow = engine.shotsRemaining;
+      return false;
+    }
+    if (engine.shotsRemaining >= ui.levelIntroShotsAtShow) {
+      return false;
+    }
+  } else if (typeof engine.runShotsFired === 'number') {
+    if (ui.levelIntroRunShotsAtShow === null || ui.levelIntroRunShotsAtShow === undefined) {
+      ui.levelIntroRunShotsAtShow = engine.runShotsFired;
+      return false;
+    }
+    if (engine.runShotsFired <= ui.levelIntroRunShotsAtShow) {
+      return false;
+    }
+  } else {
+    return false;
+  }
+  ui.levelIntroShotsAtShow = null;
+  ui.levelIntroRunShotsAtShow = null;
+  engine.dismissLevelIntro?.();
+  banner.classList.add('hidden');
+  return true;
+}
+
+function updateSinglePowerupButton(ui, engine, btn, context) {
+  const type = btn.dataset.specialType;
+  const isAllowed = engine.isSpecialTypeAllowed?.(type) !== false;
+  btn.classList.toggle('hidden', !isAllowed);
+  if (!isAllowed) {
+    return;
+  }
+  const { isOpenToAmmo, canBuyAmmo, holdReason } = context;
+  const count = engine.specialInventory[type] || 0;
+  const isEquipped = Boolean(engine.currentBall && engine.currentBall.specialType === type);
+  const isEmpty = count <= 0 && !isEquipped;
+  const countEl = document.getElementById(`powerup-count-${type}`);
+  // The empty look follows the run, not the shot: it must not flicker on every shot.
+  const isEmptyForSale = isEmpty && isOpenToAmmo;
+  const isHeld = isEmptyForSale && !canBuyAmmo;
+  setTextIfChanged(countEl, isEmptyForSale ? t('hud.powerups.button.emptyMark') : String(count));
+  const baseLabel = isEmptyForSale
+    ? t('hud.powerups.button.buyAria', { name: t(`hud.powerups.${type}.name`) })
+    : ui.getPowerupAriaLabel(type, count);
+  const label = isHeld && holdReason ? `${baseLabel}. ${holdReason}` : baseLabel;
+  setAttributeIfChanged(btn, 'aria-label', label);
+  setAttributeIfChanged(btn, 'title', isHeld && holdReason ? holdReason : t(`hud.powerups.${type}.tooltip`));
+  btn.classList.toggle('equipped', isEquipped);
+  btn.classList.toggle(EMPTY_POWERUP_CLASS, isEmptyForSale);
+  setAttributeIfChanged(btn, 'aria-pressed', String(isEquipped));
+  // Held by a shot or a stage change: still focusable, the click is rejected instead.
+  setAttributeIfChanged(btn, 'aria-disabled', String(isHeld));
+  // Ammo is only sold during a round, so between rounds an empty button stays inert.
+  btn.disabled = isEmpty && !isOpenToAmmo;
+}
+
+function configureUnlockedPuzzleStageBtn(ui, btn, stageNum, label, { stars, maxStars }) {
+  const labelEl = document.createElement('span');
+  labelEl.textContent = label;
+  const starsEl = document.createElement('span');
+  starsEl.className = 'puzzle-stage-stars';
+  starsEl.setAttribute('aria-hidden', 'true');
+  starsEl.textContent = ui.formatStars(stars, maxStars);
+  btn.append(labelEl, starsEl);
+  btn.setAttribute(
+    'aria-label',
+    t('modals.levelSelect.arcade.puzzleStageAria', {
+      stage: formatNumber(stageNum),
+      stars: formatNumber(stars),
+      maxStars: formatNumber(maxStars)
+    })
+  );
+  btn.addEventListener('click', () => {
+    ui.requestDestructiveAction(
+      () => {
+        ui.hideAllModals();
+        ui.engine.startPuzzleMode(stageNum);
+      },
+      () => label
+    );
+  });
+}
+
+function configureLockedPuzzleStageBtn(ui, btn, stageNum, label) {
+  btn.textContent = label;
+  const requiredStage = Math.max(1, stageNum - 1);
+  const lockText = t('modals.levelSelect.arcade.puzzleStageLocked', {
+    previous: formatNumber(requiredStage)
+  });
+  btn.setAttribute('aria-disabled', 'true');
+  btn.title = lockText;
+  btn.setAttribute('aria-label', `${label} - ${lockText}`);
+  btn.addEventListener('click', () => {
+    ui.showLockedLevelHint(requiredStage, 'modals.levelSelect.arcade.puzzleStageLocked');
+  });
+}
+
+function resolvePuzzleStripContext(ui) {
+  const puzzles = ui.gameConfig ? ui.gameConfig.puzzles : null;
+  const totalPuzzles = Math.max(1, puzzles ? puzzles.length : 1);
+  const storage = ui.storageManager || {};
+  const bestStage = storage.getPuzzleBestStage ? storage.getPuzzleBestStage() : 1;
+  const stageStats = storage.getPuzzleStageStats ? storage.getPuzzleStageStats() : null;
+  const scoring = ui.gameConfig ? ui.gameConfig.scoring : null;
+  return {
+    totalPuzzles,
+    unlockedStage: Math.min(totalPuzzles, Math.max(1, bestStage || 1)),
+    stageStats: stageStats || {},
+    maxStars: scoring ? scoring.maxStars || 0 : 0
+  };
+}
+
+function createPuzzleStageButton(ui, stageNum, { unlockedStage, maxStars, stageStats }) {
+  const isUnlocked = stageNum <= unlockedStage;
+  const isCurrent =
+    ui.engine?.mode === GAME_MODES.PUZZLE && ui.engine.currentPuzzleStage === stageNum;
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = `puzzle-stage-btn${isCurrent ? ' active' : ''}${isUnlocked ? '' : ' locked'}`;
+  btn.dataset.puzzleStage = String(stageNum);
+  const label = t('modals.levelSelect.arcade.puzzleStage', { stage: formatNumber(stageNum) });
+  if (isCurrent) {
+    btn.setAttribute('aria-current', 'true');
+  }
+  if (isUnlocked) {
+    configureUnlockedPuzzleStageBtn(ui, btn, stageNum, label, {
+      stars: stageStats[stageNum]?.stars || 0,
+      maxStars
+    });
+  } else {
+    configureLockedPuzzleStageBtn(ui, btn, stageNum, label);
+  }
+  return btn;
+}
+
+const STAGE_SUMMARY_MODES = new Map([
+  [GAME_MODES.BOSS_RUSH, {
+    key: 'modals.gameOver.stats.bossRushSummary',
+    param: 'wave',
+    readStage: (engine) => engine.bossRushWave,
+    readBest: (storage) => storage.getBossRushBestWave?.()
+  }],
+  [GAME_MODES.CLASSIC, {
+    key: 'modals.gameOver.stats.classicSummary',
+    param: 'stage',
+    readStage: (engine) => engine.classicStage,
+    readBest: (storage) => storage.getClassicBestStage?.()
+  }],
+  [GAME_MODES.PINBALL, {
+    key: 'modals.gameOver.stats.pinballSummary',
+    param: 'stage',
+    readStage: (engine) => engine.pinballStage || 1,
+    readBest: (storage) => storage.getPinballBestStage?.()
+  }],
+  [GAME_MODES.SLINGSHOT, {
+    key: 'modals.gameOver.stats.slingshotSummary',
+    param: 'stage',
+    readStage: (engine) => engine.slingshotStage || 1,
+    readBest: (storage) => storage.getSlingshotBestStage?.()
+  }],
+  [GAME_MODES.MERGE, {
+    key: 'modals.gameOver.stats.mergeSummary',
+    param: 'tier',
+    readStage: (engine) => engine.mergeBestTier || 1,
+    readBest: (storage) => storage.getMergeBestTier?.()
+  }]
+]);
+
+const WAVE_SUMMARY_MODES = new Set([
+  GAME_MODES.ENDLESS,
+  GAME_MODES.DAILY,
+  GAME_MODES.BLITZ,
+  GAME_MODES.CASCADE,
+  GAME_MODES.HEX_GRID,
+  GAME_MODES.ORBITAL,
+  GAME_MODES.CONVOY
+]);
+
+function formatFluxGameOverSummary(ui, engine) {
+  const weeklyBestStage = engine.isWeeklyFluxRun === true
+    ? ui.storageManager.getWeeklyFluxBest?.(engine.weeklyWeekKey)?.stage || 0
+    : 0;
+  const bestStage = engine.isWeeklyFluxRun === true
+    ? weeklyBestStage
+    : ui.storageManager.getFluxBestStage();
+  return t('modals.gameOver.stats.fluxStage', {
+    stage: formatNumber(engine.fluxStage),
+    best: formatNumber(Math.max(engine.fluxStage, bestStage))
+  });
+}
+
 /**
  * Manages DOM HUD updates, accessible modal dialogs, shop/codex tabs,
  * and keyboard/button event bindings.
@@ -124,377 +744,8 @@ export class UIManager {
     this.gameConfig = gameConfig;
     this.ballsConfig = ballsConfig;
     this.versusConfigs = versusConfigs;
-
-    this.elements = {
-      appShell: document.querySelector('.app-shell'),
-      canvasWrapper: document.querySelector('.canvas-wrapper'),
-      gameCanvas: document.getElementById('game-canvas'),
-      scoreValue: document.getElementById('hud-score-value'),
-      starProgress: document.getElementById('hud-star-progress'),
-      starGlyphs: document.getElementById('hud-star-glyphs'),
-      starCount: document.getElementById('hud-star-count'),
-      starNext: document.getElementById('hud-star-next'),
-      starMeter: document.getElementById('hud-star-meter'),
-      starMeterFill: document.getElementById('hud-star-meter-fill'),
-      sagMeter: document.getElementById('hud-sag-meter'),
-      sagMeterFill: document.getElementById('hud-sag-meter-fill'),
-      pressureMeter: document.getElementById('hud-pressure-meter'),
-      pressureMeterFill: document.getElementById('hud-pressure-meter-fill'),
-      highScoreValue: document.getElementById('hud-best-value'),
-      coinsValue: document.getElementById('hud-coins-value'),
-      overchargePct: document.getElementById('hud-overcharge-pct'),
-      overchargeFill: document.getElementById('hud-overcharge-fill'),
-      modeBanner: document.getElementById('hud-mode-banner'),
-      compactInfo: document.getElementById('hud-compact-info'),
-      shotsLabel: document.getElementById('hud-shots-label'),
-      shotsValue: document.getElementById('hud-shots-value'),
-      comboBadge: document.getElementById('hud-combo-badge'),
-      mergeEventBadge: document.getElementById('hud-merge-event'),
-      mergeContractBadge: document.getElementById('hud-merge-contract'),
-      frozenBadge: document.getElementById('hud-frozen-badge'),
-      magnetarTelegraph: document.getElementById('hud-magnetar-telegraph'),
-      quotaBadge: document.getElementById('hud-quota-badge'),
-      bestRunBadge: document.getElementById('hud-best-run'),
-      hudGhost: document.getElementById('hud-ghost'),
-      powerupsContainer: document.getElementById('powerups-bar'),
-      powerupsHeader: document.getElementById('powerups-header'),
-      powerupsEmpty: document.getElementById('powerups-empty'),
-      btnPlay: document.getElementById('btn-play'),
-      playNewBadge: document.getElementById('play-new-badge'),
-      btnEndless: document.getElementById('btn-endless'),
-      btnDaily: document.getElementById('btn-daily'),
-      btnFlux: document.getElementById('btn-flux'),
-      btnWeekly: document.getElementById('btn-weekly'),
-      btnStats: document.getElementById('btn-stats'),
-      btnShop: document.getElementById('btn-shop'),
-      btnRestart: document.getElementById('btn-restart'),
-      btnPause: document.getElementById('btn-pause'),
-      btnSound: document.getElementById('btn-sound'),
-      btnContrast: document.getElementById('btn-contrast'),
-      btnPatterns: document.getElementById('btn-patterns'),
-      btnTilt: document.getElementById('btn-tilt'),
-      btnMergeShakeGesture: document.getElementById('btn-merge-shake-gesture'),
-      mergeShakeGestureStatus: document.getElementById('merge-shake-gesture-status'),
-      btnMotion: document.getElementById('btn-motion'),
-      btnAnimSpeed: document.getElementById('btn-anim-speed'),
-      btnMusic: document.getElementById('btn-music'),
-      btnMusicVolume: document.getElementById('btn-music-volume'),
-      btnResonance: document.getElementById('btn-resonance'),
-      btnCalibrate: document.getElementById('btn-calibrate'),
-      modalCalibrate: document.getElementById('modal-calibrate'),
-      btnCalibrateTap: document.getElementById('btn-calibrate-tap'),
-      btnCalibrateReset: document.getElementById('btn-calibrate-reset'),
-      btnCalibrateDone: document.getElementById('btn-calibrate-done'),
-      calibrateRing: document.getElementById('calibrate-ring'),
-      calibrateIntro: document.getElementById('calibrate-intro'),
-      calibrateProgress: document.getElementById('calibrate-progress'),
-      calibrateResult: document.getElementById('calibrate-result'),
-      btnFullscreen: document.getElementById('btn-fullscreen'),
-      btnFullscreenHud: document.getElementById('btn-fullscreen-hud'),
-      btnResetHints: document.getElementById('btn-reset-hints'),
-      btnLang: document.getElementById('btn-lang'),
-      swapBtn: document.getElementById('btn-swap-ball'),
-      polarityBtn: document.getElementById('btn-polarity'),
-      mergeShakeBtn: document.getElementById('btn-merge-shake'),
-      hintReplayBtn: document.getElementById('btn-hint-replay'),
-      levelIntroBanner: document.getElementById('level-intro-banner'),
-      levelIntroText: document.getElementById('level-intro-text'),
-      btnDismissLevelIntro: document.getElementById('btn-dismiss-level-intro'),
-      drawer: document.getElementById('app-drawer'),
-      drawerBackdrop: document.getElementById('drawer-backdrop'),
-      btnMenu: document.getElementById('btn-menu'),
-      btnCloseDrawer: document.getElementById('btn-close-drawer'),
-      hudBar: document.querySelector('.hud-bar'),
-      stageContainer: document.querySelector('.stage-container'),
-      drawerMode: document.getElementById('drawer-mode'),
-      drawerStarProgress: document.getElementById('drawer-star-progress'),
-      drawerCoins: document.getElementById('drawer-coins'),
-      drawerBest: document.getElementById('drawer-best'),
-      drawerOvercharge: document.getElementById('drawer-overcharge'),
-      tutorialBanner: document.getElementById('tutorial-banner'),
-      tutorialBannerText: document.getElementById('tutorial-banner-text'),
-      btnDismissTutorial: document.getElementById('btn-dismiss-tutorial'),
-      specialEquippedBanner: document.getElementById('special-equipped-banner'),
-      cancelAimBanner: document.getElementById('cancel-aim-banner'),
-      modalPlay: document.getElementById('modal-play'),
-      btnClosePlay: document.getElementById('btn-close-play'),
-      playHubHint: document.getElementById('play-hub-hint'),
-      btnCampaignContinue: document.getElementById('btn-campaign-continue'),
-      btnCampaignMap: document.getElementById('btn-campaign-map'),
-      playCampaignSummary: document.getElementById('play-campaign-summary'),
-      playCampaignMeter: document.getElementById('play-campaign-meter'),
-      playCampaignMeterFill: document.getElementById('play-campaign-meter-fill'),
-      dailyReward: document.getElementById('daily-reward'),
-      weeklyReward: document.getElementById('weekly-reward'),
-      playBountiesList: document.getElementById('play-bounties-list'),
-      btnPuzzleStagesToggle: document.getElementById('btn-puzzle-stages-toggle'),
-      btnFluxSeedToggle: document.getElementById('btn-flux-seed-toggle'),
-      fluxSeedEntry: document.getElementById('flux-seed-entry'),
-      btnVersusLocalHub: document.getElementById('btn-versus-local-hub'),
-      versusLocalHubHint: document.getElementById('versus-local-hub-hint'),
-      modalLevels: document.getElementById('modal-levels'),
-      btnModeClassic: document.getElementById('btn-mode-classic'),
-      btnModePuzzle: document.getElementById('btn-mode-puzzle'),
-      btnModeBlitz: document.getElementById('btn-mode-blitz'),
-      btnModeBossRush: document.getElementById('btn-mode-boss-rush'),
-      btnModeCascade: document.getElementById('btn-mode-cascade'),
-      btnModeHexGrid: document.getElementById('btn-mode-hex-grid'),
-      btnModePinball: document.getElementById('btn-mode-pinball'),
-      btnModeOrbital: document.getElementById('btn-mode-orbital'),
-      btnModeConvoy: document.getElementById('btn-mode-convoy'),
-      btnModeMerge: document.getElementById('btn-mode-merge'),
-      btnModeSlingshot: document.getElementById('btn-mode-slingshot'),
-      btnModeVersus: document.getElementById('btn-mode-versus'),
-      arcadeBestEndless: document.getElementById('arcade-best-endless'),
-      arcadeBestFlux: document.getElementById('arcade-best-flux'),
-      arcadeBestClassic: document.getElementById('arcade-best-classic'),
-      arcadeBestPuzzle: document.getElementById('arcade-best-puzzle'),
-      arcadeBestBlitz: document.getElementById('arcade-best-blitz'),
-      arcadeBestBossRush: document.getElementById('arcade-best-boss-rush'),
-      arcadeBestCascade: document.getElementById('arcade-best-cascade'),
-      arcadeBestHexGrid: document.getElementById('arcade-best-hex-grid'),
-      arcadeBestPinball: document.getElementById('arcade-best-pinball'),
-      arcadeBestOrbital: document.getElementById('arcade-best-orbital'),
-      arcadeBestConvoy: document.getElementById('arcade-best-convoy'),
-      arcadeBestMerge: document.getElementById('arcade-best-merge'),
-      arcadeBestSlingshot: document.getElementById('arcade-best-slingshot'),
-      arcadeBestVersus: document.getElementById('arcade-best-versus'),
-      puzzleStagesStrip: document.getElementById('puzzle-stages-strip'),
-      levelsStarsSummary: document.getElementById('levels-stars-summary'),
-      btnLevelsFilterIncomplete: document.getElementById('btn-levels-filter-incomplete'),
-      inputFluxSeed: document.getElementById('input-flux-seed'),
-      btnFluxSeedGo: document.getElementById('btn-flux-seed-go'),
-      fluxSeedError: document.getElementById('flux-seed-error'),
-      btnChapterPrev: document.getElementById('btn-chapter-prev'),
-      levelsChapterSelect: document.getElementById('levels-chapter-select'),
-      btnChapterNext: document.getElementById('btn-chapter-next'),
-      levelsChapterProgress: document.getElementById('levels-chapter-progress'),
-      levelsChapterMeterFill: document.getElementById('levels-chapter-meter-fill'),
-      btnLevelsJumpCurrent: document.getElementById('btn-levels-jump-current'),
-      levelsChapterHint: document.getElementById('levels-chapter-hint'),
-      levelsGrid: document.getElementById('levels-grid'),
-      levelsDetail: document.getElementById('levels-detail'),
-      levelsDetailHeader: document.getElementById('levels-detail-header'),
-      levelsDetailTitle: document.getElementById('levels-detail-title'),
-      levelsDetailBadge: document.getElementById('levels-detail-badge'),
-      levelsDetailDesc: document.getElementById('levels-detail-desc'),
-      levelsDetailStars: document.getElementById('levels-detail-stars'),
-      levelsDetailBest: document.getElementById('levels-detail-best'),
-      levelsDetailLock: document.getElementById('levels-detail-lock'),
-      btnCloseLevels: document.getElementById('btn-close-levels'),
-      btnPlayLevelModal: document.getElementById('btn-play-level-modal'),
-      modalShop: document.getElementById('modal-shop'),
-      shopBalance: document.getElementById('shop-balance'),
-      tabShopUpgrades: document.getElementById('tab-shop-upgrades'),
-      tabShopAmmo: document.getElementById('tab-shop-ammo'),
-      shopAmmoPane: document.getElementById('shop-ammo-pane'),
-      tabShopStyles: document.getElementById('tab-shop-styles'),
-      shopStylesPane: document.getElementById('shop-styles-pane'),
-      shopStylesGrid: document.getElementById('shop-styles-grid'),
-      tabShopAchievements: document.getElementById('tab-shop-achievements'),
-      tabShopCodex: document.getElementById('tab-shop-codex'),
-      shopUpgradesPane: document.getElementById('shop-upgrades-pane'),
-      shopGrid: document.getElementById('shop-grid'),
-      shopAmmoGrid: document.getElementById('shop-ammo-grid'),
-      achievementsGrid: document.getElementById('achievements-grid'),
-      codexPane: document.getElementById('codex-pane'),
-      btnCloseShop: document.getElementById('btn-close-shop'),
-      modalVictory: document.getElementById('modal-victory'),
-      victoryUnlock: document.getElementById('victory-unlock'),
-      victoryScore: document.getElementById('victory-score'),
-      victoryBonus: document.getElementById('victory-bonus'),
-      victoryStars: document.getElementById('victory-stars'),
-      victoryNextStar: document.getElementById('victory-next-star'),
-      btnNextLevel: document.getElementById('btn-next-level'),
-      btnReplayVictory: document.getElementById('btn-replay-victory'),
-      btnLevelsVictory: document.getElementById('btn-levels-victory'),
-      modalGameOver: document.getElementById('modal-gameover'),
-      gameOverReason: document.getElementById('gameover-reason'),
-      gameOverScore: document.getElementById('gameover-score'),
-      gameOverBest: document.getElementById('gameover-best'),
-      gameoverRemaining: document.getElementById('gameover-remaining'),
-      gameOverStage: document.getElementById('gameover-stage'),
-      gameOverNearMiss: document.getElementById('gameover-near-miss'),
-      gameOverDuel: document.getElementById('gameover-duel'),
-      gameOverDailyNext: document.getElementById('gameover-daily-next'),
-      btnContinueGameOver: document.getElementById('btn-continue-gameover'),
-      btnRetry: document.getElementById('btn-retry'),
-      btnSameSeedGameOver: document.getElementById('btn-same-seed-gameover'),
-      btnLevelsGameOver: document.getElementById('btn-levels-gameover'),
-      btnShareGameOver: document.getElementById('btn-share-gameover'),
-      btnDailyHistoryGameOver: document.getElementById('btn-daily-history-gameover'),
-      gameOverShareFallback: document.getElementById('gameover-share-fallback'),
-      gameOverShareText: document.getElementById('gameover-share-text'),
-      modalPause: document.getElementById('modal-pause'),
-      modalFluxPerk: document.getElementById('modal-flux-perk'),
-      fluxPerkCards: document.getElementById('flux-perk-cards'),
-      hudPerks: document.getElementById('hud-perks'),
-      drawerPerks: document.getElementById('drawer-perks'),
-      drawerPerksStat: document.getElementById('drawer-perks-stat'),
-      pauseLevelTip: document.getElementById('pause-level-tip'),
-      pauseInstructionTip: document.getElementById('pause-instruction-tip'),
-      btnResume: document.getElementById('btn-resume'),
-      btnRestartPause: document.getElementById('btn-restart-pause'),
-      btnLevelsPause: document.getElementById('btn-levels-pause'),
-      btnSettingsPause: document.getElementById('btn-settings-pause'),
-      btnSettings: document.getElementById('btn-settings'),
-      modalSettings: document.getElementById('modal-settings'),
-      modalProgressImport: document.getElementById('modal-progress-import'),
-      btnCloseSettings: document.getElementById('btn-close-settings'),
-      btnInstall: document.getElementById('btn-install'),
-      installIosHint: document.getElementById('install-ios-hint'),
-      modalStats: document.getElementById('modal-stats'),
-      tabStatsOverview: document.getElementById('tab-stats-overview'),
-      tabStatsDaily: document.getElementById('tab-stats-daily'),
-      statsOverviewPane: document.getElementById('stats-overview-pane'),
-      statsDailyPane: document.getElementById('stats-daily-pane'),
-      statsSince: document.getElementById('stats-since'),
-      statsOverviewEmpty: document.getElementById('stats-overview-empty'),
-      statsOverviewList: document.getElementById('stats-overview-list'),
-      statsCampaignList: document.getElementById('stats-campaign-list'),
-      statsDailySummary: document.getElementById('stats-daily-summary'),
-      statsDailyEmpty: document.getElementById('stats-daily-empty'),
-      statsDailyWrap: document.getElementById('stats-daily-wrap'),
-      statsDailyCaption: document.getElementById('stats-daily-caption'),
-      statsDailyBody: document.getElementById('stats-daily-body'),
-      statsCopyFeedback: document.getElementById('stats-copy-feedback'),
-      statsCopyFallback: document.getElementById('stats-copy-fallback'),
-      statsCopyText: document.getElementById('stats-copy-text'),
-      btnCopyStats: document.getElementById('btn-copy-stats'),
-      btnCloseStats: document.getElementById('btn-close-stats'),
-      modalConfirm: document.getElementById('modal-confirm'),
-      modalConfirmTitle: document.getElementById('modal-confirm-title'),
-      modalConfirmMessage: document.getElementById('modal-confirm-message'),
-      btnConfirmYes: document.getElementById('btn-confirm-yes'),
-      btnConfirmNo: document.getElementById('btn-confirm-no'),
-      modalDuel: document.getElementById('modal-duel'),
-      duelCardSummary: document.getElementById('duel-card-summary'),
-      duelCardNotes: document.getElementById('duel-card-notes'),
-      btnDuelAccept: document.getElementById('btn-duel-accept'),
-      btnDuelDecline: document.getElementById('btn-duel-decline'),
-      btnDuelOk: document.getElementById('btn-duel-ok'),
-      inputDuelName: document.getElementById('input-duel-name'),
-      statsDuelsRecord: document.getElementById('stats-duels-record'),
-      statsDuelsFilters: document.getElementById('stats-duels-filters'),
-      btnDuelsFilterAll: document.getElementById('btn-duels-filter-all'),
-      btnDuelsFilterDaily: document.getElementById('btn-duels-filter-daily'),
-      btnDuelsFilterFlux: document.getElementById('btn-duels-filter-flux'),
-      statsDuelsEmpty: document.getElementById('stats-duels-empty'),
-      statsDuelsList: document.getElementById('stats-duels-list'),
-      srAnnouncer: document.getElementById('sr-announcer'),
-      toast: document.getElementById('toast'),
-      inputGamepadEnabled: document.getElementById('input-gamepad-enabled'),
-      selectGamepadDeadzone: document.getElementById('select-gamepad-deadzone'),
-      selectGamepadAimSpeed: document.getElementById('select-gamepad-aim-speed'),
-      inputGamepadInvertX: document.getElementById('input-gamepad-invert-x'),
-      settingsControllerFields: document.getElementById('settings-controller-fields'),
-      settingsControllerNoPad: document.getElementById('settings-controller-nopad'),
-      modalVersusTiers: document.getElementById('modal-versus-tiers'),
-      versusTierList: document.getElementById('versus-tier-list'),
-      versusTierHint: document.getElementById('versus-tier-hint'),
-      versusResonanceOption: document.getElementById('input-versus-resonance'),
-      btnVersusTiersBack: document.getElementById('btn-versus-tiers-back'),
-      btnVersusLocal: document.getElementById('btn-versus-local'),
-      versusLocalEntryHint: document.getElementById('versus-local-entry-hint'),
-      modalVersusLocal: document.getElementById('modal-versus-local'),
-      btnVersusLocalStart: document.getElementById('btn-versus-local-start'),
-      btnVersusLocalBack: document.getElementById('btn-versus-local-back'),
-      versusLocalNeedTwo: document.getElementById('versus-local-need-two'),
-      versusLocalLive: document.getElementById('versus-local-live'),
-      versusScreen: document.getElementById('versus-screen'),
-      versusBoards: document.querySelector('#versus-screen .versus-boards'),
-      versusBar: document.querySelector('#versus-screen .versus-bar'),
-      versusCanvas0: document.getElementById('versus-canvas-0'),
-      versusCanvas1: document.getElementById('versus-canvas-1'),
-      versusHud0: document.getElementById('versus-hud-0'),
-      versusHud1: document.getElementById('versus-hud-1'),
-      versusRoundOverlay: document.getElementById('versus-round-overlay'),
-      btnVersusPause: document.getElementById('btn-versus-pause'),
-      btnVersusSwap: document.getElementById('btn-versus-swap'),
-      btnVersusPolarity: document.getElementById('btn-versus-polarity'),
-      btnVersusSwap1: document.getElementById('btn-versus-swap-1'),
-      btnVersusPolarity1: document.getElementById('btn-versus-polarity-1'),
-      versusPauseSizeHint: document.getElementById('versus-pause-size-hint'),
-      versusPausePadHint: document.getElementById('versus-pause-pad-hint'),
-      modalDuelPause: document.getElementById('modal-duel-pause'),
-      btnVersusResume: document.getElementById('btn-versus-resume'),
-      btnVersusRestart: document.getElementById('btn-versus-restart'),
-      btnVersusQuit: document.getElementById('btn-versus-quit'),
-      modalDuelResult: document.getElementById('modal-duel-result'),
-      versusResultTitle: document.getElementById('modal-duel-result-title'),
-      versusResultScore: document.getElementById('versus-result-score'),
-      versusResultTier: document.getElementById('versus-result-tier'),
-      versusResultNeutralised: document.getElementById('versus-result-neutralised'),
-      versusResultPulses: document.getElementById('versus-result-pulses'),
-      versusResultNeutralisedB: document.getElementById('versus-result-neutralised-b'),
-      versusResultPulsesB: document.getElementById('versus-result-pulses-b'),
-      btnVersusChangePlayers: document.getElementById('btn-versus-change-players'),
-      versusResultShareFallback: document.getElementById('versus-result-share-fallback'),
-      versusResultShareText: document.getElementById('versus-result-share-text'),
-      btnVersusRematch: document.getElementById('btn-versus-rematch'),
-      btnVersusShare: document.getElementById('btn-versus-share'),
-      btnVersusBack: document.getElementById('btn-versus-back')
-    };
-
-    this.pendingAnnouncements = [];
-    this.isAnnouncementScheduled = false;
-    this.lastExtra = {};
-    this.pendingConfirmCallback = null;
-    this.pendingConfirmLabelResolver = null;
-    this.confirmPausedRun = false;
-    this.isSharing = false;
-    this.shareCopied = false;
-    this.hintsResetConfirmed = false;
-    this.dailyCountdownTimer = null;
-    this.activeShopTab = SHOP_TABS.UPGRADES;
-    // The deferred install prompt, kept until the player asks for it from Settings.
-    this.installPromptEvent = null;
-    this.levelsChapterIndex = 0;
-    this.levelsSelectedId = null;
-    this.levelsFilterIncomplete = false;
-    this.autoPausedByOverlay = false;
-    this.lastFocusedElement = null;
-    this.wasAnyModalOpen = false;
-    this.stackedModalOpener = null;
-    // The button the duel tier picker hands focus back to when the hub opened it (null: default).
-    this.versusTierOpener = null;
-    // Pulse: the music driver (built on the first frame) and the rhythm calibration in progress.
-    this.pulseDriver = null;
-    this.calibration = null;
-    this.calibrationFrameId = null;
-    this.calibrationPressHandled = false;
-    this.calibrationClickEnabled = false;
-    this.prevEngineState = null;
-    this.isVictoryModalRevealed = false;
-    this.isVictoryPresented = false;
-    this.victoryStarsLabel = null;
-    this.scoreCountUpFrame = null;
-    this.inputMode = this.detectInitialInputMode();
-    this.gamepadInput = null;
-    this.padFocusEl = null;
-    this.toastTimer = null;
-    this.isDrawerOpen = false;
-    this.drawerStarParts = null;
-    this.activeStatsTab = STATS_TABS.OVERVIEW;
-    this.statsOpener = null;
-    this.statsCopied = false;
-    this.duelCardRead = null;
-    this.duelCardAtStake = false;
-    this.ghostLastSide = null;
-    this.challengeUrl = null;
-    // The versus screen (null while closed), the scene the game loop drives, and what the UI
-    // routes the gameplay controls to while the screen is open.
-    this.versus = null;
-    this.versusScene = null;
-    this.versusSeedCounter = 0;
-    // The two-player lobby (slots, handicaps) and its key names; created when the lobby is bound.
-    this.versusLocal = null;
-    this.mainScene = { boards: [{ engine, renderer }] };
-    this.versusSceneController = {
-      handleGameplayKey: (event) => this.handleVersusGameplayKey(event),
-      handleGamepadActions: (actions, aimDelta) => this.handleVersusGamepadActions(actions, aimDelta),
-      pause: () => this.pauseVersus()
-    };
+    this.elements = collectUiElements();
+    initUiRuntimeState(this, engine, renderer);
   }
 
   detectInitialInputMode() {
@@ -731,17 +982,7 @@ export class UIManager {
     }
     const intro = engine.levelIntro;
     if (!intro || engine.state !== GAME_STATES.PLAYING) {
-      // A Puzzle intro that never got its turn behind a discovery card: the first shot came first,
-      // so the goal is still announced to screen readers before the intro is forgotten.
-      if (!intro && this.deferredPuzzleIntro && engine.state === GAME_STATES.PLAYING && engine.hasFiredInRound) {
-        this.announce(buildLevelIntroText({ ...this.deferredPuzzleIntro, fairPlay: null }, t));
-      }
-      if (!intro) {
-        this.deferredPuzzleIntro = null;
-      }
-      banner.classList.add('hidden');
-      this.levelIntroShotsAtShow = null;
-      this.levelIntroRunShotsAtShow = null;
+      handleInactiveLevelIntro(this, engine, banner, intro);
       return;
     }
     // A discovery card owns the slot: the Puzzle objective waits for it (deferred, never dropped).
@@ -751,27 +992,8 @@ export class UIManager {
       return;
     }
     this.deferredPuzzleIntro = null;
-    const usesShots = engine.usesShotBudget ? engine.usesShotBudget() : true;
-    if (usesShots) {
-      if (this.levelIntroShotsAtShow === null || this.levelIntroShotsAtShow === undefined) {
-        this.levelIntroShotsAtShow = engine.shotsRemaining;
-      } else if (engine.shotsRemaining < this.levelIntroShotsAtShow) {
-        this.levelIntroShotsAtShow = null;
-        this.levelIntroRunShotsAtShow = null;
-        engine.dismissLevelIntro?.();
-        banner.classList.add('hidden');
-        return;
-      }
-    } else if (typeof engine.runShotsFired === 'number') {
-      if (this.levelIntroRunShotsAtShow === null || this.levelIntroRunShotsAtShow === undefined) {
-        this.levelIntroRunShotsAtShow = engine.runShotsFired;
-      } else if (engine.runShotsFired > this.levelIntroRunShotsAtShow) {
-        this.levelIntroShotsAtShow = null;
-        this.levelIntroRunShotsAtShow = null;
-        engine.dismissLevelIntro?.();
-        banner.classList.add('hidden');
-        return;
-      }
+    if (shouldDismissIntroByShotProgress(this, engine, banner)) {
+      return;
     }
     const fairPlay = intro.mutatorKey
       ? { upgrades: engine.areUpgradesNeutralised(), ammo: engine.isDailyAmmoLocked() }
@@ -857,40 +1079,14 @@ export class UIManager {
    */
   updatePowerupButtons(engine) {
     const buttons = this.elements.powerupsContainer.querySelectorAll('.powerup-btn');
-    const isOpenToAmmo = this.isRunOpenToAmmo();
-    const canBuyAmmo = this.canBuySpecialAmmo();
     const ammoBlockKey = this.getSpecialAmmoBlockReasonKey();
-    const holdReason = ammoBlockKey ? t(ammoBlockKey) : '';
+    const context = {
+      isOpenToAmmo: this.isRunOpenToAmmo(),
+      canBuyAmmo: this.canBuySpecialAmmo(),
+      holdReason: ammoBlockKey ? t(ammoBlockKey) : ''
+    };
     for (const btn of buttons) {
-      const type = btn.dataset.specialType;
-      const isAllowed = engine.isSpecialTypeAllowed?.(type) !== false;
-      btn.classList.toggle('hidden', !isAllowed);
-      if (!isAllowed) {
-        continue;
-      }
-      const count = engine.specialInventory[type] || 0;
-      const isEquipped = Boolean(engine.currentBall && engine.currentBall.specialType === type);
-      const isEmpty = count <= 0 && !isEquipped;
-      const countEl = document.getElementById(`powerup-count-${type}`);
-      // The empty look follows the run, not the shot: it must not flicker on every shot.
-      const isEmptyForSale = isEmpty && isOpenToAmmo;
-      const isHeld = isEmptyForSale && !canBuyAmmo;
-      setTextIfChanged(countEl, isEmptyForSale ? t('hud.powerups.button.emptyMark') : String(count));
-      let label = isEmptyForSale
-        ? t('hud.powerups.button.buyAria', { name: t(`hud.powerups.${type}.name`) })
-        : this.getPowerupAriaLabel(type, count);
-      if (isHeld && holdReason) {
-        label = `${label}. ${holdReason}`;
-      }
-      setAttributeIfChanged(btn, 'aria-label', label);
-      setAttributeIfChanged(btn, 'title', isHeld && holdReason ? holdReason : t(`hud.powerups.${type}.tooltip`));
-      btn.classList.toggle('equipped', isEquipped);
-      btn.classList.toggle(EMPTY_POWERUP_CLASS, isEmptyForSale);
-      setAttributeIfChanged(btn, 'aria-pressed', String(isEquipped));
-      // Held by a shot or a stage change: still focusable, the click is rejected instead.
-      setAttributeIfChanged(btn, 'aria-disabled', String(isHeld));
-      // Ammo is only sold during a round, so between rounds an empty button stays inert.
-      btn.disabled = isEmpty && !isOpenToAmmo;
+      updateSinglePowerupButton(this, engine, btn, context);
     }
   }
 
@@ -1263,98 +1459,21 @@ export class UIManager {
 
   /** Renders the direct stage-selection buttons (1..N) for Puzzle Mode inside the Levels modal. */
   renderPuzzleStagesStrip() {
-    const strip = this.elements?.puzzleStagesStrip;
+    const strip = this.elements ? this.elements.puzzleStagesStrip : null;
     if (!strip) {
       return;
     }
-    const totalPuzzles = Math.max(1, this.gameConfig?.puzzles?.length || 1);
-    const unlockedStage = Math.min(
-      totalPuzzles,
-      Math.max(1, this.storageManager?.getPuzzleBestStage?.() || 1)
-    );
-    const stageStats = this.storageManager?.getPuzzleStageStats?.() || {};
-    const maxStars = this.gameConfig?.scoring?.maxStars || 0;
+    const context = resolvePuzzleStripContext(this);
     strip.replaceChildren();
-    for (let stageNum = 1; stageNum <= totalPuzzles; stageNum++) {
-      const isUnlocked = stageNum <= unlockedStage;
-      const isCurrent =
-        this.engine?.mode === GAME_MODES.PUZZLE && this.engine.currentPuzzleStage === stageNum;
-      const btn = document.createElement('button');
-      btn.type = 'button';
-      btn.className = `puzzle-stage-btn${isCurrent ? ' active' : ''}${isUnlocked ? '' : ' locked'}`;
-      btn.dataset.puzzleStage = String(stageNum);
-      const label = t('modals.levelSelect.arcade.puzzleStage', { stage: formatNumber(stageNum) });
-      if (isCurrent) {
-        btn.setAttribute('aria-current', 'true');
-      }
-      if (isUnlocked) {
-        const stars = stageStats[stageNum]?.stars || 0;
-        const labelEl = document.createElement('span');
-        labelEl.textContent = label;
-        const starsEl = document.createElement('span');
-        starsEl.className = 'puzzle-stage-stars';
-        starsEl.setAttribute('aria-hidden', 'true');
-        starsEl.textContent = this.formatStars(stars, maxStars);
-        btn.append(labelEl, starsEl);
-        btn.setAttribute(
-          'aria-label',
-          t('modals.levelSelect.arcade.puzzleStageAria', {
-            stage: formatNumber(stageNum),
-            stars: formatNumber(stars),
-            maxStars: formatNumber(maxStars)
-          })
-        );
-        btn.addEventListener('click', () => {
-          this.requestDestructiveAction(
-            () => {
-              this.hideAllModals();
-              this.engine.startPuzzleMode(stageNum);
-            },
-            () => label
-          );
-        });
-      } else {
-        btn.textContent = label;
-        const requiredStage = Math.max(1, stageNum - 1);
-        const lockText = t('modals.levelSelect.arcade.puzzleStageLocked', {
-          previous: formatNumber(requiredStage)
-        });
-        btn.setAttribute('aria-disabled', 'true');
-        btn.title = lockText;
-        btn.setAttribute('aria-label', `${label} - ${lockText}`);
-        btn.addEventListener('click', () => {
-          this.showLockedLevelHint(requiredStage, 'modals.levelSelect.arcade.puzzleStageLocked');
-        });
-      }
-      strip.appendChild(btn);
+    for (let stageNum = 1; stageNum <= context.totalPuzzles; stageNum++) {
+      strip.appendChild(createPuzzleStageButton(this, stageNum, context));
     }
   }
 
   /** Formats the mode-specific stage/wave/combo/coins line shown on the Game Over modal. */
   formatGameOverStageSummary(engine, summary) {
     if (engine.mode === GAME_MODES.FLUX) {
-      const weeklyBestStage = engine.isWeeklyFluxRun === true
-        ? this.storageManager.getWeeklyFluxBest?.(engine.weeklyWeekKey)?.stage || 0
-        : 0;
-      const bestStage = engine.isWeeklyFluxRun === true ? weeklyBestStage : this.storageManager.getFluxBestStage();
-      return t('modals.gameOver.stats.fluxStage', {
-        stage: formatNumber(engine.fluxStage),
-        best: formatNumber(Math.max(engine.fluxStage, bestStage))
-      });
-    }
-    if (engine.mode === GAME_MODES.BOSS_RUSH) {
-      return t('modals.gameOver.stats.bossRushSummary', {
-        wave: formatNumber(engine.bossRushWave),
-        best: formatNumber(Math.max(engine.bossRushWave, this.storageManager.getBossRushBestWave?.() || 1)),
-        coins: formatNumber(summary?.earnedCoins || 0)
-      });
-    }
-    if (engine.mode === GAME_MODES.CLASSIC) {
-      return t('modals.gameOver.stats.classicSummary', {
-        stage: formatNumber(engine.classicStage),
-        best: formatNumber(Math.max(engine.classicStage, this.storageManager.getClassicBestStage?.() || 1)),
-        coins: formatNumber(summary?.earnedCoins || 0)
-      });
+      return formatFluxGameOverSummary(this, engine);
     }
     if (engine.mode === GAME_MODES.PUZZLE) {
       return t('modals.gameOver.stats.puzzleSummary', {
@@ -1362,36 +1481,17 @@ export class UIManager {
         total: formatNumber(Math.max(1, this.gameConfig.puzzles?.length || 1))
       });
     }
-    if (engine.mode === GAME_MODES.PINBALL) {
-      return t('modals.gameOver.stats.pinballSummary', {
-        stage: formatNumber(engine.pinballStage || 1),
-        best: formatNumber(Math.max(engine.pinballStage || 1, this.storageManager.getPinballBestStage?.() || 1)),
+    const spec = STAGE_SUMMARY_MODES.get(engine.mode);
+    if (spec) {
+      const stage = spec.readStage(engine);
+      const best = Math.max(stage, spec.readBest(this.storageManager) || 1);
+      return t(spec.key, {
+        [spec.param]: formatNumber(stage),
+        best: formatNumber(best),
         coins: formatNumber(summary?.earnedCoins || 0)
       });
     }
-    if (engine.mode === GAME_MODES.SLINGSHOT) {
-      return t('modals.gameOver.stats.slingshotSummary', {
-        stage: formatNumber(engine.slingshotStage || 1),
-        best: formatNumber(Math.max(engine.slingshotStage || 1, this.storageManager.getSlingshotBestStage?.() || 1)),
-        coins: formatNumber(summary?.earnedCoins || 0)
-      });
-    }
-    if (engine.mode === GAME_MODES.MERGE) {
-      return t('modals.gameOver.stats.mergeSummary', {
-        tier: formatNumber(engine.mergeBestTier || 1),
-        best: formatNumber(Math.max(engine.mergeBestTier || 1, this.storageManager.getMergeBestTier?.() || 1)),
-        coins: formatNumber(summary?.earnedCoins || 0)
-      });
-    }
-    if (
-      engine.mode === GAME_MODES.ENDLESS ||
-      engine.mode === GAME_MODES.DAILY ||
-      engine.mode === GAME_MODES.BLITZ ||
-      engine.mode === GAME_MODES.CASCADE ||
-      engine.mode === GAME_MODES.HEX_GRID ||
-      engine.mode === GAME_MODES.ORBITAL ||
-      engine.mode === GAME_MODES.CONVOY
-    ) {
+    if (WAVE_SUMMARY_MODES.has(engine.mode)) {
       return t('modals.gameOver.stats.waveSummary', {
         wave: formatNumber(engine.waveCount),
         combo: formatNumber(Math.max(1, summary?.maxCombo || engine.combo || 1)),

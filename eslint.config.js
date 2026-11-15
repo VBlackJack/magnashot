@@ -51,12 +51,18 @@ export default [
       'src/core/WorldGeometry.js',
       'src/entities/Ball.js',
       'src/entities/Obstacle.js',
+      'src/game/EngineTurnResolution.js',
+      'src/game/GameEngine.js',
+      'src/game/Renderer.js',
       'src/game/RendererMagnetarCharges.js',
+      'src/physics/PhysicsWorld.js',
       'src/physics/SpatialHashGrid.js',
       'src/ui/ProgressBackupView.js',
       'src/ui/UICalibration.js',
       'src/ui/UIHudRefresh.js',
       'src/ui/UIInputBindings.js',
+      'src/ui/UIManager.js',
+      'src/ui/UIVersus.js',
       'src/ui/WorkshopView.js'
     ],
     rules: {

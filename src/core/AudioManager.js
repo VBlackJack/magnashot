@@ -56,6 +56,9 @@ export class AudioManager {
     this.musicVolume = 0;
     this.musicBus = null;
     this.music = null;
+    this.musicPreviewTimer = null;
+    this.musicPreviewOnEnd = null;
+    this.isPreviewingMusic = false;
   }
 
   init(initialMuted = false, initialReducedMotion = false, { musicEnabled = true, musicVolume, vibrationEnabled = true } = {}) {
@@ -152,14 +155,63 @@ export class AudioManager {
    * @returns {boolean} True when the music is playing that mode.
    */
   startMusic(modeKey) {
+    this.clearMusicPreviewTimer();
     if (!this.isMusicActive() || !this.music) {
       return false;
     }
     return this.music.start(modeKey);
   }
 
+  clearMusicPreviewTimer() {
+    if (this.musicPreviewTimer !== null) {
+      this.timers.clear(this.musicPreviewTimer);
+      this.musicPreviewTimer = null;
+    }
+    const onEnd = this.musicPreviewOnEnd;
+    this.musicPreviewOnEnd = null;
+    this.isPreviewingMusic = false;
+    onEnd?.();
+  }
+
+  /**
+   * Starts a short Settings audition of the procedural music engine. Returns false when
+   * music is off, muted, or no Web Audio context is available.
+   */
+  previewMusic({ modeKey, onEnd } = {}) {
+    if (!this.isMusicActive() || !this.config?.music) {
+      return false;
+    }
+    this.ensureContext();
+    if (!this.music) {
+      return false;
+    }
+    this.clearMusicPreviewTimer();
+    const musicCfg = this.config.music;
+    const targetMode = modeKey ?? musicCfg.previewMode;
+    if (!this.music.start(targetMode)) {
+      return false;
+    }
+    this.music.setIntensity?.(musicCfg.previewIntensity);
+    this.isPreviewingMusic = true;
+    this.musicPreviewOnEnd = typeof onEnd === 'function' ? onEnd : null;
+    this.musicPreviewTimer = this.timers.set(() => this.stopMusicPreview(), musicCfg.previewDurationMs);
+    return true;
+  }
+
+  stopMusicPreview() {
+    if (!this.isPreviewingMusic && this.musicPreviewTimer === null) {
+      return false;
+    }
+    this.clearMusicPreviewTimer();
+    this.music?.stop(this.config?.music?.endFadeSec);
+    return true;
+  }
+
   setMusicEnabled(enabled) {
     this.musicEnabled = Boolean(enabled);
+    if (!this.isMusicActive()) {
+      this.stopMusicPreview();
+    }
     this.music?.setEnabled(this.isMusicActive());
   }
 
@@ -290,6 +342,9 @@ export class AudioManager {
    */
   setMuted(muted) {
     this.muted = Boolean(muted);
+    if (this.muted) {
+      this.stopMusicPreview();
+    }
     this.music?.setEnabled(this.isMusicActive());
     this.cancelPendingSuspend();
     if (this.muted && this.stopAll()) {

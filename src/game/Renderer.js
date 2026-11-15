@@ -86,6 +86,1042 @@ export function buildResolutionQuery(dpr) {
   return `(resolution: ${dpr}dppx)`;
 }
 
+function createEmptyAimPreview() {
+  return {
+    valid: false,
+    aimAngle: 0,
+    cellX: 0,
+    cellY: 0,
+    ballId: 0,
+    specialType: null,
+    colorId: null,
+    snapTargetId: 0,
+    blastMult: 0,
+    boardCount: 0,
+    boardIdSum: 0,
+    boardBondTotal: 0,
+    boardArmorTotal: 0,
+    boardColorSum: 0,
+    highlightBalls: [],
+    highlightIsMatch: false,
+    destroyedIds: new Set(),
+    avalancheBalls: []
+  };
+}
+
+function initRendererColors(renderer, ballsConfig, options) {
+  renderer.colorMap = new Map();
+  renderer.colorWeights = new Map();
+  ballsConfig.standardColors.forEach((c, index) => {
+    renderer.colorMap.set(c.id, c);
+    renderer.colorWeights.set(c.id, index + 1);
+  });
+  const mergeTiers = resolveModesConfig(options?.modesConfig).merge.tiers;
+  const baseWeight = ballsConfig.standardColors.length;
+  mergeTiers.forEach((tierSpec, index) => {
+    renderer.colorMap.set(tierSpec.id, tierSpec);
+    renderer.colorWeights.set(tierSpec.id, baseWeight + index + 1);
+  });
+}
+
+function initRendererMetricsAndCaches(renderer, gameConfig) {
+  renderer.logicalWidth = gameConfig.canvas.logicalWidth;
+  renderer.logicalHeight = gameConfig.canvas.logicalHeight;
+  renderer.dpr = 1;
+  renderer.scaleX = 1;
+  renderer.scaleY = 1;
+  renderer.resolutionDirty = true;
+  renderer.staticLayer = null;
+  renderer.staticLayerDirty = true;
+
+  const theme = renderer.gameConfig.theme;
+  renderer.floatingTextFont = `bold ${gameConfig.juice.particles.floatingTextFontSize}px ${theme.fontFamily}`;
+  const collectorLabelPx = gameConfig.scoring?.collector?.labelFontSize || gameConfig.juice.particles.floatingTextFontSize;
+  renderer.collectorLabelFont = `bold ${collectorLabelPx}px ${theme.fontFamily}`;
+  renderer.labelFontCache = new Map();
+  // CSS pixels per logical unit; ball labels are enlarged when it gets small.
+  renderer.displayScale = 1;
+  renderer.badgeFontCache = new Map();
+
+  // Reused to draw the queued launcher colors with the regular ball renderer.
+  renderer.upcomingPreviewBall = new Ball({ x: 0, y: 0, radius: 0, colorId: null });
+  renderer.bondSegments = [];
+  for (let i = 0; i < BOND_STYLE_COUNT; i++) {
+    renderer.bondSegments.push([]);
+  }
+  renderer.portalLinks = new Map();
+  renderer.portalLinkSource = [];
+  renderer.aimPreview = createEmptyAimPreview();
+  renderer.aimPreviewComputeCount = 0;
+}
+
+function initRendererGradientAndPairState(renderer) {
+  // Per-frame inputs of drawMagneticFieldPair, kept as fields so the callback is allocated once.
+  renderer.magneticPairCtx = null;
+  renderer.magneticPairAlpha = 1;
+  renderer.magneticPairMaxDistSq = 0;
+  renderer.drawMagneticFieldPair = (a, b) => {
+    if (!a.colorId || a.colorId !== b.colorId || a.bonds.has(b.id)) {
+      return;
+    }
+    const alpha = renderer.magneticPairAlpha;
+    const ax = renderer.interpolate(a.prevX, a.x, alpha);
+    const ay = renderer.interpolate(a.prevY, a.y, alpha);
+    const bx = renderer.interpolate(b.prevX, b.x, alpha);
+    const by = renderer.interpolate(b.prevY, b.y, alpha);
+    const dx = bx - ax;
+    const dy = by - ay;
+    if (dx * dx + dy * dy <= renderer.magneticPairMaxDistSq) {
+      renderer.magneticPairCtx.moveTo(ax, ay);
+      renderer.magneticPairCtx.lineTo(bx, by);
+    }
+  };
+
+  // Slow-motion vignette gradient, rebuilt only when the canvas size or tint changes.
+  renderer.slowMoVignetteGradient = null;
+  renderer.slowMoVignetteKey = '';
+  renderer.slowMoVignetteCtx = null;
+  // Unit-radius shatter core gradients by burst colour; scaled to the ball radius at draw time.
+  renderer.shatterCoreGradients = new Map();
+  renderer.shatterCoreGradientCtx = null;
+  // Unit-radius explosion gradients (puff phases, core, flash); scaled to the radius at draw time.
+  renderer.unitRadialGradients = new Map();
+  renderer.unitRadialGradientCtx = null;
+  renderer.ballGradientCache = new Map();
+  renderer.ballSpriteCache = new Map();
+  renderer.highContrast = false;
+  renderer.colorPatterns = false;
+  renderer.isReducedMotion = false;
+  renderer.magnetarView = null;
+}
+
+function prepareFrameCanvas(renderer, engineState, theme, width, height) {
+  const ctx = renderer.ctx;
+  ctx.setTransform(renderer.scaleX, 0, 0, renderer.scaleY, 0, 0);
+  const shake = renderer.lite ? 0 : engineState.particleSystem.shakeIntensity;
+  if (shake > 0) {
+    // The shaken static layer no longer covers the edges: paint them first so no strip of
+    // the previous frame shows through.
+    ctx.fillStyle = theme.backgroundTop;
+    ctx.fillRect(0, 0, width, height);
+  }
+  ctx.save();
+  if (shake > 0) {
+    const dx = (Math.random() - MATH_CONSTANTS.HALF) * 2 * shake;
+    const dy = (Math.random() - MATH_CONSTANTS.HALF) * 2 * shake;
+    ctx.translate(dx, dy);
+  }
+  ctx.drawImage(renderer.staticLayer, 0, 0, width, height);
+  if (!renderer.lite) {
+    renderer.drawWallCracks(ctx, engineState.particleSystem);
+  }
+}
+
+function renderBoardChrome(renderer, ctx, engineState, width, height, theme, behavior, chrome, now, alpha) {
+  if (!chrome || chrome.ambientLiquid) {
+    renderer.drawLiquid(ctx, engineState.particleSystem, width, height);
+  }
+  if (!chrome || chrome.collectorBins) {
+    renderer.drawCollectorBins(ctx, width, height, theme, engineState);
+  }
+  if (!chrome || chrome.dangerZone) {
+    renderer.drawDangerZone(ctx, width, height, theme, engineState.physicsWorld.balls, now, alpha);
+  }
+  behavior?.drawUnderlay?.(ctx, engineState, renderer, theme, now);
+}
+
+function renderClusterStageLayer(renderer, ctx, engineState, theme, magnetarView, now, alpha) {
+  // A new Flux shape slides down into place; only the drawing moves, not the physics.
+  // After a Sag step the cluster is already lower in the physics: it eases down from its
+  // old place, drawing only.
+  const introOffset = renderer.getStageIntroOffset(engineState);
+  if (introOffset > 0) {
+    ctx.save();
+    ctx.translate(0, -introOffset);
+  }
+  renderer.drawObstacles(ctx, engineState.physicsWorld.obstacles, now, alpha);
+  renderer.drawRails(ctx, engineState.physicsWorld);
+  // Only the cluster and its rail ease down; fixed fixtures stay where they are.
+  const lowerOffset = renderer.getRailLowerOffset(engineState);
+  if (lowerOffset > 0) {
+    ctx.save();
+    ctx.translate(0, -lowerOffset);
+  }
+  renderer.drawAnchorRail(ctx, engineState, theme, now);
+  renderer.drawMagneticBonds(ctx, engineState.physicsWorld, theme, now, alpha);
+  renderer.drawTethers(ctx, engineState.physicsWorld, alpha);
+  for (const ball of engineState.physicsWorld.balls) {
+    renderer.drawBall(ctx, ball, now, alpha);
+  }
+  renderer.drawChainLinkOverlays(ctx, engineState.physicsWorld, alpha);
+  if (magnetarView) {
+    renderer.drawMagnetar(ctx, engineState, now);
+  }
+  if (lowerOffset > 0) {
+    ctx.restore();
+  }
+  if (introOffset > 0) {
+    ctx.restore();
+  }
+}
+
+function shouldRenderAimTrajectory(renderer, chrome, engineState) {
+  return (
+    (!chrome || chrome.aimLine)
+    && !renderer.lite
+    && Boolean(engineState.aimPoints)
+    && !engineState.physicsWorld.projectile
+    && !engineState.isAimCancelled
+  );
+}
+
+function renderForegroundAction(renderer, ctx, engineState, theme, behavior, chrome, now, alpha) {
+  for (const ball of engineState.physicsWorld.droppingBalls) {
+    renderer.drawBall(ctx, ball, now, alpha);
+  }
+  behavior?.drawOverlay?.(ctx, engineState, renderer, theme, now);
+  if (!renderer.lite) {
+    renderer.drawShatteringBalls(ctx, engineState.particleSystem, now, alpha);
+  }
+  if (shouldRenderAimTrajectory(renderer, chrome, engineState)) {
+    renderer.drawAimTrajectory(
+      ctx,
+      engineState.aimPoints,
+      engineState.currentBall,
+      engineState.physicsWorld,
+      theme,
+      now,
+      engineState.getBlastRadiusMultiplier(),
+      engineState.aimAngle,
+      alpha
+    );
+  }
+  if (!renderer.lite) {
+    renderer.drawTrail(ctx, engineState.particleSystem);
+  }
+  if (engineState.physicsWorld.projectile) {
+    renderer.drawBall(ctx, engineState.physicsWorld.projectile, now, alpha);
+  }
+}
+
+function renderForegroundChrome(renderer, ctx, engineState, width, height, theme, behavior, magnetarView, now, alpha) {
+  renderer.drawLauncher(ctx, engineState, theme, now);
+  behavior?.drawLauncherOverlay?.(ctx, engineState, renderer, theme, now);
+  renderer.drawSagGauge(ctx, engineState, theme);
+  if (!renderer.lite) {
+    renderer.drawParticles(ctx, engineState.particleSystem, alpha);
+    renderer.drawSlowMoOverlay(ctx, engineState, width, height, alpha);
+  }
+  if (engineState.versus) {
+    renderer.drawVersusCharges(ctx, engineState);
+  }
+  if (magnetarView && magnetarView.charges?.length) {
+    renderer.drawMagnetarCharges(ctx, engineState, magnetarView);
+  }
+}
+
+function strokeMagneticFieldLines(renderer, ctx, physicsWorld, theme, pulse, fieldMaxDistSq, alpha) {
+  ctx.lineWidth = theme.magneticFieldLineWidth;
+  ctx.setLineDash(theme.magneticFieldDash);
+  ctx.strokeStyle = `rgba(${theme.magneticSameColorBase}, ${theme.magneticFieldAlpha * pulse})`;
+  ctx.beginPath();
+  renderer.magneticPairCtx = ctx;
+  renderer.magneticPairAlpha = alpha;
+  renderer.magneticPairMaxDistSq = fieldMaxDistSq;
+  physicsWorld.spatialGrid.forEachNeighborPair(physicsWorld.balls, renderer.drawMagneticFieldPair);
+  renderer.magneticPairCtx = null;
+  ctx.stroke();
+  ctx.setLineDash(EMPTY_DASH);
+}
+
+function classifyBondStyle(a, b, dist, stressDist, polA, physicsWorld) {
+  if (isChainLink(a, b)) {
+    return BOND_STYLE.CHAIN;
+  }
+  if (!a.isAnchor && !b.isAnchor && dist > stressDist) {
+    return BOND_STYLE.STRESSED;
+  }
+  const sameColor = a.colorId && a.colorId === b.colorId;
+  if (sameColor) {
+    return BOND_STYLE.SAME_COLOR;
+  }
+  const polB = b.colorId ? (physicsWorld.polarityMap.get(b.colorId) || 0) : 0;
+  return polA * polB > 0 ? BOND_STYLE.REPEL : BOND_STYLE.LINK;
+}
+
+function collectBondSegments(renderer, physicsWorld, stressDist, alpha) {
+  const segments = renderer.bondSegments;
+  for (const list of segments) {
+    list.length = 0;
+  }
+  for (const a of physicsWorld.balls) {
+    const polA = a.colorId ? (physicsWorld.polarityMap.get(a.colorId) || 0) : 0;
+    const ax = renderer.interpolate(a.prevX, a.x, alpha);
+    const ay = renderer.interpolate(a.prevY, a.y, alpha);
+    for (const neighborId of a.bonds) {
+      if (neighborId <= a.id) {
+        continue;
+      }
+      const b = physicsWorld.ballMap.get(neighborId);
+      if (!b) {
+        continue;
+      }
+      const bx = renderer.interpolate(b.prevX, b.x, alpha);
+      const by = renderer.interpolate(b.prevY, b.y, alpha);
+      const dist = Math.hypot(bx - ax, by - ay);
+      const style = classifyBondStyle(a, b, dist, stressDist, polA, physicsWorld);
+      segments[style].push(ax, ay, bx, by);
+    }
+  }
+  return segments;
+}
+
+function strokeBondGlowAndSegments(renderer, ctx, segments, theme, pulse) {
+  if (theme.magneticBondGlowWidth) {
+    ctx.lineWidth = theme.magneticBondGlowWidth;
+    if (segments[BOND_STYLE.STRESSED].length > 0 && theme.magneticStressGlowColor) {
+      renderer.strokeSegments(ctx, segments[BOND_STYLE.STRESSED], theme.magneticStressGlowColor);
+    }
+    if (segments[BOND_STYLE.SAME_COLOR].length > 0 && theme.magneticBondGlowAlpha) {
+      renderer.strokeSegments(
+        ctx,
+        segments[BOND_STYLE.SAME_COLOR],
+        `rgba(${theme.magneticSameColorBase}, ${theme.magneticBondGlowAlpha * pulse})`
+      );
+    }
+    ctx.lineWidth = theme.magneticBondLineWidth;
+  }
+  if (segments[BOND_STYLE.STRESSED].length > 0) {
+    renderer.strokeSegments(ctx, segments[BOND_STYLE.STRESSED], theme.magneticStressColor);
+  }
+  if (segments[BOND_STYLE.SAME_COLOR].length > 0) {
+    renderer.strokeSegments(
+      ctx,
+      segments[BOND_STYLE.SAME_COLOR],
+      `rgba(${theme.magneticSameColorBase}, ${theme.magneticBondSameColorAlpha * pulse})`
+    );
+  }
+  if (segments[BOND_STYLE.REPEL].length > 0) {
+    renderer.strokeSegments(
+      ctx,
+      segments[BOND_STYLE.REPEL],
+      `rgba(${theme.magneticRepelColorBase}, ${theme.magneticFieldAlpha * pulse})`
+    );
+  }
+  if (segments[BOND_STYLE.LINK].length > 0) {
+    renderer.strokeSegments(ctx, segments[BOND_STYLE.LINK], theme.magneticLinkColor);
+  }
+  if (segments[BOND_STYLE.CHAIN].length > 0) {
+    const chainSpec = renderer.ballsConfig.clusterModifiers.chained;
+    ctx.lineWidth = chainSpec.linkWidth;
+    ctx.setLineDash(chainSpec.linkDash);
+    renderer.strokeSegments(ctx, segments[BOND_STYLE.CHAIN], chainSpec.linkColor);
+    ctx.setLineDash(EMPTY_DASH);
+  }
+}
+
+function drawPortalObstacle(renderer, ctx, obs, ox, oy, oAngle, cfg, obsDefaults, _now, alpha) {
+  const mate = renderer.portalLinks.get(obs);
+  if (mate) {
+    ctx.save();
+    ctx.strokeStyle = cfg.fieldColor;
+    ctx.lineWidth = obsDefaults.lineWidth;
+    ctx.setLineDash(cfg.linkDash);
+    ctx.beginPath();
+    ctx.moveTo(ox, oy);
+    ctx.lineTo(renderer.interpolate(mate.prevX, mate.x, alpha), renderer.interpolate(mate.prevY, mate.y, alpha));
+    ctx.stroke();
+    ctx.restore();
+  }
+  const pulseScale = 1 + obs.hitPulse * obsDefaults.bumperPulseScale;
+  ctx.translate(ox, oy);
+  ctx.scale(pulseScale, pulseScale);
+  ctx.fillStyle = cfg.fieldColor;
+  ctx.beginPath();
+  ctx.arc(0, 0, obs.radius + cfg.fieldRadiusPadding, 0, MATH_CONSTANTS.TWO_PI);
+  ctx.fill();
+  ctx.fillStyle = cfg.outerColor;
+  ctx.beginPath();
+  ctx.arc(0, 0, obs.radius, 0, MATH_CONSTANTS.TWO_PI);
+  ctx.fill();
+  ctx.rotate(oAngle);
+  ctx.strokeStyle = cfg.ringColor;
+  ctx.lineWidth = obsDefaults.ringLineWidth;
+  ctx.setLineDash(cfg.ringDash);
+  ctx.beginPath();
+  ctx.arc(0, 0, obs.radius - cfg.ringInset, 0, MATH_CONSTANTS.TWO_PI);
+  ctx.stroke();
+  ctx.setLineDash(EMPTY_DASH);
+  ctx.strokeStyle = cfg.coreColor;
+  ctx.lineWidth = obsDefaults.lineWidth;
+  ctx.beginPath();
+  ctx.arc(0, 0, obs.radius * cfg.swirlRadiusFactor, 0, Math.PI * cfg.swirlArcAngleFactor);
+  ctx.stroke();
+}
+
+function drawSingularityObstacle(_renderer, ctx, obs, ox, oy, oAngle, cfg, obsDefaults, now) {
+  if (obs.pullRadius > obs.captureRadius && cfg.pullFieldColor) {
+    const pullWave = obs.pullRadius - ((now * obsDefaults.fieldWaveSpeed) % obs.pullRadius);
+    ctx.fillStyle = cfg.pullFieldColor;
+    ctx.beginPath();
+    ctx.arc(ox, oy, obs.pullRadius, 0, MATH_CONSTANTS.TWO_PI);
+    ctx.fill();
+    ctx.strokeStyle = cfg.ringColor;
+    ctx.globalAlpha = obsDefaults.pullWaveAlpha;
+    ctx.lineWidth = obsDefaults.lineWidth;
+    ctx.beginPath();
+    ctx.arc(ox, oy, Math.max(obs.captureRadius, pullWave), 0, MATH_CONSTANTS.TWO_PI);
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+  }
+  const pulseScale = 1 + obs.hitPulse * obsDefaults.bumperPulseScale;
+  ctx.translate(ox, oy);
+  ctx.scale(pulseScale, pulseScale);
+  ctx.fillStyle = cfg.fieldColor;
+  ctx.beginPath();
+  ctx.arc(0, 0, obs.captureRadius, 0, MATH_CONSTANTS.TWO_PI);
+  ctx.fill();
+  ctx.fillStyle = cfg.outerColor;
+  ctx.beginPath();
+  ctx.arc(0, 0, obs.radius, 0, MATH_CONSTANTS.TWO_PI);
+  ctx.fill();
+  ctx.rotate(oAngle);
+  ctx.strokeStyle = cfg.ringColor;
+  ctx.lineWidth = obsDefaults.ringLineWidth;
+  ctx.setLineDash(cfg.ringDash);
+  ctx.beginPath();
+  ctx.arc(0, 0, obs.radius - cfg.ringInset, 0, MATH_CONSTANTS.TWO_PI);
+  ctx.stroke();
+  ctx.setLineDash(EMPTY_DASH);
+  ctx.fillStyle = cfg.coreColor;
+  ctx.beginPath();
+  ctx.arc(0, 0, obs.radius * cfg.swirlRadiusFactor, 0, MATH_CONSTANTS.TWO_PI);
+  ctx.fill();
+}
+
+function drawFieldObstacle(_renderer, ctx, obs, ox, oy, _oAngle, cfg, obsDefaults, now) {
+  const wave = (now * obsDefaults.fieldWaveSpeed) % obs.fieldRadius;
+  const radiusWave = obs.type === OBSTACLE_TYPES.ATTRACTOR ? obs.fieldRadius - wave : wave;
+  ctx.fillStyle = cfg.fieldColor;
+  ctx.beginPath();
+  ctx.arc(ox, oy, obs.fieldRadius, 0, MATH_CONSTANTS.TWO_PI);
+  ctx.fill();
+  ctx.strokeStyle = cfg.ringColor || cfg.coreColor;
+  ctx.globalAlpha = obsDefaults.fieldWaveAlpha;
+  ctx.lineWidth = obsDefaults.lineWidth;
+  ctx.beginPath();
+  ctx.arc(ox, oy, Math.max(obsDefaults.fieldWaveMinRadius, radiusWave), 0, MATH_CONSTANTS.TWO_PI);
+  ctx.stroke();
+  ctx.globalAlpha = 1;
+  if (cfg.outerColor) {
+    const inset = obsDefaults.ringInset;
+    ctx.fillStyle = cfg.outerColor;
+    ctx.beginPath();
+    ctx.arc(ox, oy, obs.radius, 0, MATH_CONSTANTS.TWO_PI);
+    ctx.fill();
+    if (cfg.ringColor) {
+      ctx.strokeStyle = cfg.ringColor;
+      ctx.lineWidth = obsDefaults.lineWidth;
+      ctx.beginPath();
+      ctx.arc(ox, oy, Math.max(obsDefaults.fieldWaveMinRadius, obs.radius - inset), 0, MATH_CONSTANTS.TWO_PI);
+      ctx.stroke();
+    }
+    ctx.fillStyle = cfg.coreColor;
+    ctx.beginPath();
+    ctx.arc(ox, oy, Math.max(obsDefaults.fieldWaveMinRadius, obs.radius - inset * 2), 0, MATH_CONSTANTS.TWO_PI);
+    ctx.fill();
+  } else {
+    ctx.fillStyle = cfg.coreColor;
+    ctx.beginPath();
+    ctx.arc(ox, oy, obs.radius, 0, MATH_CONSTANTS.TWO_PI);
+    ctx.fill();
+  }
+}
+
+function drawPivotObstacle(_renderer, ctx, obs, ox, oy, oAngle, cfg, obsDefaults) {
+  const inset = obsDefaults.ringInset;
+  ctx.translate(ox, oy);
+  ctx.rotate(oAngle);
+  ctx.fillStyle = cfg.outerColor;
+  ctx.beginPath();
+  ctx.arc(0, 0, obs.radius, 0, MATH_CONSTANTS.TWO_PI);
+  ctx.fill();
+  ctx.strokeStyle = cfg.ringColor;
+  ctx.lineWidth = obsDefaults.ringLineWidth;
+  ctx.beginPath();
+  ctx.arc(0, 0, obs.radius - inset, 0, MATH_CONSTANTS.TWO_PI);
+  ctx.stroke();
+  ctx.strokeStyle = cfg.coreColor;
+  ctx.beginPath();
+  ctx.moveTo(-obs.radius + inset, 0);
+  ctx.lineTo(obs.radius - inset, 0);
+  ctx.moveTo(0, -obs.radius + inset);
+  ctx.lineTo(0, obs.radius - inset);
+  ctx.stroke();
+}
+
+function drawBumperObstacle(_renderer, ctx, obs, ox, oy, _oAngle, cfg, obsDefaults) {
+  const pulseScale = 1 + obs.hitPulse * obsDefaults.bumperPulseScale;
+  ctx.translate(ox, oy);
+  ctx.scale(pulseScale, pulseScale);
+  ctx.fillStyle = cfg.outerColor;
+  ctx.beginPath();
+  ctx.arc(0, 0, obs.radius, 0, MATH_CONSTANTS.TWO_PI);
+  ctx.fill();
+  ctx.strokeStyle = cfg.ringColor;
+  ctx.lineWidth = cfg.ringLineWidth;
+  ctx.beginPath();
+  ctx.arc(0, 0, obs.radius - obsDefaults.ringInset, 0, MATH_CONSTANTS.TWO_PI);
+  ctx.stroke();
+  ctx.fillStyle = cfg.coreColor;
+  ctx.beginPath();
+  ctx.arc(0, 0, obs.radius * obsDefaults.bumperCoreRadiusFactor, 0, MATH_CONSTANTS.TWO_PI);
+  ctx.fill();
+}
+
+function drawRectObstacle(_renderer, ctx, obs, ox, oy, _oAngle, cfg, obsDefaults) {
+  const halfW = obs.width * MATH_CONSTANTS.HALF;
+  const halfH = obs.height * MATH_CONSTANTS.HALF;
+  ctx.fillStyle = cfg.fillColor;
+  ctx.strokeStyle = cfg.borderColor;
+  ctx.lineWidth = obsDefaults.lineWidth;
+  ctx.beginPath();
+  ctx.roundRect(ox - halfW, oy - halfH, obs.width, obs.height, obsDefaults.barrierCornerRadius);
+  ctx.fill();
+  ctx.stroke();
+}
+
+const OBSTACLE_DRAWERS = Object.freeze({
+  [OBSTACLE_TYPES.PORTAL]: drawPortalObstacle,
+  [OBSTACLE_TYPES.SINGULARITY]: drawSingularityObstacle,
+  [OBSTACLE_TYPES.REPULSOR]: drawFieldObstacle,
+  [OBSTACLE_TYPES.ATTRACTOR]: drawFieldObstacle,
+  [OBSTACLE_TYPES.ANTIMAGNET]: drawFieldObstacle,
+  [OBSTACLE_TYPES.PIVOT]: drawPivotObstacle,
+  [OBSTACLE_TYPES.BUMPER]: drawBumperObstacle,
+  [OBSTACLE_TYPES.BARRIER]: drawRectObstacle,
+  [OBSTACLE_TYPES.PLATFORM]: drawRectObstacle
+});
+
+function drawBallPreOrbEffects(ctx, ball, palette, r, theme, renderCfg) {
+  if (palette.glow && (ball.specialType || ball.clusterModifier)) {
+    ctx.save();
+    ctx.fillStyle = palette.glow;
+    ctx.globalAlpha = renderCfg.glowAlpha;
+    ctx.beginPath();
+    ctx.arc(0, 0, r * renderCfg.glowRadiusFactor, 0, MATH_CONSTANTS.TWO_PI);
+    ctx.fill();
+    ctx.restore();
+  }
+  if (ball.isAnchor) {
+    ctx.strokeStyle = theme.anchorRingColor;
+    ctx.lineWidth = renderCfg.anchorRingLineWidth;
+    ctx.beginPath();
+    ctx.arc(0, 0, r + renderCfg.anchorRingPadding, 0, MATH_CONSTANTS.TWO_PI);
+    ctx.stroke();
+    ctx.fillStyle = theme.anchorCoreColor;
+    ctx.beginPath();
+    ctx.arc(0, -r - renderCfg.anchorRingPadding, renderCfg.anchorPinRadius, 0, MATH_CONSTANTS.TWO_PI);
+    ctx.fill();
+  }
+}
+
+function drawBallModifierRing(ctx, ball, r, renderCfg, modSpec) {
+  if (!modSpec) {
+    return;
+  }
+  const isArmoredType =
+    ball.clusterModifier === CLUSTER_MODIFIERS.ARMORED || ball.clusterModifier === CLUSTER_MODIFIERS.BOSS_CORE;
+  const isCrackedArmor = isArmoredType && ball.armorHits === 1;
+  ctx.strokeStyle = isCrackedArmor && modSpec.crackedColor ? modSpec.crackedColor : modSpec.ringColor;
+  ctx.lineWidth = isArmoredType && ball.armorHits > 1
+    ? renderCfg.armorIntactLineWidth
+    : renderCfg.modifierRingLineWidth;
+  if (isCrackedArmor) {
+    ctx.setLineDash(renderCfg.crackedArmorDash);
+  }
+  ctx.beginPath();
+  ctx.arc(0, 0, r - renderCfg.modifierRingInset, 0, MATH_CONSTANTS.TWO_PI);
+  ctx.stroke();
+  ctx.setLineDash(EMPTY_DASH);
+}
+
+function drawBallPrimaryLabel(renderer, ctx, palette, r, theme, renderCfg) {
+  const primaryLabel = palette.icon || palette.symbol;
+  if (!primaryLabel) {
+    return;
+  }
+  const label = renderer.getLabelFont(r);
+  ctx.font = label.font;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  // An enlarged glyph covers the shine and gradient, so it gets the outline too.
+  if (renderer.highContrast || label.isEnlarged) {
+    ctx.strokeStyle = theme.floatingTextShadowColor;
+    ctx.lineWidth = renderCfg.labelStrokeWidth;
+    ctx.strokeText(primaryLabel, 0, renderCfg.labelOffsetY);
+  }
+  ctx.fillStyle = renderer.highContrast ? renderCfg.labelColorHighContrast : renderCfg.labelColorNormal;
+  ctx.fillText(primaryLabel, 0, renderCfg.labelOffsetY);
+}
+
+function drawBallModifierBadge(renderer, ctx, r, theme, renderCfg, modSpec) {
+  if (!modSpec?.badge) {
+    return;
+  }
+  const bx = r * renderCfg.badgeOffsetFactor;
+  const by = -r * renderCfg.badgeOffsetFactor;
+  ctx.fillStyle = theme.floatingTextShadowColor;
+  ctx.strokeStyle = modSpec.ringColor;
+  ctx.lineWidth = renderCfg.badgeBorderWidth;
+  ctx.beginPath();
+  ctx.arc(bx, by, r * renderCfg.badgeRadiusFactor, 0, MATH_CONSTANTS.TWO_PI);
+  ctx.fill();
+  ctx.stroke();
+  ctx.fillStyle = renderCfg.badgeColor;
+  ctx.font = renderer.getBadgeFont(r);
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(modSpec.badge, bx, by + renderCfg.badgeTextOffsetY);
+}
+
+function drawBallPostOrbEffects(renderer, ctx, ball, palette, r, now, renderCfg) {
+  if (ball.specialType) {
+    const glowPulse =
+      renderCfg.specialGlowBaseAlpha +
+      renderCfg.specialGlowPulseAmp * Math.sin(now * renderCfg.specialGlowPulseSpeed + ball.pulsePhase);
+    ctx.strokeStyle = palette.highlight;
+    ctx.globalAlpha = glowPulse;
+    ctx.lineWidth = renderCfg.specialGlowLineWidth;
+    ctx.beginPath();
+    ctx.arc(0, 0, r + renderCfg.specialGlowRadiusOffset, 0, MATH_CONSTANTS.TWO_PI);
+    ctx.stroke();
+  }
+  if (ball.clusterModifier === CLUSTER_MODIFIERS.BUBBLE) {
+    renderer.drawBubbleShell(ctx, r);
+  }
+}
+
+function drawCollectorSlotLabels(renderer, ctx, collectorCfg, margin, topY, slotWidth, theme, engineState) {
+  const bonusPoints = engineState?.getCollectorBonusPoints?.() ?? collectorCfg.bonusPointsPerBall;
+  if (!theme.collectorLabelColor || !(bonusPoints > 0)) {
+    return;
+  }
+  const labelText = t('gameplay.feedback.collector.slotLabel', { points: bonusPoints });
+  ctx.fillStyle = theme.collectorLabelColor;
+  ctx.font = renderer.collectorLabelFont;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  const labelY = topY + collectorCfg.zoneHeight * MATH_CONSTANTS.HALF;
+  for (let i = 0; i < collectorCfg.slotCount; i++) {
+    const slotCenterX = margin + (i + MATH_CONSTANTS.HALF) * slotWidth;
+    ctx.fillText(labelText, slotCenterX, labelY);
+  }
+}
+
+function computeBoardSignature(physicsWorld, colorWeights) {
+  let boardCount = 0;
+  let boardIdSum = 0;
+  let boardBondTotal = 0;
+  let boardArmorTotal = 0;
+  let boardColorSum = 0;
+  for (const b of physicsWorld.balls) {
+    boardCount++;
+    boardIdSum += b.id;
+    boardBondTotal += b.bonds.size;
+    boardArmorTotal += b.armorHits;
+    if (b.colorId) {
+      boardColorSum += b.id * colorWeights.get(b.colorId);
+    }
+  }
+  return { boardCount, boardIdSum, boardBondTotal, boardArmorTotal, boardColorSum };
+}
+
+function matchesAimShotKey(cache, key) {
+  return (
+    cache.valid
+    && cache.aimAngle === key.aimAngle
+    && cache.cellX === key.cellX
+    && cache.cellY === key.cellY
+    && cache.ballId === key.ballId
+    && cache.specialType === key.specialType
+    && cache.colorId === key.colorId
+    && cache.snapTargetId === key.snapTargetId
+    && cache.blastMult === key.blastMult
+  );
+}
+
+function matchesAimBoardKey(cache, sig) {
+  return (
+    cache.boardCount === sig.boardCount
+    && cache.boardIdSum === sig.boardIdSum
+    && cache.boardBondTotal === sig.boardBondTotal
+    && cache.boardArmorTotal === sig.boardArmorTotal
+    && cache.boardColorSum === sig.boardColorSum
+  );
+}
+
+const SPECIAL_RADIUS_KEYS = Object.freeze({
+  [SPECIAL_TYPES.BOMB]: 'blastRadiusFactor',
+  [SPECIAL_TYPES.FREEZE]: 'freezeRadiusFactor',
+  [SPECIAL_TYPES.BRUSH]: 'paintRadiusFactor'
+});
+
+function strokeAimTrajectoryPath(renderer, ctx, points, palette, theme, now) {
+  const dashOffset = renderer.isReducedMotion || !theme.aimDashSpeed ? 0 : -(now * theme.aimDashSpeed);
+  ctx.beginPath();
+  ctx.moveTo(points[0].x, points[0].y);
+  for (let i = 1; i < points.length; i++) {
+    if (points[i].warpBreak) {
+      ctx.moveTo(points[i].x, points[i].y);
+    } else {
+      ctx.lineTo(points[i].x, points[i].y);
+    }
+  }
+  if (theme.aimGlowWidth && theme.aimGlowAlpha) {
+    ctx.strokeStyle = palette.fill;
+    ctx.lineWidth = theme.aimGlowWidth;
+    ctx.globalAlpha = theme.aimGlowAlpha;
+    ctx.setLineDash(EMPTY_DASH);
+    ctx.stroke();
+  }
+  ctx.globalAlpha = 1.0;
+  ctx.strokeStyle = palette.highlight;
+  ctx.lineWidth = theme.aimLineWidth;
+  ctx.setLineDash(theme.aimLineDash);
+  ctx.lineDashOffset = dashOffset;
+  ctx.stroke();
+  ctx.setLineDash(EMPTY_DASH);
+  ctx.lineDashOffset = 0;
+
+  if (theme.aimBounceNodeRadius) {
+    ctx.fillStyle = palette.highlight;
+    ctx.globalAlpha = theme.aimBounceNodeAlpha;
+    for (let i = 1; i < points.length - 1; i++) {
+      if (points[i].isBounce) {
+        ctx.beginPath();
+        ctx.arc(points[i].x, points[i].y, theme.aimBounceNodeRadius, 0, MATH_CONSTANTS.TWO_PI);
+        ctx.fill();
+      }
+    }
+    ctx.globalAlpha = 1.0;
+  }
+}
+
+function drawAimSpecialAoe(renderer, ctx, currentBall, palette, theme, pulse, endX, endY, blastRadiusMultiplier) {
+  if (!currentBall.specialType) {
+    return;
+  }
+  const specType = currentBall.specialType;
+  const specCfg = renderer.ballsConfig.specialTypes[specType];
+  const radiusKey = SPECIAL_RADIUS_KEYS[specType];
+  if (radiusKey) {
+    const aoeRadius = currentBall.radius * specCfg[radiusKey] * blastRadiusMultiplier;
+    ctx.save();
+    ctx.fillStyle = palette.highlight;
+    ctx.globalAlpha = theme.specialAoeFillAlpha;
+    ctx.beginPath();
+    ctx.arc(endX, endY, aoeRadius, 0, MATH_CONSTANTS.TWO_PI);
+    ctx.fill();
+    ctx.strokeStyle = palette.highlight;
+    ctx.globalAlpha = theme.specialAoeStrokeAlpha * pulse;
+    ctx.lineWidth = theme.aimGhostLineWidth;
+    ctx.setLineDash(theme.specialAoeDash);
+    ctx.stroke();
+    ctx.restore();
+  } else if (specType === SPECIAL_TYPES.LIGHTNING) {
+    const bandHalf = currentBall.radius * specCfg.bandHalfHeightFactor * blastRadiusMultiplier;
+    const margin = renderer.gameConfig.canvas.wallMargin;
+    const bandWidth = renderer.logicalWidth - margin * 2;
+    ctx.save();
+    ctx.fillStyle = palette.highlight;
+    ctx.globalAlpha = theme.specialAoeFillAlpha;
+    ctx.fillRect(margin, endY - bandHalf, bandWidth, bandHalf * 2);
+    ctx.strokeStyle = palette.highlight;
+    ctx.globalAlpha = theme.specialAoeStrokeAlpha * pulse;
+    ctx.lineWidth = theme.aimGhostLineWidth;
+    ctx.setLineDash(theme.specialAoeDash);
+    ctx.strokeRect(margin, endY - bandHalf, bandWidth, bandHalf * 2);
+    ctx.restore();
+  }
+}
+
+function drawAimTargetHighlights(renderer, ctx, preview, palette, theme, pulse, alpha) {
+  if (preview.highlightBalls.length > 0) {
+    ctx.strokeStyle = preview.highlightIsMatch ? theme.targetHighlightColor : palette.highlight;
+    ctx.lineWidth = preview.highlightIsMatch ? theme.aimTargetMatchLineWidth : theme.aimTargetNormalLineWidth;
+    ctx.globalAlpha = pulse;
+    renderer.strokeBallRings(ctx, preview.highlightBalls, theme.aimTargetRingPadding, alpha);
+  }
+  if (preview.avalancheBalls.length > 0) {
+    ctx.save();
+    ctx.strokeStyle = theme.avalancheDropHighlightColor;
+    ctx.lineWidth = theme.aimTargetNormalLineWidth;
+    ctx.setLineDash(theme.specialAoeDash);
+    ctx.globalAlpha = pulse;
+    renderer.strokeBallRings(
+      ctx,
+      preview.avalancheBalls,
+      theme.aimTargetRingPadding + theme.avalancheRingPaddingExtra,
+      alpha
+    );
+    ctx.restore();
+  }
+}
+
+function resolveBeatRingAnchor(engineState, canvasCfg) {
+  const spec = typeof engineState.getLauncherSpec === 'function' ? engineState.getLauncherSpec() : null;
+  if (!spec) {
+    return { rx: canvasCfg.launcherX, ry: canvasCfg.launcherY };
+  }
+  const rx = spec.posture === LAUNCHER_POSTURES.DROP_RAIL ? (engineState.mergeDropX ?? spec.x) : spec.x;
+  return { rx, ry: spec.y };
+}
+
+function resolveLauncherSpecLayout(engineState, canvasCfg) {
+  const spec = typeof engineState.getLauncherSpec === 'function' ? engineState.getLauncherSpec() : null;
+  const posture = spec ? spec.posture : LAUNCHER_POSTURES.UPWARD;
+  const isDropRail = posture === LAUNCHER_POSTURES.DROP_RAIL;
+  const baseX = spec ? spec.x : canvasCfg.launcherX;
+  const lx = isDropRail ? (engineState.mergeDropX ?? baseX) : baseX;
+  const ly = spec ? spec.y : canvasCfg.launcherY;
+  return {
+    spec,
+    isDropRail,
+    baseX,
+    lx,
+    ly,
+    nextOffsetX: spec ? spec.nextOffsetX : canvasCfg.nextBallOffsetX,
+    nextOffsetY: spec ? spec.nextOffsetY : canvasCfg.nextBallOffsetY
+  };
+}
+
+function drawDropRailAndCancelChrome(ctx, engineState, theme, launcherGeom, layout) {
+  if (layout.isDropRail) {
+    const basin = engineState.getMergeBasinGeometry?.() ?? null;
+    if (basin) {
+      ctx.save();
+      ctx.strokeStyle = theme.launcherAccentColor;
+      ctx.lineWidth = launcherGeom.baseBorderWidth;
+      ctx.beginPath();
+      ctx.moveTo(basin.left, layout.ly);
+      ctx.lineTo(basin.right, layout.ly);
+      ctx.stroke();
+      ctx.restore();
+    }
+  }
+  if (engineState.isAimCancelled) {
+    ctx.save();
+    ctx.strokeStyle = theme.cancelAimColor;
+    ctx.lineWidth = launcherGeom.cancelRingLineWidth;
+    ctx.setLineDash(launcherGeom.cancelRingDash);
+    ctx.beginPath();
+    ctx.arc(layout.lx, layout.ly, launcherGeom.cancelRingRadius, 0, MATH_CONSTANTS.TWO_PI);
+    ctx.stroke();
+    ctx.restore();
+  }
+}
+
+function drawLauncherChassis(ctx, engineState, theme, launcherGeom, layout) {
+  if (!layout.isDropRail) {
+    ctx.save();
+    ctx.translate(layout.lx, layout.ly);
+    ctx.rotate(engineState.aimAngle + Math.PI * MATH_CONSTANTS.HALF);
+    ctx.fillStyle = theme.launcherBarrelColor;
+    ctx.strokeStyle = theme.launcherAccentColor;
+    ctx.lineWidth = launcherGeom.barrelBorderWidth;
+    ctx.beginPath();
+    ctx.roundRect(
+      launcherGeom.barrelX,
+      launcherGeom.barrelY,
+      launcherGeom.barrelWidth,
+      launcherGeom.barrelHeight,
+      launcherGeom.barrelCornerRadius
+    );
+    ctx.fill();
+    ctx.stroke();
+    ctx.restore();
+  }
+  ctx.save();
+  ctx.fillStyle = theme.launcherBaseColor;
+  ctx.strokeStyle = theme.launcherAccentColor;
+  ctx.lineWidth = launcherGeom.baseBorderWidth;
+  const baseRadius = layout.isDropRail
+    ? launcherGeom.baseRadius * DROP_RAIL_CARRIAGE_RADIUS_FACTOR
+    : launcherGeom.baseRadius;
+  ctx.beginPath();
+  ctx.arc(layout.lx, layout.ly, baseRadius, 0, MATH_CONSTANTS.TWO_PI);
+  ctx.fill();
+  ctx.stroke();
+  ctx.restore();
+}
+
+function drawBlitzAutoFireRing(renderer, ctx, engineState, theme, launcherGeom, lx, ly) {
+  if (
+    engineState.mode !== GAME_MODES.BLITZ
+    || !(engineState.blitzIdleFrames > 0)
+    || engineState.physicsWorld.projectile
+  ) {
+    return;
+  }
+  const autoFireMax = renderer.gameConfig.blitz?.autoFireFrames || 0;
+  if (!(autoFireMax > 0)) {
+    return;
+  }
+  const ratio = Math.min(1, engineState.blitzIdleFrames / autoFireMax);
+  const startAngle = -Math.PI * MATH_CONSTANTS.HALF;
+  const endAngle = startAngle + ratio * MATH_CONSTANTS.TWO_PI;
+  ctx.save();
+  ctx.strokeStyle = ratio >= launcherGeom.autoFireUrgentRatio ? theme.dangerLineColor : theme.wavePopupColor;
+  ctx.lineWidth = launcherGeom.autoFireRingWidth;
+  ctx.beginPath();
+  ctx.arc(lx, ly, launcherGeom.baseRadius + launcherGeom.autoFireRingOffset, startAngle, endAngle);
+  ctx.stroke();
+  ctx.restore();
+}
+
+function drawLauncherCurrentBall(renderer, ctx, engineState, launcherGeom, layout, canShowPolarity, polaritySign, now) {
+  if (!engineState.currentBall || engineState.physicsWorld.projectile) {
+    return;
+  }
+  renderer.drawBallAt(ctx, engineState.currentBall, layout.lx, layout.ly, now);
+  const rawShot = canShowPolarity ? engineState.getVersusShotPolarity() : null;
+  const shotPolarity = rawShot ? rawShot * polaritySign : null;
+  if (shotPolarity) {
+    renderer.drawShotPolarityGlyph(
+      ctx,
+      layout.lx,
+      layout.ly,
+      engineState.currentBall.radius * renderer.gameConfig.versus.render.launcherGlyphSizeFactor,
+      shotPolarity
+    );
+  }
+  if (engineState.isPolarityFlipped) {
+    const renderCfg = renderer.ballsConfig.render;
+    ctx.save();
+    ctx.strokeStyle = renderCfg.polarityFlipRingColor;
+    ctx.lineWidth = launcherGeom.nextBallRingWidth;
+    ctx.setLineDash(renderCfg.polarityFlipDash);
+    ctx.beginPath();
+    ctx.arc(layout.lx, layout.ly, engineState.currentBall.radius + renderCfg.polarityFlipRadiusOffset, 0, MATH_CONSTANTS.TWO_PI);
+    ctx.stroke();
+    ctx.restore();
+  }
+}
+
+function drawLauncherNextBall(renderer, ctx, engineState, theme, launcherGeom, layout, canShowPolarity, polaritySign, now) {
+  if (
+    !engineState.nextBall
+    || (engineState.mode === GAME_MODES.PUZZLE && engineState.shotsRemaining <= 1)
+  ) {
+    return;
+  }
+  const nx = layout.baseX + layout.nextOffsetX;
+  const ny = layout.ly + layout.nextOffsetY;
+  ctx.save();
+  ctx.strokeStyle = theme.launcherAccentColor;
+  ctx.lineWidth = launcherGeom.nextBallRingWidth;
+  ctx.beginPath();
+  ctx.arc(nx, ny, engineState.nextBall.radius + launcherGeom.nextBallRingPadding, 0, MATH_CONSTANTS.TWO_PI);
+  ctx.stroke();
+  ctx.restore();
+  renderer.drawBallAt(ctx, engineState.nextBall, nx, ny, now);
+  // The flip only applies to the loaded shot: the next sphere shows its own polarity.
+  const rawNext = canShowPolarity ? engineState.getVersusShotPolarity(engineState.nextBall, false) : null;
+  const nextPolarity = rawNext ? rawNext * polaritySign : null;
+  if (nextPolarity) {
+    renderer.drawShotPolarityGlyph(
+      ctx,
+      nx,
+      ny,
+      engineState.nextBall.radius * renderer.gameConfig.versus.render.nextGlyphSizeFactor,
+      nextPolarity
+    );
+  }
+  if (!layout.spec?.compactQueue) {
+    renderer.drawUpcomingBalls(ctx, engineState.upcomingColorIds, nx, ny, engineState.nextBall.radius, now);
+  }
+}
+
+function measureAnchorRowBounds(balls) {
+  let top = Infinity;
+  let minX = Infinity;
+  let maxX = -Infinity;
+  for (const ball of balls) {
+    if (!ball.isAnchor) {
+      continue;
+    }
+    top = Math.min(top, ball.y);
+    minX = Math.min(minX, ball.x - ball.radius);
+    maxX = Math.max(maxX, ball.x + ball.radius);
+  }
+  return { top, minX, maxX };
+}
+
+function drawAnchorRailHatching(renderer, ctx, sagCfg, sagPhase, minX, maxX, top, half) {
+  if (sagPhase === SAG_DRAW.PHASE_CALM || (!renderer.colorPatterns && !renderer.highContrast)) {
+    return;
+  }
+  // Shape cue besides the color: diagonal hatching on the rail while it is stressed.
+  ctx.strokeStyle = sagCfg.render.hatchColor;
+  ctx.lineWidth = SAG_DRAW.HATCH_WIDTH;
+  ctx.beginPath();
+  for (let x = minX; x < maxX; x += SAG_DRAW.RAIL_HATCH_STEP) {
+    ctx.moveTo(x, top + half);
+    ctx.lineTo(x + sagCfg.render.railThickness, top - half);
+  }
+  ctx.stroke();
+}
+
+function drawSagGaugeSegment(ctx, left, y, gauge, fill, hatch, isWarn, isFull, filled, sagCfg, theme) {
+  if (!filled) {
+    ctx.globalAlpha = SAG_DRAW.EMPTY_ALPHA;
+    ctx.fillStyle = theme.launcherAccentColor;
+    ctx.fillRect(left, y, gauge.width, gauge.segmentHeight);
+    ctx.globalAlpha = 1;
+    return;
+  }
+  ctx.fillStyle = fill;
+  ctx.fillRect(left, y, gauge.width, gauge.segmentHeight);
+  if (hatch && (isWarn || isFull)) {
+    ctx.strokeStyle = sagCfg.render.hatchColor;
+    ctx.lineWidth = SAG_DRAW.HATCH_WIDTH;
+    ctx.beginPath();
+    ctx.moveTo(left, y + gauge.segmentHeight);
+    ctx.lineTo(left + gauge.width, y);
+    if (isFull) {
+      ctx.moveTo(left, y);
+      ctx.lineTo(left + gauge.width, y + gauge.segmentHeight);
+    }
+    ctx.stroke();
+  }
+}
+
+function drawSagGaugeAlertChrome(ctx, left, top, totalHeight, gauge, fill, isWarn, isFull) {
+  if (isWarn) {
+    ctx.strokeStyle = fill;
+    ctx.lineWidth = SAG_DRAW.OUTLINE_WIDTH;
+    ctx.setLineDash(SAG_DRAW.WARN_DASH);
+    ctx.strokeRect(
+      left - SAG_DRAW.OUTLINE_PADDING,
+      top - SAG_DRAW.OUTLINE_PADDING,
+      gauge.width + SAG_DRAW.OUTLINE_PADDING * 2,
+      totalHeight + SAG_DRAW.OUTLINE_PADDING * 2
+    );
+    ctx.setLineDash(EMPTY_DASH);
+  } else if (isFull) {
+    const cx = left + gauge.width * MATH_CONSTANTS.HALF;
+    const tipY = top - SAG_DRAW.CHEVRON_GAP;
+    ctx.strokeStyle = fill;
+    ctx.lineWidth = SAG_DRAW.CHEVRON_WIDTH;
+    ctx.beginPath();
+    ctx.moveTo(cx - SAG_DRAW.CHEVRON_HALF_WIDTH, tipY - SAG_DRAW.CHEVRON_HEIGHT);
+    ctx.lineTo(cx, tipY);
+    ctx.lineTo(cx + SAG_DRAW.CHEVRON_HALF_WIDTH, tipY - SAG_DRAW.CHEVRON_HEIGHT);
+    ctx.stroke();
+  }
+}
+
 /**
  * Canvas 2D renderer supporting high-DPI scaling, state interpolation,
  * high-contrast mode, and predictive trajectory/AOE/avalanche overlays.
@@ -110,105 +1146,9 @@ export class Renderer {
     this.ballsConfig = ballsConfig;
     this.obstaclesConfig = obstaclesConfig;
 
-    this.colorMap = new Map();
-    this.colorWeights = new Map();
-    ballsConfig.standardColors.forEach((c, index) => {
-      this.colorMap.set(c.id, c);
-      this.colorWeights.set(c.id, index + 1);
-    });
-    const mergeTiers = resolveModesConfig(options?.modesConfig).merge.tiers;
-    const baseWeight = ballsConfig.standardColors.length;
-    mergeTiers.forEach((tierSpec, index) => {
-      this.colorMap.set(tierSpec.id, tierSpec);
-      this.colorWeights.set(tierSpec.id, baseWeight + index + 1);
-    });
-
-    this.logicalWidth = gameConfig.canvas.logicalWidth;
-    this.logicalHeight = gameConfig.canvas.logicalHeight;
-    this.dpr = 1;
-    this.scaleX = 1;
-    this.scaleY = 1;
-    this.resolutionDirty = true;
-    this.staticLayer = null;
-    this.staticLayerDirty = true;
-
-    const theme = this.gameConfig.theme;
-    this.floatingTextFont = `bold ${gameConfig.juice.particles.floatingTextFontSize}px ${theme.fontFamily}`;
-    const collectorLabelPx = gameConfig.scoring?.collector?.labelFontSize || gameConfig.juice.particles.floatingTextFontSize;
-    this.collectorLabelFont = `bold ${collectorLabelPx}px ${theme.fontFamily}`;
-    this.labelFontCache = new Map();
-    // CSS pixels per logical unit; ball labels are enlarged when it gets small.
-    this.displayScale = 1;
-    this.badgeFontCache = new Map();
-
-    // Reused to draw the queued launcher colors with the regular ball renderer.
-    this.upcomingPreviewBall = new Ball({ x: 0, y: 0, radius: 0, colorId: null });
-    this.bondSegments = [];
-    for (let i = 0; i < BOND_STYLE_COUNT; i++) {
-      this.bondSegments.push([]);
-    }
-
-    this.portalLinks = new Map();
-    this.portalLinkSource = [];
-
-    this.aimPreview = {
-      valid: false,
-      aimAngle: 0,
-      cellX: 0,
-      cellY: 0,
-      ballId: 0,
-      specialType: null,
-      colorId: null,
-      snapTargetId: 0,
-      blastMult: 0,
-      boardCount: 0,
-      boardIdSum: 0,
-      boardBondTotal: 0,
-      boardArmorTotal: 0,
-      boardColorSum: 0,
-      highlightBalls: [],
-      highlightIsMatch: false,
-      destroyedIds: new Set(),
-      avalancheBalls: []
-    };
-    this.aimPreviewComputeCount = 0;
-
-    // Per-frame inputs of drawMagneticFieldPair, kept as fields so the callback is allocated once.
-    this.magneticPairCtx = null;
-    this.magneticPairAlpha = 1;
-    this.magneticPairMaxDistSq = 0;
-    this.drawMagneticFieldPair = (a, b) => {
-      if (!a.colorId || a.colorId !== b.colorId || a.bonds.has(b.id)) {
-        return;
-      }
-      const alpha = this.magneticPairAlpha;
-      const ax = this.interpolate(a.prevX, a.x, alpha);
-      const ay = this.interpolate(a.prevY, a.y, alpha);
-      const bx = this.interpolate(b.prevX, b.x, alpha);
-      const by = this.interpolate(b.prevY, b.y, alpha);
-      const dx = bx - ax;
-      const dy = by - ay;
-      if (dx * dx + dy * dy <= this.magneticPairMaxDistSq) {
-        this.magneticPairCtx.moveTo(ax, ay);
-        this.magneticPairCtx.lineTo(bx, by);
-      }
-    };
-    // Slow-motion vignette gradient, rebuilt only when the canvas size or tint changes.
-    this.slowMoVignetteGradient = null;
-    this.slowMoVignetteKey = '';
-    this.slowMoVignetteCtx = null;
-    // Unit-radius shatter core gradients by burst colour; scaled to the ball radius at draw time.
-    this.shatterCoreGradients = new Map();
-    this.shatterCoreGradientCtx = null;
-    // Unit-radius explosion gradients (puff phases, core, flash); scaled to the radius at draw time.
-    this.unitRadialGradients = new Map();
-    this.unitRadialGradientCtx = null;
-    this.ballGradientCache = new Map();
-    this.ballSpriteCache = new Map();
-    this.highContrast = false;
-    this.colorPatterns = false;
-    this.isReducedMotion = false;
-    this.magnetarView = null;
+    initRendererColors(this, ballsConfig, options);
+    initRendererMetricsAndCaches(this, gameConfig);
+    initRendererGradientAndPairState(this);
     this.activeBallStyle = gameConfig.defaults?.ballStyle || BALL_STYLES.CLASSIC;
     this.ballSpriteKeySuffix = '';
     this.refreshBallSpriteKeySuffix();
@@ -534,125 +1474,14 @@ export class Renderer {
     this.magnetarView = magnetarView;
     const now = this.isReducedMotion ? REDUCED_MOTION_CLOCK_MS : performance.now();
 
-    ctx.setTransform(this.scaleX, 0, 0, this.scaleY, 0, 0);
-    const shake = this.lite ? 0 : engineState.particleSystem.shakeIntensity;
-    if (shake > 0) {
-      // The shaken static layer no longer covers the edges: paint them first so no strip of
-      // the previous frame shows through.
-      ctx.fillStyle = theme.backgroundTop;
-      ctx.fillRect(0, 0, width, height);
-    }
-    ctx.save();
-    if (shake > 0) {
-      const dx = (Math.random() - MATH_CONSTANTS.HALF) * 2 * shake;
-      const dy = (Math.random() - MATH_CONSTANTS.HALF) * 2 * shake;
-      ctx.translate(dx, dy);
-    }
-
-    ctx.drawImage(this.staticLayer, 0, 0, width, height);
-    if (!this.lite) {
-      this.drawWallCracks(ctx, engineState.particleSystem);
-    }
-    const behavior = typeof engineState.getModeBehavior === 'function'
-      ? engineState.getModeBehavior()
-      : null;
+    prepareFrameCanvas(this, engineState, theme, width, height);
+    const behavior = typeof engineState.getModeBehavior === 'function' ? engineState.getModeBehavior() : null;
     const chrome = behavior ? behavior.getRenderChrome(engineState) : null;
 
-    if (!chrome || chrome.ambientLiquid) {
-      this.drawLiquid(ctx, engineState.particleSystem, width, height);
-    }
-    if (!chrome || chrome.collectorBins) {
-      this.drawCollectorBins(ctx, width, height, theme, engineState);
-    }
-    if (!chrome || chrome.dangerZone) {
-      this.drawDangerZone(ctx, width, height, theme, engineState.physicsWorld.balls, now, alpha);
-    }
-
-    behavior?.drawUnderlay?.(ctx, engineState, this, theme, now);
-
-    // A new Flux shape slides down into place; only the drawing moves, not the physics.
-    // After a Sag step the cluster is already lower in the physics: it eases down from its
-    // old place, drawing only.
-    const introOffset = this.getStageIntroOffset(engineState);
-    if (introOffset > 0) {
-      ctx.save();
-      ctx.translate(0, -introOffset);
-    }
-    this.drawObstacles(ctx, engineState.physicsWorld.obstacles, now, alpha);
-    this.drawRails(ctx, engineState.physicsWorld);
-    // Only the cluster and its rail ease down; fixed fixtures stay where they are.
-    const lowerOffset = this.getRailLowerOffset(engineState);
-    if (lowerOffset > 0) {
-      ctx.save();
-      ctx.translate(0, -lowerOffset);
-    }
-    this.drawAnchorRail(ctx, engineState, theme, now);
-    this.drawMagneticBonds(ctx, engineState.physicsWorld, theme, now, alpha);
-    this.drawTethers(ctx, engineState.physicsWorld, alpha);
-
-    for (const ball of engineState.physicsWorld.balls) {
-      this.drawBall(ctx, ball, now, alpha);
-    }
-    this.drawChainLinkOverlays(ctx, engineState.physicsWorld, alpha);
-    if (magnetarView) {
-      this.drawMagnetar(ctx, engineState, now);
-    }
-    if (lowerOffset > 0) {
-      ctx.restore();
-    }
-    if (introOffset > 0) {
-      ctx.restore();
-    }
-
-    for (const ball of engineState.physicsWorld.droppingBalls) {
-      this.drawBall(ctx, ball, now, alpha);
-    }
-    behavior?.drawOverlay?.(ctx, engineState, this, theme, now);
-    if (!this.lite) {
-      this.drawShatteringBalls(ctx, engineState.particleSystem, now, alpha);
-    }
-
-    if (
-      (!chrome || chrome.aimLine)
-      && !this.lite
-      && engineState.aimPoints
-      && !engineState.physicsWorld.projectile
-      && !engineState.isAimCancelled
-    ) {
-      this.drawAimTrajectory(
-        ctx,
-        engineState.aimPoints,
-        engineState.currentBall,
-        engineState.physicsWorld,
-        theme,
-        now,
-        engineState.getBlastRadiusMultiplier(),
-        engineState.aimAngle,
-        alpha
-      );
-    }
-
-    if (!this.lite) {
-      this.drawTrail(ctx, engineState.particleSystem);
-    }
-
-    if (engineState.physicsWorld.projectile) {
-      this.drawBall(ctx, engineState.physicsWorld.projectile, now, alpha);
-    }
-
-    this.drawLauncher(ctx, engineState, theme, now);
-    behavior?.drawLauncherOverlay?.(ctx, engineState, this, theme, now);
-    this.drawSagGauge(ctx, engineState, theme);
-    if (!this.lite) {
-      this.drawParticles(ctx, engineState.particleSystem, alpha);
-      this.drawSlowMoOverlay(ctx, engineState, width, height, alpha);
-    }
-    if (engineState.versus) {
-      this.drawVersusCharges(ctx, engineState);
-    }
-    if (magnetarView && magnetarView.charges?.length) {
-      this.drawMagnetarCharges(ctx, engineState, magnetarView);
-    }
+    renderBoardChrome(this, ctx, engineState, width, height, theme, behavior, chrome, now, alpha);
+    renderClusterStageLayer(this, ctx, engineState, theme, magnetarView, now, alpha);
+    renderForegroundAction(this, ctx, engineState, theme, behavior, chrome, now, alpha);
+    renderForegroundChrome(this, ctx, engineState, width, height, theme, behavior, magnetarView, now, alpha);
     ctx.restore();
   }
 
@@ -845,98 +1674,10 @@ export class Renderer {
     const stressDist = ballRadius * simCfg.bondRestDistanceFactor * theme.magneticStressThresholdFactor;
 
     ctx.save();
-    ctx.lineWidth = theme.magneticFieldLineWidth;
-    ctx.setLineDash(theme.magneticFieldDash);
-    ctx.strokeStyle = `rgba(${theme.magneticSameColorBase}, ${theme.magneticFieldAlpha * pulse})`;
-    ctx.beginPath();
-    this.magneticPairCtx = ctx;
-    this.magneticPairAlpha = alpha;
-    this.magneticPairMaxDistSq = fieldMaxDistSq;
-    physicsWorld.spatialGrid.forEachNeighborPair(physicsWorld.balls, this.drawMagneticFieldPair);
-    this.magneticPairCtx = null;
-    ctx.stroke();
-    ctx.setLineDash(EMPTY_DASH);
-
+    strokeMagneticFieldLines(this, ctx, physicsWorld, theme, pulse, fieldMaxDistSq, alpha);
     ctx.lineWidth = theme.magneticBondLineWidth;
-    const segments = this.bondSegments;
-    for (const list of segments) {
-      list.length = 0;
-    }
-    for (const a of physicsWorld.balls) {
-      const polA = a.colorId ? (physicsWorld.polarityMap.get(a.colorId) || 0) : 0;
-      const ax = this.interpolate(a.prevX, a.x, alpha);
-      const ay = this.interpolate(a.prevY, a.y, alpha);
-      for (const neighborId of a.bonds) {
-        if (neighborId <= a.id) {
-          continue;
-        }
-        const b = physicsWorld.ballMap.get(neighborId);
-        if (!b) {
-          continue;
-        }
-        const bx = this.interpolate(b.prevX, b.x, alpha);
-        const by = this.interpolate(b.prevY, b.y, alpha);
-        const dist = Math.hypot(bx - ax, by - ay);
-        const isStressed = !a.isAnchor && !b.isAnchor && dist > stressDist;
-        const sameColor = a.colorId && a.colorId === b.colorId;
-        const polB = b.colorId ? (physicsWorld.polarityMap.get(b.colorId) || 0) : 0;
-        const samePolarityRepel = !sameColor && polA * polB > 0;
-        let style = BOND_STYLE.LINK;
-        if (isChainLink(a, b)) {
-          style = BOND_STYLE.CHAIN;
-        } else if (isStressed) {
-          style = BOND_STYLE.STRESSED;
-        } else if (sameColor) {
-          style = BOND_STYLE.SAME_COLOR;
-        } else if (samePolarityRepel) {
-          style = BOND_STYLE.REPEL;
-        }
-        segments[style].push(ax, ay, bx, by);
-      }
-    }
-
-    if (theme.magneticBondGlowWidth) {
-      ctx.lineWidth = theme.magneticBondGlowWidth;
-      if (segments[BOND_STYLE.STRESSED].length > 0 && theme.magneticStressGlowColor) {
-        this.strokeSegments(ctx, segments[BOND_STYLE.STRESSED], theme.magneticStressGlowColor);
-      }
-      if (segments[BOND_STYLE.SAME_COLOR].length > 0 && theme.magneticBondGlowAlpha) {
-        this.strokeSegments(
-          ctx,
-          segments[BOND_STYLE.SAME_COLOR],
-          `rgba(${theme.magneticSameColorBase}, ${theme.magneticBondGlowAlpha * pulse})`
-        );
-      }
-      ctx.lineWidth = theme.magneticBondLineWidth;
-    }
-
-    if (segments[BOND_STYLE.STRESSED].length > 0) {
-      this.strokeSegments(ctx, segments[BOND_STYLE.STRESSED], theme.magneticStressColor);
-    }
-    if (segments[BOND_STYLE.SAME_COLOR].length > 0) {
-      this.strokeSegments(
-        ctx,
-        segments[BOND_STYLE.SAME_COLOR],
-        `rgba(${theme.magneticSameColorBase}, ${theme.magneticBondSameColorAlpha * pulse})`
-      );
-    }
-    if (segments[BOND_STYLE.REPEL].length > 0) {
-      this.strokeSegments(
-        ctx,
-        segments[BOND_STYLE.REPEL],
-        `rgba(${theme.magneticRepelColorBase}, ${theme.magneticFieldAlpha * pulse})`
-      );
-    }
-    if (segments[BOND_STYLE.LINK].length > 0) {
-      this.strokeSegments(ctx, segments[BOND_STYLE.LINK], theme.magneticLinkColor);
-    }
-    if (segments[BOND_STYLE.CHAIN].length > 0) {
-      const chainSpec = this.ballsConfig.clusterModifiers.chained;
-      ctx.lineWidth = chainSpec.linkWidth;
-      ctx.setLineDash(chainSpec.linkDash);
-      this.strokeSegments(ctx, segments[BOND_STYLE.CHAIN], chainSpec.linkColor);
-      ctx.setLineDash(EMPTY_DASH);
-    }
+    const segments = collectBondSegments(this, physicsWorld, stressDist, alpha);
+    strokeBondGlowAndSegments(this, ctx, segments, theme, pulse);
     ctx.restore();
   }
 
@@ -991,199 +1732,16 @@ export class Renderer {
       if (obs.disabled) {
         continue;
       }
+      const drawer = OBSTACLE_DRAWERS[obs.type];
+      if (!drawer) {
+        continue;
+      }
       const cfg = typesCfg[obs.type] || {};
       const ox = this.interpolate(obs.prevX, obs.x, alpha);
       const oy = this.interpolate(obs.prevY, obs.y, alpha);
       const oAngle = this.interpolate(obs.prevAngle, obs.angle, alpha);
       ctx.save();
-
-      if (obs.type === OBSTACLE_TYPES.PORTAL) {
-        const mate = this.portalLinks.get(obs);
-        if (mate) {
-          ctx.save();
-          ctx.strokeStyle = cfg.fieldColor;
-          ctx.lineWidth = obsDefaults.lineWidth;
-          ctx.setLineDash(cfg.linkDash);
-          ctx.beginPath();
-          ctx.moveTo(ox, oy);
-          ctx.lineTo(this.interpolate(mate.prevX, mate.x, alpha), this.interpolate(mate.prevY, mate.y, alpha));
-          ctx.stroke();
-          ctx.restore();
-        }
-
-        const pulseScale = 1 + obs.hitPulse * obsDefaults.bumperPulseScale;
-        ctx.translate(ox, oy);
-        ctx.scale(pulseScale, pulseScale);
-
-        ctx.fillStyle = cfg.fieldColor;
-        ctx.beginPath();
-        ctx.arc(0, 0, obs.radius + cfg.fieldRadiusPadding, 0, MATH_CONSTANTS.TWO_PI);
-        ctx.fill();
-
-        ctx.fillStyle = cfg.outerColor;
-        ctx.beginPath();
-        ctx.arc(0, 0, obs.radius, 0, MATH_CONSTANTS.TWO_PI);
-        ctx.fill();
-
-        ctx.rotate(oAngle);
-        ctx.strokeStyle = cfg.ringColor;
-        ctx.lineWidth = obsDefaults.ringLineWidth;
-        ctx.setLineDash(cfg.ringDash);
-        ctx.beginPath();
-        ctx.arc(0, 0, obs.radius - cfg.ringInset, 0, MATH_CONSTANTS.TWO_PI);
-        ctx.stroke();
-        ctx.setLineDash(EMPTY_DASH);
-
-        ctx.strokeStyle = cfg.coreColor;
-        ctx.lineWidth = obsDefaults.lineWidth;
-        ctx.beginPath();
-        ctx.arc(0, 0, obs.radius * cfg.swirlRadiusFactor, 0, Math.PI * cfg.swirlArcAngleFactor);
-        ctx.stroke();
-      } else if (obs.type === OBSTACLE_TYPES.SINGULARITY) {
-        if (obs.pullRadius > obs.captureRadius && cfg.pullFieldColor) {
-          const pullWave = obs.pullRadius - ((now * obsDefaults.fieldWaveSpeed) % obs.pullRadius);
-          ctx.fillStyle = cfg.pullFieldColor;
-          ctx.beginPath();
-          ctx.arc(ox, oy, obs.pullRadius, 0, MATH_CONSTANTS.TWO_PI);
-          ctx.fill();
-
-          ctx.strokeStyle = cfg.ringColor;
-          ctx.globalAlpha = obsDefaults.pullWaveAlpha;
-          ctx.lineWidth = obsDefaults.lineWidth;
-          ctx.beginPath();
-          ctx.arc(ox, oy, Math.max(obs.captureRadius, pullWave), 0, MATH_CONSTANTS.TWO_PI);
-          ctx.stroke();
-          ctx.globalAlpha = 1;
-        }
-
-        const pulseScale = 1 + obs.hitPulse * obsDefaults.bumperPulseScale;
-        ctx.translate(ox, oy);
-        ctx.scale(pulseScale, pulseScale);
-
-        ctx.fillStyle = cfg.fieldColor;
-        ctx.beginPath();
-        ctx.arc(0, 0, obs.captureRadius, 0, MATH_CONSTANTS.TWO_PI);
-        ctx.fill();
-
-        ctx.fillStyle = cfg.outerColor;
-        ctx.beginPath();
-        ctx.arc(0, 0, obs.radius, 0, MATH_CONSTANTS.TWO_PI);
-        ctx.fill();
-
-        ctx.rotate(oAngle);
-        ctx.strokeStyle = cfg.ringColor;
-        ctx.lineWidth = obsDefaults.ringLineWidth;
-        ctx.setLineDash(cfg.ringDash);
-        ctx.beginPath();
-        ctx.arc(0, 0, obs.radius - cfg.ringInset, 0, MATH_CONSTANTS.TWO_PI);
-        ctx.stroke();
-        ctx.setLineDash(EMPTY_DASH);
-
-        ctx.fillStyle = cfg.coreColor;
-        ctx.beginPath();
-        ctx.arc(0, 0, obs.radius * cfg.swirlRadiusFactor, 0, MATH_CONSTANTS.TWO_PI);
-        ctx.fill();
-      } else if (
-        obs.type === OBSTACLE_TYPES.REPULSOR
-        || obs.type === OBSTACLE_TYPES.ATTRACTOR
-        || obs.type === OBSTACLE_TYPES.ANTIMAGNET
-      ) {
-        const wave = (now * obsDefaults.fieldWaveSpeed) % obs.fieldRadius;
-        const radiusWave = obs.type === OBSTACLE_TYPES.ATTRACTOR
-          ? obs.fieldRadius - wave
-          : wave;
-
-        ctx.fillStyle = cfg.fieldColor;
-        ctx.beginPath();
-        ctx.arc(ox, oy, obs.fieldRadius, 0, MATH_CONSTANTS.TWO_PI);
-        ctx.fill();
-
-        ctx.strokeStyle = cfg.ringColor || cfg.coreColor;
-        ctx.globalAlpha = obsDefaults.fieldWaveAlpha;
-        ctx.lineWidth = obsDefaults.lineWidth;
-        ctx.beginPath();
-        ctx.arc(ox, oy, Math.max(obsDefaults.fieldWaveMinRadius, radiusWave), 0, MATH_CONSTANTS.TWO_PI);
-        ctx.stroke();
-        ctx.globalAlpha = 1;
-
-        if (cfg.outerColor) {
-          const inset = obsDefaults.ringInset;
-          ctx.fillStyle = cfg.outerColor;
-          ctx.beginPath();
-          ctx.arc(ox, oy, obs.radius, 0, MATH_CONSTANTS.TWO_PI);
-          ctx.fill();
-
-          if (cfg.ringColor) {
-            ctx.strokeStyle = cfg.ringColor;
-            ctx.lineWidth = obsDefaults.lineWidth;
-            ctx.beginPath();
-            ctx.arc(ox, oy, Math.max(obsDefaults.fieldWaveMinRadius, obs.radius - inset), 0, MATH_CONSTANTS.TWO_PI);
-            ctx.stroke();
-          }
-
-          ctx.fillStyle = cfg.coreColor;
-          ctx.beginPath();
-          ctx.arc(ox, oy, Math.max(obsDefaults.fieldWaveMinRadius, obs.radius - inset * 2), 0, MATH_CONSTANTS.TWO_PI);
-          ctx.fill();
-        } else {
-          ctx.fillStyle = cfg.coreColor;
-          ctx.beginPath();
-          ctx.arc(ox, oy, obs.radius, 0, MATH_CONSTANTS.TWO_PI);
-          ctx.fill();
-        }
-      } else if (obs.type === OBSTACLE_TYPES.PIVOT) {
-        const inset = obsDefaults.ringInset;
-        ctx.translate(ox, oy);
-        ctx.rotate(oAngle);
-        ctx.fillStyle = cfg.outerColor;
-        ctx.beginPath();
-        ctx.arc(0, 0, obs.radius, 0, MATH_CONSTANTS.TWO_PI);
-        ctx.fill();
-
-        ctx.strokeStyle = cfg.ringColor;
-        ctx.lineWidth = obsDefaults.ringLineWidth;
-        ctx.beginPath();
-        ctx.arc(0, 0, obs.radius - inset, 0, MATH_CONSTANTS.TWO_PI);
-        ctx.stroke();
-
-        ctx.strokeStyle = cfg.coreColor;
-        ctx.beginPath();
-        ctx.moveTo(-obs.radius + inset, 0);
-        ctx.lineTo(obs.radius - inset, 0);
-        ctx.moveTo(0, -obs.radius + inset);
-        ctx.lineTo(0, obs.radius - inset);
-        ctx.stroke();
-      } else if (obs.type === OBSTACLE_TYPES.BUMPER) {
-        const pulseScale = 1 + obs.hitPulse * obsDefaults.bumperPulseScale;
-        ctx.translate(ox, oy);
-        ctx.scale(pulseScale, pulseScale);
-        ctx.fillStyle = cfg.outerColor;
-        ctx.beginPath();
-        ctx.arc(0, 0, obs.radius, 0, MATH_CONSTANTS.TWO_PI);
-        ctx.fill();
-
-        ctx.strokeStyle = cfg.ringColor;
-        ctx.lineWidth = cfg.ringLineWidth;
-        ctx.beginPath();
-        ctx.arc(0, 0, obs.radius - obsDefaults.ringInset, 0, MATH_CONSTANTS.TWO_PI);
-        ctx.stroke();
-
-        ctx.fillStyle = cfg.coreColor;
-        ctx.beginPath();
-        ctx.arc(0, 0, obs.radius * obsDefaults.bumperCoreRadiusFactor, 0, MATH_CONSTANTS.TWO_PI);
-        ctx.fill();
-      } else if (obs.type === OBSTACLE_TYPES.BARRIER || obs.type === OBSTACLE_TYPES.PLATFORM) {
-        const halfW = obs.width * MATH_CONSTANTS.HALF;
-        const halfH = obs.height * MATH_CONSTANTS.HALF;
-        ctx.fillStyle = cfg.fillColor;
-        ctx.strokeStyle = cfg.borderColor;
-        ctx.lineWidth = obsDefaults.lineWidth;
-        ctx.beginPath();
-        ctx.roundRect(ox - halfW, oy - halfH, obs.width, obs.height, obsDefaults.barrierCornerRadius);
-        ctx.fill();
-        ctx.stroke();
-      }
-
+      drawer(this, ctx, obs, ox, oy, oAngle, cfg, obsDefaults, now, alpha);
       ctx.restore();
     }
   }
@@ -1318,43 +1876,14 @@ export class Renderer {
     if (ball.impactScale !== 1) {
       ctx.scale(ball.impactScale, ball.impactScale);
     }
-
-    if (palette.glow && (ball.specialType || ball.clusterModifier)) {
-      ctx.save();
-      ctx.fillStyle = palette.glow;
-      ctx.globalAlpha = renderCfg.glowAlpha;
-      ctx.beginPath();
-      ctx.arc(0, 0, r * renderCfg.glowRadiusFactor, 0, MATH_CONSTANTS.TWO_PI);
-      ctx.fill();
-      ctx.restore();
-    }
-
-    if (ball.isAnchor) {
-      ctx.strokeStyle = theme.anchorRingColor;
-      ctx.lineWidth = renderCfg.anchorRingLineWidth;
-      ctx.beginPath();
-      ctx.arc(0, 0, r + renderCfg.anchorRingPadding, 0, MATH_CONSTANTS.TWO_PI);
-      ctx.stroke();
-
-      ctx.fillStyle = theme.anchorCoreColor;
-      ctx.beginPath();
-      ctx.arc(0, -r - renderCfg.anchorRingPadding, renderCfg.anchorPinRadius, 0, MATH_CONSTANTS.TWO_PI);
-      ctx.fill();
-    }
+    drawBallPreOrbEffects(ctx, ball, palette, r, theme, renderCfg);
 
     const sprite = this.getCachedBallSprite(palette, r);
     if (sprite) {
-      ctx.drawImage(
-        sprite.canvas,
-        -sprite.halfLogical,
-        -sprite.halfLogical,
-        sprite.logicalSize,
-        sprite.logicalSize
-      );
+      ctx.drawImage(sprite.canvas, -sprite.halfLogical, -sprite.halfLogical, sprite.logicalSize, sprite.logicalSize);
     } else {
       this.drawBallOrb(ctx, palette, r);
     }
-
     if (ball.isFrozen) {
       ctx.fillStyle = theme.frozenOverlayColor;
       ctx.beginPath();
@@ -1362,77 +1891,11 @@ export class Renderer {
       ctx.fill();
     }
 
-    const modSpec = ball.clusterModifier
-      ? this.ballsConfig.clusterModifiers?.[ball.clusterModifier]
-      : null;
-
-    if (modSpec) {
-      const isArmoredType =
-        ball.clusterModifier === CLUSTER_MODIFIERS.ARMORED || ball.clusterModifier === CLUSTER_MODIFIERS.BOSS_CORE;
-      const isCrackedArmor = isArmoredType && ball.armorHits === 1;
-      ctx.strokeStyle = isCrackedArmor && modSpec.crackedColor ? modSpec.crackedColor : modSpec.ringColor;
-      ctx.lineWidth = isArmoredType && ball.armorHits > 1
-        ? renderCfg.armorIntactLineWidth
-        : renderCfg.modifierRingLineWidth;
-      if (isCrackedArmor) {
-        ctx.setLineDash(renderCfg.crackedArmorDash);
-      }
-      ctx.beginPath();
-      ctx.arc(0, 0, r - renderCfg.modifierRingInset, 0, MATH_CONSTANTS.TWO_PI);
-      ctx.stroke();
-      ctx.setLineDash(EMPTY_DASH);
-    }
-
-    const primaryLabel = palette.icon || palette.symbol;
-    if (primaryLabel) {
-      const label = this.getLabelFont(r);
-      ctx.font = label.font;
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      // An enlarged glyph covers the shine and gradient, so it gets the outline too.
-      if (this.highContrast || label.isEnlarged) {
-        ctx.strokeStyle = theme.floatingTextShadowColor;
-        ctx.lineWidth = renderCfg.labelStrokeWidth;
-        ctx.strokeText(primaryLabel, 0, renderCfg.labelOffsetY);
-      }
-      ctx.fillStyle = this.highContrast ? renderCfg.labelColorHighContrast : renderCfg.labelColorNormal;
-      ctx.fillText(primaryLabel, 0, renderCfg.labelOffsetY);
-    }
-
-    if (modSpec?.badge) {
-      const bx = r * renderCfg.badgeOffsetFactor;
-      const by = -r * renderCfg.badgeOffsetFactor;
-      ctx.fillStyle = theme.floatingTextShadowColor;
-      ctx.strokeStyle = modSpec.ringColor;
-      ctx.lineWidth = renderCfg.badgeBorderWidth;
-      ctx.beginPath();
-      ctx.arc(bx, by, r * renderCfg.badgeRadiusFactor, 0, MATH_CONSTANTS.TWO_PI);
-      ctx.fill();
-      ctx.stroke();
-
-      ctx.fillStyle = renderCfg.badgeColor;
-      ctx.font = this.getBadgeFont(r);
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText(modSpec.badge, bx, by + renderCfg.badgeTextOffsetY);
-    }
-
-    if (ball.specialType) {
-      const glowPulse =
-        renderCfg.specialGlowBaseAlpha +
-        renderCfg.specialGlowPulseAmp * Math.sin(now * renderCfg.specialGlowPulseSpeed + ball.pulsePhase);
-      ctx.strokeStyle = palette.highlight;
-      ctx.globalAlpha = glowPulse;
-      ctx.lineWidth = renderCfg.specialGlowLineWidth;
-      ctx.beginPath();
-      ctx.arc(0, 0, r + renderCfg.specialGlowRadiusOffset, 0, MATH_CONSTANTS.TWO_PI);
-      ctx.stroke();
-    }
-
-    if (ball.clusterModifier === CLUSTER_MODIFIERS.BUBBLE) {
-      this.drawBubbleShell(ctx, r);
-    }
-
+    const modSpec = ball.clusterModifier ? this.ballsConfig.clusterModifiers?.[ball.clusterModifier] : null;
+    drawBallModifierRing(ctx, ball, r, renderCfg, modSpec);
+    drawBallPrimaryLabel(this, ctx, palette, r, theme, renderCfg);
+    drawBallModifierBadge(this, ctx, r, theme, renderCfg, modSpec);
+    drawBallPostOrbEffects(this, ctx, ball, palette, r, now, renderCfg);
     ctx.restore();
   }
 
@@ -1517,21 +1980,7 @@ export class Renderer {
     }
     ctx.stroke();
 
-    const bonusPoints = engineState?.getCollectorBonusPoints?.() ?? collectorCfg.bonusPointsPerBall;
-    if (theme.collectorLabelColor && bonusPoints > 0) {
-      const labelText = t('gameplay.feedback.collector.slotLabel', {
-        points: bonusPoints
-      });
-      ctx.fillStyle = theme.collectorLabelColor;
-      ctx.font = this.collectorLabelFont;
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      const labelY = topY + collectorCfg.zoneHeight * MATH_CONSTANTS.HALF;
-      for (let i = 0; i < collectorCfg.slotCount; i++) {
-        const slotCenterX = margin + (i + MATH_CONSTANTS.HALF) * slotWidth;
-        ctx.fillText(labelText, slotCenterX, labelY);
-      }
-    }
+    drawCollectorSlotLabels(this, ctx, collectorCfg, margin, topY, slotWidth, theme, engineState);
     ctx.restore();
   }
 
@@ -1697,56 +2146,20 @@ export class Renderer {
   isAimPreviewFresh(points, currentBall, physicsWorld, endX, endY, blastMult, aimAngle) {
     const cache = this.aimPreview;
     const cell = this.gameConfig.canvas.aimPreviewCacheCellPx;
-    const cellX = Math.round(endX / cell);
-    const cellY = Math.round(endY / cell);
-    const snapTargetId = points.snapTarget ? points.snapTarget.id : 0;
-
-    let boardCount = 0;
-    let boardIdSum = 0;
-    let boardBondTotal = 0;
-    let boardArmorTotal = 0;
-    let boardColorSum = 0;
-    for (const b of physicsWorld.balls) {
-      boardCount++;
-      boardIdSum += b.id;
-      boardBondTotal += b.bonds.size;
-      boardArmorTotal += b.armorHits;
-      if (b.colorId) {
-        boardColorSum += b.id * this.colorWeights.get(b.colorId);
-      }
-    }
-
-    const fresh =
-      cache.valid &&
-      cache.aimAngle === aimAngle &&
-      cache.cellX === cellX &&
-      cache.cellY === cellY &&
-      cache.ballId === currentBall.id &&
-      cache.specialType === currentBall.specialType &&
-      cache.colorId === currentBall.colorId &&
-      cache.snapTargetId === snapTargetId &&
-      cache.blastMult === blastMult &&
-      cache.boardCount === boardCount &&
-      cache.boardIdSum === boardIdSum &&
-      cache.boardBondTotal === boardBondTotal &&
-      cache.boardArmorTotal === boardArmorTotal &&
-      cache.boardColorSum === boardColorSum;
-
+    const shotKey = {
+      aimAngle,
+      cellX: Math.round(endX / cell),
+      cellY: Math.round(endY / cell),
+      ballId: currentBall.id,
+      specialType: currentBall.specialType,
+      colorId: currentBall.colorId,
+      snapTargetId: points.snapTarget ? points.snapTarget.id : 0,
+      blastMult
+    };
+    const boardSig = computeBoardSignature(physicsWorld, this.colorWeights);
+    const fresh = matchesAimShotKey(cache, shotKey) && matchesAimBoardKey(cache, boardSig);
     if (!fresh) {
-      cache.valid = true;
-      cache.aimAngle = aimAngle;
-      cache.cellX = cellX;
-      cache.cellY = cellY;
-      cache.ballId = currentBall.id;
-      cache.specialType = currentBall.specialType;
-      cache.colorId = currentBall.colorId;
-      cache.snapTargetId = snapTargetId;
-      cache.blastMult = blastMult;
-      cache.boardCount = boardCount;
-      cache.boardIdSum = boardIdSum;
-      cache.boardBondTotal = boardBondTotal;
-      cache.boardArmorTotal = boardArmorTotal;
-      cache.boardColorSum = boardColorSum;
+      Object.assign(cache, shotKey, boardSig, { valid: true });
     }
     return fresh;
   }
@@ -1801,46 +2214,8 @@ export class Renderer {
       return;
     }
     const palette = this.getBallPalette(currentBall);
-
     ctx.save();
-    const dashOffset = this.isReducedMotion || !theme.aimDashSpeed ? 0 : -(now * theme.aimDashSpeed);
-    ctx.beginPath();
-    ctx.moveTo(points[0].x, points[0].y);
-    for (let i = 1; i < points.length; i++) {
-      if (points[i].warpBreak) {
-        ctx.moveTo(points[i].x, points[i].y);
-      } else {
-        ctx.lineTo(points[i].x, points[i].y);
-      }
-    }
-    if (theme.aimGlowWidth && theme.aimGlowAlpha) {
-      ctx.strokeStyle = palette.fill;
-      ctx.lineWidth = theme.aimGlowWidth;
-      ctx.globalAlpha = theme.aimGlowAlpha;
-      ctx.setLineDash(EMPTY_DASH);
-      ctx.stroke();
-    }
-    ctx.globalAlpha = 1.0;
-    ctx.strokeStyle = palette.highlight;
-    ctx.lineWidth = theme.aimLineWidth;
-    ctx.setLineDash(theme.aimLineDash);
-    ctx.lineDashOffset = dashOffset;
-    ctx.stroke();
-    ctx.setLineDash(EMPTY_DASH);
-    ctx.lineDashOffset = 0;
-
-    if (theme.aimBounceNodeRadius) {
-      ctx.fillStyle = palette.highlight;
-      ctx.globalAlpha = theme.aimBounceNodeAlpha;
-      for (let i = 1; i < points.length - 1; i++) {
-        if (points[i].isBounce) {
-          ctx.beginPath();
-          ctx.arc(points[i].x, points[i].y, theme.aimBounceNodeRadius, 0, MATH_CONSTANTS.TWO_PI);
-          ctx.fill();
-        }
-      }
-      ctx.globalAlpha = 1.0;
-    }
+    strokeAimTrajectoryPath(this, ctx, points, palette, theme, now);
 
     const endX = points.landingX !== undefined ? points.landingX : points[points.length - 1].x;
     const endY = points.landingY !== undefined ? points.landingY : points[points.length - 1].y;
@@ -1854,82 +2229,16 @@ export class Renderer {
     ctx.lineWidth = theme.aimGhostLineWidth;
     ctx.stroke();
 
-    const pulse = theme.magneticPulseBase + theme.magneticPulseAmp * Math.sin(now * theme.aimTargetPulseSpeed);
     if (!physicsWorld) {
       ctx.restore();
       return;
     }
+    const pulse = theme.magneticPulseBase + theme.magneticPulseAmp * Math.sin(now * theme.aimTargetPulseSpeed);
     if (!this.isAimPreviewFresh(points, currentBall, physicsWorld, endX, endY, blastRadiusMultiplier, aimAngle)) {
       this.computeAimPreview(points, currentBall, physicsWorld, endX, endY, blastRadiusMultiplier);
     }
-    const preview = this.aimPreview;
-
-    if (currentBall.specialType) {
-      const specType = currentBall.specialType;
-      const specCfg = this.ballsConfig.specialTypes[specType];
-      if (
-        specType === SPECIAL_TYPES.BOMB
-        || specType === SPECIAL_TYPES.FREEZE
-        || specType === SPECIAL_TYPES.BRUSH
-      ) {
-        let radiusFactor = specCfg.freezeRadiusFactor;
-        if (specType === SPECIAL_TYPES.BOMB) {
-          radiusFactor = specCfg.blastRadiusFactor;
-        } else if (specType === SPECIAL_TYPES.BRUSH) {
-          radiusFactor = specCfg.paintRadiusFactor;
-        }
-        const aoeRadius = currentBall.radius * radiusFactor * blastRadiusMultiplier;
-        ctx.save();
-        ctx.fillStyle = palette.highlight;
-        ctx.globalAlpha = theme.specialAoeFillAlpha;
-        ctx.beginPath();
-        ctx.arc(endX, endY, aoeRadius, 0, MATH_CONSTANTS.TWO_PI);
-        ctx.fill();
-        ctx.strokeStyle = palette.highlight;
-        ctx.globalAlpha = theme.specialAoeStrokeAlpha * pulse;
-        ctx.lineWidth = theme.aimGhostLineWidth;
-        ctx.setLineDash(theme.specialAoeDash);
-        ctx.stroke();
-        ctx.restore();
-      } else if (specType === SPECIAL_TYPES.LIGHTNING) {
-        const bandHalf = currentBall.radius * specCfg.bandHalfHeightFactor * blastRadiusMultiplier;
-        const margin = this.gameConfig.canvas.wallMargin;
-        const bandWidth = this.logicalWidth - margin * 2;
-        ctx.save();
-        ctx.fillStyle = palette.highlight;
-        ctx.globalAlpha = theme.specialAoeFillAlpha;
-        ctx.fillRect(margin, endY - bandHalf, bandWidth, bandHalf * 2);
-        ctx.strokeStyle = palette.highlight;
-        ctx.globalAlpha = theme.specialAoeStrokeAlpha * pulse;
-        ctx.lineWidth = theme.aimGhostLineWidth;
-        ctx.setLineDash(theme.specialAoeDash);
-        ctx.strokeRect(margin, endY - bandHalf, bandWidth, bandHalf * 2);
-        ctx.restore();
-      }
-    }
-
-    if (preview.highlightBalls.length > 0) {
-      ctx.strokeStyle = preview.highlightIsMatch ? theme.targetHighlightColor : palette.highlight;
-      ctx.lineWidth = preview.highlightIsMatch ? theme.aimTargetMatchLineWidth : theme.aimTargetNormalLineWidth;
-      ctx.globalAlpha = pulse;
-      this.strokeBallRings(ctx, preview.highlightBalls, theme.aimTargetRingPadding, alpha);
-    }
-
-    if (preview.avalancheBalls.length > 0) {
-      ctx.save();
-      ctx.strokeStyle = theme.avalancheDropHighlightColor;
-      ctx.lineWidth = theme.aimTargetNormalLineWidth;
-      ctx.setLineDash(theme.specialAoeDash);
-      ctx.globalAlpha = pulse;
-      this.strokeBallRings(
-        ctx,
-        preview.avalancheBalls,
-        theme.aimTargetRingPadding + theme.avalancheRingPaddingExtra,
-        alpha
-      );
-      ctx.restore();
-    }
-
+    drawAimSpecialAoe(this, ctx, currentBall, palette, theme, pulse, endX, endY, blastRadiusMultiplier);
+    drawAimTargetHighlights(this, ctx, this.aimPreview, palette, theme, pulse, alpha);
     ctx.restore();
   }
 
@@ -1948,11 +2257,7 @@ export class Renderer {
     const cfg = this.gameConfig.resonance;
     const ring = cfg.ring;
     const canvasCfg = this.gameConfig.canvas;
-    const spec = typeof engineState.getLauncherSpec === 'function' ? engineState.getLauncherSpec() : null;
-    const rx = spec
-      ? (spec.posture === LAUNCHER_POSTURES.DROP_RAIL ? (engineState.mergeDropX ?? spec.x) : spec.x)
-      : canvasCfg.launcherX;
-    const ry = spec ? spec.y : canvasCfg.launcherY;
+    const { rx, ry } = resolveBeatRingAnchor(engineState, canvasCfg);
     const baseRadius = canvasCfg.launcher.baseRadius * ring.radiusFactor;
     const visual = ringVisual(pulse.beatFrame, {
       framesPerBeat: pulse.framesPerBeat,
@@ -1963,7 +2268,6 @@ export class Renderer {
     const widthFactor = this.highContrast ? ring.highContrastWidthFactor : 1;
     const color = this.highContrast ? ring.highContrastColor : theme.launcherAccentColor;
     const lineWidth = (visual.inWindow ? ring.windowLineWidth : ring.lineWidth) * widthFactor;
-    const radius = baseRadius * visual.radiusScale;
     ctx.save();
     ctx.strokeStyle = color;
     if (visual.inWindow) {
@@ -1977,7 +2281,7 @@ export class Renderer {
     ctx.lineWidth = lineWidth;
     ctx.setLineDash(visual.inWindow ? EMPTY_DASH : ring.dashPattern);
     ctx.beginPath();
-    ctx.arc(rx, ry, radius, 0, MATH_CONSTANTS.TWO_PI);
+    ctx.arc(rx, ry, baseRadius * visual.radiusScale, 0, MATH_CONSTANTS.TWO_PI);
     ctx.stroke();
     ctx.setLineDash(EMPTY_DASH);
     if (engineState.resonanceFlashFrames > 0 && !this.isReducedMotion) {
@@ -1993,157 +2297,21 @@ export class Renderer {
   drawLauncher(ctx, engineState, theme, now) {
     const canvasCfg = this.gameConfig.canvas;
     const launcherGeom = canvasCfg.launcher;
-    const spec = typeof engineState.getLauncherSpec === 'function' ? engineState.getLauncherSpec() : null;
-    const posture = spec ? spec.posture : LAUNCHER_POSTURES.UPWARD;
-    const isDropRail = posture === LAUNCHER_POSTURES.DROP_RAIL;
-    const baseX = spec ? spec.x : canvasCfg.launcherX;
-    const lx = isDropRail ? (engineState.mergeDropX ?? baseX) : baseX;
-    const ly = spec ? spec.y : canvasCfg.launcherY;
-    const nextOffsetX = spec ? spec.nextOffsetX : canvasCfg.nextBallOffsetX;
-    const nextOffsetY = spec ? spec.nextOffsetY : canvasCfg.nextBallOffsetY;
-    const angle = engineState.aimAngle;
-
-    if (isDropRail) {
-      const basin = engineState.getMergeBasinGeometry?.() ?? null;
-      if (basin) {
-        ctx.save();
-        ctx.strokeStyle = theme.launcherAccentColor;
-        ctx.lineWidth = launcherGeom.baseBorderWidth;
-        ctx.beginPath();
-        ctx.moveTo(basin.left, ly);
-        ctx.lineTo(basin.right, ly);
-        ctx.stroke();
-        ctx.restore();
-      }
-    }
-
-    if (engineState.isAimCancelled) {
-      ctx.save();
-      ctx.strokeStyle = theme.cancelAimColor;
-      ctx.lineWidth = launcherGeom.cancelRingLineWidth;
-      ctx.setLineDash(launcherGeom.cancelRingDash);
-      ctx.beginPath();
-      ctx.arc(lx, ly, launcherGeom.cancelRingRadius, 0, MATH_CONSTANTS.TWO_PI);
-      ctx.stroke();
-      ctx.restore();
-    }
-
-    if (!isDropRail) {
-      ctx.save();
-      ctx.translate(lx, ly);
-      ctx.rotate(angle + Math.PI * MATH_CONSTANTS.HALF);
-
-      ctx.fillStyle = theme.launcherBarrelColor;
-      ctx.strokeStyle = theme.launcherAccentColor;
-      ctx.lineWidth = launcherGeom.barrelBorderWidth;
-      ctx.beginPath();
-      ctx.roundRect(
-        launcherGeom.barrelX,
-        launcherGeom.barrelY,
-        launcherGeom.barrelWidth,
-        launcherGeom.barrelHeight,
-        launcherGeom.barrelCornerRadius
-      );
-      ctx.fill();
-      ctx.stroke();
-
-      ctx.restore();
-    }
-
-    ctx.save();
-    ctx.fillStyle = theme.launcherBaseColor;
-    ctx.strokeStyle = theme.launcherAccentColor;
-    ctx.lineWidth = launcherGeom.baseBorderWidth;
-    ctx.beginPath();
-    ctx.arc(
-      lx,
-      ly,
-      isDropRail ? launcherGeom.baseRadius * DROP_RAIL_CARRIAGE_RADIUS_FACTOR : launcherGeom.baseRadius,
-      0,
-      MATH_CONSTANTS.TWO_PI
-    );
-    ctx.fill();
-    ctx.stroke();
-    ctx.restore();
-
-    if (!isDropRail) {
+    const layout = resolveLauncherSpecLayout(engineState, canvasCfg);
+    drawDropRailAndCancelChrome(ctx, engineState, theme, launcherGeom, layout);
+    drawLauncherChassis(ctx, engineState, theme, launcherGeom, layout);
+    if (!layout.isDropRail) {
       this.drawBeatRing(ctx, engineState, theme);
     }
-
-    if (
-      engineState.mode === GAME_MODES.BLITZ &&
-      engineState.blitzIdleFrames > 0 &&
-      !engineState.physicsWorld.projectile
-    ) {
-      const autoFireMax = this.gameConfig.blitz?.autoFireFrames || 0;
-      if (autoFireMax > 0) {
-        const ratio = Math.min(1, engineState.blitzIdleFrames / autoFireMax);
-        const startAngle = -Math.PI * MATH_CONSTANTS.HALF;
-        const endAngle = startAngle + ratio * MATH_CONSTANTS.TWO_PI;
-        ctx.save();
-        ctx.strokeStyle = ratio >= launcherGeom.autoFireUrgentRatio ? theme.dangerLineColor : theme.wavePopupColor;
-        ctx.lineWidth = launcherGeom.autoFireRingWidth;
-        ctx.beginPath();
-        ctx.arc(lx, ly, launcherGeom.baseRadius + launcherGeom.autoFireRingOffset, startAngle, endAngle);
-        ctx.stroke();
-        ctx.restore();
-      }
-    }
+    drawBlitzAutoFireRing(this, ctx, engineState, theme, launcherGeom, layout.lx, layout.ly);
 
     const canShowPolarity = !this.lite
       && (Boolean(engineState.versus) || Boolean(this.magnetarView))
       && typeof engineState.getVersusShotPolarity === 'function';
     // A Magnetar Reverse Field flips how the shot is pulled: the glyph shows the effective sign.
     const polaritySign = engineState.physicsWorld?.boardPolarityInverted ? -1 : 1;
-    if (engineState.currentBall && !engineState.physicsWorld.projectile) {
-      this.drawBallAt(ctx, engineState.currentBall, lx, ly, now);
-      const rawShot = canShowPolarity ? engineState.getVersusShotPolarity() : null;
-      const shotPolarity = rawShot ? rawShot * polaritySign : null;
-      if (shotPolarity) {
-        this.drawShotPolarityGlyph(
-          ctx, lx, ly, engineState.currentBall.radius * this.gameConfig.versus.render.launcherGlyphSizeFactor, shotPolarity
-        );
-      }
-      if (engineState.isPolarityFlipped) {
-        const renderCfg = this.ballsConfig.render;
-        ctx.save();
-        ctx.strokeStyle = renderCfg.polarityFlipRingColor;
-        ctx.lineWidth = launcherGeom.nextBallRingWidth;
-        ctx.setLineDash(renderCfg.polarityFlipDash);
-        ctx.beginPath();
-        ctx.arc(lx, ly, engineState.currentBall.radius + renderCfg.polarityFlipRadiusOffset, 0, MATH_CONSTANTS.TWO_PI);
-        ctx.stroke();
-        ctx.restore();
-      }
-    }
-
-    if (
-      engineState.nextBall &&
-      !(engineState.mode === GAME_MODES.PUZZLE && engineState.shotsRemaining <= 1)
-    ) {
-      const nx = baseX + nextOffsetX;
-      const ny = ly + nextOffsetY;
-      ctx.save();
-      ctx.strokeStyle = theme.launcherAccentColor;
-      ctx.lineWidth = launcherGeom.nextBallRingWidth;
-      ctx.beginPath();
-      ctx.arc(nx, ny, engineState.nextBall.radius + launcherGeom.nextBallRingPadding, 0, MATH_CONSTANTS.TWO_PI);
-      ctx.stroke();
-      ctx.restore();
-
-      this.drawBallAt(ctx, engineState.nextBall, nx, ny, now);
-      // The flip only applies to the loaded shot: the next sphere shows its own polarity.
-      const rawNext = canShowPolarity ? engineState.getVersusShotPolarity(engineState.nextBall, false) : null;
-      const nextPolarity = rawNext ? rawNext * polaritySign : null;
-      if (nextPolarity) {
-        this.drawShotPolarityGlyph(
-          ctx, nx, ny, engineState.nextBall.radius * this.gameConfig.versus.render.nextGlyphSizeFactor, nextPolarity
-        );
-      }
-      if (!spec?.compactQueue) {
-        this.drawUpcomingBalls(ctx, engineState.upcomingColorIds, nx, ny, engineState.nextBall.radius, now);
-      }
-    }
+    drawLauncherCurrentBall(this, ctx, engineState, launcherGeom, layout, canShowPolarity, polaritySign, now);
+    drawLauncherNextBall(this, ctx, engineState, theme, launcherGeom, layout, canShowPolarity, polaritySign, now);
   }
 
   /**
@@ -2177,17 +2345,7 @@ export class Renderer {
     if (sagCfg.modes?.[engineState.mode]?.step !== SAG_STEPS.RAIL) {
       return;
     }
-    let top = Infinity;
-    let minX = Infinity;
-    let maxX = -Infinity;
-    for (const ball of engineState.physicsWorld.balls) {
-      if (!ball.isAnchor) {
-        continue;
-      }
-      top = Math.min(top, ball.y);
-      minX = Math.min(minX, ball.x - ball.radius);
-      maxX = Math.max(maxX, ball.x + ball.radius);
-    }
+    const { top, minX, maxX } = measureAnchorRowBounds(engineState.physicsWorld.balls);
     if (!Number.isFinite(top)) {
       return;
     }
@@ -2210,17 +2368,7 @@ export class Renderer {
       ctx.fillRect(minX, top - half, maxX - minX, sagCfg.render.railThickness);
       ctx.globalAlpha = 1;
     }
-    if (sag.phase !== SAG_DRAW.PHASE_CALM && (this.colorPatterns || this.highContrast)) {
-      // Shape cue besides the color: diagonal hatching on the rail while it is stressed.
-      ctx.strokeStyle = sagCfg.render.hatchColor;
-      ctx.lineWidth = SAG_DRAW.HATCH_WIDTH;
-      ctx.beginPath();
-      for (let x = minX; x < maxX; x += SAG_DRAW.RAIL_HATCH_STEP) {
-        ctx.moveTo(x, top + half);
-        ctx.lineTo(x + sagCfg.render.railThickness, top - half);
-      }
-      ctx.stroke();
-    }
+    drawAnchorRailHatching(this, ctx, sagCfg, sag.phase, minX, maxX, top, half);
     ctx.restore();
   }
 
@@ -2252,50 +2400,9 @@ export class Renderer {
     ctx.save();
     for (let i = 0; i < sag.size; i++) {
       const y = bottom - (i + 1) * pitch + gauge.segmentGap;
-      if (i < sag.level) {
-        ctx.fillStyle = fill;
-        ctx.fillRect(left, y, gauge.width, gauge.segmentHeight);
-        if (hatch && (isWarn || isFull)) {
-          ctx.strokeStyle = sagCfg.render.hatchColor;
-          ctx.lineWidth = SAG_DRAW.HATCH_WIDTH;
-          ctx.beginPath();
-          ctx.moveTo(left, y + gauge.segmentHeight);
-          ctx.lineTo(left + gauge.width, y);
-          if (isFull) {
-            ctx.moveTo(left, y);
-            ctx.lineTo(left + gauge.width, y + gauge.segmentHeight);
-          }
-          ctx.stroke();
-        }
-      } else {
-        ctx.globalAlpha = SAG_DRAW.EMPTY_ALPHA;
-        ctx.fillStyle = theme.launcherAccentColor;
-        ctx.fillRect(left, y, gauge.width, gauge.segmentHeight);
-        ctx.globalAlpha = 1;
-      }
+      drawSagGaugeSegment(ctx, left, y, gauge, fill, hatch, isWarn, isFull, i < sag.level, sagCfg, theme);
     }
-    if (isWarn) {
-      ctx.strokeStyle = fill;
-      ctx.lineWidth = SAG_DRAW.OUTLINE_WIDTH;
-      ctx.setLineDash(SAG_DRAW.WARN_DASH);
-      ctx.strokeRect(
-        left - SAG_DRAW.OUTLINE_PADDING,
-        top - SAG_DRAW.OUTLINE_PADDING,
-        gauge.width + SAG_DRAW.OUTLINE_PADDING * 2,
-        totalHeight + SAG_DRAW.OUTLINE_PADDING * 2
-      );
-      ctx.setLineDash(EMPTY_DASH);
-    } else if (isFull) {
-      const cx = left + gauge.width * MATH_CONSTANTS.HALF;
-      const tipY = top - SAG_DRAW.CHEVRON_GAP;
-      ctx.strokeStyle = fill;
-      ctx.lineWidth = SAG_DRAW.CHEVRON_WIDTH;
-      ctx.beginPath();
-      ctx.moveTo(cx - SAG_DRAW.CHEVRON_HALF_WIDTH, tipY - SAG_DRAW.CHEVRON_HEIGHT);
-      ctx.lineTo(cx, tipY);
-      ctx.lineTo(cx + SAG_DRAW.CHEVRON_HALF_WIDTH, tipY - SAG_DRAW.CHEVRON_HEIGHT);
-      ctx.stroke();
-    }
+    drawSagGaugeAlertChrome(ctx, left, top, totalHeight, gauge, fill, isWarn, isFull);
     ctx.restore();
   }
 

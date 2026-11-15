@@ -24,12 +24,27 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="description" data-i18n-content="app.header.subtitle.description" content="Magnetic physics bubble shooter game with dynamic attraction, rotors, and special spheres." />
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="MagnaShot" />
+  <meta property="og:title" content="MagnaShot - Magnetic Physics Edition" />
+  <meta property="og:description" content="Magnetic physics bubble shooter game with 16 arcade and story modes, Polarity Duel, and procedural Web Audio sound." />
+  <meta property="og:url" content="https://vblackjack.github.io/magnashot/" />
+  <meta property="og:image" content="https://vblackjack.github.io/magnashot/icons/og-card.png" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="MagnaShot - Magnetic Physics Edition" />
+  <meta name="twitter:description" content="Magnetic physics bubble shooter game with 16 arcade and story modes, Polarity Duel, and procedural Web Audio sound." />
+  <meta name="twitter:image" content="https://vblackjack.github.io/magnashot/icons/og-card.png" />
   <title data-i18n="app.header.title.main">MAGNASHOT</title>
   <link rel="manifest" href="./manifest.webmanifest" />
   <link rel="icon" type="image/svg+xml" href="./icons/icon.svg" />
   <link rel="icon" type="image/png" sizes="192x192" href="./icons/icon-192.png" />
   <link rel="apple-touch-icon" href="./icons/icon-maskable-192.png" />
   <link rel="stylesheet" href="./styles/main.css" />
+  <link rel="stylesheet" href="./styles/modals.css" />
+  <link rel="stylesheet" href="./styles/responsive.css" />
+  <link rel="stylesheet" href="./styles/versus.css" />
 </head>
 <body>
   <div class="app-shell">
@@ -548,6 +563,10 @@
           <div class="pause-setting">
             <button id="btn-music-volume" type="button" class="nav-btn badge-btn"></button>
             <span class="pause-setting-caption" data-caption-for="btn-music-volume" aria-hidden="true"></span>
+          </div>
+          <div class="pause-setting">
+            <button id="btn-music-preview" type="button" class="nav-btn icon-btn"></button>
+            <span class="pause-setting-caption" data-caption-for="btn-music-preview" aria-hidden="true"></span>
           </div>
         </div>
       </section>

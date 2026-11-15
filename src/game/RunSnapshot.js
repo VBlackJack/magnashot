@@ -412,11 +412,15 @@ export function applyRunSnapshot(engine, snapshot) {
     const contentVersion = Number.isInteger(savedVersion) && savedVersion >= MIN_CONTENT_VERSION && savedVersion <= currentVersion
       ? savedVersion
       : engine.fluxConfig.shapeSettle.sinceContentVersion - 1;
+    const isWeeklySnapshot = snapshot.isWeeklyFluxRun === true
+      && typeof snapshot.weeklyWeekKey === 'string'
+      && WEEK_KEY_PATTERN.test(snapshot.weeklyWeekKey);
     engine.restoreFluxRun(
       snapshot.engine.fluxSeed,
       snapshot.engine.fluxStage,
       snapshot.engine.fluxPreviousFamily,
-      contentVersion
+      contentVersion,
+      { markModeSeen: !isWeeklySnapshot }
     );
   } else if (snapshot.mode === GAME_MODES.PUZZLE) {
     engine.startPuzzleMode(snapshot.engine.currentPuzzleStage || 1);

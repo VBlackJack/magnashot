@@ -65,6 +65,376 @@ export function getOccupiedPlatformIndices(world) {
   return occupied;
 }
 
+function crackBallArmor(engine, ball, spec, textKey, withShockwave, canvasCfg) {
+  ball.armorHits--;
+  engine.audioManager.playEffect('armorCrack');
+  engine.particleSystem.spawnBurst(
+    ball.x,
+    ball.y,
+    spec.ringColor,
+    spec.crackBurstCount,
+    spec.crackBurstSpeed
+  );
+  if (withShockwave) {
+    engine.particleSystem.spawnShockwave(ball.x, ball.y, spec.ringColor, spec.crackShockwaveRadius);
+  }
+  engine.particleSystem.spawnFloatingText(
+    ball.x,
+    ball.y + canvasCfg.floatingTextOffsetY,
+    t(textKey),
+    spec.ringColor
+  );
+}
+
+function tryAbsorbClusterHit(engine, ball, ignoreArmor, canvasCfg) {
+  if (ball.clusterModifier === CLUSTER_MODIFIERS.MAGNETAR) {
+    // Immune to every strike, whatever ignores armor: only losing its Moorings brings it down.
+    const magnetarSpec = engine.ballsConfig.clusterModifiers.magnetar;
+    engine.particleSystem.spawnFloatingText(
+      ball.x,
+      ball.y + canvasCfg.floatingTextOffsetY,
+      t('gameplay.feedback.magnetar.immune'),
+      magnetarSpec.highlight
+    );
+    return true;
+  }
+  if (!ignoreArmor && ball.clusterModifier === CLUSTER_MODIFIERS.ARMORED && ball.armorHits > 1) {
+    crackBallArmor(
+      engine,
+      ball,
+      engine.ballsConfig.clusterModifiers.armored,
+      'gameplay.feedback.armor.cracked',
+      false,
+      canvasCfg
+    );
+    return true;
+  }
+  if (ball.clusterModifier === CLUSTER_MODIFIERS.BOSS_CORE && ball.armorHits > 1) {
+    crackBallArmor(
+      engine,
+      ball,
+      engine.ballsConfig.clusterModifiers.bossCore,
+      'gameplay.feedback.boss.shield',
+      true,
+      canvasCfg
+    );
+    return true;
+  }
+  return false;
+}
+
+function computeShatterPush(engine, ball) {
+  if (!engine.detonationOrigin || engine.detonationOrigin === ball) {
+    return { pushVx: 0, pushVy: 0 };
+  }
+  const dx = ball.x - engine.detonationOrigin.x;
+  const dy = ball.y - engine.detonationOrigin.y;
+  const dist = Math.hypot(dx, dy);
+  if (dist <= MATH_CONSTANTS.EPSILON) {
+    return { pushVx: 0, pushVy: 0 };
+  }
+  const pushSpeed = engine.gameConfig.juice.particles.shatterPushSpeed || 0;
+  return { pushVx: (dx / dist) * pushSpeed, pushVy: (dy / dist) * pushSpeed };
+}
+
+function triggerDormantBombDestroy(engine, ball) {
+  const dormantSpecs = engine.ballsConfig.clusterModifiers.dormantBomb;
+  const prevOrigin = engine.detonationOrigin;
+  engine.detonationOrigin = ball;
+  const bombResult = engine.specialController.triggerBomb(
+    ball,
+    dormantSpecs,
+    engine.physicsWorld,
+    engine.particleSystem,
+    engine.audioManager,
+    engine.getBlastRadiusMultiplier(),
+    (target, color, ignArmor, count, speed) => engine.destroyClusterBall(target, color, ignArmor, count, speed)
+  );
+  engine.detonationOrigin = prevOrigin;
+  if (bombResult.scoreDelta > 0) {
+    engine.addScore(bombResult.scoreDelta);
+  }
+  if (bombResult.destroyed.length > 0) {
+    engine.addOvercharge(bombResult.destroyed.length * engine.gameConfig.scoring.overchargePerMatchedBall);
+    engine.triggerSpecialSlowMo(dormantSpecs.slowMoFrames, dormantSpecs.slowMoTimeScale, dormantSpecs.highlight);
+  }
+}
+
+const DESTROY_MODIFIER_HANDLERS = new Map([
+  [CLUSTER_MODIFIERS.BOSS_CORE, (engine, ball) => engine.rewardBossCore(ball)],
+  [CLUSTER_MODIFIERS.COIN_CORE, (engine, ball, canvasCfg) => {
+    const reward = engine.ballsConfig.clusterModifiers.coinCore.coinReward;
+    engine.awardRunCoins(reward);
+    engine.particleSystem.spawnFloatingText(
+      ball.x,
+      ball.y + canvasCfg.floatingTextOffsetY,
+      t('gameplay.feedback.coins.gain', { coins: reward }),
+      engine.gameConfig.theme.coinPopupColor
+    );
+  }],
+  [CLUSTER_MODIFIERS.DORMANT_BOMB, (engine, ball) => triggerDormantBombDestroy(engine, ball)],
+  [CLUSTER_MODIFIERS.LASER_LOCK, (engine, ball) => {
+    const lockSpec = engine.ballsConfig.clusterModifiers.laserLock;
+    engine.addScore(lockSpec.pointsBonus);
+    engine.particleSystem.spawnShockwave(ball.x, ball.y, lockSpec.ringColor, lockSpec.shockwaveRadius);
+    engine.releaseBarriersWhenLocksCleared();
+  }],
+  [CLUSTER_MODIFIERS.FREEZE_CORE, (engine, ball) => engine.triggerFreezeCore(ball)],
+  [CLUSTER_MODIFIERS.LIGHTNING_CORE, (engine, ball) => engine.triggerLightningCore(ball)],
+  [CLUSTER_MODIFIERS.PAINT_CORE, (engine, ball) => {
+    const paintSpec = engine.ballsConfig.clusterModifiers.paintCore;
+    const paintResult = engine.specialController.triggerPaint(
+      ball,
+      paintSpec,
+      engine.physicsWorld,
+      engine.particleSystem,
+      engine.audioManager,
+      engine.getBlastRadiusMultiplier()
+    );
+    engine.addScore(paintResult.scoreDelta);
+  }],
+  [CLUSTER_MODIFIERS.RESCUE_CORE, (engine, ball) => engine.rewardRescueCore(ball)]
+]);
+
+function resolveSpecialProjectileImpact(engine, snappedBall) {
+  const prevOrigin = engine.detonationOrigin;
+  engine.detonationOrigin = snappedBall;
+  if (engine.versus) {
+    engine.neutraliseChargesBySpecial(snappedBall.specialType, snappedBall.x, snappedBall.y);
+  }
+  const result = engine.specialController.resolveSpecialImpact(
+    snappedBall,
+    engine.physicsWorld,
+    engine.particleSystem,
+    engine.audioManager,
+    engine.getBlastRadiusMultiplier(),
+    (target, color, ignoreArmor, count, speed) => engine.destroyClusterBall(target, color, ignoreArmor, count, speed)
+  );
+  engine.detonationOrigin = prevOrigin;
+  if (result.scoreDelta > 0) {
+    engine.addScore(result.scoreDelta);
+  }
+  if (result.destroyed.length > 0) {
+    engine.addOvercharge(result.destroyed.length * engine.gameConfig.scoring.overchargePerMatchedBall);
+    engine.hitStopFrames = engine.isVersusRole ? 0 : engine.gameConfig.juice.hitStopFramesSpecial;
+    if (result.slowMoFrames > 0) {
+      engine.triggerSpecialSlowMo(result.slowMoFrames, result.slowMoTimeScale, result.slowMoColor);
+    }
+  }
+  const paintedCount = result.painted ? result.painted.length : 0;
+  if (paintedCount > 0) {
+    engine.addOvercharge(paintedCount * engine.gameConfig.scoring.overchargePerDroppedBall);
+  }
+  if (result.freezeTurns > 0) {
+    engine.freezeTurnsRemaining = result.freezeTurns;
+  }
+  const madeProgress = result.destroyed.length > 0 || paintedCount > 0;
+  engine.handlePostTurnCleanup(madeProgress, result.freezeTurns > 0);
+}
+
+function stampAvalancheMilestone(engine, droppedCount) {
+  const funnelCfg = engine.gameConfig.playerStats.funnel;
+  if (
+    engine.avalancheMilestoneStamped ||
+    engine.isVersusRole ||
+    engine.isRestoringRun ||
+    droppedCount < funnelCfg.avalancheMinDrops
+  ) {
+    return;
+  }
+  // Local first-avalanche milestone: written once per session, with the buffered play time.
+  engine.avalancheMilestoneStamped = true;
+  const milestoneDelta = { playMs: engine.pendingPlayMs, m: { avalanche: true } };
+  engine.pendingPlayMs = 0;
+  engine.storageManager.applyPlayerStatsDelta?.(milestoneDelta);
+}
+
+function rewardAvalancheModifiers(engine, detached) {
+  let bonusCoins = detached.length * engine.gameConfig.scoring.coinsPerAvalancheBall;
+  let hasLaserLock = false;
+  for (const d of detached) {
+    if (d.clusterModifier === CLUSTER_MODIFIERS.COIN_CORE) {
+      bonusCoins += engine.ballsConfig.clusterModifiers.coinCore.coinReward;
+    } else if (d.clusterModifier === CLUSTER_MODIFIERS.BOSS_CORE) {
+      engine.rewardBossCore(d);
+    } else if (d.clusterModifier === CLUSTER_MODIFIERS.MAGNETAR) {
+      engine.rewardMagnetarFall(d, detached.length - 1);
+    } else if (d.clusterModifier === CLUSTER_MODIFIERS.RESCUE_CORE) {
+      engine.rewardRescueCore(d);
+    } else if (d.clusterModifier === CLUSTER_MODIFIERS.LASER_LOCK) {
+      hasLaserLock = true;
+    }
+  }
+  engine.awardRunCoins(bonusCoins);
+  if (hasLaserLock) {
+    engine.releaseBarriersWhenLocksCleared();
+  }
+}
+
+function grantBlitzAvalancheTimeBonus(engine, sample, droppedCount) {
+  const blitzCfg = engine.gameConfig.blitz;
+  const bonusStep = blitzCfg.avalancheTimeBonusFrames;
+  const maxBonus = blitzCfg.maxBonusDurationFrames;
+  if (droppedCount < blitzCfg.avalancheTimeBonusMinSpheres || bonusStep <= 0 || maxBonus <= 0) {
+    return;
+  }
+  const earned = engine.blitzBonusFramesEarned || 0;
+  const granted = Math.min(bonusStep, Math.max(0, maxBonus - earned));
+  if (granted <= 0) {
+    return;
+  }
+  engine.blitzFramesRemaining += granted;
+  engine.blitzBonusFramesEarned = earned + granted;
+  const bonusSeconds = Math.max(1, Math.round(granted / blitzCfg.framesPerSecond));
+  engine.audioManager?.playEffect('blitzTimeBonus');
+  engine.particleSystem.spawnFloatingText(
+    sample.x,
+    sample.y + engine.gameConfig.canvas.floatingTextOffsetY,
+    t('gameplay.feedback.blitz.timeBonus', { seconds: bonusSeconds }),
+    engine.gameConfig.theme.wavePopupColor
+  );
+  engine.notifyUI();
+}
+
+function applySagLoweredStep(engine, spec, canvasCfg) {
+  const isRail = spec.step === SAG_STEPS.RAIL;
+  // A board emptied by this very turn is about to be paid as a cleared stage: the rail
+  // does not drop on it.
+  if (isRail && engine.physicsWorld.balls.length === 0 && !engine.physicsWorld.projectile) {
+    return;
+  }
+  if (isRail) {
+    engine.lowerAnchorRail();
+  } else {
+    engine.spawnEndlessWave();
+    // A wave on a cleared board brings colors back that the first refresh could not compare against.
+    engine.refreshStaleLauncherColors();
+  }
+  // The step may have ended the run (rail past the danger line): no creak, shake or text on end screen.
+  if (!engine.isRunPlaying()) {
+    engine.railLowerFrames = 0;
+    return;
+  }
+  const sagCfg = engine.gameConfig.sag;
+  engine.railLowerFrames = sagCfg ? sagCfg.lowerFrames ?? 0 : 0;
+  engine.audioManager.playEffect?.('creak');
+  if (sagCfg && sagCfg.lowerShake) {
+    engine.particleSystem.addScreenShake(sagCfg.lowerShake, engine.gameConfig.juice.maxShakeOffset);
+  }
+  if (sagCfg) {
+    engine.particleSystem.spawnFloatingText(
+      canvasCfg.logicalWidth * MATH_CONSTANTS.HALF,
+      engine.gameConfig.endless.startY + canvasCfg.wavePopupOffsetY,
+      t(isRail ? 'gameplay.feedback.sag.lowered' : 'gameplay.feedback.sag.dropped'),
+      engine.gameConfig.theme.wavePopupColor
+    );
+  }
+}
+
+function tickTurnFreezeState(engine, appliedFreeze) {
+  // A Freeze Core that went off during this turn (the shot or its avalanche) counts as a
+  // freeze applied this turn. Read after the avalanche so a core it sets off is consumed here.
+  const freezeAppliedThisTurn = appliedFreeze || engine.isCoreFreezeApplied;
+  engine.isCoreFreezeApplied = false;
+  const wasFrozen = engine.freezeTurnsRemaining > 0 || freezeAppliedThisTurn;
+  if (!freezeAppliedThisTurn && engine.freezeTurnsRemaining > 0) {
+    engine.freezeTurnsRemaining--;
+    if (engine.freezeTurnsRemaining === 0) {
+      for (const b of engine.physicsWorld.balls) {
+        b.isFrozen = false;
+      }
+    }
+  }
+  return wasFrozen;
+}
+
+function resolveBlitzPostTurn(engine, madeProgress) {
+  if (!madeProgress) {
+    engine.blitzHitStreak = 0;
+    return;
+  }
+  const blitzCfg = engine.gameConfig.blitz;
+  engine.blitzHitStreak = (engine.blitzHitStreak || 0) + 1;
+  if (blitzCfg.feverStreakTurns <= 0 || engine.blitzHitStreak % blitzCfg.feverStreakTurns !== 0) {
+    return;
+  }
+  const feverPts = (blitzCfg.feverBonusPoints || 0) * Math.max(1, engine.waveCount);
+  if (feverPts > 0) {
+    engine.addScore(feverPts);
+  }
+  const earned = engine.blitzBonusFramesEarned || 0;
+  const maxBonus = blitzCfg.maxBonusDurationFrames || 0;
+  const grantFrames = Math.min(blitzCfg.feverTimeBonusFrames || 0, Math.max(0, maxBonus - earned));
+  if (grantFrames > 0) {
+    engine.blitzFramesRemaining += grantFrames;
+    engine.blitzBonusFramesEarned = earned + grantFrames;
+  }
+  engine.audioManager?.playEffect('blitzTimeBonus');
+  const launcherSpec = engine.getLauncherSpec();
+  engine.particleSystem.spawnFloatingText(
+    launcherSpec.x,
+    launcherSpec.y + engine.gameConfig.canvas.launcherPopupOffsetY,
+    t('gameplay.feedback.blitz.fever', { streak: engine.blitzHitStreak, points: feverPts }),
+    engine.gameConfig.theme.overchargePopupColor
+  );
+}
+
+function countClearedCascadeShelves(prevOccupied, nowOccupied) {
+  if (!(prevOccupied instanceof Set)) {
+    return 0;
+  }
+  let cleared = 0;
+  for (const prevIdx of prevOccupied) {
+    if (!nowOccupied.has(prevIdx)) {
+      cleared++;
+    }
+  }
+  return cleared;
+}
+
+function resolveCascadePostTurn(engine, wasFrozen) {
+  const cascadeCfg = engine.gameConfig.cascade;
+  const clearedShelves = countClearedCascadeShelves(
+    engine.cascadeOccupiedPlatforms,
+    getOccupiedPlatformIndices(engine.physicsWorld)
+  );
+  if (!wasFrozen) {
+    engine.cascadeTurnsUntilDrop--;
+  }
+  if (clearedShelves > 0) {
+    const shelfBonus = (cascadeCfg.shelfClearBonus || 0) * clearedShelves * Math.max(1, engine.cascadeWave);
+    if (shelfBonus > 0) {
+      engine.addScore(shelfBonus);
+    }
+    engine.cascadeTurnsUntilDrop = Math.min(
+      cascadeCfg.shotsBeforeDrop + 1,
+      engine.cascadeTurnsUntilDrop + clearedShelves
+    );
+    engine.audioManager?.playEffect('overcharge');
+    const launcherSpec = engine.getLauncherSpec();
+    engine.particleSystem.spawnFloatingText(
+      launcherSpec.x,
+      launcherSpec.y + engine.gameConfig.canvas.launcherPopupOffsetY,
+      t('gameplay.feedback.cascade.shelfCleared', { points: shelfBonus }),
+      engine.gameConfig.theme.overchargePopupColor
+    );
+  }
+  if (!wasFrozen && engine.cascadeTurnsUntilDrop <= 0) {
+    engine.cascadeWave++;
+    engine.waveCount = engine.cascadeWave;
+    engine.spawnCascadeDropWave(0);
+    engine.refreshStaleLauncherColors();
+    engine.cascadeTurnsUntilDrop = cascadeCfg.shotsBeforeDrop;
+    engine.particleSystem.spawnFloatingText(
+      engine.gameConfig.canvas.logicalWidth * MATH_CONSTANTS.HALF,
+      cascadeCfg.startY + engine.gameConfig.canvas.wavePopupOffsetY,
+      t('gameplay.feedback.wave.incoming'),
+      engine.gameConfig.theme.wavePopupColor
+    );
+  }
+  engine.cascadeOccupiedPlatforms = getOccupiedPlatformIndices(engine.physicsWorld);
+}
+
 /** Methods of GameEngine that belong to this domain, installed on its prototype. */
 export const engineTurnResolutionMethods = {
   /**
@@ -207,129 +577,19 @@ export const engineTurnResolutionMethods = {
     if (!this.isRunPlaying() || !this.physicsWorld.ballMap.has(ball.id)) {
       return false;
     }
-
     const canvasCfg = this.gameConfig.canvas;
-
-    if (ball.clusterModifier === CLUSTER_MODIFIERS.MAGNETAR) {
-      // Immune to every strike, whatever ignores armor: only losing its Moorings brings it down.
-      const magnetarSpec = this.ballsConfig.clusterModifiers.magnetar;
-      this.particleSystem.spawnFloatingText(
-        ball.x,
-        ball.y + canvasCfg.floatingTextOffsetY,
-        t('gameplay.feedback.magnetar.immune'),
-        magnetarSpec.highlight
-      );
+    if (tryAbsorbClusterHit(this, ball, ignoreArmor, canvasCfg)) {
       return false;
     }
-
-    if (!ignoreArmor && ball.clusterModifier === CLUSTER_MODIFIERS.ARMORED && ball.armorHits > 1) {
-      ball.armorHits--;
-      const armoredSpec = this.ballsConfig.clusterModifiers.armored;
-      this.audioManager.playEffect('armorCrack');
-      this.particleSystem.spawnBurst(
-        ball.x,
-        ball.y,
-        armoredSpec.ringColor,
-        armoredSpec.crackBurstCount,
-        armoredSpec.crackBurstSpeed
-      );
-      this.particleSystem.spawnFloatingText(
-        ball.x,
-        ball.y + canvasCfg.floatingTextOffsetY,
-        t('gameplay.feedback.armor.cracked'),
-        armoredSpec.ringColor
-      );
-      return false;
-    }
-
-    if (ball.clusterModifier === CLUSTER_MODIFIERS.BOSS_CORE && ball.armorHits > 1) {
-      ball.armorHits--;
-      const bossSpec = this.ballsConfig.clusterModifiers.bossCore;
-      this.audioManager.playEffect('armorCrack');
-      this.particleSystem.spawnBurst(
-        ball.x,
-        ball.y,
-        bossSpec.ringColor,
-        bossSpec.crackBurstCount,
-        bossSpec.crackBurstSpeed
-      );
-      this.particleSystem.spawnShockwave(ball.x, ball.y, bossSpec.ringColor, bossSpec.crackShockwaveRadius);
-      this.particleSystem.spawnFloatingText(
-        ball.x,
-        ball.y + canvasCfg.floatingTextOffsetY,
-        t('gameplay.feedback.boss.shield'),
-        bossSpec.ringColor
-      );
-      return false;
-    }
-
-    const pCfg = this.gameConfig.juice.particles;
-    let pushVx = 0;
-    let pushVy = 0;
-    if (this.detonationOrigin && this.detonationOrigin !== ball) {
-      const dx = ball.x - this.detonationOrigin.x;
-      const dy = ball.y - this.detonationOrigin.y;
-      const dist = Math.hypot(dx, dy);
-      if (dist > MATH_CONSTANTS.EPSILON) {
-        const pushSpeed = pCfg.shatterPushSpeed || 0;
-        pushVx = (dx / dist) * pushSpeed;
-        pushVy = (dy / dist) * pushSpeed;
-      }
-    }
+    const { pushVx, pushVy } = computeShatterPush(this, ball);
     this.particleSystem.spawnShatterBall?.(ball, burstColor, pushVx, pushVy);
     this.particleSystem.spawnBurst(ball.x, ball.y, burstColor, burstCount, burstSpeed);
     this.popBubblesAround(ball);
     this.physicsWorld.removeBall(ball);
-
-    if (ball.clusterModifier === CLUSTER_MODIFIERS.BOSS_CORE) {
-      this.rewardBossCore(ball);
-    } else if (ball.clusterModifier === CLUSTER_MODIFIERS.COIN_CORE) {
-      const reward = this.ballsConfig.clusterModifiers.coinCore.coinReward;
-      this.awardRunCoins(reward);
-      this.particleSystem.spawnFloatingText(
-        ball.x,
-        ball.y + canvasCfg.floatingTextOffsetY,
-        t('gameplay.feedback.coins.gain', { coins: reward }),
-        this.gameConfig.theme.coinPopupColor
-      );
-    } else if (ball.clusterModifier === CLUSTER_MODIFIERS.DORMANT_BOMB) {
-      const dormantSpecs = this.ballsConfig.clusterModifiers.dormantBomb;
-      const prevOrigin = this.detonationOrigin;
-      this.detonationOrigin = ball;
-      const bombResult = this.specialController.triggerBomb(
-        ball,
-        dormantSpecs,
-        this.physicsWorld,
-        this.particleSystem,
-        this.audioManager,
-        this.getBlastRadiusMultiplier(),
-        (target, color, ignArmor, count, speed) => this.destroyClusterBall(target, color, ignArmor, count, speed)
-      );
-      this.detonationOrigin = prevOrigin;
-      if (bombResult.scoreDelta > 0) {
-        this.addScore(bombResult.scoreDelta);
-      }
-      if (bombResult.destroyed.length > 0) {
-        this.addOvercharge(bombResult.destroyed.length * this.gameConfig.scoring.overchargePerMatchedBall);
-        this.triggerSpecialSlowMo(dormantSpecs.slowMoFrames, dormantSpecs.slowMoTimeScale, dormantSpecs.highlight);
-      }
-    } else if (ball.clusterModifier === CLUSTER_MODIFIERS.LASER_LOCK) {
-      const lockSpec = this.ballsConfig.clusterModifiers.laserLock;
-      this.addScore(lockSpec.pointsBonus);
-      this.particleSystem.spawnShockwave(ball.x, ball.y, lockSpec.ringColor, lockSpec.shockwaveRadius);
-      this.releaseBarriersWhenLocksCleared();
-    } else if (ball.clusterModifier === CLUSTER_MODIFIERS.FREEZE_CORE) {
-      this.triggerFreezeCore(ball);
-    } else if (ball.clusterModifier === CLUSTER_MODIFIERS.LIGHTNING_CORE) {
-      this.triggerLightningCore(ball);
-    } else if (ball.clusterModifier === CLUSTER_MODIFIERS.PAINT_CORE) {
-      const paintSpec = this.ballsConfig.clusterModifiers.paintCore;
-      const paintResult = this.specialController.triggerPaint(ball, paintSpec, this.physicsWorld, this.particleSystem, this.audioManager, this.getBlastRadiusMultiplier());
-      this.addScore(paintResult.scoreDelta);
-    } else if (ball.clusterModifier === CLUSTER_MODIFIERS.RESCUE_CORE) {
-      this.rewardRescueCore(ball);
+    const handler = DESTROY_MODIFIER_HANDLERS.get(ball.clusterModifier);
+    if (handler) {
+      handler(this, ball, canvasCfg);
     }
-
     return true;
   },
 
@@ -504,46 +764,12 @@ export const engineTurnResolutionMethods = {
     ) {
       this.popBubble(hitTarget);
     }
-
     if (snappedBall.specialType) {
-      const prevOrigin = this.detonationOrigin;
-      this.detonationOrigin = snappedBall;
-      if (this.versus) {
-        this.neutraliseChargesBySpecial(snappedBall.specialType, snappedBall.x, snappedBall.y);
-      }
-      const result = this.specialController.resolveSpecialImpact(
-        snappedBall,
-        this.physicsWorld,
-        this.particleSystem,
-        this.audioManager,
-        this.getBlastRadiusMultiplier(),
-        (target, color, ignoreArmor, count, speed) => this.destroyClusterBall(target, color, ignoreArmor, count, speed)
-      );
-      this.detonationOrigin = prevOrigin;
-      if (result.scoreDelta > 0) {
-        this.addScore(result.scoreDelta);
-      }
-      if (result.destroyed.length > 0) {
-        this.addOvercharge(result.destroyed.length * this.gameConfig.scoring.overchargePerMatchedBall);
-        this.hitStopFrames = this.isVersusRole ? 0 : this.gameConfig.juice.hitStopFramesSpecial;
-        if (result.slowMoFrames > 0) {
-          this.triggerSpecialSlowMo(result.slowMoFrames, result.slowMoTimeScale, result.slowMoColor);
-        }
-      }
-      if (result.painted?.length > 0) {
-        this.addOvercharge(result.painted.length * this.gameConfig.scoring.overchargePerDroppedBall);
-      }
-      if (result.freezeTurns > 0) {
-        this.freezeTurnsRemaining = result.freezeTurns;
-      }
-      const madeProgress = result.destroyed.length > 0 || (result.painted?.length || 0) > 0;
-      this.handlePostTurnCleanup(madeProgress, result.freezeTurns > 0);
+      resolveSpecialProjectileImpact(this, snappedBall);
       return;
     }
-
     const cluster = this.physicsWorld.findColorCluster(snappedBall);
     const minMatch = this.gameConfig.defaults.matchMinCount;
-
     if (cluster.length >= minMatch) {
       const destroyedCount = this.resolveColorMatchCluster(cluster, snappedBall, false);
       this.handlePostTurnCleanup(destroyedCount > 0);
@@ -630,39 +856,11 @@ export const engineTurnResolutionMethods = {
       const scoring = this.gameConfig.scoring;
       const juice = this.gameConfig.juice;
       this.noteVersusDrop(detached.length, detached[0].colorId);
-      const funnelCfg = this.gameConfig.playerStats.funnel;
-      if (!this.avalancheMilestoneStamped && !this.isVersusRole && !this.isRestoringRun
-        && detached.length >= funnelCfg.avalancheMinDrops) {
-        // Local first-avalanche milestone: written once per session, with the buffered play time.
-        this.avalancheMilestoneStamped = true;
-        const milestoneDelta = { playMs: this.pendingPlayMs, m: { avalanche: true } };
-        this.pendingPlayMs = 0;
-        this.storageManager.applyPlayerStatsDelta?.(milestoneDelta);
-      }
+      stampAvalancheMilestone(this, detached.length);
       const dropPoints = detached.length * scoring.droppedBallPoints * Math.max(1, this.combo);
       this.addScore(dropPoints);
       this.addOvercharge(detached.length * scoring.overchargePerDroppedBall);
-
-      let bonusCoins = detached.length * scoring.coinsPerAvalancheBall;
-      for (const d of detached) {
-        if (d.clusterModifier === CLUSTER_MODIFIERS.COIN_CORE) {
-          bonusCoins += this.ballsConfig.clusterModifiers.coinCore.coinReward;
-        }
-      }
-      this.awardRunCoins(bonusCoins);
-      for (const d of detached) {
-        if (d.clusterModifier === CLUSTER_MODIFIERS.BOSS_CORE) {
-          this.rewardBossCore(d);
-        } else if (d.clusterModifier === CLUSTER_MODIFIERS.MAGNETAR) {
-          this.rewardMagnetarFall(d, detached.length - 1);
-        } else if (d.clusterModifier === CLUSTER_MODIFIERS.RESCUE_CORE) {
-          this.rewardRescueCore(d);
-        }
-      }
-      if (detached.some((d) => d.clusterModifier === CLUSTER_MODIFIERS.LASER_LOCK)) {
-        this.releaseBarriersWhenLocksCleared();
-      }
-
+      rewardAvalancheModifiers(this, detached);
       const sample = detached[0];
       this.particleSystem.spawnFloatingText(
         sample.x,
@@ -671,35 +869,12 @@ export const engineTurnResolutionMethods = {
         this.gameConfig.theme.avalanchePopupColor
       );
       this.particleSystem.addScreenShake(juice.avalancheShake, juice.maxShakeOffset);
-
       this.storageManager?.recordAchievementProgress?.({ maxAvalanche: detached.length });
       this.unlockAchievementTiers('firstAvalanche', detached.length);
       reportBountyEvent(this, 'avalanche_balls', detached.length);
-
       if (this.mode === GAME_MODES.BLITZ) {
-        const blitzCfg = this.gameConfig.blitz;
-        const minSpheres = blitzCfg.avalancheTimeBonusMinSpheres;
-        const bonusStep = blitzCfg.avalancheTimeBonusFrames;
-        const maxBonus = blitzCfg.maxBonusDurationFrames;
-        if (detached.length >= minSpheres && bonusStep > 0 && maxBonus > 0) {
-          const earned = this.blitzBonusFramesEarned || 0;
-          const granted = Math.min(bonusStep, Math.max(0, maxBonus - earned));
-          if (granted > 0) {
-            this.blitzFramesRemaining += granted;
-            this.blitzBonusFramesEarned = earned + granted;
-            const bonusSeconds = Math.max(1, Math.round(granted / blitzCfg.framesPerSecond));
-            this.audioManager?.playEffect('blitzTimeBonus');
-            this.particleSystem.spawnFloatingText(
-              sample.x,
-              sample.y + this.gameConfig.canvas.floatingTextOffsetY,
-              t('gameplay.feedback.blitz.timeBonus', { seconds: bonusSeconds }),
-              this.gameConfig.theme.wavePopupColor
-            );
-            this.notifyUI();
-          }
-        }
+        grantBlitzAvalancheTimeBonus(this, sample, detached.length);
       }
-
       if (this.isSurvivalMode() && this.random() < scoring.specialDropChanceEndless) {
         this.grantRandomSpecialBall();
       }
@@ -847,41 +1022,7 @@ export const engineTurnResolutionMethods = {
       );
     }
     if (result.lowered) {
-      const isRail = spec.step === SAG_STEPS.RAIL;
-      // A board emptied by this very turn is about to be paid as a cleared stage: the rail
-      // does not drop on it.
-      if (isRail && this.physicsWorld.balls.length === 0 && !this.physicsWorld.projectile) {
-        return;
-      }
-      if (isRail) {
-        this.lowerAnchorRail();
-      } else {
-        this.spawnEndlessWave();
-        // A wave on a cleared board brings colors back that the first refresh could not
-        // compare against. On a non-empty board the wave only adds balls, so every launcher
-        // color is still present and this second pass draws nothing from the seeded random.
-        this.refreshStaleLauncherColors();
-      }
-      // The step may have ended the run (rail past the danger line): no creak, shake or
-      // text on the end screen, and the cluster stays where it really is.
-      if (!this.isRunPlaying()) {
-        this.railLowerFrames = 0;
-        return;
-      }
-      this.railLowerFrames = this.gameConfig.sag?.lowerFrames ?? 0;
-      this.audioManager.playEffect?.('creak');
-      const shake = this.gameConfig.sag?.lowerShake;
-      if (shake) {
-        this.particleSystem.addScreenShake(shake, this.gameConfig.juice.maxShakeOffset);
-      }
-      if (this.gameConfig.sag) {
-        this.particleSystem.spawnFloatingText(
-          canvasCfg.logicalWidth * MATH_CONSTANTS.HALF,
-          this.gameConfig.endless.startY + canvasCfg.wavePopupOffsetY,
-          t(isRail ? 'gameplay.feedback.sag.lowered' : 'gameplay.feedback.sag.dropped'),
-          this.gameConfig.theme.wavePopupColor
-        );
-      }
+      applySagLoweredStep(this, spec, canvasCfg);
     } else if (result.warned) {
       this.audioManager.playEffect?.('sagWarn');
     }
@@ -889,103 +1030,18 @@ export const engineTurnResolutionMethods = {
 
   handlePostTurnCleanup(madeMatch, appliedFreeze = false) {
     const dropped = this.detachAndRewardAvalanche();
-    this.settleTurnResonance(madeMatch || dropped > 0);
+    const madeProgress = madeMatch || dropped > 0;
+    this.settleTurnResonance(madeProgress);
     this.shiftChameleonBalls();
-    // A Freeze Core that went off during this turn (the shot or its avalanche) counts as a
-    // freeze applied this turn. Read after the avalanche so a core it sets off is consumed here.
-    const freezeAppliedThisTurn = appliedFreeze || this.isCoreFreezeApplied;
-    this.isCoreFreezeApplied = false;
-
     this.refreshStaleLauncherColors();
-
-    const wasFrozen = this.freezeTurnsRemaining > 0 || freezeAppliedThisTurn;
-    if (!freezeAppliedThisTurn && this.freezeTurnsRemaining > 0) {
-      this.freezeTurnsRemaining--;
-      if (this.freezeTurnsRemaining === 0) {
-        for (const b of this.physicsWorld.balls) {
-          b.isFrozen = false;
-        }
-      }
-    }
-
+    const wasFrozen = tickTurnFreezeState(this, appliedFreeze);
     if (this.isSurvivalMode() || this.mode === GAME_MODES.CLASSIC) {
       this.resolveSagTurn({ removed: madeMatch, dropped, frozen: wasFrozen });
     } else if (this.mode === GAME_MODES.BLITZ) {
-      const blitzCfg = this.gameConfig.blitz;
-      if (madeMatch || dropped > 0) {
-        this.blitzHitStreak = (this.blitzHitStreak || 0) + 1;
-        if (blitzCfg.feverStreakTurns > 0 && this.blitzHitStreak % blitzCfg.feverStreakTurns === 0) {
-          const feverPts = (blitzCfg.feverBonusPoints || 0) * Math.max(1, this.waveCount);
-          if (feverPts > 0) {
-            this.addScore(feverPts);
-          }
-          const earned = this.blitzBonusFramesEarned || 0;
-          const maxBonus = blitzCfg.maxBonusDurationFrames || 0;
-          const grantFrames = Math.min(blitzCfg.feverTimeBonusFrames || 0, Math.max(0, maxBonus - earned));
-          if (grantFrames > 0) {
-            this.blitzFramesRemaining += grantFrames;
-            this.blitzBonusFramesEarned = earned + grantFrames;
-          }
-          this.audioManager?.playEffect('blitzTimeBonus');
-          const launcherSpec = this.getLauncherSpec();
-          this.particleSystem.spawnFloatingText(
-            launcherSpec.x,
-            launcherSpec.y + this.gameConfig.canvas.launcherPopupOffsetY,
-            t('gameplay.feedback.blitz.fever', { streak: this.blitzHitStreak, points: feverPts }),
-            this.gameConfig.theme.overchargePopupColor
-          );
-        }
-      } else {
-        this.blitzHitStreak = 0;
-      }
+      resolveBlitzPostTurn(this, madeProgress);
     } else if (this.mode === GAME_MODES.CASCADE) {
-      const cascadeCfg = this.gameConfig.cascade;
-      const nowOccupied = getOccupiedPlatformIndices(this.physicsWorld);
-      let clearedShelves = 0;
-      if (this.cascadeOccupiedPlatforms instanceof Set) {
-        for (const prevIdx of this.cascadeOccupiedPlatforms) {
-          if (!nowOccupied.has(prevIdx)) {
-            clearedShelves++;
-          }
-        }
-      }
-      if (!wasFrozen) {
-        this.cascadeTurnsUntilDrop--;
-      }
-      if (clearedShelves > 0) {
-        const shelfBonus = (cascadeCfg.shelfClearBonus || 0) * clearedShelves * Math.max(1, this.cascadeWave);
-        if (shelfBonus > 0) {
-          this.addScore(shelfBonus);
-        }
-        this.cascadeTurnsUntilDrop = Math.min(
-          cascadeCfg.shotsBeforeDrop + 1,
-          this.cascadeTurnsUntilDrop + clearedShelves
-        );
-        this.audioManager?.playEffect('overcharge');
-        const launcherSpec = this.getLauncherSpec();
-        this.particleSystem.spawnFloatingText(
-          launcherSpec.x,
-          launcherSpec.y + this.gameConfig.canvas.launcherPopupOffsetY,
-          t('gameplay.feedback.cascade.shelfCleared', { points: shelfBonus }),
-          this.gameConfig.theme.overchargePopupColor
-        );
-      }
-      if (!wasFrozen && this.cascadeTurnsUntilDrop <= 0) {
-        this.cascadeWave++;
-        this.waveCount = this.cascadeWave;
-        this.spawnCascadeDropWave(0);
-        this.refreshStaleLauncherColors();
-        this.cascadeTurnsUntilDrop = cascadeCfg.shotsBeforeDrop;
-        this.particleSystem.spawnFloatingText(
-          this.gameConfig.canvas.logicalWidth * MATH_CONSTANTS.HALF,
-          cascadeCfg.startY + this.gameConfig.canvas.wavePopupOffsetY,
-          t('gameplay.feedback.wave.incoming'),
-          this.gameConfig.theme.wavePopupColor
-        );
-      }
-      this.cascadeOccupiedPlatforms = getOccupiedPlatformIndices(this.physicsWorld);
+      resolveCascadePostTurn(this, wasFrozen);
     }
-
     this.advanceMagnetarTurn();
     this.getModeBehavior().onTurnCleanedUp?.(this, { madeMatch, dropped, wasFrozen });
     this.evaluateRoundEnd();

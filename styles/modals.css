@@ -1,0 +1,1666 @@
+/*
+ * Copyright 2026 Julien Bombled
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+
+
+/*
+ * The card never exceeds the viewport: fixed parts (title, tabs, actions)
+ * keep their height and the scrollable panes shrink, so Close stays visible.
+ */
+.modal-card {
+  background: var(--bg-panel);
+  border: 1px solid var(--border-subtle);
+  border-radius: 16px;
+  padding: 24px;
+  width: 100%;
+  max-width: 420px;
+  max-height: calc(100vh - 32px);
+  max-height: calc(100dvh - var(--modal-pad-top) - var(--modal-pad-bottom));
+  overflow-y: auto;
+  margin: auto;
+  box-shadow: 0 20px 50px var(--shadow-alpha-75);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  text-align: center;
+}
+
+.modal-card > * {
+  flex-shrink: 0;
+}
+
+.modal-card > .levels-grid,
+.modal-card > .shop-pane,
+.modal-card > .codex-pane {
+  flex-shrink: 1;
+  min-height: 0;
+}
+
+.progress-backup-controls {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+}
+
+#progress-backup-status:empty {
+  display: none;
+}
+
+#progress-backup-status {
+  color: var(--text-info-soft);
+  text-align: center;
+}
+
+.modal-card.wide {
+  max-width: 640px;
+}
+
+.modal-title {
+  font-size: 1.45rem;
+  font-weight: 800;
+}
+
+.victory-title {
+  color: var(--accent-emerald);
+}
+
+.danger-title {
+  color: var(--accent-danger);
+}
+
+.victory-stars-banner {
+  font-size: 1.5rem;
+  color: var(--accent-amber);
+  font-weight: 700;
+}
+
+.victory-star {
+  display: inline-block;
+}
+
+/* Earned stars pop in one after another; the delay is set per star by the UI. */
+.victory-star.filled {
+  animation: victory-star-pop 0.42s cubic-bezier(0.34, 1.56, 0.64, 1) backwards;
+}
+
+@keyframes victory-star-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.2) rotate(-25deg);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) rotate(0deg);
+  }
+}
+
+.modal-stat-line {
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.modal-stat-line.muted {
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}
+
+.modal-subtext {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.is-new-record {
+  color: var(--text-gold);
+  font-weight: 700;
+}
+
+.is-all-stars {
+  color: var(--accent-emerald);
+  font-weight: 700;
+}
+
+.share-fallback {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  text-align: left;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.share-fallback-text {
+  width: 100%;
+  min-height: 7.5em;
+  resize: none;
+  background: var(--surface-sunken);
+  color: var(--text-main);
+  border: 1px solid var(--border-strong);
+  border-radius: 10px;
+  padding: 8px 10px;
+  font: inherit;
+  font-size: 0.85rem;
+  line-height: 1.4;
+}
+
+.instructions-list {
+  list-style: none;
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: var(--surface-sunken);
+  padding: 14px;
+  border-radius: 10px;
+  font-size: 0.88rem;
+  color: var(--text-secondary);
+}
+
+.pause-level-tip {
+  background: var(--accent-blue-alpha-14);
+  border: 1px solid var(--accent-blue-alpha-45);
+  color: var(--text-info-bright);
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 0.84rem;
+  font-weight: 600;
+  text-align: left;
+}
+
+.modal-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  border-bottom: 1px solid var(--border-subtle);
+  padding-bottom: 8px;
+}
+
+.modal-tab {
+  flex: 1 1 auto;
+  min-width: fit-content;
+  background: var(--surface-sunken);
+  color: var(--text-muted);
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.modal-tab.active {
+  background: var(--accent-amber-alpha-20);
+  color: var(--text-gold-soft);
+  border-color: var(--accent-amber);
+}
+
+.arcade-mode-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  padding: 6px 10px;
+  background: var(--surface-raised);
+  color: var(--text-main);
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
+}
+
+.arcade-mode-card:hover {
+  border-color: var(--accent-blue);
+}
+
+.arcade-mode-card.active-mode {
+  background: var(--accent-purple-alpha-38);
+  border-color: var(--accent-purple);
+  box-shadow: 0 0 10px var(--accent-purple-alpha-45);
+}
+
+.arcade-card-title {
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.arcade-card-desc {
+  font-size: 0.68rem;
+  color: var(--text-muted);
+  line-height: 1.25;
+}
+
+.arcade-card-best {
+  font-size: 0.68rem;
+  font-weight: 600;
+}
+
+.puzzle-stages-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+/*
+ * Locked modes: still focusable (aria-disabled), but plainly out of reach. The look uses a
+ * dashed border and a sunken fill with a lighter-than-muted text, never opacity, so the
+ * label keeps its WCAG AA contrast.
+ */
+.nav-btn.is-locked,
+.arcade-mode-card.is-locked {
+  background: var(--surface-sunken);
+  color: var(--text-secondary);
+  border: 1px dashed var(--border-strong);
+  cursor: not-allowed;
+}
+
+.nav-btn.is-locked:hover,
+.arcade-mode-card.is-locked:hover {
+  border-color: var(--border-strong);
+  transform: none;
+}
+
+.arcade-mode-card.is-locked .arcade-card-desc {
+  color: var(--text-secondary);
+}
+
+.mode-new-badge {
+  display: inline-block;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--accent-amber);
+  color: var(--text-on-accent);
+  font-size: 0.68rem;
+  font-weight: 800;
+  line-height: 1.5;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  vertical-align: middle;
+  animation: mode-new-badge-pulse 1.8s ease-in-out infinite;
+}
+
+@keyframes mode-new-badge-pulse {
+  50% {
+    box-shadow: 0 0 8px var(--accent-amber-alpha-45);
+  }
+}
+
+/* The Weekly Flux button and the status line take a full row of the mode grid. */
+#btn-weekly,
+.nav-lock-hint {
+  grid-column: 1 / -1;
+}
+
+.nav-lock-hint {
+  margin: 0;
+  font-size: 0.78rem;
+  line-height: 1.3;
+  color: var(--text-gold-soft);
+  text-align: left;
+}
+
+.nav-btn.stats-btn {
+  width: 100%;
+}
+
+.stats-pane {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  text-align: left;
+}
+
+.stats-list {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
+  gap: 4px 12px;
+  margin: 0;
+}
+
+.stats-list dt {
+  font-weight: 700;
+  color: var(--text-gold-soft);
+}
+
+.stats-list dd {
+  margin: 0;
+  grid-column: 2;
+  color: var(--text-main);
+}
+
+.stats-campaign-list {
+  margin: 0;
+  padding-left: 1.2em;
+  color: var(--text-main);
+}
+
+.stats-duels-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.stats-filter-btn {
+  padding: 5px 12px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 999px;
+  background: var(--surface-sunken);
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.stats-filter-btn:hover {
+  border-color: var(--accent-blue);
+  color: var(--text-main);
+}
+
+.stats-filter-btn.active {
+  border-color: var(--accent-blue);
+  background: var(--accent-blue-alpha-22);
+  color: var(--text-main);
+}
+
+.stats-table-wrap {
+  overflow-x: auto;
+}
+
+.stats-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+}
+
+.stats-table caption {
+  caption-side: top;
+  padding-bottom: 6px;
+  text-align: left;
+  font-weight: 700;
+  color: var(--text-gold-soft);
+}
+
+.stats-table th,
+.stats-table td {
+  padding: 5px 8px;
+  border-bottom: 1px solid var(--border-subtle);
+  text-align: left;
+  font-weight: 600;
+  color: var(--text-main);
+}
+
+.stats-table thead th {
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+@media (max-width: 480px) {
+  .stats-list {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .stats-list dd {
+    grid-column: 1;
+  }
+  .stats-table thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
+  .stats-table,
+  .stats-table tbody,
+  .stats-table tr,
+  .stats-table th,
+  .stats-table td {
+    display: block;
+  }
+  .stats-table tr {
+    padding: 6px 0;
+    border-bottom: 1px solid var(--border-strong);
+  }
+  .stats-table th,
+  .stats-table td {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    border-bottom: none;
+    padding: 2px 4px;
+  }
+  .stats-table th::before,
+  .stats-table td::before {
+    content: attr(data-label);
+    font-weight: 700;
+    color: var(--text-secondary);
+  }
+}
+
+.puzzle-stage-btn {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  min-height: var(--touch-target);
+  min-width: var(--touch-target);
+  padding: 4px 10px;
+  background: var(--surface-raised);
+  color: var(--text-main);
+  border: 1px solid var(--border-subtle);
+  border-radius: 6px;
+  font: inherit;
+  font-size: 0.72rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.puzzle-stage-stars {
+  color: var(--accent-amber);
+  font-size: 0.6rem;
+  line-height: 1;
+  letter-spacing: 0;
+}
+
+.puzzle-stage-btn:hover:not(:disabled):not(.locked) {
+  border-color: var(--accent-blue);
+}
+
+.puzzle-stage-btn.active {
+  background: var(--accent-amber-alpha-20);
+  color: var(--text-gold-soft);
+  border-color: var(--accent-amber);
+}
+
+.puzzle-stage-btn:disabled,
+.puzzle-stage-btn.locked {
+  background: var(--surface-sunken);
+  color: var(--text-secondary);
+  border: 1px dashed var(--border-strong);
+  cursor: not-allowed;
+}
+
+.style-card-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.style-preview-orb {
+  display: inline-block;
+  flex: 0 0 22px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 1.5px solid var(--border-subtle);
+}
+
+.style-preview-classic {
+  background: radial-gradient(circle at 32% 30%, var(--text-main), var(--accent-blue) 60%, var(--bg-dark));
+}
+
+.style-preview-crystal {
+  background: conic-gradient(
+    from 30deg,
+    var(--accent-blue),
+    var(--accent-purple),
+    var(--text-main),
+    var(--accent-blue)
+  );
+  border-color: var(--text-main);
+}
+
+.style-preview-neon {
+  background: radial-gradient(circle, var(--bg-dark) 52%, var(--accent-blue) 68%, var(--accent-purple));
+  border-color: var(--accent-blue);
+}
+
+.style-preview-metallic {
+  background: linear-gradient(135deg, var(--text-main), var(--text-muted) 48%, var(--bg-dark));
+  border: 2px double var(--text-main);
+}
+
+.levels-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(175px, 1fr));
+  gap: 12px;
+  max-height: 380px;
+  overflow-y: auto;
+  /* At least the focus outline plus its offset (3px + 2px), so the ring is not clipped. */
+  padding: 5px;
+}
+
+#levels-grid {
+  flex: 1 1 auto;
+  max-height: none;
+  scroll-padding: 12px;
+}
+
+#modal-levels .modal-card {
+  height: calc(100dvh - var(--modal-pad-top) - var(--modal-pad-bottom));
+  max-width: 880px;
+}
+
+/*
+ * Play hub (#modal-play): one section per family of modes. Phones stack one column of sections
+ * with two-column card grids; tablets widen the grids; desktops put Campaign beside Challenges;
+ * short landscape screens split the hub in two columns. Nothing here is nowrap: card text wraps.
+ */
+#modal-play .modal-card {
+  max-width: 960px;
+  text-align: left;
+}
+
+.play-hub-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 12px;
+}
+
+.play-hub-section {
+  --play-hub-columns: 2;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+  padding: 10px 12px;
+  background: var(--surface-sunken);
+  border: 1px solid var(--border-subtle);
+  border-radius: 10px;
+}
+
+.play-hub-section.active-mode {
+  border-color: var(--accent-purple);
+  box-shadow: 0 0 10px var(--accent-purple-alpha-45);
+}
+
+.play-hub-section > h3 {
+  margin: 0;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-gold-soft);
+}
+
+.play-hub-grid {
+  display: grid;
+  grid-template-columns: repeat(var(--play-hub-columns), minmax(0, 1fr));
+  gap: 6px;
+  align-items: stretch;
+}
+
+/* A card and its disclosure toggle share one grid cell. */
+.play-hub-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.play-hub-cell > .arcade-mode-card {
+  flex: 1 1 auto;
+}
+
+.play-hub-campaign-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+#btn-campaign-continue,
+#btn-campaign-map {
+  flex: 1 1 150px;
+  min-width: 0;
+  min-height: var(--touch-target);
+  white-space: normal;
+}
+
+#play-campaign-summary {
+  margin: 0;
+  font-size: 0.85rem;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+#modal-play .arcade-mode-card {
+  position: relative;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-content: center;
+  min-width: 0;
+  min-height: var(--touch-target);
+  padding: 6px 10px;
+  overflow-wrap: anywhere;
+  white-space: normal;
+  transition: transform 0.12s ease, border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
+}
+
+#modal-play .arcade-mode-card.is-mastered:not(.is-locked) {
+  border-color: var(--accent-amber);
+  box-shadow: 0 0 8px var(--accent-amber-alpha-20);
+}
+
+#modal-play .arcade-mode-card.is-mastered:not(.is-locked) .arcade-card-title {
+  padding-inline-end: 16px;
+}
+
+#modal-play .arcade-mode-card .mode-mastered-badge {
+  position: absolute;
+  top: 6px;
+  right: 8px;
+  font-size: 0.72rem;
+  color: var(--accent-amber);
+  pointer-events: none;
+}
+
+#modal-play .arcade-mode-card.is-locked .mode-mastered-badge,
+#modal-play .arcade-mode-card .mode-mastered-badge.hidden {
+  display: none;
+}
+
+#modal-play .arcade-mode-card:hover:not(.is-locked) {
+  transform: translateY(-1px);
+}
+
+#modal-play .arcade-mode-card > * {
+  grid-column: 2;
+  min-width: 0;
+}
+
+#modal-play .arcade-mode-card > .arcade-card-icon {
+  grid-column: 1;
+  grid-row: 1 / span 3;
+  align-self: center;
+  margin-inline-end: 8px;
+  font-size: 1.1rem;
+  line-height: 1;
+}
+
+#modal-play .arcade-card-title {
+  font-size: 0.85rem;
+}
+
+#modal-play .arcade-card-desc {
+  font-size: var(--desc-font-size);
+}
+
+#modal-play .arcade-card-best {
+  font-size: var(--desc-font-size);
+  color: var(--text-gold-soft);
+}
+
+.arcade-mode-card.is-locked .arcade-card-best {
+  display: none;
+}
+
+/* Reward chips on the Daily and Weekly cards. */
+#daily-reward,
+#weekly-reward {
+  justify-self: start;
+  padding: 0 8px;
+  border: 1px solid var(--accent-amber-alpha-45);
+  border-radius: 999px;
+  background: var(--accent-amber-alpha-20);
+  color: var(--text-gold-soft);
+  font-size: 0.7rem;
+  font-weight: 700;
+  line-height: 1.6;
+}
+
+.play-bounties {
+  margin-top: 6px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border-subtle);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.play-bounties-title {
+  margin: 0;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-secondary);
+}
+
+.play-bounties-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.play-bounty-row {
+  margin: 0;
+  padding: 0;
+}
+
+.play-bounty-btn {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 4px 8px;
+  padding: 5px 8px;
+  border-radius: 8px;
+  border: 1px solid var(--border-subtle);
+  background: var(--surface-sunken);
+  font: inherit;
+  font-size: 0.74rem;
+  color: inherit;
+  text-align: start;
+  cursor: pointer;
+  transition: border-color 0.14s ease, background-color 0.14s ease;
+}
+
+.play-bounty-btn:not(:disabled):hover,
+.play-bounty-btn:not(:disabled):focus-visible {
+  border-color: var(--accent-blue);
+}
+
+.play-bounty-btn:disabled {
+  cursor: default;
+  opacity: 1;
+}
+
+.play-bounty-row.is-done .play-bounty-btn {
+  border-color: var(--accent-emerald);
+}
+
+.play-bounty-title {
+  color: var(--text-main);
+  overflow-wrap: anywhere;
+}
+
+.play-bounty-progress {
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.play-bounty-row.is-done .play-bounty-progress {
+  color: var(--accent-emerald);
+  font-weight: 700;
+}
+
+.play-bounty-reward {
+  color: var(--text-gold-soft);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.play-bounty-meter {
+  grid-column: 1 / -1;
+  height: 3px;
+  border-radius: 999px;
+  background: var(--border-subtle);
+  overflow: hidden;
+}
+
+.play-bounty-meter-fill {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--accent-blue);
+}
+
+.play-bounty-row.is-done .play-bounty-meter-fill {
+  background: var(--accent-emerald);
+}
+
+/* Disclosure toggles under a card: full width of the cell, chevron drawn as text. */
+#btn-puzzle-stages-toggle,
+#btn-flux-seed-toggle {
+  min-height: var(--touch-target);
+  width: 100%;
+  white-space: normal;
+}
+
+#btn-puzzle-stages-toggle::after,
+#btn-flux-seed-toggle::after {
+  content: '\25BE';
+  margin-inline-start: 6px;
+}
+
+#btn-puzzle-stages-toggle[aria-expanded='true']::after,
+#btn-flux-seed-toggle[aria-expanded='true']::after {
+  content: '\25B4';
+}
+
+/* Disclosures sit after the arcade grid, across every column. */
+#puzzle-stages-strip,
+#flux-seed-entry {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+#flux-seed-entry .flux-seed-input {
+  flex: 1 1 148px;
+  width: auto;
+  min-width: 0;
+}
+
+#btn-versus-local-hub {
+  min-height: var(--touch-target);
+  white-space: normal;
+}
+
+#versus-local-hub-hint {
+  grid-column: 1 / -1;
+}
+
+#play-hub-hint,
+#versus-local-hub-hint,
+#levels-chapter-hint {
+  margin: 0;
+  font-size: var(--caption-font-size);
+  line-height: var(--caption-line-height);
+  color: var(--text-gold-soft);
+  text-align: left;
+  overflow-wrap: anywhere;
+}
+
+/*
+ * Campaign map (#modal-levels): chapter switcher, compact square tiles, detail panel.
+ * The switcher never scrolls sideways: the select takes the free width and ellipsizes.
+ */
+.levels-switcher {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 8px;
+  /* Holds the focus outline plus its offset (3px + 2px), so the ring is not clipped. */
+  padding: 6px;
+}
+
+.levels-switcher .nav-btn {
+  flex: 0 0 auto;
+  min-width: var(--touch-target);
+  min-height: var(--touch-target);
+}
+
+.levels-switcher .nav-btn[aria-disabled='true'] {
+  color: var(--text-secondary);
+  border-style: dashed;
+  cursor: not-allowed;
+}
+
+#levels-chapter-select {
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: var(--touch-target);
+  padding: 6px 10px;
+  background: var(--surface-sunken);
+  color: var(--text-main);
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  font: inherit;
+  font-size: var(--caption-font-size);
+  font-weight: 700;
+  text-overflow: ellipsis;
+}
+
+#levels-chapter-progress {
+  margin: 0;
+  font-size: var(--caption-font-size);
+  color: var(--text-secondary);
+  text-align: left;
+}
+
+#btn-levels-filter-incomplete,
+#btn-levels-jump-current {
+  min-height: var(--touch-target);
+}
+
+/* Grid and detail panel side by side; the grid is the one scroller. */
+.levels-body {
+  --levels-detail-width: 260px;
+  display: flex;
+  flex: 1 1 auto;
+  gap: 12px;
+  min-height: 0;
+}
+
+#levels-grid {
+  min-width: 0;
+}
+
+.level-tiles {
+  --level-tile-size: calc(var(--touch-target) + 12px);
+  grid-template-columns: repeat(auto-fill, minmax(var(--level-tile-size), 1fr));
+  grid-auto-rows: min-content;
+  align-content: start;
+  gap: 6px;
+  min-height: 0;
+  /* At least the focus outline plus its offset (3px + 2px), so the ring is not clipped. */
+  padding: 6px;
+}
+
+.level-tile {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  min-width: 0;
+  min-height: var(--level-tile-size);
+  aspect-ratio: 1;
+  padding: 4px;
+  background: var(--surface-raised);
+  color: var(--text-main);
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  font: inherit;
+  cursor: pointer;
+  transition: transform 0.12s ease, border-color 0.15s ease, background 0.15s ease;
+}
+
+.level-tile:not(.locked):hover {
+  transform: translateY(-1px);
+  border-color: var(--accent-blue);
+}
+
+.level-tile-number {
+  font-size: 1rem;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.level-tile-stars {
+  color: var(--accent-amber);
+  font-size: 0.6rem;
+  line-height: 1;
+  letter-spacing: 0;
+}
+
+.level-tile-mark {
+  position: absolute;
+  top: 2px;
+  right: 3px;
+  font-size: 0.7rem;
+  line-height: 1;
+}
+
+.level-tile[aria-selected='true'] {
+  background: var(--accent-blue-alpha-22);
+  border-color: var(--accent-blue);
+}
+
+/* Current level: amber ring and a dot, so it reads without color alone. */
+.level-tile.current {
+  box-shadow: 0 0 0 2px var(--accent-amber);
+}
+
+.level-tile.current::after {
+  content: '';
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent-amber);
+}
+
+/* Locked: sunken fill and dashed border (never opacity); the lock glyph replaces the stars. */
+.level-tile.locked {
+  background: var(--surface-locked);
+  color: var(--text-secondary);
+  border-style: dashed;
+  cursor: not-allowed;
+}
+
+.level-tile.locked .level-tile-stars {
+  display: none;
+}
+
+.level-tile.locked::before {
+  content: '\1F512';
+  font-size: 0.8rem;
+  line-height: 1;
+}
+
+#levels-detail {
+  display: flex;
+  flex: 0 0 var(--levels-detail-width);
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  padding: 12px;
+  background: var(--surface-sunken);
+  border: 1px solid var(--border-subtle);
+  border-radius: 10px;
+  text-align: left;
+  overflow-y: auto;
+  overflow-wrap: anywhere;
+}
+
+#levels-detail-header {
+  font-size: 0.74rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--accent-blue);
+}
+
+#levels-detail-title {
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+#levels-detail-badge {
+  align-self: flex-start;
+  margin-left: 0;
+}
+
+#levels-detail-desc {
+  font-size: var(--caption-font-size);
+  line-height: var(--caption-line-height);
+  color: var(--text-muted);
+}
+
+#levels-detail-stars {
+  color: var(--accent-amber);
+  letter-spacing: 2px;
+}
+
+#levels-detail-best {
+  font-size: var(--caption-font-size);
+  color: var(--text-secondary);
+}
+
+#levels-detail-lock {
+  font-size: var(--caption-font-size);
+  color: var(--text-gold-soft);
+}
+
+#btn-play-level-modal {
+  min-height: var(--touch-target);
+  margin-top: auto;
+}
+
+.modal-subtitle {
+  font-size: 0.92rem;
+  font-weight: 700;
+  color: var(--accent-amber);
+  text-align: left;
+  margin-top: 6px;
+}
+
+.shop-pane {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-height: 360px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+#shop-grid,
+#shop-styles-grid {
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  max-height: none;
+  overflow-y: visible;
+}
+
+.ammo-shop-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+  gap: 8px;
+}
+
+.ammo-card {
+  background: var(--surface-raised);
+  border: 1px solid var(--border-subtle);
+  border-radius: 10px;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.ammo-card-title {
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.ammo-card-stock {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+}
+
+.ammo-card-desc {
+  font-size: var(--desc-font-size);
+  line-height: var(--caption-line-height);
+  color: var(--text-muted);
+  text-align: center;
+}
+
+.ammo-buy-btn {
+  width: 100%;
+  padding: 5px 8px;
+  font-size: 0.76rem;
+}
+
+.ammo-buy-btn.unavailable {
+  font-size: 0.68rem;
+}
+
+#achievements-grid {
+  grid-template-columns: repeat(auto-fit, minmax(185px, 1fr));
+  max-height: 360px;
+}
+
+.codex-pane {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-height: 360px;
+  overflow-y: auto;
+  text-align: left;
+  padding: 4px;
+}
+
+.codex-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 10px;
+}
+
+.codex-card {
+  background: var(--surface-raised);
+  border: 1px solid var(--border-subtle);
+  border-radius: 10px;
+  padding: 10px;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.codex-badge {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--surface-sunken);
+  border: 2px solid var(--accent-blue);
+  box-shadow:
+    inset 0 2px 4px var(--highlight-alpha-40),
+    0 2px 6px var(--shadow-alpha-45);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1rem;
+  flex-shrink: 0;
+}
+
+.codex-info {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.codex-title {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--text-main);
+}
+
+.codex-desc {
+  font-size: var(--desc-font-size);
+  color: var(--text-muted);
+}
+
+.achievement-unlocked-badge {
+  color: var(--accent-emerald);
+  font-weight: 700;
+}
+
+.level-card {
+  background: var(--surface-raised);
+  border: 1px solid var(--border-subtle);
+  border-radius: 12px;
+  padding: 12px;
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  transition: transform 0.15s ease, border-color 0.15s ease;
+}
+
+.level-card.unlocked {
+  cursor: pointer;
+}
+
+.level-card.unlocked:hover {
+  transform: translateY(-2px);
+  border-color: var(--accent-blue);
+}
+
+/* Locked cards are dimmed by color, not opacity, so text keeps >= 4.5:1. */
+.level-card.locked {
+  background: var(--surface-locked);
+  cursor: not-allowed;
+  border-style: dashed;
+}
+
+.level-card.locked .level-card-title {
+  color: var(--text-muted);
+}
+
+.level-card-header {
+  font-size: 0.74rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--accent-blue);
+}
+
+.level-card-title {
+  font-size: 0.95rem;
+  font-weight: 700;
+}
+
+.level-card-desc {
+  font-size: 0.76rem;
+  color: var(--text-muted);
+  flex: 1;
+}
+
+.level-card-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 6px;
+  font-size: 0.78rem;
+}
+
+.level-stars {
+  color: var(--accent-amber);
+  letter-spacing: 2px;
+}
+
+.level-best {
+  color: var(--text-secondary);
+}
+
+.level-locked-badge {
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+.levels-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.levels-toolbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.flux-seed-entry {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.flux-seed-input {
+  min-height: var(--touch-target);
+  width: 148px;
+  padding: 6px 10px;
+  background: var(--surface-sunken);
+  color: var(--text-main);
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  font: inherit;
+  font-size: var(--caption-font-size);
+}
+
+.flux-seed-input::placeholder {
+  color: var(--text-muted);
+}
+
+.flux-seed-input[aria-invalid='true'] {
+  border-color: var(--accent-danger);
+}
+
+.flux-seed-error {
+  flex: 1 0 100%;
+  margin: 2px 0 0;
+  font-size: var(--caption-font-size);
+  line-height: var(--caption-line-height);
+  color: var(--text-danger-soft);
+}
+
+.level-format-badge {
+  display: inline-block;
+  margin-left: 4px;
+  padding: 1px 6px;
+  border-radius: 6px;
+  font-size: 0.65rem;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  vertical-align: middle;
+  border: 1px solid var(--border-subtle);
+  background: var(--surface-sunken);
+  color: var(--text-secondary);
+}
+
+.level-format-badge.landmark {
+  border-color: var(--accent-danger);
+  background: var(--accent-danger-alpha-22);
+  color: var(--text-danger-soft);
+}
+
+.level-format-badge.precision {
+  border-color: var(--accent-amber);
+  background: var(--accent-amber-alpha-16);
+  color: var(--text-gold-soft);
+}
+
+.level-format-badge.arsenal {
+  border-color: var(--accent-blue);
+  background: var(--accent-blue-alpha-14);
+  color: var(--text-info-soft);
+}
+
+.level-format-badge.twist {
+  border-color: var(--accent-purple);
+  background: var(--accent-purple-alpha-38);
+  color: var(--text-purple-soft);
+}
+
+.nav-btn.badge-btn.active {
+  border-color: var(--accent-blue);
+  background: var(--accent-blue-alpha-22);
+  color: var(--text-main);
+}
+
+.levels-empty-filter {
+  grid-column: 1 / -1;
+  text-align: center;
+  padding: 18px 12px;
+  color: var(--text-muted);
+  font-size: var(--caption-font-size);
+}
+
+.achievement-progress-track {
+  width: 100%;
+  height: 5px;
+  background: var(--surface-sunken);
+  border: 1px solid var(--border-subtle);
+  border-radius: 999px;
+  overflow: hidden;
+  margin-top: 2px;
+}
+
+.achievement-progress-fill {
+  height: 100%;
+  background: var(--accent-amber);
+  transition: width 0.2s ease;
+}
+
+.level-card.unlocked .achievement-progress-fill {
+  background: var(--accent-emerald);
+}
+
+.achievement-tiers {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.achievement-tier-badge {
+  font-size: 0.68rem;
+  font-weight: 700;
+  padding: 1px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--border-subtle);
+  color: var(--text-muted);
+  background: var(--surface-sunken);
+}
+
+.achievement-tier-badge.is-unlocked {
+  color: var(--text-main);
+}
+
+.achievement-tier-badge.is-unlocked::before {
+  content: '✓ ';
+}
+
+.achievement-tier-badge.is-unlocked.tier-bronze {
+  border-color: var(--tier-bronze);
+}
+
+.achievement-tier-badge.is-unlocked.tier-silver {
+  border-color: var(--tier-silver);
+}
+
+.achievement-tier-badge.is-unlocked.tier-gold {
+  border-color: var(--accent-amber);
+}
+
+.achievement-progress-text {
+  color: var(--text-secondary);
+  font-weight: 600;
+}
+
+.level-card.current {
+  border-color: var(--accent-blue);
+  box-shadow: 0 0 0 1px var(--accent-blue), 0 0 14px var(--accent-blue-alpha-35);
+}
+
+.level-current-badge {
+  margin-left: 6px;
+  padding: 1px 6px;
+  border-radius: 6px;
+  background: var(--accent-blue);
+  color: var(--text-on-accent);
+  text-transform: none;
+}
+
+/* Status, not a control: no fill, no button shape. */
+.upgrade-maxed-badge {
+  align-self: center;
+  padding: 6px 0;
+  font-size: 0.8rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  color: var(--text-gold);
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 6px;
+}
+
+.modal-btn {
+  background: var(--surface-raised);
+  color: var(--text-main);
+  border: 1px solid var(--border-strong);
+  border-radius: 10px;
+  padding: 9px 16px;
+  min-height: var(--touch-target);
+  font-size: 0.9rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.modal-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.modal-btn.primary:focus-visible,
+.nav-btn.primary:focus-visible {
+  outline-color: var(--text-main);
+}
+
+.modal-btn.primary {
+  background: var(--accent-blue);
+  color: var(--text-on-accent);
+  border-color: var(--accent-blue);
+}
+
+/* Flux perk choice: one tappable card per offered perk. */
+.flux-perk-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.flux-perk-card {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  grid-template-areas:
+    'icon name stack'
+    'icon description description';
+  align-items: center;
+  column-gap: 12px;
+  row-gap: 2px;
+  min-height: calc(var(--touch-target) + 20px);
+  padding: 10px 14px;
+  background: var(--surface-raised);
+  color: var(--text-main);
+  border: 1px solid var(--border-strong);
+  border-radius: 12px;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    border-color 0.15s ease,
+    background-color 0.15s ease;
+}
+
+.flux-perk-card:hover,
+.flux-perk-card:focus-visible {
+  border-color: var(--accent-blue);
+  background: var(--accent-blue-alpha-22);
+}
+
+.flux-perk-icon {
+  grid-area: icon;
+  font-size: 1.8rem;
+  line-height: 1;
+}
+
+.flux-perk-name {
+  grid-area: name;
+  font-size: 1rem;
+  font-weight: 800;
+}
+
+.flux-perk-stack {
+  grid-area: stack;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--text-gold-soft);
+}
+
+.flux-perk-description {
+  grid-area: description;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+/* Active perks: a compact row of icon and stack count. */
+.perk-chips {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 4px;
+}
+
+.perk-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  background: var(--accent-amber-alpha-20);
+  color: var(--text-gold-soft);
+  border: 1px solid var(--accent-amber);
+}
+
+.modal-btn.danger {
+  background: var(--accent-danger-solid);
+  color: var(--text-bright);
+  border-color: var(--accent-danger-solid);
+}
+
+.pause-settings-row {
+  display: flex;
+  justify-content: center;
+  gap: 6px;
+  margin-bottom: 14px;
+  flex-wrap: wrap;
+}
+
+.pause-setting {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  width: var(--pause-setting-width);
+}
+
+.pause-setting-caption {
+  font-size: 0.72rem;
+  line-height: 1.2;
+  color: var(--text-muted);
+}
+
+/* Settings dialog: the install button, or the hint that replaces it. */
+.settings-install-row {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.install-hint {
+  font-size: var(--caption-font-size);
+  color: var(--text-muted);
+  text-align: center;
+  max-width: var(--install-hint-width);
+}

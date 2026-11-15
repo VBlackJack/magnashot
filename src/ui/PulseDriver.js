@@ -44,6 +44,12 @@ export function createPulseDriver({ audioManager, getLead, driverConfig, fadeSec
       const lead = getLead();
       const wantsMusic = Boolean(lead.engine) && lead.isPlaying && audioManager.isMusicActive();
       const state = music.getState();
+      if (audioManager.isPreviewingMusic) {
+        if (!wantsMusic) {
+          return Boolean(state.running);
+        }
+        audioManager.clearMusicPreviewTimer?.();
+      }
       if (!wantsMusic) {
         if (state.running) {
           music.stop(fadeSec);

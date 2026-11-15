@@ -582,6 +582,9 @@ export const uiModalMethods = {
       this.elements.playHubHint?.classList.add('hidden');
       syncFluxSeedValidationError(this.elements);
     }
+    if (modalElement === this.elements.modalSettings) {
+      this.audioManager?.stopMusicPreview?.();
+    }
     if (modalElement === this.elements.modalStats) {
       // Opened over the Daily game over: focus returns to its History button.
       if (this.statsOpener?.isConnected) {

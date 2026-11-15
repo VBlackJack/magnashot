@@ -303,7 +303,7 @@ test('startWeeklyFlux runs the seed of the week, pays the bonus once and locks i
     assert.equal(engine.weeklyWeekKey, weekKey);
     assert.equal(engine.isSharedFluxRun, true);
     assert.equal(storage.getCoins(), coinsBefore + WEEKLY_BONUS);
-    assert.equal(storage.getModeAccess()[GAME_MODES.FLUX].unlocked, true);
+    assert.equal(storage.getModeAccess()[GAME_MODES.FLUX].unlocked, false);
     engine.startWeeklyFlux();
     assert.equal(storage.getCoins(), coinsBefore + WEEKLY_BONUS);
     engine.startWeeklyFlux({ isRestart: true });

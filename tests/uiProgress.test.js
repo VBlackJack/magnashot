@@ -591,7 +591,7 @@ test('stats tabs switch with aria-selected and a roving tabindex', () => {
 });
 
 const html = readFileSync('./index.html', 'utf8');
-const css = readFileSync('./styles/main.css', 'utf8');
+const css = ['main.css', 'modals.css', 'responsive.css', 'versus.css'].map((f) => readFileSync(`./styles/${f}`, 'utf8')).join('\n');
 
 test('the page carries the hub status line, the weekly card, the stats window and the History button', () => {
   assert.match(html, /<button id="btn-daily"[^>]*class="arcade-mode-card">[\s\S]*?<\/button>\s*<button id="btn-weekly"[^>]*class="arcade-mode-card">/);
