@@ -806,11 +806,12 @@
 
 @media (min-width: 900px) {
   .play-hub-layout {
-    grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+    grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr);
     grid-template-areas:
       'campaign challenges'
-      'arcade arcade'
-      'duel duel';
+      'duel challenges'
+      'arcade arcade';
   }
   .play-hub-campaign {
     grid-area: campaign;
@@ -825,6 +826,8 @@
   }
   .play-hub-duel {
     grid-area: duel;
+    align-self: start;
+    --play-hub-columns: 2;
   }
 }
 
@@ -876,6 +879,7 @@
   }
   .play-hub-duel {
     grid-area: duel;
+    align-self: start;
     --play-hub-columns: 2;
   }
 }
@@ -934,6 +938,7 @@
   #levels-detail,
   #levels-chapter-select,
   #play-campaign-meter,
+  .mode-mastery-meter,
   #daily-reward,
   #weekly-reward,
   .puzzle-stage-btn,
@@ -986,6 +991,7 @@
     outline: 3px solid Highlight;
   }
   #play-campaign-meter-fill,
+  .mode-mastery-fill,
   #levels-chapter-meter-fill {
     background: Highlight;
   }
