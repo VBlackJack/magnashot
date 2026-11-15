@@ -160,7 +160,7 @@ Each player picks a device in the lobby, and pressing a join key or a controller
 ## Pulse: music and Resonance
 
 - **Music**: an original procedural score synthesised in the browser, with its own tempo, key and chord progression for each of the sixteen modes (Merge Basin 88 BPM up to Blitz 132). It plays only while a run is being played: opening a menu, pausing, losing or winning fades it out, and nothing plays on the menus. It builds with the pressure on the board: a pad and a bass at rest, then an arpeggio, busier hats and a filter that opens as the Sag meter fills, the cluster nears the danger line or charges close in on your board. It never uses the random streams of a run. The music starts after your first tap or key press (browsers refuse sound before that).
-- **Settings**: the **Sound** button still mutes everything. **Music** switches the score on or off (effects keep playing) and **Music volume** cycles 20, 40, 60, 80 and 100 percent (the Music button alone turns the score off). All are stored locally. Settings are grouped in four sections: **Audio**, **Gameplay**, **Accessibility** and **Controller**.
+- **Settings**: the **Sound** button still mutes everything. **Music** switches the score on or off (effects keep playing), **Music volume** cycles 20, 40, 60, 80 and 100 percent (the Music button alone turns the score off), and **Music preview** plays a short live sample right inside Settings even while playback is paused. All are stored locally. Settings are grouped in four sections: **Audio**, **Gameplay**, **Accessibility** and **Controller**.
 - **Resonance**: a shot released within 5 frames of the beat (about a twelfth of a second, never more than 12 percent of the beat) is **Resonant**. A beat ring around the launcher shrinks onto it every beat; while the window is open the ring turns solid and thick, outside it is thin and dashed, so the cue never depends on colour alone. A Resonant release flashes the launcher, shows "Resonance!" and plays a short arpeggio.
   - **Unlock**: Resonance unlocks after campaign level 5, in every solo mode where Overcharge applies. A hint explains it the first time it applies, and the Codex gets a **Resonance** entry. Polarity Duel boards always have it. **Purist**, **Puzzle**, **Hex Grid** and **Merge Basin** have none. The music plays from the start either way.
   - **Solo modes**: if a Resonant shot's turn makes at least one match or drops at least one sphere, all the Overcharge earned that turn is multiplied by 1.5. A whiff earns nothing extra.
@@ -176,7 +176,7 @@ The codebase follows a modular, zero-dependency ES module architecture with stri
 
 ```text
 ├── configs/                  # Externalized game, physics, ball, obstacle, audio, mode, level, campaign & Flux data
-├── icons/                    # Brand logo mark/banner SVGs and PWA icons (icon.svg, icon-maskable.svg, 192 px / 512 px PNGs)
+├── icons/                    # Brand logo mark/banner SVGs, og-card.png, and PWA icons (192 px / 512 px PNGs)
 ├── locales/                  # Bilingual translation dictionaries (fr.json, en.json)
 ├── scripts/
 │   ├── calibrate-campaign.mjs# Offline campaign level calibration CLI
@@ -280,7 +280,7 @@ The codebase follows a modular, zero-dependency ES module architecture with stri
 │       ├── UISettingsControls.js # UIManager module: settings controls, Share and the Daily countdown
 │       ├── UIStats.js        # UIManager module: My stats dialog (overview, Daily history, copy my stats)
 │       └── WorkshopView.js   # Upgrades, in-run Special Ammo refills & achievement progress bars
-├── styles/main.css           # Responsive layout and design tokens
+├── styles/                   # Modular CSS: base tokens/HUD (main.css), dialogs (modals.css), breakpoints (responsive.css), duel (versus.css)
 ├── eslint.config.js          # ESLint 10 flat configuration with complexity and function-length guardrails
 ├── index.html                # Application shell and static bootstrap error banner
 ├── manifest.webmanifest      # PWA manifest

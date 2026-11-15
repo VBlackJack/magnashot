@@ -4,6 +4,20 @@ All notable changes to **MagnaShot** are documented in this file.
 
 ## [Unreleased]
 
+## [1.30.0] - 2026-11-15
+
+### Added
+- OpenGraph and Twitter Card social preview metadata (`index.html`) paired with the 1200x630 `icons/og-card.png` artwork and Service Worker precaching (`sw.js`).
+- Pulse Audio Preview in Settings (`#btn-music-preview`, `AudioManager.previewMusic`, `PulseDriver` preview handoff while paused, and `configs/audio.json` preview timing), with localized EN/FR labels and unit tests.
+
+### Changed
+- Modularized stylesheets by splitting `styles/main.css` into `styles/main.css`, `styles/modals.css`, `styles/responsive.css`, and `styles/versus.css` in preserved cascade order (`index.html`, `sw.js`, CSS test suites).
+- Decomposed `UIManager.js`, `UIVersus.js`, `EngineTurnResolution.js`, `GameEngine.js`, `PhysicsWorld.js`, and `Renderer.js` into focused helpers and enforced ESLint `complexity <= 15` and `max-lines-per-function <= 80` guardrails across all six modules in `eslint.config.js`.
+- Synced `package-lock.json` and dev dependencies to `eslint@^10.15.0` and `playwright@^1.65.1`.
+
+### Fixed
+- Weekly Flux runs no longer prematurely unlock regular Flux mode across same-week restarts or cross-week `RunSnapshot` restores (`markModeSeen`, `isCurrentWeeklyFluxSeed`, and pre-shot `setFluxRecord` guard).
+
 ## [1.29.2] - 2026-11-15
 
 ### Changed
