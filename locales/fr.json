@@ -165,7 +165,7 @@
         "orbital": "Orbital 360 • Vague {{wave}}",
         "pinball": "Pinball • Étape {{stage}} (⚡ {{cores}})",
         "convoy": "Convoi • Vague {{wave}}",
-        "merge": "Fusion • Calibre {{tier}}",
+        "merge": "Fusion • Calibre {{tier}} • {{merges}} fusions",
         "slingshot": "Fronde • Étape {{stage}} (✦ {{cores}})"
       },
       "shots": {
@@ -254,7 +254,8 @@
         "icon": "⇄",
         "label": "Échanger",
         "shortcut": "Espace",
-        "caption": "Échanger"
+        "caption": "Échanger",
+        "lockedPuzzle": "File fixe en Puzzle"
       },
       "polarity": {
         "icon": "🧲",
@@ -417,6 +418,11 @@
         "stage20": "Déverrouillez le bouclier du rotor à droite, puis décrochez le noyau central."
       },
       "arcadeModes": {
+        "classic": "Puriste : tirs limités par étape, sans boutique ni Atelier. Videz le plateau pour recharger.",
+        "blitz": "Blitz 90s : vagues rapides contre la montre. Enchaînez pour la Fièvre et faites tomber 8+ sphères pour +3s.",
+        "boss_rush": "Boss Rush : brisez les boucliers du Titan par Surcharge et coupez les amarres du rotor central.",
+        "cascade": "Cascade : les sphères tombent sur des plateformes. Videz tout un palier pour points et pièces bonus.",
+        "flux": "Mode Flux : formes générées à l'infini avec un atout au choix toutes les 3 formes vidées.",
         "hex_grid": "Grille Hex : accrochez les sphères aux alvéoles. Éliminez des groupes pour charger des impulsions avant la descente.",
         "orbital": "Orbital 360 : orbitez autour du noyau sans gravité et guidez les chutes vers les arcs collecteurs sans franchir l'anneau.",
         "pinball": "Pinball : allumez tous les Noyaux dorés avant d'épuiser vos tirs. Rattrapez votre bille dans le panier pour +1 tir.",
@@ -534,7 +540,11 @@
         "cleared": "PLATEAU NETTOYÉ !"
       },
       "flux": {
-        "stageCleared": "FORME {{stage}} VIDÉE ! +{{points}} • +{{shots}} tirs"
+        "stageCleared": "FORME {{stage}} VIDÉE ! +{{points}} • +{{shots}} tirs",
+        "salvageShot": {
+          "one": "RÉCUPÉRATION ! +{{shots}} TIR",
+          "other": "RÉCUPÉRATION ! +{{shots}} TIRS"
+        }
       },
       "core": {
         "paint": "PEINTURE x{{count}} !"
@@ -570,11 +580,13 @@
       },
       "orbital": {
         "arcCatch": "ARC COLLECTEUR +{{points}}",
-        "waveCleared": "ORBITE VIDÉE ! +{{points}}"
+        "waveCleared": "ORBITE VIDÉE ! +{{points}}",
+        "polarityPulse": "IMPULSION MAGNÉTIQUE !"
       },
       "pinball": {
         "freeBall": "BILLE BONUS ! +1 • +{{points}}",
-        "stageCleared": "ÉTAPE VIDÉE ! +{{points}}"
+        "stageCleared": "ÉTAPE VIDÉE ! +{{points}}",
+        "comboMilestone": "COMBO x{{combo}} ! +{{charge}}%⚡"
       },
       "convoy": {
         "snapback": "RAPPEL MAGNÉTIQUE ! +{{points}}",
@@ -774,6 +786,14 @@
         "golden": {
           "name": "Doré",
           "description": "Pièces bonus à chaque forme vidée : +{{value}}."
+        },
+        "combo": {
+          "name": "Catalyseur",
+          "description": "Les combos rapportent {{value}}% de points en plus."
+        },
+        "salvage": {
+          "name": "Récupération",
+          "description": "+{{value}} tir sur une avalanche de {{minDrops}}+ sphères."
         }
       }
     },
@@ -797,7 +817,7 @@
       "platform": "Les plateformes soutiennent les sphères par en dessous tout en laissant passer vos tirs !",
       "antimagnet": "Les coussins antimagnétiques repoussent l'amas suspendu sans dévier vos projectiles !",
       "rescueCore": "Libérez tous les Noyaux Captifs (💎) par un groupe ou une avalanche pour remporter aussitôt le niveau !",
-      "puzzle": "Puzzle : file de tir fixe, sans échange, sans boutique ni améliorations de l'Atelier. Lisez le plateau, puis tirez.",
+      "puzzle": "Puzzle : file de tir fixe, sans échange, sans boutique ni améliorations de l'Atelier. 3 étoiles dès le 1er essai.",
       "polarity": {
         "pointer": "Cliquez sur le bouton 🧲 (ou appuyez sur F) pour inverser la charge de votre tir : les sphères l'attirent alors dans l'autre sens, et il courbe de l'autre côté.",
         "touch": "Touchez le bouton 🧲 pour inverser la charge de votre tir : les sphères l'attirent alors dans l'autre sens, et il courbe de l'autre côté.",
@@ -1845,6 +1865,10 @@
         "arcade": "Arcade",
         "duel": "Duel"
       },
+      "arcadeSubhead": {
+        "core": "Classiques & Chrono",
+        "labs": "Labos Physiques"
+      },
       "campaign": {
         "summary": "{{chapter}} • {{stars}} / {{maxStars}} ★",
         "progressAria": "Étoiles du chapitre : {{stars}} sur {{maxStars}}",
@@ -1877,6 +1901,11 @@
           "flux_stages": { "title": "Terminer {{target}} formes en Mode Flux" },
           "boss_rush_waves": { "title": "Vaincre {{target}} vagues Boss en Boss Rush" },
           "campaign_levels": { "title": "Terminer {{target}} niveaux de Campagne" },
+          "classic_stages": { "title": "Terminer {{target}} étapes en Puriste" },
+          "puzzle_clears": { "title": "Résoudre {{target}} niveaux en Puzzle" },
+          "blitz_fevers": { "title": "Déclencher {{target}} fois la Fièvre en Blitz 90s" },
+          "cascade_shelves": { "title": "Vider {{target}} paliers en Cascade" },
+          "versus_wins": { "title": "Gagner {{target}} Duel de polarité contre l'ordinateur" },
           "any_groups": { "title": "Détruire {{target}} groupes magnétiques" },
           "any_avalanches": { "title": "Faire tomber {{target}} sphères en avalanche" },
           "overcharge_bursts": { "title": "Remplir la surcharge {{target}} fois" },
@@ -2328,6 +2357,7 @@
       "neutralised": "Charges neutralisées : {{count}}",
       "pulses": "Impulsions envoyées : {{count}}",
       "tier": "Ordinateur {{tier}}",
+      "coins": "Pièces gagnées : +{{coins}} ⬡",
       "playAgain": "Rejouer",
       "backToMenu": "Retour au menu"
     },

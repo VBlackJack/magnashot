@@ -103,7 +103,8 @@ function buildPerkCard(engine, perkId, position, inputMode) {
   const description = document.createElement('span');
   description.className = 'flux-perk-description';
   description.textContent = t(`gameplay.flux.perks.${perkId}.description`, {
-    value: fluxPerkDisplayValue(spec)
+    value: fluxPerkDisplayValue(spec),
+    ...(spec.minDrops ? { minDrops: formatNumber(spec.minDrops) } : {})
   });
 
   const stack = document.createElement('span');

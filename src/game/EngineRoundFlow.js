@@ -394,6 +394,7 @@ export const engineRoundFlowMethods = {
         const earnedCoins = newlyEarnedStars * (scoring.coinsPerVictoryStar + scoring.firstTimeStarCoinBonus);
         this.storageManager.addCoins(earnedCoins);
         this.flushPendingRunCoins();
+        reportBountyEvent(this, 'puzzle_stage_cleared', 1);
         this.state = GAME_STATES.VICTORY;
         this.persistRunHighScore();
         this.recordRunOutcome('win');

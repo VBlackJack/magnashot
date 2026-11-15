@@ -4177,6 +4177,9 @@ describe('Lot E and audit smoke checks', () => {
 
   test('launches new Arcade modes cleanly on desktop and widens canvas on portrait phone when powerups bar hides', async () => {
     const arcadeCards = [
+      ['#btn-mode-classic', GAME_MODES.CLASSIC],
+      ['#btn-mode-cascade', GAME_MODES.CASCADE],
+      ['#btn-mode-boss-rush', GAME_MODES.BOSS_RUSH],
       ['#btn-mode-hex-grid', GAME_MODES.HEX_GRID],
       ['#btn-mode-pinball', GAME_MODES.PINBALL],
       ['#btn-mode-orbital', GAME_MODES.ORBITAL],
@@ -4275,6 +4278,8 @@ describe('Lot E and audit smoke checks', () => {
     const { context, page, errors } = await openGame(viewport, { initStorage: fullProfileStorage });
     try {
       await openPlayHub(page, viewport);
+      const subheadCount = await page.locator('#modal-play .play-hub-subhead').count();
+      assert.equal(subheadCount, 2, 'Play Hub renders Core & Labs arcade subheadings');
       const bountyCount = await page.locator('#play-bounties-list > li.play-bounty-row > button.play-bounty-btn').count();
       assert.equal(bountyCount, GAME_CONFIG.bounties.dailyCount);
       assert.equal(

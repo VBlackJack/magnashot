@@ -109,14 +109,14 @@ test('every gated mode follows its threshold exactly', () => {
     [GAME_MODES.VERSUS]: 6,
     [GAME_MODES.BLITZ]: 7,
     [GAME_MODES.FLUX]: 8,
-    [GAME_MODES.CASCADE]: 10,
-    [GAME_MODES.BOSS_RUSH]: 12,
-    [GAME_MODES.HEX_GRID]: 13,
-    [GAME_MODES.PINBALL]: 14,
-    [GAME_MODES.ORBITAL]: 15,
-    [GAME_MODES.CONVOY]: 16,
-    [GAME_MODES.MERGE]: 17,
-    [GAME_MODES.SLINGSHOT]: 18
+    [GAME_MODES.CASCADE]: 8,
+    [GAME_MODES.BOSS_RUSH]: 9,
+    [GAME_MODES.HEX_GRID]: 9,
+    [GAME_MODES.PINBALL]: 10,
+    [GAME_MODES.ORBITAL]: 10,
+    [GAME_MODES.CONVOY]: 11,
+    [GAME_MODES.MERGE]: 11,
+    [GAME_MODES.SLINGSHOT]: 12
   });
 });
 
@@ -238,12 +238,12 @@ test('classic: unlocks at campaign level 4, right after Survival, and is announc
   assert.deepEqual(cfg.introduced, {
     [CLASSIC_MODE]: 4,
     [GAME_MODES.VERSUS]: 6,
-    [GAME_MODES.HEX_GRID]: 13,
-    [GAME_MODES.PINBALL]: 14,
-    [GAME_MODES.ORBITAL]: 15,
-    [GAME_MODES.CONVOY]: 16,
-    [GAME_MODES.MERGE]: 17,
-    [GAME_MODES.SLINGSHOT]: 18
+    [GAME_MODES.HEX_GRID]: 9,
+    [GAME_MODES.PINBALL]: 10,
+    [GAME_MODES.ORBITAL]: 10,
+    [GAME_MODES.CONVOY]: 11,
+    [GAME_MODES.MERGE]: 11,
+    [GAME_MODES.SLINGSHOT]: 12
   });
   assert.deepEqual(cfg.recordKeys[CLASSIC_MODE], ['classicHighScore', 'classicBestStage']);
   assert.equal(resolveModeAccess({}, 3, cfg)[CLASSIC_MODE].unlocked, false);

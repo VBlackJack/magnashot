@@ -20,7 +20,8 @@ import {
   OBSTACLE_TYPES,
   SPECIAL_TYPES,
   CLUSTER_MODIFIERS,
-  MATH_CONSTANTS
+  MATH_CONSTANTS,
+  FLUX_PERK_IDS
 } from '../core/Constants.js';
 import { t } from '../core/I18n.js';
 import { DISCOVERY_INTERACTIONS } from './Discovery.js';
@@ -271,6 +272,26 @@ function rewardAvalancheModifiers(engine, detached) {
   }
 }
 
+function applyFluxSalvagePerk(engine, sample, droppedCount) {
+  if (engine.mode !== GAME_MODES.FLUX) {
+    return;
+  }
+  const bonusShots = engine.getFluxPerkBonus(FLUX_PERK_IDS.SALVAGE);
+  const minDrops = engine.fluxConfig?.perks?.catalog?.salvage?.minDrops || 0;
+  if (bonusShots <= 0 || minDrops <= 0 || droppedCount < minDrops) {
+    return;
+  }
+  engine.shotsRemaining += bonusShots;
+  engine.particleSystem.spawnFloatingText(
+    sample.x,
+    sample.y + engine.gameConfig.canvas.floatingTextOffsetY,
+    t(bonusShots === 1 ? 'gameplay.feedback.flux.salvageShot.one' : 'gameplay.feedback.flux.salvageShot.other', {
+      shots: bonusShots
+    }),
+    engine.gameConfig.theme.overchargePopupColor
+  );
+}
+
 function grantBlitzAvalancheTimeBonus(engine, sample, droppedCount) {
   const blitzCfg = engine.gameConfig.blitz;
   const bonusStep = blitzCfg.avalancheTimeBonusFrames;
@@ -370,6 +391,7 @@ function resolveBlitzPostTurn(engine, madeProgress) {
     engine.blitzBonusFramesEarned = earned + grantFrames;
   }
   engine.audioManager?.playEffect('blitzTimeBonus');
+  reportBountyEvent(engine, 'blitz_fever_triggered', 1);
   const launcherSpec = engine.getLauncherSpec();
   engine.particleSystem.spawnFloatingText(
     launcherSpec.x,
@@ -406,6 +428,8 @@ function resolveCascadePostTurn(engine, wasFrozen) {
     if (shelfBonus > 0) {
       engine.addScore(shelfBonus);
     }
+    engine.awardRunCoins((cascadeCfg.shelfClearCoinBonus || 0) * clearedShelves);
+    reportBountyEvent(engine, 'cascade_shelf_cleared', clearedShelves);
     engine.cascadeTurnsUntilDrop = Math.min(
       cascadeCfg.shotsBeforeDrop + 1,
       engine.cascadeTurnsUntilDrop + clearedShelves
@@ -477,7 +501,8 @@ export const engineTurnResolutionMethods = {
     this.maxComboInRound = Math.max(this.maxComboInRound, this.combo);
 
     const basePoints = scoring.baseMatchPoints + (cluster.length - minMatch) * scoring.extraBallMultiplier;
-    const points = basePoints * destroyedCount * this.combo;
+    const comboBoost = this.combo > 1 ? 1 + this.getFluxPerkBonus(FLUX_PERK_IDS.COMBO) : 1;
+    const points = Math.round(basePoints * destroyedCount * this.combo * comboBoost);
     this.addScore(points);
     this.addOvercharge(destroyedCount * scoring.overchargePerMatchedBall);
 
@@ -875,6 +900,7 @@ export const engineTurnResolutionMethods = {
       if (this.mode === GAME_MODES.BLITZ) {
         grantBlitzAvalancheTimeBonus(this, sample, detached.length);
       }
+      applyFluxSalvagePerk(this, sample, detached.length);
       if (this.isSurvivalMode() && this.random() < scoring.specialDropChanceEndless) {
         this.grantRandomSpecialBall();
       }

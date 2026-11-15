@@ -319,6 +319,8 @@ function renderDailyBounties(listEl, state) {
 }
 
 const DEFAULT_MASTERY = Object.freeze({
+  campaignStars: 30,
+  dailyStreak: 3,
   endlessScore: 5000,
   classicStage: 5,
   blitzScore: 4000,
@@ -336,15 +338,71 @@ const DEFAULT_MASTERY = Object.freeze({
 const MASTERED_CLASS = 'is-mastered';
 const MASTERED_BADGE_CLASS = 'mode-mastered-badge';
 const MASTERED_STAR_CLASS = 'mode-mastered-star';
+const MASTERY_METER_CLASS = 'mode-mastery-meter';
+const MASTERY_FILL_CLASS = 'mode-mastery-fill';
+
+const MODE_MASTERY_SPECS = Object.freeze([
+  [GAME_MODES.CAMPAIGN, (s) => s.getTotalStars?.() || 0, 'campaignStars'],
+  [GAME_MODES.DAILY, (s) => s.getDailyStreak?.() || 0, 'dailyStreak'],
+  [GAME_MODES.ENDLESS, (s) => s.getEndlessHighScore?.() || 0, 'endlessScore'],
+  [GAME_MODES.CLASSIC, (s) => s.getClassicBestStage?.() || 0, 'classicStage'],
+  [GAME_MODES.BLITZ, (s) => s.getBlitzHighScore?.() || 0, 'blitzScore'],
+  [GAME_MODES.FLUX, (s) => s.getFluxBestStage?.() || 0, 'fluxStage'],
+  [GAME_MODES.CASCADE, (s) => s.getCascadeHighScore?.() || 0, 'cascadeScore'],
+  [GAME_MODES.BOSS_RUSH, (s) => s.getBossRushBestWave?.() || 0, 'bossRushWave'],
+  [GAME_MODES.HEX_GRID, (s) => s.getHexGridBestWave?.() || 0, 'hexGridWave'],
+  [GAME_MODES.PINBALL, (s) => s.getPinballBestStage?.() || 0, 'pinballStage'],
+  [GAME_MODES.ORBITAL, (s) => s.getOrbitalBestWave?.() || 0, 'orbitalWave'],
+  [GAME_MODES.CONVOY, (s) => s.getConvoyBestWave?.() || 0, 'convoyWave'],
+  [GAME_MODES.MERGE, (s) => s.getMergeBestTier?.() || 0, 'mergeTier'],
+  [GAME_MODES.SLINGSHOT, (s) => s.getSlingshotBestStage?.() || 0, 'slingshotStage']
+]);
+
+function buildMasteryEntry(current, target) {
+  const safeTarget = Math.max(0, Number(target) || 0);
+  const safeCurrent = Math.max(0, Number(current) || 0);
+  if (safeTarget <= 0) {
+    return { current: safeCurrent, target: 0, ratio: 0, mastered: false };
+  }
+  return {
+    current: safeCurrent,
+    target: safeTarget,
+    ratio: Math.min(1, safeCurrent / safeTarget),
+    mastered: safeCurrent >= safeTarget
+  };
+}
+
+function syncMasteryMeter(card, showMeter, ratio) {
+  let meter = card.querySelector(`.${MASTERY_METER_CLASS}`);
+  if (!showMeter) {
+    meter?.classList?.add(HIDDEN_CLASS);
+    return;
+  }
+  if (!meter) {
+    meter = document.createElement('span');
+    meter.className = MASTERY_METER_CLASS;
+    meter.setAttribute('aria-hidden', 'true');
+    const fill = document.createElement('span');
+    fill.className = MASTERY_FILL_CLASS;
+    meter.append(fill);
+    card.append(meter);
+  }
+  meter.classList.remove(HIDDEN_CLASS);
+  const fill = meter.querySelector(`.${MASTERY_FILL_CLASS}`);
+  if (fill) {
+    fill.style.width = `${Math.round(ratio * FULL_PERCENT)}%`;
+  }
+}
 
 /**
- * Attaches or updates an accessible Mastery badge inside a Play Hub mode card.
- * @param {HTMLElement|object|null|undefined} card - Mode button element.
+ * Attaches or updates an accessible Mastery badge and optional progress meter inside a Play Hub card.
+ * @param {HTMLElement|object|null|undefined} card - Mode button or section element.
  * @param {boolean} mastered - Whether the mode has reached mastery.
  * @param {string} starSymbol - Star symbol from `gameConfig.theme.starFilledSymbol`.
  * @param {string} srLabel - Localized screen-reader label for mastery.
+ * @param {{current: number, target: number, ratio: number, showMeter?: boolean}|null} [progress] - Progress details.
  */
-function syncMasteredBadge(card, mastered, starSymbol, srLabel) {
+function syncMasteredBadge(card, mastered, starSymbol, srLabel, progress = null) {
   if (!card) {
     return;
   }
@@ -352,6 +410,9 @@ function syncMasteredBadge(card, mastered, starSymbol, srLabel) {
   if (typeof document === 'undefined' || typeof card.querySelector !== 'function' || typeof card.append !== 'function') {
     return;
   }
+  const hasProgressBar = Boolean(!mastered && progress?.showMeter !== false && progress?.current > 0 && progress?.ratio > 0 && progress?.ratio < 1);
+  syncMasteryMeter(card, hasProgressBar, progress?.ratio || 0);
+
   let badge = card.querySelector(`.${MASTERED_BADGE_CLASS}`);
   if (!mastered) {
     badge?.classList?.add(HIDDEN_CLASS);
@@ -376,6 +437,34 @@ function syncMasteredBadge(card, mastered, starSymbol, srLabel) {
 }
 
 /**
+ * Computes progress toward each Play Hub mode's mastery milestone.
+ * @param {object} storage - StorageManager or compatible mock.
+ * @param {object} [gameConfig] - Game config carrying `playHub.mastery`, `puzzles`, `scoring`.
+ * @returns {Record<string, {current: number, target: number, ratio: number, mastered: boolean}>}
+ */
+export function resolveModeMasteryProgress(storage, gameConfig) {
+  if (!storage) {
+    return {};
+  }
+  const m = { ...DEFAULT_MASTERY, ...(gameConfig?.playHub?.mastery || {}) };
+  const totalPuzzles = Math.max(1, gameConfig?.puzzles?.length || 1);
+  const maxPuzzleStars = gameConfig?.scoring?.maxStars || 0;
+  const versusRecords = storage.getVersusRecords?.() || storage.getVersusStats?.() || {};
+  const result = {};
+  for (const [mode, readValue, targetKey] of MODE_MASTERY_SPECS) {
+    result[mode] = buildMasteryEntry(readValue(storage), m[targetKey]);
+  }
+  result[GAME_MODES.PUZZLE] = maxPuzzleStars > 0
+    ? buildMasteryEntry(storage.getPuzzleTotalStars?.() || 0, totalPuzzles * maxPuzzleStars)
+    : buildMasteryEntry(0, 0);
+  result[GAME_MODES.VERSUS] = buildMasteryEntry(
+    versusRecords.hard?.w ?? versusRecords.hard?.won ?? 0,
+    m.versusHardWins
+  );
+  return result;
+}
+
+/**
  * Computes which Play Hub mode cards have reached their configured mastery milestone.
  * Pure helper; missing storage getters evaluate to false.
  * @param {object} storage - StorageManager or compatible mock.
@@ -383,30 +472,12 @@ function syncMasteredBadge(card, mastered, starSymbol, srLabel) {
  * @returns {Record<string, boolean>} Map of mode key to mastered flag.
  */
 export function resolveModeMastery(storage, gameConfig) {
-  if (!storage) {
-    return {};
+  const progress = resolveModeMasteryProgress(storage, gameConfig);
+  const mastered = {};
+  for (const [mode, entry] of Object.entries(progress)) {
+    mastered[mode] = entry.mastered;
   }
-  const m = { ...DEFAULT_MASTERY, ...(gameConfig?.playHub?.mastery || {}) };
-  const totalPuzzles = Math.max(1, gameConfig?.puzzles?.length || 1);
-  const maxPuzzleStars = gameConfig?.scoring?.maxStars || 0;
-  const bestMergeTier = storage.getMergeBestTier?.() || 0;
-  const versusRecords = storage.getVersusRecords?.() || storage.getVersusStats?.() || {};
-  return {
-    [GAME_MODES.ENDLESS]: (storage.getEndlessHighScore?.() || 0) >= m.endlessScore,
-    [GAME_MODES.CLASSIC]: (storage.getClassicBestStage?.() || 0) >= m.classicStage,
-    [GAME_MODES.PUZZLE]: maxPuzzleStars > 0 && (storage.getPuzzleTotalStars?.() || 0) >= totalPuzzles * maxPuzzleStars,
-    [GAME_MODES.BLITZ]: (storage.getBlitzHighScore?.() || 0) >= m.blitzScore,
-    [GAME_MODES.FLUX]: (storage.getFluxBestStage?.() || 0) >= m.fluxStage,
-    [GAME_MODES.CASCADE]: (storage.getCascadeHighScore?.() || 0) >= m.cascadeScore,
-    [GAME_MODES.BOSS_RUSH]: (storage.getBossRushBestWave?.() || 0) >= m.bossRushWave,
-    [GAME_MODES.HEX_GRID]: (storage.getHexGridBestWave?.() || 0) >= m.hexGridWave,
-    [GAME_MODES.PINBALL]: (storage.getPinballBestStage?.() || 0) >= m.pinballStage,
-    [GAME_MODES.ORBITAL]: (storage.getOrbitalBestWave?.() || 0) >= m.orbitalWave,
-    [GAME_MODES.CONVOY]: (storage.getConvoyBestWave?.() || 0) >= m.convoyWave,
-    [GAME_MODES.MERGE]: bestMergeTier >= m.mergeTier,
-    [GAME_MODES.SLINGSHOT]: (storage.getSlingshotBestStage?.() || 0) >= m.slingshotStage,
-    [GAME_MODES.VERSUS]: (versusRecords.hard?.w ?? versusRecords.hard?.won ?? 0) >= m.versusHardWins
-  };
+  return mastered;
 }
 
 /** Methods installed on UIManager (see installMethods). `this` is the UIManager. */
@@ -548,14 +619,22 @@ export const uiPlayHubMethods = {
     writeRewardChip(els.dailyReward, this.describeDailyRewardChip());
     writeRewardChip(els.weeklyReward, this.describeWeeklyRewardChip());
     renderDailyBounties(els.playBountiesList, storage.getDailyBountiesState?.());
-    const mastery = resolveModeMastery(storage, this.gameConfig);
+    const mastery = resolveModeMasteryProgress(storage, this.gameConfig);
     const starSymbol = this.gameConfig?.theme?.starFilledSymbol || '';
     const masteredLabel = t('modals.levelSelect.arcade.masteredBadge');
     for (const [mode, spec] of Object.entries(ARCADE_CARD_SPECS)) {
       if (Object.hasOwn(mastery, mode)) {
-        syncMasteredBadge(els[spec.card], Boolean(mastery[mode]), starSymbol, masteredLabel);
+        syncMasteredBadge(els[spec.card], mastery[mode].mastered, starSymbol, masteredLabel, mastery[mode]);
       }
     }
+    syncMasteredBadge(els.btnDaily, Boolean(mastery[GAME_MODES.DAILY]?.mastered), starSymbol, masteredLabel, mastery[GAME_MODES.DAILY]);
+    syncMasteredBadge(
+      els.playCampaignSection,
+      Boolean(mastery[GAME_MODES.CAMPAIGN]?.mastered),
+      starSymbol,
+      masteredLabel,
+      mastery[GAME_MODES.CAMPAIGN] ? { ...mastery[GAME_MODES.CAMPAIGN], showMeter: false } : null
+    );
   },
 
   /** What the primary Campaign button does right now (see resolveContinueTarget). */

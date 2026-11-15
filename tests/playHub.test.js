@@ -27,6 +27,7 @@ import {
   resolveContinueTarget,
   resolveInitialFocusKey,
   resolveModeMastery,
+  resolveModeMasteryProgress,
   resolveVersusLocalEntry,
   sumChapterStars,
   uiPlayHubMethods
@@ -403,4 +404,110 @@ test('resolveModeMastery reads StorageManager.getVersusRecords().hard.w for Pola
   assert.equal(unmastered[GAME_MODES.VERSUS], false);
   const mastered = resolveModeMastery({ getVersusRecords: () => ({ easy: { w: 0, l: 0 }, normal: { w: 0, l: 0 }, hard: { w: 1, l: 0 } }) }, cfg);
   assert.equal(mastered[GAME_MODES.VERSUS], true);
+});
+
+test('resolveModeMastery tracks campaign stars and daily streak thresholds', () => {
+  const cfg = { playHub: { mastery: { campaignStars: 30, dailyStreak: 3 } } };
+  const partial = resolveModeMastery(
+    { getTotalStars: () => 29, getDailyStreak: () => 2 },
+    cfg
+  );
+  assert.equal(partial[GAME_MODES.CAMPAIGN], false);
+  assert.equal(partial[GAME_MODES.DAILY], false);
+
+  const complete = resolveModeMastery(
+    { getTotalStars: () => 30, getDailyStreak: () => 3 },
+    cfg
+  );
+  assert.equal(complete[GAME_MODES.CAMPAIGN], true);
+  assert.equal(complete[GAME_MODES.DAILY], true);
+});
+
+test('resolveModeMasteryProgress computes clamped ratios and refreshPlayHubRecords renders progress meters', () => {
+  const cfg = {
+    puzzles: new Array(10).fill({}),
+    scoring: { maxStars: 3 },
+    playHub: { mastery: { campaignStars: 30, dailyStreak: 3, endlessScore: 5000, pinballStage: 4 } }
+  };
+  const progress = resolveModeMasteryProgress(
+    {
+      getTotalStars: () => 15,
+      getDailyStreak: () => 6,
+      getEndlessHighScore: () => 2500,
+      getPinballBestStage: () => 0,
+      getPuzzleTotalStars: () => 18
+    },
+    cfg
+  );
+  assert.deepEqual(progress[GAME_MODES.CAMPAIGN], { current: 15, target: 30, ratio: 0.5, mastered: false });
+  assert.deepEqual(progress[GAME_MODES.DAILY], { current: 6, target: 3, ratio: 1, mastered: true });
+  assert.deepEqual(progress[GAME_MODES.ENDLESS], { current: 2500, target: 5000, ratio: 0.5, mastered: false });
+  assert.deepEqual(progress[GAME_MODES.PINBALL], { current: 0, target: 4, ratio: 0, mastered: false });
+  assert.deepEqual(progress[GAME_MODES.PUZZLE], { current: 18, target: 30, ratio: 0.6, mastered: false });
+
+  // DOM meter renders on partial progress and hides once mastered.
+  const createNode = () => {
+    const classes = new Set();
+    const children = [];
+    const attrs = new Map();
+    const node = {
+      className: '',
+      textContent: '',
+      style: {},
+      classList: {
+        contains: (c) => classes.has(c) || node.className.split(/\s+/).includes(c),
+        add: (c) => classes.add(c),
+        remove: (c) => classes.delete(c),
+        toggle: (c, force) => {
+          const on = force === undefined ? !classes.has(c) : Boolean(force);
+          if (on) { classes.add(c); } else { classes.delete(c); }
+          return on;
+        }
+      },
+      setAttribute: (k, v) => attrs.set(k, String(v)),
+      append: (...items) => children.push(...items),
+      querySelector: (sel) => {
+        const cls = sel.replace(/^\./, '');
+        for (const ch of children) {
+          if (ch.className.split(/\s+/).includes(cls)) {
+            return ch;
+          }
+          const nested = ch.querySelector?.(sel);
+          if (nested) {
+            return nested;
+          }
+        }
+        return null;
+      }
+    };
+    return node;
+  };
+
+  const prevDoc = globalThis.document;
+  globalThis.document = { createElement: () => createNode() };
+  try {
+    const endlessCard = createNode();
+    const ctx = {
+      gameConfig: cfg,
+      storageManager: {
+        getEndlessHighScore: () => 2500,
+        getTotalStars: () => 15,
+        getDailyStreak: () => 1
+      },
+      elements: { btnEndless: endlessCard },
+      describeDailyRewardChip: () => ({ text: '', ariaLabel: '' }),
+      describeWeeklyRewardChip: () => ({ text: '', ariaLabel: '' })
+    };
+    uiPlayHubMethods.refreshPlayHubRecords.call(ctx);
+    const meter = endlessCard.querySelector('.mode-mastery-meter');
+    assert.ok(meter && !meter.classList.contains('hidden'), 'partial progress shows mastery meter');
+    assert.equal(meter.querySelector('.mode-mastery-fill')?.style.width, '50%');
+
+    ctx.storageManager.getEndlessHighScore = () => 6000;
+    uiPlayHubMethods.refreshPlayHubRecords.call(ctx);
+    assert.equal(endlessCard.classList.contains('is-mastered'), true);
+    assert.equal(meter.classList.contains('hidden'), true, 'meter hides once mastered');
+  } finally {
+    globalThis.document = prevDoc;
+  }
 });

@@ -238,3 +238,15 @@ export const SEPARATION_FALLBACK_AXIS = Object.freeze({
   X: 1,
   Y: 0
 });
+
+/** Flux perk ids; specs live in configs/flux.json. */
+export const FLUX_PERK_IDS = Object.freeze({
+  RESERVE: 'reserve',
+  REFILL: 'refill',
+  BLAST: 'blast',
+  OVERCHARGE: 'overcharge',
+  ARSENAL: 'arsenal',
+  GOLDEN: 'golden',
+  COMBO: 'combo',
+  SALVAGE: 'salvage'
+});

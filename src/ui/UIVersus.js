@@ -73,6 +73,27 @@ const TIER_RECORD_CLASS = 'versus-tier-record';
 const VERSUS_KINDS = Object.freeze({ CPU: 'cpu', LOCAL: 'local' });
 const FIRST_PLAYER_NUMBER = 1;
 
+function awardVersusCpuWinCoins(storageManager, gameConfig, tier) {
+  const byTier = gameConfig?.versus?.rewards?.winCoinsByTier || {};
+  const coins = Math.max(0, Math.floor(Number(byTier[tier]) || 0));
+  if (coins > 0) {
+    storageManager?.addCoins?.(coins);
+  }
+  storageManager?.recordBountyProgress?.('versus_cpu_won', 1);
+  return coins;
+}
+
+function syncVersusCoinsLine(coinsEl, result) {
+  if (!coinsEl) {
+    return;
+  }
+  const showCoins = result?.kind !== VERSUS_KINDS.LOCAL && Boolean(result?.won) && (result?.earnedCoins || 0) > 0;
+  coinsEl.classList?.toggle(HIDDEN_CLASS, !showCoins);
+  if (showCoins) {
+    setTextIfChanged(coinsEl, t('versus.result.coins', { coins: formatNumber(result.earnedCoins) }));
+  }
+}
+
 /** Phases of the screen, as the match announcements report them. */
 const SCREEN_PHASES = Object.freeze({
   PLAYING: 'playing',
@@ -1234,11 +1255,13 @@ export const uiVersusMethods = {
     }
     const won = event.type === MATCH_EVENTS.MATCH_WON;
     this.storageManager.recordVersusResult?.(v.tier, won);
+    const earnedCoins = won ? awardVersusCpuWinCoins(this.storageManager, this.gameConfig, v.tier) : 0;
     this.recordVersusOutcome(won ? OUTCOME_WIN : OUTCOME_LOSS);
     const state = v.controller.getState();
     const playerStats = state.boards[PLAYER_BOARD].matchStats;
     v.result = {
       won,
+      earnedCoins,
       tier: v.tier,
       wins: [event.wins[PLAYER_BOARD], event.wins[CPU_BOARD]],
       neutralised: playerStats.neutralised,
@@ -1292,6 +1315,7 @@ export const uiVersusMethods = {
     els.versusResultPulsesB?.classList.toggle(HIDDEN_CLASS, !isLocal);
     els.btnVersusShare?.classList.toggle(HIDDEN_CLASS, isLocal);
     els.btnVersusChangePlayers?.classList.toggle(HIDDEN_CLASS, !isLocal);
+    syncVersusCoinsLine(els.versusResultCoins, result);
     if (isLocal) {
       const [first, second] = result.players;
       setTextIfChanged(els.versusResultTitle, t('versus.local.result.title', { n: result.winner + FIRST_PLAYER_NUMBER }));

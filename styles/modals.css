@@ -609,6 +609,38 @@
   align-items: stretch;
 }
 
+.play-hub-subhead {
+  grid-column: 1 / -1;
+  margin: 4px 0 0;
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+}
+
+#modal-play .play-hub-campaign {
+  position: relative;
+}
+
+#modal-play .play-hub-campaign.is-mastered {
+  border-color: var(--accent-amber);
+  box-shadow: 0 0 8px var(--accent-amber-alpha-20);
+}
+
+#modal-play .play-hub-campaign .mode-mastered-badge {
+  position: absolute;
+  top: 8px;
+  right: 12px;
+  font-size: 0.72rem;
+  color: var(--accent-amber);
+  pointer-events: none;
+}
+
+#modal-play .play-hub-campaign .mode-mastered-badge.hidden {
+  display: none;
+}
+
 /* A card and its disclosure toggle share one grid cell. */
 .play-hub-cell {
   display: flex;
@@ -675,6 +707,31 @@
 
 #modal-play .arcade-mode-card.is-locked .mode-mastered-badge,
 #modal-play .arcade-mode-card .mode-mastered-badge.hidden {
+  display: none;
+}
+
+#modal-play .arcade-mode-card .mode-mastery-meter {
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  bottom: 2px;
+  height: 2px;
+  border-radius: 999px;
+  background: var(--border-subtle);
+  overflow: hidden;
+  pointer-events: none;
+}
+
+#modal-play .arcade-mode-card .mode-mastery-fill {
+  display: block;
+  height: 100%;
+  background: var(--accent-amber);
+  transition: width 0.2s ease;
+}
+
+#modal-play .arcade-mode-card.is-locked .mode-mastery-meter,
+#modal-play .arcade-mode-card.is-mastered .mode-mastery-meter,
+#modal-play .arcade-mode-card .mode-mastery-meter.hidden {
   display: none;
 }
 

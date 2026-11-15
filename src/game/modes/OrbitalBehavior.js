@@ -366,6 +366,44 @@ export class OrbitalBehavior extends ModeBehavior {
     return false;
   }
 
+  /**
+   * Flips airborne shot polarity and kicks drifting fragments radially + the core rotor spin,
+   * making the Polarity toggle an active steering tool in Orbital 360.
+   * @param {object} engine - GameEngine instance.
+   */
+  onPolarityFlipped(engine) {
+    if (!engine.isRunPlaying?.() || !engine.modeState) {
+      return;
+    }
+    const cfg = engine.modesConfig.orbital;
+    const projectile = engine.physicsWorld?.projectile;
+    if (projectile) {
+      projectile.isPolarityFlipped = engine.isPolarityFlipped;
+    }
+    const sign = engine.isPolarityFlipped ? -1 : 1;
+    const nudgeSpeed = cfg.polarityNudgeSpeed || 0;
+    const drifting = engine.modeState.driftingBalls || [];
+    for (const d of drifting) {
+      const dx = d.x - cfg.coreX;
+      const dy = d.y - cfg.coreY;
+      const dist = Math.hypot(dx, dy) || 1;
+      d.vx += (dx / dist) * nudgeSpeed * sign;
+      d.vy += (dy / dist) * nudgeSpeed * sign;
+    }
+    const corePivot = this.getCorePivot(engine);
+    if (corePivot && cfg.polaritySpinKick) {
+      corePivot.applyTorque(sign * cfg.polaritySpinKick, cfg.maxAngularVelocity);
+    }
+    const theme = engine.gameConfig.theme;
+    engine.particleSystem?.spawnShockwave?.(cfg.coreX, cfg.coreY, theme.overchargePopupColor, cfg.ringSpacing * 2);
+    engine.particleSystem?.spawnFloatingText?.(
+      cfg.coreX,
+      cfg.coreY + engine.gameConfig.canvas.floatingTextOffsetY,
+      t('gameplay.feedback.orbital.polarityPulse'),
+      theme.overchargePopupColor
+    );
+  }
+
   onAfterPhysicsStep(engine, dtSec) {
     if (!engine.isRunPlaying() || !engine.modeState) {
       return;
@@ -461,6 +499,7 @@ export class OrbitalBehavior extends ModeBehavior {
     if (engine.physicsWorld.balls.length === 0) {
       const bonus = cfg.waveClearBonus * engine.waveCount;
       engine.addScore(bonus);
+      engine.awardRunCoins(cfg.waveClearCoinBonus || 0);
       engine.waveCount++;
       const paletteSize = this.getPaletteCountForWave(
         engine.waveCount,
@@ -482,6 +521,7 @@ export class OrbitalBehavior extends ModeBehavior {
       );
       engine.unlockAchievementTiers('orbitalWaves', engine.waveCount);
       engine.persistRunHighScore();
+      engine.saveRunSnapshot({ force: true });
       return;
     }
 

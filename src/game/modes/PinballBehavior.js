@@ -43,6 +43,62 @@ const CORE_PULSE_AMP_ALPHA = 0.3;
 const STALL_NUDGE_VY = 0.35;
 const MAX_PLACEMENT_ATTEMPTS = 80;
 const BUMPER_Y_FRACTION = 0.52;
+const PEG_LAYOUT_PATTERN_COUNT = 3;
+const DIAMOND_ROW_COUNTS = Object.freeze([3, 5, 7, 5, 3]);
+const CHANNEL_COLS = 5;
+const CHANNEL_ROWS = 5;
+
+function canPlacePegAt(cand, cfg, world, positions, minX, maxX) {
+  if (cand.x < minX || cand.x > maxX || cand.y < cfg.pegFieldTopY || cand.y > cfg.pegFieldBottomY) {
+    return false;
+  }
+  for (const obs of world.obstacles) {
+    if (Math.hypot(cand.x - obs.x, cand.y - obs.y) < obs.radius + cfg.pegRadius + 22) {
+      return false;
+    }
+  }
+  for (const existing of positions) {
+    if (Math.hypot(cand.x - existing.x, cand.y - existing.y) < cfg.pegMinSpacing) {
+      return false;
+    }
+  }
+  return true;
+}
+
+function collectPatternPegs(patternIndex, totalPegs, cfg, world, width, positions) {
+  const minX = cfg.pegFieldMarginX;
+  const maxX = width - cfg.pegFieldMarginX;
+  const centerX = width * MATH_CONSTANTS.HALF;
+  const spanX = maxX - minX;
+  const spanY = cfg.pegFieldBottomY - cfg.pegFieldTopY;
+  const tryPush = (cand) => {
+    if (positions.length < totalPegs && canPlacePegAt(cand, cfg, world, positions, minX, maxX)) {
+      positions.push(cand);
+    }
+  };
+  if (patternIndex === 1) {
+    const stepY = spanY / Math.max(1, DIAMOND_ROW_COUNTS.length - 1);
+    const maxCols = Math.max(...DIAMOND_ROW_COUNTS);
+    const colSpacing = Math.max(cfg.pegMinSpacing, spanX / Math.max(1, maxCols - 1));
+    for (let r = 0; r < DIAMOND_ROW_COUNTS.length; r++) {
+      const count = DIAMOND_ROW_COUNTS[r];
+      const py = cfg.pegFieldTopY + r * stepY;
+      const half = (count - 1) * MATH_CONSTANTS.HALF;
+      for (let c = 0; c < count; c++) {
+        tryPush({ x: centerX + (c - half) * colSpacing, y: py });
+      }
+    }
+  } else if (patternIndex === 2) {
+    const stepX = spanX / Math.max(1, CHANNEL_COLS - 1);
+    const stepY = spanY / Math.max(1, CHANNEL_ROWS - 1);
+    for (let c = 0; c < CHANNEL_COLS; c++) {
+      const stagger = (c % 2) * stepY * 0.45;
+      for (let r = 0; r < CHANNEL_ROWS; r++) {
+        tryPush({ x: minX + c * stepX, y: cfg.pegFieldTopY + r * stepY + stagger });
+      }
+    }
+  }
+}
 const BUMPER_SPREAD_X = 118;
 
 const PINBALL_CHROME = Object.freeze({
@@ -172,6 +228,10 @@ export class PinballBehavior extends ModeBehavior {
     const maxX = width - cfg.pegFieldMarginX;
     const centerX = width * MATH_CONSTANTS.HALF;
     const positions = [];
+    const patternIndex = (stage - 1) % PEG_LAYOUT_PATTERN_COUNT;
+    if (patternIndex > 0) {
+      collectPatternPegs(patternIndex, totalPegs, cfg, world, width, positions);
+    }
 
     // Place mirrored pairs + center column pegs so every Pinball stage reads cleanly like an arcade table.
     let attempts = 0;
@@ -188,22 +248,7 @@ export class PinballBehavior extends ModeBehavior {
         { x: width - px, y: py }
       ];
 
-      const valid = candidates.every((cand) => {
-        if (cand.x < minX || cand.x > maxX) {
-          return false;
-        }
-        for (const obs of world.obstacles) {
-          if (Math.hypot(cand.x - obs.x, cand.y - obs.y) < obs.radius + cfg.pegRadius + 22) {
-            return false;
-          }
-        }
-        for (const existing of positions) {
-          if (Math.hypot(cand.x - existing.x, cand.y - existing.y) < cfg.pegMinSpacing) {
-            return false;
-          }
-        }
-        return true;
-      });
+      const valid = candidates.every((cand) => canPlacePegAt(cand, cfg, world, positions, minX, maxX));
 
       if (valid) {
         for (const cand of candidates) {
@@ -311,6 +356,18 @@ export class PinballBehavior extends ModeBehavior {
     const pts = basePts * Math.max(1, engine.combo);
     engine.addScore(pts);
     engine.addOvercharge(scoring.overchargePerMatchedBall);
+    if (cfg.comboMilestoneEvery > 0 && engine.combo >= cfg.comboMilestoneEvery && engine.combo % cfg.comboMilestoneEvery === 0) {
+      const charge = cfg.comboOverchargeBonus || 0;
+      if (charge > 0) {
+        engine.addOvercharge(charge);
+      }
+      engine.particleSystem.spawnFloatingText(
+        peg.x,
+        peg.y + engine.gameConfig.canvas.floatingTextOffsetY,
+        t('gameplay.feedback.pinball.comboMilestone', { combo: engine.combo, charge }),
+        engine.gameConfig.theme.overchargePopupColor
+      );
+    }
     engine.audioManager.playEffect('match', engine.combo);
     if (peg.pinballCore) {
       reportBountyEvent(engine, 'pinball_core_lit', 1);
@@ -552,6 +609,7 @@ export class PinballBehavior extends ModeBehavior {
 
     const bonus = cfg.stageClearBonusBase * clearedStage + engine.shotsRemaining * cfg.stageClearShotBonus;
     engine.addScore(bonus);
+    engine.awardRunCoins(cfg.stageClearCoinBonus || 0);
     engine.audioManager.playEffect('victory');
     engine.particleSystem.spawnFloatingText(
       engine.gameConfig.canvas.logicalWidth * MATH_CONSTANTS.HALF,

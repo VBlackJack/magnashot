@@ -165,7 +165,7 @@
         "orbital": "Orbital 360 • Wave {{wave}}",
         "pinball": "Pinball • Stage {{stage}} (⚡ {{cores}})",
         "convoy": "Convoy • Wave {{wave}}",
-        "merge": "Merge Basin • Calibre {{tier}}",
+        "merge": "Merge Basin • Calibre {{tier}} • {{merges}} merges",
         "slingshot": "Slingshot • Stage {{stage}} (✦ {{cores}})"
       },
       "shots": {
@@ -254,7 +254,8 @@
         "icon": "⇄",
         "label": "Swap",
         "shortcut": "Space",
-        "caption": "Swap"
+        "caption": "Swap",
+        "lockedPuzzle": "Queue locked in Puzzle"
       },
       "polarity": {
         "icon": "🧲",
@@ -417,6 +418,11 @@
         "stage20": "Unlock the rotor shield on the right first, then drop the hanging core."
       },
       "arcadeModes": {
+        "classic": "Purist: fixed shots per stage, no upgrades or shop. Clear every sphere for bonus shots.",
+        "blitz": "Blitz 90s: rapid waves against the clock. Build streaks for Fever and drop 8+ spheres for +3s.",
+        "boss_rush": "Boss Rush: crack Titan shields on the central rotor with Overcharge bursts and clear its moorings.",
+        "cascade": "Cascade: spheres fall onto one-way shelves. Empty a whole shelf for bonus points and coins.",
+        "flux": "Flux Mode: infinite seeded shapes with a choice of perk after every 3rd clear.",
         "hex_grid": "Hex Grid: snap spheres onto the anchored hex lattice. Clear connected cells to trigger magnetic pulses before misses drop the grid.",
         "orbital": "Orbital 360: build around the zero-G core and steer falling fragments into rotating collector arcs before touching the outer ring.",
         "pinball": "Pinball: clear every glowing Core Peg before shots run out. Catch your sphere in the bottom bucket for a free shot refund.",
@@ -534,7 +540,11 @@
         "cleared": "BOARD CLEARED!"
       },
       "flux": {
-        "stageCleared": "SHAPE {{stage}} CLEARED! +{{points}} • +{{shots}} shots"
+        "stageCleared": "SHAPE {{stage}} CLEARED! +{{points}} • +{{shots}} shots",
+        "salvageShot": {
+          "one": "SALVAGE! +{{shots}} SHOT",
+          "other": "SALVAGE! +{{shots}} SHOTS"
+        }
       },
       "core": {
         "paint": "PAINT SPLASH x{{count}}!"
@@ -570,11 +580,13 @@
       },
       "orbital": {
         "arcCatch": "ORBITAL COLLECTOR +{{points}}",
-        "waveCleared": "ORBIT CLEARED! +{{points}}"
+        "waveCleared": "ORBIT CLEARED! +{{points}}",
+        "polarityPulse": "MAGNETIC PULSE!"
       },
       "pinball": {
         "freeBall": "FREE BALL! +1 • +{{points}}",
-        "stageCleared": "STAGE CLEARED! +{{points}}"
+        "stageCleared": "STAGE CLEARED! +{{points}}",
+        "comboMilestone": "COMBO x{{combo}}! +{{charge}}%⚡"
       },
       "convoy": {
         "snapback": "MAGNETIC SNAP-BACK! +{{points}}",
@@ -774,6 +786,14 @@
         "golden": {
           "name": "Golden",
           "description": "+{{value}} bonus coins on every cleared shape."
+        },
+        "combo": {
+          "name": "Catalyst",
+          "description": "Combos pay {{value}}% more points."
+        },
+        "salvage": {
+          "name": "Salvage",
+          "description": "+{{value}} shot on an avalanche of {{minDrops}}+ spheres."
         }
       }
     },
@@ -797,7 +817,7 @@
       "platform": "Support platforms hold hanging spheres from below while letting your shots pass right through!",
       "antimagnet": "Antimagnet cushions push hanging clusters upward without bending your shots!",
       "rescueCore": "Free all Rescue Cores (💎) by matching or dropping them to trigger an instant avalanche victory!",
-      "puzzle": "Puzzle: a fixed queue, no swap, no shop and no Workshop upgrades. Read the board, then shoot.",
+      "puzzle": "Puzzle: a fixed queue, no swap, no shop and no Workshop upgrades. First-try clear earns 3 stars.",
       "polarity": {
         "pointer": "Click the 🧲 button (or press F) to flip your shot's charge: spheres then pull it the other way, so it curves in the opposite direction.",
         "touch": "Tap the 🧲 button to flip your shot's charge: spheres then pull it the other way, so it curves in the opposite direction.",
@@ -1845,6 +1865,10 @@
         "arcade": "Arcade",
         "duel": "Duel"
       },
+      "arcadeSubhead": {
+        "core": "Core & Timed",
+        "labs": "Physics Labs"
+      },
       "campaign": {
         "summary": "{{chapter}} • {{stars}} / {{maxStars}} ★",
         "progressAria": "Chapter stars: {{stars}} of {{maxStars}}",
@@ -1877,6 +1901,11 @@
           "flux_stages": { "title": "Clear {{target}} shapes in Flux Mode" },
           "boss_rush_waves": { "title": "Defeat {{target}} Boss Waves in Boss Rush" },
           "campaign_levels": { "title": "Clear {{target}} Campaign levels" },
+          "classic_stages": { "title": "Clear {{target}} stages in Purist" },
+          "puzzle_clears": { "title": "Solve {{target}} Puzzle stages" },
+          "blitz_fevers": { "title": "Trigger Fever {{target}} times in Blitz 90s" },
+          "cascade_shelves": { "title": "Clear {{target}} shelves in Cascade" },
+          "versus_wins": { "title": "Win {{target}} Polarity Duel against CPU" },
           "any_groups": { "title": "Clear {{target}} magnetic groups" },
           "any_avalanches": { "title": "Drop {{target}} spheres in Avalanches" },
           "overcharge_bursts": { "title": "Fill Overcharge {{target}} times" },
@@ -2328,6 +2357,7 @@
       "neutralised": "Charges neutralised: {{count}}",
       "pulses": "Pulses sent: {{count}}",
       "tier": "CPU {{tier}}",
+      "coins": "Coins earned: +{{coins}} ⬡",
       "playAgain": "Play again",
       "backToMenu": "Back to menu"
     },
