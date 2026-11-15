@@ -4,6 +4,8 @@ All notable changes to **MagnaShot** are documented in this file.
 
 ## [Unreleased]
 
+## [1.31.0] - 2026-11-15
+
 ### Added
 - Two new Flux perks (`Catalyst` for `+20%` combo points per stack, `Salvage` for `+1` shot on avalanches of `5+` spheres per stack), bringing Flux Mode to 8 selectable perks (`configs/flux.json`, `FLUX_PERK_IDS`, `locales/*.json`).
 - Coin progression rewards across previously unrewarded Arcade and Duel modes: Purist stage clears (`+6`), Cascade empty-shelf clears (`+2`), Hex Grid / Orbital Spin / Magnetic Convoy wave clears (`+6`), Magnetic Pinball / Magnetic Slingshot stage clears (`+8`), Merge Basin Supernovas (`+15`), and CPU Polarity Duel match wins (`15 / 25 / 40` coins by difficulty, shown on `#versus-result-coins`).
