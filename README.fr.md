@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="icons/logo-banner.svg" alt="MagnaShot : édition Physique Magnétique" width="760" />
+</p>
+
 # MagnaShot : édition Physique Magnétique
 
 *Read this in [English](README.md).*
@@ -172,7 +176,7 @@ Le code suit une architecture en modules ES sans dépendance, avec une séparati
 
 ```text
 ├── configs/                  # Données externalisées : jeu, physique, sphères, obstacles, audio, modes, niveaux, campagne et Mode Flux
-├── icons/                    # Icônes PWA (SVG, SVG maskable, PNG 192 px et 512 px)
+├── icons/                    # Logo (emblème et bannière SVG) et icônes PWA (SVG, SVG maskable, PNG 192 px et 512 px)
 ├── locales/                  # Dictionnaires de traduction (fr.json, en.json)
 ├── scripts/
 │   ├── calibrate-campaign.mjs# Outil en ligne de commande de calibration hors ligne de la campagne

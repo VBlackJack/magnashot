@@ -28,7 +28,7 @@
   <link rel="manifest" href="./manifest.webmanifest" />
   <link rel="icon" type="image/svg+xml" href="./icons/icon.svg" />
   <link rel="icon" type="image/png" sizes="192x192" href="./icons/icon-192.png" />
-  <link rel="apple-touch-icon" href="./icons/icon-192.png" />
+  <link rel="apple-touch-icon" href="./icons/icon-maskable-192.png" />
   <link rel="stylesheet" href="./styles/main.css" />
 </head>
 <body>
@@ -36,9 +36,12 @@
     <!-- Slide-in burger menu (see .app-shell.drawer-open). -->
     <header id="app-drawer" class="top-bar" data-i18n-aria-label="app.drawer.aria.label">
       <div class="drawer-head">
-        <div class="brand-group">
-          <p class="brand-title" data-i18n="app.header.title.main"></p>
-          <span class="brand-subtitle" data-i18n="app.header.subtitle.edition"></span>
+        <div class="brand-lockup">
+          <img src="./icons/logo-mark.svg" alt="" class="brand-mark" width="42" height="42" />
+          <div class="brand-group">
+            <p class="brand-title" data-i18n="app.header.title.main"></p>
+            <span class="brand-subtitle" data-i18n="app.header.subtitle.edition"></span>
+          </div>
         </div>
         <button id="btn-close-drawer" type="button" class="drawer-close-btn" data-i18n-aria-label="app.drawer.button.closeAria" data-i18n-title="app.drawer.button.closeAria"><span aria-hidden="true">✕</span></button>
       </div>

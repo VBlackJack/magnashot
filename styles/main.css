@@ -236,9 +236,24 @@ body {
   gap: 8px;
 }
 
+.brand-lockup {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.brand-mark {
+  width: 42px;
+  height: 42px;
+  flex-shrink: 0;
+  display: block;
+}
+
 .brand-group {
   display: flex;
   flex-direction: column;
+  min-width: 0;
 }
 
 .brand-title {
