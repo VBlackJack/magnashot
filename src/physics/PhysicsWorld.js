@@ -15,7 +15,7 @@
  */
 
 import { OBSTACLE_TYPES, SPECIAL_TYPES, CLUSTER_MODIFIERS, MATH_CONSTANTS, SEPARATION_FALLBACK_AXIS } from '../core/Constants.js';
-import { resolveModesConfig } from '../game/modes/ModeConfig.js';
+import { resolveModesConfig } from '../core/ModeConfig.js';
 import { SpatialHashGrid } from './SpatialHashGrid.js';
 
 const NOT_FOUND_INDEX = -1;

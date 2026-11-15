@@ -641,18 +641,34 @@ test('the share call passes the weekly flag and week to the share builder', () =
 });
 
 test('the overlay list holds the stats window and Escape closes it', () => {
-  const bindings = readFileSync('./src/ui/UIInputBindings.js', 'utf8');
-  assert.match(bindings, /modalStats\.classList\.contains\('hidden'\)\) \{\s*this\.closeOverlayModal\(this\.elements\.modalStats\)/);
+  const closedModals = [];
   const ui = makeUi({
     elements: {
       modalLevels: fakeElement('hidden'),
+      modalPlay: fakeElement('hidden'),
       modalShop: fakeElement('hidden'),
       modalSettings: fakeElement('hidden'),
       modalStats: fakeElement()
     }
   });
+  ui.activeScene = 'main';
+  ui.isDrawerOpen = false;
+  ui.setInputMode = () => {};
+  ui.isAnyModalOpen = () => ui.isAnyOverlayModalOpen();
+  ui.trapModalFocus = () => {};
+  ui.isDuelCardOpen = () => false;
+  ui.handleVersusBack = () => false;
+  ui.isCalibrationOpen = () => false;
+  ui.closeOverlayModal = (modal) => {
+    modal.classList.add('hidden');
+    closedModals.push(modal);
+  };
   assert.ok(ui.getOverlayModals().includes(ui.elements.modalStats));
   assert.equal(ui.isAnyOverlayModalOpen(), true);
+  ui.handleKeyDown({ code: 'Escape', key: 'Escape', preventDefault() {} });
+  assert.deepEqual(closedModals, [ui.elements.modalStats]);
+  assert.equal(ui.elements.modalStats.classList.contains('hidden'), true);
+  assert.equal(ui.isAnyOverlayModalOpen(), false);
 });
 
 test('a hub card decides on the live mode access, not on a stale aria-disabled', () => {
@@ -720,4 +736,53 @@ test('Daily history rows carry explicit table roles that survive the narrow layo
   const [row] = body.rows;
   assert.equal(row.attrs.role, 'row');
   assert.deepEqual(row.children.map((cell) => cell.attrs.role), ['rowheader', 'cell', 'cell', 'cell', 'cell', 'cell']);
+});
+
+test('Play Hub hints scroll into view cleanly and invalid Flux seed exposes inline ARIA error', () => {
+  const prevLocale = i18n.currentLocale;
+  try {
+    i18n.dictionaries.set('en', loadJson('./locales/en.json'));
+    i18n.currentLocale = 'en';
+
+    const scrolled = [];
+    let focused = false;
+    const playHubHint = fakeElement('hidden');
+    playHubHint.scrollIntoView = (opts) => scrolled.push(['hint', opts]);
+    const fluxSeedError = fakeElement('hidden');
+    fluxSeedError.id = 'flux-seed-error';
+    fluxSeedError.scrollIntoView = (opts) => scrolled.push(['seedError', opts]);
+    const inputFluxSeed = fakeElement();
+    inputFluxSeed.value = 'x';
+    inputFluxSeed.focus = () => {
+      focused = true;
+    };
+
+    const ui = makeUi({
+      elements: {
+        modalPlay: fakeElement(),
+        playHubHint,
+        inputFluxSeed,
+        fluxSeedError
+      }
+    });
+    ui.engine = { fluxConfig: { seed: { length: 6, alphabet: '23456789abcdefghjkmnpqrstuvwxyz' } } };
+
+    ui.showModeLockHint(GAME_MODES.ENDLESS, { [GAME_MODES.ENDLESS]: { unlocked: false, requiredLevel: 3 } });
+    assert.equal(playHubHint.classList.contains('hidden'), false);
+    assert.deepEqual(scrolled[0], ['hint', { block: 'nearest', inline: 'nearest' }]);
+
+    ui.submitFluxSeedInput();
+    assert.equal(fluxSeedError.classList.contains('hidden'), false);
+    assert.equal(inputFluxSeed.getAttribute('aria-invalid'), 'true');
+    assert.equal(inputFluxSeed.getAttribute('aria-describedby'), 'flux-seed-error');
+    assert.equal(focused, true);
+    assert.deepEqual(scrolled[1], ['seedError', { block: 'nearest', inline: 'nearest' }]);
+
+    ui.collapsePlayHubDisclosures();
+    assert.equal(fluxSeedError.classList.contains('hidden'), true);
+    assert.equal(inputFluxSeed.getAttribute('aria-invalid'), null);
+    assert.equal(inputFluxSeed.getAttribute('aria-describedby'), null);
+  } finally {
+    i18n.currentLocale = prevLocale;
+  }
 });

@@ -23,7 +23,7 @@ import {
   SPECIAL_TYPES
 } from '../../core/Constants.js';
 import { t } from '../../core/I18n.js';
-import { DEFAULT_MODES_CONFIG } from './ModeConfig.js';
+import { DEFAULT_MODES_CONFIG } from '../../core/ModeConfig.js';
 import { Ball } from '../../entities/Ball.js';
 import { ModeBehavior, registerModeBehavior } from './ModeBehavior.js';
 import { reportBountyEvent } from '../Bounties.js';
@@ -119,6 +119,8 @@ const MERGE_CHROME = Object.freeze({
 
 /** Pause input hints that the basin words its own way. */
 const MERGE_INPUT_HINT_KEYS = Object.freeze({
+  'modals.pause.instructions.aim': 'modals.pause.instructions.mergeAim',
+  'modals.pause.instructions.swap': 'modals.pause.instructions.mergeSwap',
   'modals.pause.instructions.cancel': 'modals.pause.instructions.mergeCancel',
   'modals.pause.instructions.keyboard': 'modals.pause.instructions.mergeKeyboard'
 });
@@ -1159,6 +1161,213 @@ export class MergeBehavior extends ModeBehavior {
     }
   }
 
+  containBasinBall(
+    b,
+    geometry,
+    wallRestitution,
+    floorRestitution,
+    pegRestitution,
+    floorFriction,
+    settling = false
+  ) {
+    const minX = geometry.left + b.radius;
+    const maxX = geometry.right - b.radius;
+    const maxY = geometry.floor - b.radius;
+    if (b.x < minX) {
+      b.x = minX;
+      if (b.vx < 0) {
+        b.vx = settling ? 0 : -b.vx * wallRestitution;
+      }
+    } else if (b.x > maxX) {
+      b.x = maxX;
+      if (b.vx > 0) {
+        b.vx = settling ? 0 : -b.vx * wallRestitution;
+      }
+    }
+    if (b.y > maxY) {
+      b.y = maxY;
+      if (b.vy > 0) {
+        b.vy = settling ? 0 : -b.vy * floorRestitution;
+      }
+      if (!settling) {
+        b.vx *= floorFriction;
+      }
+    }
+    for (const peg of geometry.pegs) {
+      this.collideWithPeg(b, peg, settling ? SETTLE_RESTITUTION : pegRestitution);
+    }
+  }
+
+  /** Advances entry, merge grace, polarity, pulse, and pop timers for a single basin sphere. */
+  advanceBasinBallTimers(b, dtSec, lineY, entryGraceMaxSec) {
+    if (b.mergeEntering) {
+      // A fresh sphere keeps its grace until it first passes below the current line, capped.
+      b.mergeEntrySec = (b.mergeEntrySec || 0) + dtSec;
+      if (b.y - b.radius >= lineY || b.mergeEntrySec >= entryGraceMaxSec) {
+        b.mergeEntering = false;
+      }
+    }
+    if (b.mergeGraceSec > 0) {
+      b.mergeGraceSec = Math.max(b.mergeEntering ? dtSec : 0, b.mergeGraceSec - dtSec);
+    }
+    if (b.mergePolaritySec > 0) {
+      b.mergePolaritySec = Math.max(0, b.mergePolaritySec - dtSec);
+    }
+    if (b.mergePulseSec > 0) {
+      b.mergePulseSec = Math.max(0, b.mergePulseSec - dtSec);
+    }
+    if (b.impactScale > 1) {
+      b.impactScale = Math.max(1, b.impactScale - POP_DECAY_PER_SEC * dtSec);
+    }
+  }
+
+  /** Integrates sphere entry/grace timers, velocities, polarity bias and positions before collision passes. */
+  integrateBasinMotionAndTimers(engine, balls, dtSec, cfg, world, state) {
+    const lowGravity = this.getActiveEventParams(engine, MERGE_EVENT_IDS.LOW_GRAVITY);
+    const gravity = cfg.gravity * (lowGravity?.gravityFactor ?? 1);
+    const wind = this.getActiveEventParams(engine, MERGE_EVENT_IDS.WIND);
+    const windAcceleration = wind ? state.event.direction * wind.acceleration : 0;
+    const lineY = this.getOverflowLineY(engine);
+    const entryGraceMaxSec = this.getPressureConfig(engine)?.entryGraceMaxSec ?? 0;
+
+    for (const b of balls) {
+      this.advanceBasinBallTimers(b, dtSec, lineY, entryGraceMaxSec);
+      b.vy += gravity * dtSec;
+      b.vx += (cfg.tiltAcceleration * world.tiltFactor + windAcceleration) * dtSec;
+    }
+
+    this.applyPolarityBiasForces(engine, balls, dtSec);
+
+    for (const b of balls) {
+      b.vx *= cfg.linearDamping;
+      b.vy *= cfg.linearDamping;
+      b.x += b.vx * dtSec;
+      b.y += b.vy * dtSec;
+    }
+  }
+
+  /** Separates two overlapping basin spheres and applies elastic normal restitution. */
+  resolveBallPairImpulse(a, b, dx, dy, distSq, minDist, ballRestitution) {
+    let nx = SEPARATION_FALLBACK_AXIS.X;
+    let ny = SEPARATION_FALLBACK_AXIS.Y;
+    let dist = 0;
+    if (distSq > MATH_CONSTANTS.EPSILON) {
+      dist = Math.sqrt(distSq);
+      nx = dx / dist;
+      ny = dy / dist;
+    }
+    const overlap = minDist - dist;
+    const massA = a.radius * a.radius;
+    const massB = b.radius * b.radius;
+    const invMassSum = 1 / massA + 1 / massB;
+    const shareA = (1 / massA) / invMassSum;
+    const shareB = (1 / massB) / invMassSum;
+
+    a.x -= nx * overlap * shareA;
+    a.y -= ny * overlap * shareA;
+    b.x += nx * overlap * shareB;
+    b.y += ny * overlap * shareB;
+
+    const rvx = b.vx - a.vx;
+    const rvy = b.vy - a.vy;
+    const relNormal = rvx * nx + rvy * ny;
+    if (relNormal < 0) {
+      const jImpulse = -(1 + ballRestitution) * relNormal / invMassSum;
+      a.vx -= (jImpulse / massA) * nx;
+      a.vy -= (jImpulse / massA) * ny;
+      b.vx += (jImpulse / massB) * nx;
+      b.vy += (jImpulse / massB) * ny;
+    }
+  }
+
+  /** Runs iterative wall/peg containment, fusion-pair collection, and pair impulse resolution. */
+  solveBasinSolverIterations(balls, geometry, cfg, params, mergePairs, mergedIds) {
+    const { wallRestitution, floorRestitution, ballRestitution, pegRestitution, topCalibre } = params;
+    for (let iter = 0; iter < cfg.solverIterations; iter++) {
+      for (const b of balls) {
+        this.containBasinBall(b, geometry, wallRestitution, floorRestitution, pegRestitution, cfg.floorFriction);
+      }
+      for (let i = 0; i < balls.length; i++) {
+        const a = balls[i];
+        if (mergedIds.has(a.id)) {
+          continue;
+        }
+        for (let j = i + 1; j < balls.length; j++) {
+          const b = balls[j];
+          if (mergedIds.has(b.id)) {
+            continue;
+          }
+          const dx = b.x - a.x;
+          const dy = b.y - a.y;
+          const minDist = a.radius + b.radius;
+          const distSq = dx * dx + dy * dy;
+          if (
+            iter === FUSION_PAIR_FIRST_ITERATION
+            && distSq <= (minDist + TOUCH_MERGE_TOLERANCE_PX) * (minDist + TOUCH_MERGE_TOLERANCE_PX)
+            && getMergeFusionCalibre(a, b, topCalibre) !== null
+          ) {
+            mergedIds.add(a.id);
+            mergedIds.add(b.id);
+            mergePairs.push([a, b]);
+            break;
+          }
+          if (distSq < minDist * minDist) {
+            this.resolveBallPairImpulse(a, b, dx, dy, distSq, minDist, ballRestitution);
+          }
+        }
+      }
+    }
+    // The last pair pass can leave a sphere a sliver into a wall or a peg: the step ends contained.
+    for (const b of balls) {
+      this.containBasinBall(b, geometry, wallRestitution, floorRestitution, pegRestitution, cfg.floorFriction, true);
+    }
+  }
+
+  /** Updates overflow timers, near-danger UI state, and ends the run if grace expires. */
+  evaluateBasinOverflow(engine, balls, state, cfg, dtSec) {
+    const overflowLineY = this.getOverflowLineY(engine);
+    let worstRatio = 0;
+    for (const b of balls) {
+      if ((b.mergeGraceSec || 0) > 0) {
+        // Grace only pauses the timer: the danger line still reacts to a settled sphere above it.
+        if (!b.mergeEntering && b.y - b.radius < overflowLineY) {
+          worstRatio = Math.max(worstRatio, GRACED_OVERFLOW_RATIO);
+        }
+        continue;
+      }
+      if (b.y - b.radius < overflowLineY) {
+        b.mergeOverflowSec = (b.mergeOverflowSec || 0) + dtSec;
+        worstRatio = Math.max(worstRatio, b.mergeOverflowSec / cfg.overflowGraceSec);
+        if (b.mergeOverflowSec >= cfg.overflowGraceSec) {
+          engine.triggerGameOver(GAME_OVER_REASONS.BASIN_OVERFLOW);
+          return;
+        }
+      } else if (b.mergeOverflowSec > 0) {
+        b.mergeOverflowSec = Math.max(0, b.mergeOverflowSec - dtSec * 2);
+        worstRatio = Math.max(worstRatio, b.mergeOverflowSec / cfg.overflowGraceSec);
+      }
+    }
+    state.maxOverflowRatio = Math.min(1, worstRatio);
+    const nextDanger = state.maxOverflowRatio >= OVERFLOW_WARN_RATIO;
+    if (nextDanger !== Boolean(state.nearDanger)) {
+      state.nearDanger = nextDanger;
+      engine.notifyUI();
+    }
+  }
+
+  buildBasinSolverParams(engine, cfg) {
+    const bouncy = this.getActiveEventParams(engine, MERGE_EVENT_IDS.BOUNCY);
+    const bouncyRest = bouncy ? bouncy.restitution : null;
+    const pegsShape = cfg.shapes ? cfg.shapes[MERGE_SHAPE_IDS.PEGS] : null;
+    return {
+      wallRestitution: bouncyRest ?? cfg.wallRestitution,
+      floorRestitution: bouncyRest ?? cfg.floorRestitution,
+      ballRestitution: bouncyRest ?? cfg.ballRestitution,
+      pegRestitution: pegsShape ? pegsShape.restitution : 0,
+      topCalibre: cfg.tiers.length - 1
+    };
+  }
+
   onBeforePhysicsStep(engine, dtSec) {
     if (!engine.isRunPlaying() || !engine.modeState) {
       return;
@@ -1185,192 +1394,25 @@ export class MergeBehavior extends ModeBehavior {
       return;
     }
 
-    const lowGravity = this.getActiveEventParams(engine, MERGE_EVENT_IDS.LOW_GRAVITY);
-    const gravity = cfg.gravity * (lowGravity?.gravityFactor ?? 1);
-    const wind = this.getActiveEventParams(engine, MERGE_EVENT_IDS.WIND);
-    const windAcceleration = wind ? state.event.direction * wind.acceleration : 0;
-    const bouncy = this.getActiveEventParams(engine, MERGE_EVENT_IDS.BOUNCY);
-    const wallRestitution = bouncy?.restitution ?? cfg.wallRestitution;
-    const floorRestitution = bouncy?.restitution ?? cfg.floorRestitution;
-    const ballRestitution = bouncy?.restitution ?? cfg.ballRestitution;
+    this.integrateBasinMotionAndTimers(engine, balls, dtSec, cfg, world, state);
+    const mergePairs = this.mergePairsScratch || (this.mergePairsScratch = []);
+    mergePairs.length = 0;
+    const mergedIds = this.mergedIdsScratch || (this.mergedIdsScratch = new Set());
+    mergedIds.clear();
 
-    const lineY = this.getOverflowLineY(engine);
-    const entryGraceMaxSec = this.getPressureConfig(engine)?.entryGraceMaxSec ?? 0;
-    for (const b of balls) {
-      if (b.mergeEntering) {
-        // A fresh sphere keeps its grace until it first passes below the current line, capped.
-        b.mergeEntrySec = (b.mergeEntrySec || 0) + dtSec;
-        if (b.y - b.radius >= lineY || b.mergeEntrySec >= entryGraceMaxSec) {
-          b.mergeEntering = false;
-        }
-      }
-      if (b.mergeGraceSec > 0) {
-        b.mergeGraceSec = Math.max(b.mergeEntering ? dtSec : 0, b.mergeGraceSec - dtSec);
-      }
-      if (b.mergePolaritySec > 0) {
-        b.mergePolaritySec = Math.max(0, b.mergePolaritySec - dtSec);
-      }
-      if (b.mergePulseSec > 0) {
-        b.mergePulseSec = Math.max(0, b.mergePulseSec - dtSec);
-      }
-      if (b.impactScale > 1) {
-        b.impactScale = Math.max(1, b.impactScale - POP_DECAY_PER_SEC * dtSec);
-      }
-      b.vy += gravity * dtSec;
-      b.vx += (cfg.tiltAcceleration * world.tiltFactor + windAcceleration) * dtSec;
-    }
-
-    this.applyPolarityBiasForces(engine, balls, dtSec);
-
-    for (const b of balls) {
-      b.vx *= cfg.linearDamping;
-      b.vy *= cfg.linearDamping;
-      b.x += b.vx * dtSec;
-      b.y += b.vy * dtSec;
-    }
-
-    const mergePairs = [];
-    const mergedIds = new Set();
-    const topCalibre = cfg.tiers.length - 1;
-
-    const geometry = this.getBasinGeometry(engine);
-    const pegRestitution = cfg.shapes?.[MERGE_SHAPE_IDS.PEGS]?.restitution ?? 0;
-    const contain = (b, settling = false) => {
-      const minX = geometry.left + b.radius;
-      const maxX = geometry.right - b.radius;
-      const maxY = geometry.floor - b.radius;
-      if (b.x < minX) {
-        b.x = minX;
-        if (b.vx < 0) {
-          b.vx = settling ? 0 : -b.vx * wallRestitution;
-        }
-      } else if (b.x > maxX) {
-        b.x = maxX;
-        if (b.vx > 0) {
-          b.vx = settling ? 0 : -b.vx * wallRestitution;
-        }
-      }
-      if (b.y > maxY) {
-        b.y = maxY;
-        if (b.vy > 0) {
-          b.vy = settling ? 0 : -b.vy * floorRestitution;
-        }
-        if (!settling) {
-          b.vx *= cfg.floorFriction;
-        }
-      }
-      for (const peg of geometry.pegs) {
-        this.collideWithPeg(b, peg, settling ? SETTLE_RESTITUTION : pegRestitution);
-      }
-    };
-
-    for (let iter = 0; iter < cfg.solverIterations; iter++) {
-      for (const b of balls) {
-        contain(b);
-      }
-
-      for (let i = 0; i < balls.length; i++) {
-        const a = balls[i];
-        if (mergedIds.has(a.id)) {
-          continue;
-        }
-        for (let j = i + 1; j < balls.length; j++) {
-          const b = balls[j];
-          if (mergedIds.has(b.id)) {
-            continue;
-          }
-          const dx = b.x - a.x;
-          const dy = b.y - a.y;
-          const minDist = a.radius + b.radius;
-          const distSq = dx * dx + dy * dy;
-
-          if (
-            iter === FUSION_PAIR_FIRST_ITERATION
-            && distSq <= (minDist + TOUCH_MERGE_TOLERANCE_PX) * (minDist + TOUCH_MERGE_TOLERANCE_PX)
-            && getMergeFusionCalibre(a, b, topCalibre) !== null
-          ) {
-            mergedIds.add(a.id);
-            mergedIds.add(b.id);
-            mergePairs.push([a, b]);
-            break;
-          }
-
-          if (distSq >= minDist * minDist) {
-            continue;
-          }
-          let nx = SEPARATION_FALLBACK_AXIS.X;
-          let ny = SEPARATION_FALLBACK_AXIS.Y;
-          let dist = 0;
-          if (distSq > MATH_CONSTANTS.EPSILON) {
-            dist = Math.sqrt(distSq);
-            nx = dx / dist;
-            ny = dy / dist;
-          }
-          const overlap = minDist - dist;
-          const massA = a.radius * a.radius;
-          const massB = b.radius * b.radius;
-          const invMassSum = 1 / massA + 1 / massB;
-          const shareA = (1 / massA) / invMassSum;
-          const shareB = (1 / massB) / invMassSum;
-
-          a.x -= nx * overlap * shareA;
-          a.y -= ny * overlap * shareA;
-          b.x += nx * overlap * shareB;
-          b.y += ny * overlap * shareB;
-
-          const rvx = b.vx - a.vx;
-          const rvy = b.vy - a.vy;
-          const relNormal = rvx * nx + rvy * ny;
-          if (relNormal < 0) {
-            const jImpulse = -(1 + ballRestitution) * relNormal / invMassSum;
-            a.vx -= (jImpulse / massA) * nx;
-            a.vy -= (jImpulse / massA) * ny;
-            b.vx += (jImpulse / massB) * nx;
-            b.vy += (jImpulse / massB) * ny;
-          }
-        }
-      }
-    }
-
-    // The last pair pass can leave a sphere a sliver into a wall or a peg: the step ends contained.
-    for (const b of balls) {
-      contain(b, true);
-    }
-
+    this.solveBasinSolverIterations(
+      balls,
+      this.getBasinGeometry(engine),
+      cfg,
+      this.buildBasinSolverParams(engine, cfg),
+      mergePairs,
+      mergedIds
+    );
     if (mergePairs.length > 0) {
       this.resolveMergePairs(engine, mergePairs);
     }
     this.updateSpecials(engine, dtSec);
-
-    // Check top overflow danger line with grace timer
-    const overflowLineY = this.getOverflowLineY(engine);
-    let worstRatio = 0;
-    for (const b of world.balls) {
-      if ((b.mergeGraceSec || 0) > 0) {
-        // Grace only pauses the timer: the danger line still reacts to a settled sphere above it.
-        if (!b.mergeEntering && b.y - b.radius < overflowLineY) {
-          worstRatio = Math.max(worstRatio, GRACED_OVERFLOW_RATIO);
-        }
-        continue;
-      }
-      if (b.y - b.radius < overflowLineY) {
-        b.mergeOverflowSec = (b.mergeOverflowSec || 0) + dtSec;
-        worstRatio = Math.max(worstRatio, b.mergeOverflowSec / cfg.overflowGraceSec);
-        if (b.mergeOverflowSec >= cfg.overflowGraceSec) {
-          engine.triggerGameOver(GAME_OVER_REASONS.BASIN_OVERFLOW);
-          return;
-        }
-      } else if (b.mergeOverflowSec > 0) {
-        b.mergeOverflowSec = Math.max(0, b.mergeOverflowSec - dtSec * 2);
-        worstRatio = Math.max(worstRatio, b.mergeOverflowSec / cfg.overflowGraceSec);
-      }
-    }
-    state.maxOverflowRatio = Math.min(1, worstRatio);
-    const nextDanger = state.maxOverflowRatio >= OVERFLOW_WARN_RATIO;
-    if (nextDanger !== Boolean(state.nearDanger)) {
-      state.nearDanger = nextDanger;
-      engine.notifyUI();
-    }
+    this.evaluateBasinOverflow(engine, world.balls, state, cfg, dtSec);
   }
 
   /** Pushes a sphere out of a static peg along the normal and bounces its normal velocity, keeping the tangent. */

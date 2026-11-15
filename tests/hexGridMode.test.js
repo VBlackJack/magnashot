@@ -25,7 +25,7 @@ import { applyWorldGeometry } from '../src/core/WorldGeometry.js';
 import { GAME_MODES, GAME_OVER_REASONS, GAME_STATES, SPECIAL_TYPES } from '../src/core/Constants.js';
 import { Ball } from '../src/entities/Ball.js';
 import { GameEngine } from '../src/game/GameEngine.js';
-import { DEFAULT_MODES_CONFIG } from '../src/game/modes/ModeConfig.js';
+import { DEFAULT_MODES_CONFIG } from '../src/core/ModeConfig.js';
 import { hexCellToWorld, hexGridBehavior } from '../src/game/modes/HexGridBehavior.js';
 
 const loadJson = (p) => JSON.parse(fs.readFileSync(p, 'utf8'));

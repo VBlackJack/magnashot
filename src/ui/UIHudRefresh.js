@@ -112,6 +112,837 @@ export function getFluxBannerKey(isBossStage, magnetarView) {
   return magnetarView ? 'hud.stats.mode.fluxBossMagnetar' : 'hud.stats.mode.fluxBoss';
 }
 
+const MODAL_VISIBILITY_KEYS = ['modalPause', 'modalFluxPerk', 'modalVictory', 'modalGameOver', 'appDrawer'];
+
+const BEST_SCORE_GETTERS = Object.freeze({
+  [GAME_MODES.CAMPAIGN]: (storage, engine) => storage.getLevelStats()[engine.currentLevelId]?.bestScore || 0,
+  [GAME_MODES.DAILY]: (storage, engine) => storage.getDailyHighScore(engine.dailySeedKey || SeededRandom.getTodayDateKey()),
+  [GAME_MODES.FLUX]: (storage, engine, ui) => (
+    engine.isWeeklyFluxRun === true
+      ? ui.getWeeklyFluxBestScore(engine.weeklyWeekKey)
+      : storage.getFluxHighScore()
+  ),
+  [GAME_MODES.PUZZLE]: (storage, engine) => storage.getPuzzleStageStats?.()?.[engine.currentPuzzleStage]?.bestScore || 0,
+  [GAME_MODES.BLITZ]: (storage) => storage.getBlitzHighScore(),
+  [GAME_MODES.BOSS_RUSH]: (storage) => storage.getBossRushHighScore(),
+  [GAME_MODES.CASCADE]: (storage) => storage.getCascadeHighScore(),
+  [GAME_MODES.CLASSIC]: (storage) => storage.getClassicHighScore(),
+  [GAME_MODES.HEX_GRID]: (storage) => storage.getHexGridHighScore?.() || 0,
+  [GAME_MODES.ORBITAL]: (storage) => storage.getOrbitalHighScore?.() || 0,
+  [GAME_MODES.PINBALL]: (storage) => storage.getPinballHighScore?.() || 0,
+  [GAME_MODES.CONVOY]: (storage) => storage.getConvoyHighScore?.() || 0,
+  [GAME_MODES.MERGE]: (storage) => storage.getMergeHighScore?.() || 0,
+  [GAME_MODES.SLINGSHOT]: (storage) => storage.getSlingshotHighScore?.() || 0
+});
+
+const WAVE_BANNER_SPECS = Object.freeze({
+  [GAME_MODES.DAILY]: (engine) => ({
+    key: 'hud.stats.mode.daily',
+    params: {
+      mutator: engine.activeMutatorKey ? t(`gameplay.mutators.${engine.activeMutatorKey}`) : '',
+      wave: engine.waveCount
+    }
+  }),
+  [GAME_MODES.CASCADE]: (engine) => ({
+    key: 'hud.stats.mode.cascade',
+    params: { wave: engine.waveCount }
+  }),
+  [GAME_MODES.CLASSIC]: (engine) => ({
+    key: 'hud.stats.mode.classic',
+    params: { stage: formatNumber(engine.classicStage) }
+  }),
+  [GAME_MODES.HEX_GRID]: (engine) => ({
+    key: 'hud.stats.mode.hexGrid',
+    params: { wave: formatNumber(engine.waveCount) }
+  }),
+  [GAME_MODES.ORBITAL]: (engine) => ({
+    key: 'hud.stats.mode.orbital',
+    params: { wave: formatNumber(engine.waveCount) }
+  }),
+  [GAME_MODES.CONVOY]: (engine) => ({
+    key: 'hud.stats.mode.convoy',
+    params: { wave: formatNumber(engine.waveCount) }
+  }),
+  [GAME_MODES.MERGE]: (engine) => ({
+    key: 'hud.stats.mode.merge',
+    params: { tier: formatNumber(engine.mergeBestTier || 1) }
+  })
+});
+
+function resolveModeBestScore(ui, engine) {
+  const getter = BEST_SCORE_GETTERS[engine.mode];
+  return getter ? getter(ui.storageManager, engine, ui) : ui.storageManager.getEndlessHighScore();
+}
+
+function getRoundModalVisibilityMask(ui) {
+  let mask = 0;
+  for (let i = 0; i < MODAL_VISIBILITY_KEYS.length; i += 1) {
+    const el = ui.elements[MODAL_VISIBILITY_KEYS[i]];
+    if (el && !el.classList.contains('hidden')) {
+      mask |= 1 << i;
+    }
+  }
+  return mask;
+}
+
+function refreshHeaderMetrics(ui, engine) {
+  setTextIfChanged(ui.elements.scoreValue, formatNumber(engine.score));
+  setTextIfChanged(
+    ui.elements.coinsValue,
+    t('hud.stats.coins.value', { coins: formatNumber(ui.storageManager.getCoins()) })
+  );
+
+  const affordableCount = ui.getAffordableUpgradeCount();
+  setTextIfChanged(
+    ui.elements.btnShop,
+    affordableCount > 0
+      ? t('app.nav.button.shopBadge', { count: formatNumber(affordableCount) })
+      : t('app.nav.button.shop')
+  );
+  ui.elements.btnShop.classList.toggle('has-affordable', affordableCount > 0);
+}
+
+function setModeButtonActiveState(button, isActive) {
+  if (!button) {
+    return;
+  }
+  button.classList.toggle('active-mode', isActive);
+  if (isActive) {
+    setAttributeIfChanged(button, 'aria-current', 'true');
+  } else {
+    button.removeAttribute('aria-current');
+  }
+}
+
+function refreshModeSelectionHighlights(ui, engine) {
+  // Only the mode being played stands out, and says so to screen readers.
+  for (const [mode, elementKeys] of Object.entries(MODE_BUTTON_KEYS)) {
+    const isActive = engine.mode === mode;
+    for (const elementKey of elementKeys) {
+      const button = ui.elements[elementKey];
+      if (!button) {
+        continue;
+      }
+      if (mode === GAME_MODES.CAMPAIGN) {
+        // The Campaign card is a section with two buttons: the section stands out, no button is "current".
+        (button.closest?.('section') ?? button).classList.toggle('active-mode', isActive);
+        continue;
+      }
+      setModeButtonActiveState(button, isActive);
+    }
+  }
+  // Only the run of the current week lights the Weekly button: a run of last week, still
+  // open after Monday 00:00 UTC, is plain Flux for the menu.
+  const isCurrentWeekRun = isCurrentWeeklyRun(engine, getUtcIsoWeekKey(Date.now()));
+  setModeButtonActiveState(ui.elements.btnFlux, engine.mode === GAME_MODES.FLUX && !isCurrentWeekRun);
+  setModeButtonActiveState(ui.elements.btnWeekly, isCurrentWeekRun);
+
+  ui.refreshModeLocks(ui.getModeAccess());
+  if (ui.elements.btnDaily) {
+    // The Daily card shows its state in the reward chip; the card keeps its title and text.
+    writeRewardChip(ui.elements.dailyReward, ui.describeDailyRewardChip());
+    const todayKey = SeededRandom.getTodayDateKey();
+    const streak = ui.storageManager.getDailyStreak?.(todayKey) || 0;
+    const graceHint = formatStreakGraceText(streak, ui.storageManager.getDailyStreakGrace?.(todayKey), todayKey);
+    if (graceHint) {
+      setAttributeIfChanged(ui.elements.btnDaily, 'title', graceHint);
+    } else {
+      ui.elements.btnDaily.removeAttribute?.('title');
+    }
+  }
+}
+
+function refreshOverchargeAndBestScore(ui, engine) {
+  const overchargePct = Math.min(
+    FULL_PERCENT,
+    Math.round((engine.overcharge / ui.gameConfig.scoring.overchargeMax) * FULL_PERCENT)
+  );
+  setTextIfChanged(ui.elements.overchargePct, t('hud.stats.overcharge.pct', { pct: overchargePct }));
+  ui.elements.overchargeFill.style.width = `${overchargePct}%`;
+
+  const bestScore = resolveModeBestScore(ui, engine);
+  setTextIfChanged(ui.elements.highScoreValue, formatNumber(Math.max(bestScore, engine.score)));
+  return bestScore;
+}
+
+/** @this {import('./UIManager.js').UIManager} */
+function refreshLauncherControls(engine) {
+  if (this.elements.polarityBtn) {
+    const polState = engine.isPolarityFlipped ? 'inverted' : 'normal';
+    this.setLauncherButton(
+      this.elements.polarityBtn,
+      'hud.launcher.polarity.icon',
+      `hud.launcher.polarity.${polState}`,
+      'hud.launcher.polarity.shortcut',
+      `hud.launcher.polarity.caption.${polState}`
+    );
+    this.elements.polarityBtn.classList.toggle('active', Boolean(engine.isPolarityFlipped));
+  }
+
+  if (this.elements.swapBtn) {
+    const isSwapLocked = engine.mode === GAME_MODES.PUZZLE;
+    this.elements.swapBtn.disabled = isSwapLocked;
+  }
+}
+
+/**
+ * @this {import('./UIManager.js').UIManager}
+ * @param {object} engine
+ */
+function refreshStarProgress(engine) {
+  if (!this.elements.starProgress) {
+    return;
+  }
+  const thresholds = engine.getStarThresholds();
+  const maxStars = this.gameConfig.scoring.maxStars;
+  const currentStars = engine.computeStars(engine.score);
+  const nextThreshold = thresholds.find((th) => th > engine.score);
+  this.updateStarMeter(engine.score, thresholds, nextThreshold);
+  // Two unbreakable parts, so a narrow HUD wraps between them and never inside one.
+  this.renderStarGlyphs(this.elements.starGlyphs, currentStars, maxStars);
+  // The glyphs are hidden from screen readers; this hidden text states the count.
+  setTextIfChanged(
+    this.elements.starCount,
+    t('hud.stats.score.starsAria', {
+      stars: formatNumber(Math.max(0, Math.min(maxStars, currentStars))),
+      maxStars: formatNumber(maxStars)
+    })
+  );
+  setTextIfChanged(
+    this.elements.starNext,
+    nextThreshold !== undefined
+      ? t('hud.stats.score.nextThreshold', { next: formatNumber(nextThreshold) })
+      : t('hud.stats.score.maxReached')
+  );
+  this.elements.starProgress.classList.remove('hidden');
+}
+
+function hideStarProgress(ui) {
+  ui.elements.starProgress?.classList.add('hidden');
+}
+
+function refreshStandardShotCounter(ui, engine, warningShotsThreshold) {
+  if (ui.elements.shotsLabel) {
+    setTextIfChanged(ui.elements.shotsLabel, t('hud.stats.shots.label'));
+  }
+  setTextIfChanged(ui.elements.shotsValue, formatNumber(engine.shotsRemaining));
+  ui.elements.shotsValue.classList.toggle('warning', engine.shotsRemaining <= warningShotsThreshold);
+}
+
+function formatCoreRescueSuffix(engine) {
+  if (engine.currentObjective !== OBJECTIVE_TYPES.CORE_RESCUE || engine.targetCoreCount <= 0) {
+    return '';
+  }
+  return ` • ${t('hud.stats.mode.coreRescueProgress', {
+    rescued: formatNumber(Math.min(engine.targetCoreCount, engine.rescuedCores || 0)),
+    total: formatNumber(engine.targetCoreCount)
+  })}`;
+}
+
+const STAGE_MODE_BANNER_BUILDERS = Object.freeze({
+  [GAME_MODES.CAMPAIGN]: (ui, engine) => {
+    const lvl = engine.levelCatalog.summarize(engine.currentLevelId);
+    return `${t('hud.stats.mode.campaign', {
+      level: engine.currentLevelId,
+      name: lvl ? ui.formatLevelName(lvl) : ''
+    })}${formatCoreRescueSuffix(engine)}`;
+  },
+  [GAME_MODES.PUZZLE]: (ui, engine) => `${t('hud.stats.mode.puzzle', {
+    stage: engine.currentPuzzleStage,
+    total: ui.gameConfig.puzzles?.length || 1
+  })}${formatCoreRescueSuffix(engine)}`,
+  [GAME_MODES.BLITZ]: (_ui, engine) => t('hud.stats.mode.blitz', { wave: formatNumber(engine.waveCount) }),
+  [GAME_MODES.FLUX]: (ui, engine, magnetarView) => t(getFluxBannerKey(engine.fluxIsBossStage, magnetarView), {
+    stage: engine.fluxStage,
+    shape: ui.formatFluxShapeName(engine.fluxShapeIds),
+    moorings: magnetarView ? formatNumber(magnetarView.moorings) : ''
+  }),
+  [GAME_MODES.PINBALL]: (_ui, engine) => t('hud.stats.mode.pinball', {
+    stage: formatNumber(engine.pinballStage || 1),
+    cores: formatNumber(engine.modeState?.corePegsRemaining ?? 0)
+  }),
+  [GAME_MODES.SLINGSHOT]: (_ui, engine) => {
+    const balls = engine.physicsWorld?.balls;
+    const remainingCores = Array.isArray(balls) ? balls.reduce((sum, b) => sum + (b.slingshotCore ? 1 : 0), 0) : 0;
+    return t('hud.stats.mode.slingshot', {
+      stage: formatNumber(engine.slingshotStage || 1),
+      cores: formatNumber(remainingCores)
+    });
+  }
+});
+
+function refreshBlitzTimeCounter(ui, engine) {
+  const fps = ui.gameConfig.blitz.framesPerSecond;
+  const secondsLeft = Math.max(0, Math.ceil(engine.blitzFramesRemaining / fps));
+  if (ui.elements.shotsLabel) {
+    setTextIfChanged(ui.elements.shotsLabel, t('hud.stats.time.label'));
+  }
+  setTextIfChanged(ui.elements.shotsValue, t('hud.stats.time.seconds', { seconds: formatNumber(secondsLeft) }));
+  ui.elements.shotsValue.classList.toggle('warning', secondsLeft <= ui.gameConfig.blitz.warningSeconds);
+}
+
+function refreshStageModeHud(ui, engine, magnetarView, warningShotsThreshold) {
+  const buildBanner = STAGE_MODE_BANNER_BUILDERS[engine.mode];
+  if (!buildBanner) {
+    return false;
+  }
+  setTextIfChanged(ui.elements.modeBanner, buildBanner(ui, engine, magnetarView));
+  if (engine.mode === GAME_MODES.BLITZ) {
+    refreshBlitzTimeCounter(ui, engine);
+  } else {
+    refreshStandardShotCounter(ui, engine, warningShotsThreshold);
+  }
+  if (engine.mode === GAME_MODES.CAMPAIGN || engine.mode === GAME_MODES.PUZZLE) {
+    refreshStarProgress.call(ui, engine);
+  } else {
+    hideStarProgress(ui);
+  }
+  return true;
+}
+
+function formatBossRushBanner(engine, magnetarView) {
+  if (magnetarView) {
+    const isResting = magnetarView.phase === 'rest' && Number.isFinite(magnetarView.restLeft);
+    return t(isResting ? 'hud.stats.mode.bossRushMagnetarRest' : 'hud.stats.mode.bossRushMagnetar', {
+      wave: engine.bossRushWave,
+      moorings: formatNumber(magnetarView.moorings),
+      ...(isResting ? { rest: formatNumber(magnetarView.restLeft) } : {})
+    });
+  }
+  const shields = engine.getBossBall()?.armorHits || 0;
+  return t('hud.stats.mode.bossRush', {
+    wave: engine.bossRushWave,
+    shields: formatNumber(shields)
+  });
+}
+
+function refreshWaveModeBanner(ui, engine, magnetarView) {
+  if (engine.mode === GAME_MODES.BOSS_RUSH) {
+    setTextIfChanged(ui.elements.modeBanner, formatBossRushBanner(engine, magnetarView));
+    return;
+  }
+  const specBuilder = WAVE_BANNER_SPECS[engine.mode];
+  if (specBuilder) {
+    const { key, params } = specBuilder(engine);
+    setTextIfChanged(ui.elements.modeBanner, t(key, params));
+    return;
+  }
+  setTextIfChanged(ui.elements.modeBanner, t('hud.stats.mode.endless', { wave: engine.waveCount }));
+}
+
+function resolveWaveShotsLabelKey(mode, shakeLeft) {
+  if (mode === GAME_MODES.BOSS_RUSH) {
+    return 'hud.stats.shots.shieldsLabel';
+  }
+  if (mode === GAME_MODES.CONVOY) {
+    return 'hud.stats.shots.convoyLabel';
+  }
+  if (mode === GAME_MODES.MERGE) {
+    return shakeLeft !== null && shakeLeft !== undefined
+      ? 'hud.stats.shots.shakeLabel'
+      : 'hud.stats.shots.mergesLabel';
+  }
+  return 'hud.stats.shots.waveLabel';
+}
+
+const WAVE_COUNTDOWN_RESOLVERS = Object.freeze({
+  [GAME_MODES.CASCADE]: (engine, _shakeLeft, warn) => ({
+    waveCountdown: engine.cascadeTurnsUntilDrop,
+    isShotsWarning: engine.cascadeTurnsUntilDrop <= warn
+  }),
+  [GAME_MODES.BOSS_RUSH]: (engine, _shakeLeft, warn) => {
+    const waveCountdown = engine.getBossBall()?.armorHits || 0;
+    return { waveCountdown, isShotsWarning: waveCountdown <= warn };
+  },
+  [GAME_MODES.HEX_GRID]: (engine, _shakeLeft, warn) => {
+    const waveCountdown = engine.modeState?.shotsUntilDescent ?? 0;
+    return { waveCountdown, isShotsWarning: waveCountdown <= warn };
+  },
+  [GAME_MODES.ORBITAL]: (engine, _shakeLeft, warn) => {
+    const waveCountdown = engine.modeState?.turnsUntilWave ?? 0;
+    return { waveCountdown, isShotsWarning: waveCountdown <= warn || Boolean(engine.modeState?.nearDanger) };
+  },
+  [GAME_MODES.CONVOY]: (engine) => ({
+    waveCountdown: engine.physicsWorld.balls.length + (engine.modeState?.spawnRemaining ?? 0),
+    isShotsWarning: Boolean(engine.modeState?.nearDanger)
+  }),
+  [GAME_MODES.MERGE]: (engine, shakeLeft) => ({
+    waveValueText: shakeLeft !== null && shakeLeft !== undefined
+      ? (shakeLeft === 0 ? t('hud.stats.shots.shakeReady') : formatNumber(shakeLeft))
+      : null,
+    waveCountdown: engine.modeState?.mergesCount ?? 0,
+    isShotsWarning: Boolean(engine.modeState?.nearDanger)
+  })
+});
+
+function resolveWaveCountdownState(engine, shakeLeft, warningShotsThreshold) {
+  const resolver = WAVE_COUNTDOWN_RESOLVERS[engine.mode];
+  if (!resolver) {
+    return { waveValueText: formatNumber(0), isShotsWarning: 0 <= warningShotsThreshold };
+  }
+  const { waveCountdown = 0, waveValueText = null, isShotsWarning } = resolver(engine, shakeLeft, warningShotsThreshold);
+  return { waveValueText: waveValueText ?? formatNumber(waveCountdown), isShotsWarning };
+}
+
+function refreshWaveModeHud(ui, engine, magnetarView, warningShotsThreshold) {
+  refreshWaveModeBanner(ui, engine, magnetarView);
+  const sag = engine.getSagState?.();
+  if (sag?.active) {
+    ui.refreshSagMeter(engine, sag);
+  } else {
+    const shakeLeft = engine.mode === GAME_MODES.MERGE ? engine.getMergeShakeRemaining?.() : null;
+    if (ui.elements.shotsLabel) {
+      setTextIfChanged(ui.elements.shotsLabel, t(resolveWaveShotsLabelKey(engine.mode, shakeLeft)));
+    }
+    const { waveValueText, isShotsWarning } = resolveWaveCountdownState(engine, shakeLeft, warningShotsThreshold);
+    setTextIfChanged(ui.elements.shotsValue, waveValueText);
+    ui.elements.shotsValue.classList.toggle('warning', isShotsWarning);
+  }
+  hideStarProgress(ui);
+}
+
+function updateNearDangerAnnouncement(ui, engine) {
+  const tracksDanger = engine.state === GAME_STATES.PLAYING
+    && (engine.mode === GAME_MODES.CONVOY || engine.mode === GAME_MODES.ORBITAL || engine.mode === GAME_MODES.MERGE);
+  if (!tracksDanger) {
+    ui.nearDangerAnnouncedMode = null;
+    ui.nearDangerWasActive = false;
+    return;
+  }
+  const nextNearDanger = Boolean(engine.modeState?.nearDanger);
+  if (ui.nearDangerAnnouncedMode !== engine.mode) {
+    ui.nearDangerAnnouncedMode = engine.mode;
+    ui.nearDangerWasActive = nextNearDanger;
+  } else if (nextNearDanger && !ui.nearDangerWasActive) {
+    ui.nearDangerWasActive = true;
+    ui.announce(t(`hud.announcer.nearDanger.${engine.mode}`));
+  } else if (!nextNearDanger) {
+    ui.nearDangerWasActive = false;
+  }
+}
+
+/** @this {import('./UIManager.js').UIManager} */
+function refreshModeHudSection(engine, magnetarView) {
+  const warningShotsThreshold = this.gameConfig.canvas.survivalWaveWarningThreshold;
+  if (!refreshStageModeHud(this, engine, magnetarView, warningShotsThreshold)) {
+    refreshWaveModeHud(this, engine, magnetarView, warningShotsThreshold);
+  }
+  const sagActive = Boolean(engine.getSagState?.().active);
+  if (!sagActive) {
+    this.hideSagMeter();
+  }
+  updatePressureMeter(this, engine, sagActive);
+  this.refreshMagnetarHud(engine, magnetarView);
+  updateNearDangerAnnouncement(this, engine);
+
+  if (this.elements.modeBanner) {
+    setAttributeIfChanged(
+      this.elements.modeBanner,
+      'aria-label',
+      `${this.elements.modeBanner.textContent} (${t('hud.stats.mode.switchHint')})`
+    );
+  }
+}
+
+function refreshTutorialAndSpecialBanners(ui, engine) {
+  // Both banners are polite live regions: rewriting identical text on every
+  // engine event would make screen readers repeat them.
+  if (ui.elements.tutorialBanner) {
+    const hintText = engine.activeDiscoveryId
+      ? resolveHintText(engine.activeDiscoveryId, ui.gameConfig.onboarding, ui.ballsConfig, t, ui.inputMode)
+      : '';
+    if (hintText && engine.state === GAME_STATES.PLAYING) {
+      revealLiveRegion({
+        region: ui.elements.tutorialBanner,
+        textElement: ui.elements.tutorialBannerText,
+        text: hintText,
+        schedule: scheduleNextFrame
+      });
+    } else {
+      ui.elements.tutorialBanner.classList.add('hidden');
+    }
+  }
+
+  const equippedBanner = ui.elements.specialEquippedBanner;
+  if (!equippedBanner) {
+    return;
+  }
+  const equippedType = engine.currentBall?.specialType;
+  if (equippedType && engine.state === GAME_STATES.PLAYING) {
+    const spec = ui.ballsConfig.specialTypes[equippedType];
+    revealLiveRegion({
+      region: equippedBanner,
+      textElement: equippedBanner,
+      text: t('hud.launcher.specialEquipped.hint', {
+        icon: spec?.icon || '',
+        name: t(`hud.powerups.${equippedType}.name`),
+        desc: t(`hud.powerups.${equippedType}.tooltip`),
+        unequip: t(`hud.launcher.specialEquipped.unequip.${ui.getHintInputMode('hud.launcher.specialEquipped.unequip')}`)
+      }),
+      schedule: scheduleNextFrame
+    });
+  } else {
+    equippedBanner.classList.add('hidden');
+  }
+}
+
+function refreshSpecialPanelsVisibility(ui, engine) {
+  // A level that hands out no special ball shows no empty slots to a new player.
+  const offersSpecialBalls = engine.offersSpecialBalls();
+  ui.elements.powerupsContainer.classList.toggle('hidden', !offersSpecialBalls);
+  ui.elements.powerupsHeader?.classList.toggle('hidden', !offersSpecialBalls);
+  // Purist modes (Classic, Hex Grid, Merge) have no specials at all: no empty-panel message and no overcharge bar.
+  const hidesByBehavior = Boolean(engine.getModeBehavior?.()?.hidesOvercharge?.(engine));
+  const isPurist = engine.mode === GAME_MODES.CLASSIC || hidesByBehavior;
+  ui.elements.powerupsEmpty?.classList.toggle('hidden', offersSpecialBalls || isPurist);
+  // Puzzle runs carry no Overcharge either: the bar would never move.
+  const hidesOvercharge = isPurist || engine.mode === GAME_MODES.PUZZLE;
+  ui.elements.overchargeFill?.closest?.('.overcharge-widget')?.classList.toggle('hidden', hidesOvercharge);
+  ui.elements.overchargePct?.classList.toggle('hidden', hidesOvercharge);
+}
+
+function refreshLiveStatusBadgesAndBanners(ui, engine) {
+  if (engine.combo > 1) {
+    setTextIfChanged(ui.elements.comboBadge, t('hud.stats.combo.label', { count: engine.combo }));
+    ui.elements.comboBadge.classList.remove('hidden');
+  } else {
+    ui.elements.comboBadge.classList.add('hidden');
+  }
+
+  ui.refreshMergeEventBadge(engine);
+  ui.refreshMergeContractBadge(engine);
+  ui.announceMergePressureChanges(engine.getMergePressureState?.() ?? null);
+
+  const convoyFrozenSec = engine.mode === GAME_MODES.CONVOY
+    ? Math.ceil(engine.modeState?.freezeTimerSec || 0)
+    : 0;
+  const freezeDisplayCount = engine.freezeTurnsRemaining > 0 ? engine.freezeTurnsRemaining : convoyFrozenSec;
+  if (freezeDisplayCount > 0) {
+    setTextIfChanged(ui.elements.frozenBadge, t('hud.stats.frozen.label', { turns: freezeDisplayCount }));
+    ui.elements.frozenBadge.classList.remove('hidden');
+  } else {
+    ui.elements.frozenBadge.classList.add('hidden');
+  }
+
+  refreshTutorialAndSpecialBanners(ui, engine);
+  ui.updateDiscoveryPulse(engine);
+  ui.updateHintReplayButton(engine);
+  ui.updateLevelIntro(engine);
+  ui.updateAimState(engine);
+  refreshSpecialPanelsVisibility(ui, engine);
+
+  ui.syncShopAmmoAvailability();
+  ui.updateTiltButton();
+  ui.refreshMergeShakeControls?.();
+  ui.updatePowerupButtons(engine);
+}
+
+/** @this {import('./UIManager.js').UIManager} */
+function announceRefreshEvents(extra, oneShot) {
+  const { unlockedAchievementIds, fluxStageCleared, classicStageCleared, slingshotStageCleared, fluxPerkChosen } = oneShot;
+
+  if (extra.magnetarAnnouncement) {
+    this.announceMagnetarEvent(extra.magnetarAnnouncement);
+    // Announced once: a refresh re-run with lastExtra must not repeat it.
+    delete this.lastExtra.magnetarAnnouncement;
+  }
+
+  if (extra.ghostAnnouncement) {
+    this.announceGhostEvent(extra.ghostAnnouncement);
+    delete this.lastExtra.ghostAnnouncement;
+  }
+
+  if (fluxStageCleared) {
+    this.announce(t('hud.announcer.round.fluxStageCleared', { stage: fluxStageCleared }));
+  }
+  if (classicStageCleared) {
+    this.announce(t('hud.announcer.round.classicStageCleared', { stage: classicStageCleared }));
+  }
+  if (slingshotStageCleared) {
+    this.announce(t('hud.announcer.round.slingshotStageCleared', { stage: slingshotStageCleared }));
+  }
+  if (fluxPerkChosen) {
+    this.announce(t('hud.announcer.flux.perkChosen', { name: t(`gameplay.flux.perks.${fluxPerkChosen}.name`) }));
+  }
+
+  if (Array.isArray(extra.completedBounties) && extra.completedBounties.length > 0) {
+    const coinsTotal = extra.completedBounties.reduce((sum, item) => sum + (item.coins || 0), 0);
+    const labelList = extra.completedBounties
+      .map((item) => t(`modals.play.bounties.items.${item.id}.title`, { target: formatNumber(item.target) }))
+      .join(t('gameplay.feedback.achievement.listSeparator'));
+    this.announce(t('gameplay.feedback.bounty.completed', { name: labelList, coins: formatNumber(coinsTotal) }));
+    delete this.lastExtra.completedBounties;
+  }
+
+  if (Array.isArray(unlockedAchievementIds) && unlockedAchievementIds.length > 0) {
+    const rewardCoins = unlockedAchievementIds.reduce(
+      (sum, id) => sum + (this.gameConfig.achievements?.[id]?.rewardCoins || 0),
+      0
+    );
+    const names = unlockedAchievementIds
+      .map((id) => t(`modals.shop.achievements.items.${id}.name`))
+      .join(t('gameplay.feedback.achievement.listSeparator'));
+    const announceKey = unlockedAchievementIds.length === 1
+      ? 'hud.announcer.achievement.unlocked'
+      : 'hud.announcer.achievement.unlockedMany';
+    this.announce(t(announceKey, { name: names, coins: formatNumber(rewardCoins) }));
+  }
+}
+
+function syncPauseModal(ui, engine, transitionedState) {
+  if (engine.state !== GAME_STATES.PAUSED || ui.isRunHeldByUi() || ui.isAnyOverlayModalOpen()) {
+    ui.elements.modalPause.classList.add('hidden');
+    return;
+  }
+  setTextIfChanged(ui.elements.pauseInstructionTip, t(engine.getModeBehavior().getPauseTipKey()));
+  ui.updateInputHints();
+  if (ui.elements.pauseLevelTip) {
+    if (engine.levelTutorialKey) {
+      setTextIfChanged(ui.elements.pauseLevelTip, t('modals.pause.levelTip', { tip: t(engine.levelTutorialKey) }));
+      ui.elements.pauseLevelTip.classList.remove('hidden');
+    } else {
+      ui.elements.pauseLevelTip.classList.add('hidden');
+    }
+  }
+  if (transitionedState) {
+    ui.saveLastFocusedElement();
+  }
+  ui.elements.modalPause.classList.remove('hidden');
+  if (transitionedState && ui.elements.btnResume) {
+    ui.elements.btnResume.focus();
+  }
+}
+
+function syncVictoryPresentation(ui, engine, stars, maxStars, isNewRecord) {
+  if (!ui.isVictoryPresented) {
+    ui.isVictoryPresented = true;
+    ui.buildVictoryStars(stars, maxStars);
+    ui.startScoreCountUp(engine.score, isNewRecord);
+    return;
+  }
+  ui.elements.victoryScore?.classList.toggle('is-new-record', isNewRecord);
+  if (ui.scoreCountUpFrame === null) {
+    setTextIfChanged(ui.elements.victoryScore, ui.formatVictoryScoreText(engine.score, isNewRecord));
+  }
+  setTextIfChanged(ui.victoryStarsLabel, t('modals.victory.stats.stars', { stars, maxStars }));
+}
+
+function syncVictoryNextStarHint(ui, summary) {
+  const hintEl = ui.elements.victoryNextStar;
+  if (!hintEl || !summary) {
+    return;
+  }
+  hintEl.classList.remove('hidden');
+  if (summary.nextStarTarget !== null && summary.nextStarTarget !== undefined) {
+    hintEl.textContent = t('modals.victory.nextStarHint', {
+      star: summary.nextStarNumber,
+      target: formatNumber(summary.nextStarTarget),
+      points: formatNumber(summary.pointsToNextStar)
+    });
+    hintEl.classList.remove('is-all-stars');
+    return;
+  }
+  hintEl.textContent = t('modals.victory.allStarsEarned');
+  hintEl.classList.add('is-all-stars');
+}
+
+function revealVictoryContent(ui, engine, summary, isVictoryJustRevealed) {
+  // The run is over: the menu goes away without resuming anything.
+  ui.closeDrawer({ resume: false });
+  const stars = summary.stars || engine.computeStars(engine.score);
+  const maxStars = ui.gameConfig.scoring.maxStars;
+  syncVictoryPresentation(ui, engine, stars, maxStars, Boolean(summary.isNewRecord));
+  syncVictoryNextStarHint(ui, summary);
+  setTextIfChanged(
+    ui.elements.victoryBonus,
+    t('modals.victory.stats.shotsBonus', {
+      bonus: formatNumber(summary.victoryBonus || 0),
+      coins: formatNumber(summary.earnedCoins || 0)
+    })
+  );
+  ui.updateNextLevelButton(engine);
+  const unlockedModes = summary.unlockedModes ?? [];
+  const unlockText = formatUnlockedModesText(unlockedModes, t);
+  if (ui.elements.victoryUnlock) {
+    setTextIfChanged(ui.elements.victoryUnlock, unlockText);
+    ui.elements.victoryUnlock.classList.toggle('hidden', !unlockText);
+  }
+  if (isVictoryJustRevealed) {
+    ui.saveLastFocusedElement();
+    const victoryResult = t('hud.announcer.round.victory', { score: formatNumber(engine.score), stars, maxStars });
+    const unlockedNames = formatUnlockedModeNames(unlockedModes, t);
+    ui.announce(unlockedNames ? `${victoryResult} ${t('hud.announcer.modeUnlocked', { modes: unlockedNames })}` : victoryResult);
+  }
+  ui.elements.modalVictory.classList.remove('hidden');
+  if (isVictoryJustRevealed) {
+    const nextButton = ui.elements.btnNextLevel;
+    // Hidden after the last Puzzle stage: the other-modes button takes the focus.
+    ui.focusInTopModal(nextButton?.classList.contains('hidden') ? ui.elements.btnLevelsVictory : nextButton);
+  }
+}
+
+function syncVictoryModal(ui, engine, extra) {
+  // The modal waits for the post-victory celebration, and for any menu opened meanwhile:
+  // closing that menu reveals it (see closeOverlayModal).
+  const canRevealVictory =
+    engine.state === GAME_STATES.VICTORY
+    && !engine.isVictoryCelebrating()
+    && !ui.isAnyOverlayModalOpen();
+  const isVictoryJustRevealed = canRevealVictory && !ui.isVictoryModalRevealed;
+  if (engine.state !== GAME_STATES.VICTORY || canRevealVictory) {
+    ui.isVictoryModalRevealed = canRevealVictory;
+  }
+  if (engine.state !== GAME_STATES.VICTORY && ui.isVictoryPresented) {
+    ui.isVictoryPresented = false;
+    ui.stopScoreCountUp();
+  }
+  if (canRevealVictory) {
+    revealVictoryContent(ui, engine, engine.victorySummary || extra, isVictoryJustRevealed);
+  }
+}
+
+function syncGameOverActionButtons(ui, engine) {
+  if (ui.elements.gameOverDailyNext) {
+    const isDaily = engine.mode === GAME_MODES.DAILY;
+    if (isDaily) {
+      ui.startDailyCountdown();
+    }
+    ui.elements.gameOverDailyNext.classList.toggle('hidden', !isDaily);
+  }
+  // Every mode but the campaign has a result worth sharing.
+  ui.elements.btnShareGameOver?.classList.toggle('hidden', engine.mode === GAME_MODES.CAMPAIGN);
+  ui.elements.btnDailyHistoryGameOver?.classList.toggle('hidden', engine.mode !== GAME_MODES.DAILY);
+  if (ui.elements.btnContinueGameOver) {
+    const canContinue = Boolean(engine.canContinueOutOfShots?.());
+    if (canContinue) {
+      const pack = engine.getContinuePackSpec();
+      setTextIfChanged(
+        ui.elements.btnContinueGameOver,
+        t('modals.gameOver.button.continueShots', { shots: formatNumber(pack.shots), cost: formatNumber(pack.costCoins) })
+      );
+      ui.elements.btnContinueGameOver.disabled = ui.storageManager.getCoins() < pack.costCoins;
+    }
+    ui.elements.btnContinueGameOver.classList.toggle('hidden', !canContinue);
+  }
+  if (ui.elements.btnSameSeedGameOver) {
+    const hasFluxSeed = engine.mode === GAME_MODES.FLUX && Boolean(engine.fluxSeed);
+    if (hasFluxSeed) {
+      setTextIfChanged(ui.elements.btnSameSeedGameOver, t('modals.gameOver.button.sameSeed', { seed: engine.fluxSeed }));
+    }
+    ui.elements.btnSameSeedGameOver.classList.toggle('hidden', !hasFluxSeed);
+  }
+}
+
+function syncGameOverStatsSummary(ui, engine, extra, bestScore) {
+  const summary = engine.gameOverSummary;
+  const reasonKey = gameOverReasonKey(extra.gameOverReason || summary?.reasonKey);
+  const scoreText = formatNumber(engine.score);
+  setTextIfChanged(ui.elements.gameOverReason, t(reasonKey));
+  setTextIfChanged(ui.elements.gameOverScore, t('modals.gameOver.stats.score', { score: scoreText }));
+  const highScoreText = t('modals.gameOver.stats.highScore', {
+    highScore: formatNumber(Math.max(bestScore, engine.score))
+  });
+  const isNewRecord = Boolean(summary?.isNewRecord);
+  setTextIfChanged(
+    ui.elements.gameOverBest,
+    isNewRecord ? `${highScoreText} - ${t('modals.gameOver.stats.newRecordBadge')}` : highScoreText
+  );
+  ui.elements.gameOverBest?.classList.toggle('is-new-record', isNewRecord);
+  if (ui.elements.gameoverRemaining) {
+    const showRemaining = engine.usesShotBudget() && summary?.remainingSpheres > 0;
+    if (showRemaining) {
+      setTextIfChanged(
+        ui.elements.gameoverRemaining,
+        t('modals.gameOver.stats.remainingSpheres', { count: formatNumber(summary.remainingSpheres) })
+      );
+    }
+    ui.elements.gameoverRemaining.classList.toggle('hidden', !showRemaining);
+  }
+  if (ui.elements.gameOverStage) {
+    const stageSummaryText = ui.formatGameOverStageSummary(engine, summary);
+    if (stageSummaryText) {
+      setTextIfChanged(ui.elements.gameOverStage, stageSummaryText);
+    }
+    ui.elements.gameOverStage.classList.toggle('hidden', !stageSummaryText);
+  }
+  let nearMissText = '';
+  if (ui.elements.gameOverNearMiss) {
+    nearMissText = formatNearMissText(summary?.nearMiss);
+    if (nearMissText) {
+      setTextIfChanged(ui.elements.gameOverNearMiss, nearMissText);
+    }
+    ui.elements.gameOverNearMiss.classList.toggle('hidden', !nearMissText);
+  }
+  const duelText = ui.refreshGameOverDuel(summary);
+  return { reasonKey, scoreText, nearMissText, duelText };
+}
+
+function syncGameOverModal(ui, engine, extra, bestScore, transitionedState) {
+  if (engine.state !== GAME_STATES.GAME_OVER || engine.mode !== GAME_MODES.DAILY) {
+    ui.stopDailyCountdown();
+  }
+  if (engine.state !== GAME_STATES.GAME_OVER) {
+    ui.elements.modalGameOver.classList.add('hidden');
+    return;
+  }
+
+  ui.closeDrawer({ resume: false });
+  const { reasonKey, scoreText, nearMissText, duelText } = syncGameOverStatsSummary(ui, engine, extra, bestScore);
+  syncGameOverActionButtons(ui, engine);
+  if (transitionedState) {
+    ui.shareCopied = false;
+    ui.refreshChallengeUrl();
+    ui.updateShareButtonLabel();
+    ui.elements.gameOverShareFallback?.classList.add('hidden');
+    ui.saveLastFocusedElement();
+    const gameOverResult = t('hud.announcer.round.gameOver', { reason: t(reasonKey), score: scoreText });
+    const roundResult = duelText ? `${gameOverResult} ${duelText}` : gameOverResult;
+    ui.announce(
+      nearMissText
+        ? t('hud.announcer.round.withNearMiss', { result: roundResult, nearMiss: nearMissText })
+        : roundResult
+    );
+  }
+  ui.elements.modalGameOver.classList.remove('hidden');
+  if (transitionedState) {
+    ui.focusInTopModal(ui.elements.btnRetry);
+  }
+}
+
+function syncRoundStateModals(ui, engine, extra, bestScore, transitionedState) {
+  syncPauseModal(ui, engine, transitionedState);
+  syncFluxPerkModal.call(ui, engine);
+  syncVictoryModal(ui, engine, extra);
+  syncGameOverModal(ui, engine, extra, bestScore, transitionedState);
+}
+
+function refreshFooterAndDrawerSync(ui, engine, transitionedState) {
+  // During a duel the rival badge takes the best-run marker's place in the badge row.
+  const isDuelBadgeShown = ui.refreshGhostBadge(engine);
+  const bestRunText = engine.state !== GAME_STATES.VICTORY && engine.state !== GAME_STATES.GAME_OVER && !isDuelBadgeShown
+    ? formatBestRunMarker(engine.getRunBestMarker?.())
+    : '';
+  if (ui.isDuelCardOpen()) {
+    ui.renderDuelCard();
+  }
+  if (ui.elements.bestRunBadge) {
+    setTextIfChanged(ui.elements.bestRunBadge, bestRunText);
+    ui.elements.bestRunBadge.classList.toggle('hidden', !bestRunText);
+  }
+  setTextIfChanged(
+    ui.elements.compactInfo,
+    t('hud.stats.compactLine', {
+      mode: ui.elements.modeBanner.textContent,
+      coins: ui.elements.coinsValue.textContent,
+      best: ui.elements.highScoreValue.textContent
+    })
+  );
+  const transitionedRoundEnd = transitionedState
+    && (engine.state === GAME_STATES.VICTORY || engine.state === GAME_STATES.GAME_OVER);
+  updateQuotaWarning(ui, engine, transitionedRoundEnd);
+  ui.syncDrawerStats();
+}
+
 export const uiHudRefreshMethods = {
   /**
    * Shows the Sag box: label, level/size value, the segmented meter and its accessible
@@ -446,853 +1277,29 @@ export const uiHudRefreshMethods = {
     // One-shot extras (an unlocked achievement, a cleared Flux stage) must not replay
     // when refresh is re-run with lastExtra (language change, input mode change, shop
     // purchase): they are read from this call only.
-    const {
-      oneShot: { unlockedAchievementIds, fluxStageCleared, classicStageCleared, slingshotStageCleared, fluxPerkChosen },
-      persistentExtra
-    } = splitRefreshExtra(extra);
+    const { oneShot, persistentExtra } = splitRefreshExtra(extra);
     this.lastExtra = persistentExtra;
     const magnetarView = engine.getMagnetarView?.() ?? null;
-    setTextIfChanged(this.elements.scoreValue, formatNumber(engine.score));
-    setTextIfChanged(
-      this.elements.coinsValue,
-      t('hud.stats.coins.value', { coins: formatNumber(this.storageManager.getCoins()) })
-    );
 
-    const affordableCount = this.getAffordableUpgradeCount();
-    setTextIfChanged(
-      this.elements.btnShop,
-      affordableCount > 0
-        ? t('app.nav.button.shopBadge', { count: formatNumber(affordableCount) })
-        : t('app.nav.button.shop')
-    );
-    this.elements.btnShop.classList.toggle('has-affordable', affordableCount > 0);
-
-    // Only the mode being played stands out, and says so to screen readers.
-    for (const [mode, elementKeys] of Object.entries(MODE_BUTTON_KEYS)) {
-      const isActive = engine.mode === mode;
-      for (const elementKey of elementKeys) {
-        const button = this.elements[elementKey];
-        if (button) {
-          if (mode === GAME_MODES.CAMPAIGN) {
-            // The Campaign card is a section with two buttons: the section stands out, no button is "current".
-            (button.closest?.('section') ?? button).classList.toggle('active-mode', isActive);
-            continue;
-          }
-          button.classList.toggle('active-mode', isActive);
-          if (isActive) {
-            setAttributeIfChanged(button, 'aria-current', 'true');
-          } else {
-            button.removeAttribute('aria-current');
-          }
-        }
-      }
-    }
-    // A Weekly Flux run highlights its own button, not the plain Flux one.
-    const isWeeklyRun = engine.mode === GAME_MODES.FLUX && engine.isWeeklyFluxRun === true;
-    // Only the run of the current week lights the Weekly button: a run of last week, still
-    // open after Monday 00:00 UTC, is plain Flux for the menu.
-    const isCurrentWeekRun = isCurrentWeeklyRun(engine, getUtcIsoWeekKey(Date.now()));
-    for (const [elementKey, isActive] of [
-      ['btnFlux', engine.mode === GAME_MODES.FLUX && !isCurrentWeekRun],
-      ['btnWeekly', isCurrentWeekRun]
-    ]) {
-      const button = this.elements[elementKey];
-      if (button) {
-        button.classList.toggle('active-mode', isActive);
-        if (isActive) {
-          setAttributeIfChanged(button, 'aria-current', 'true');
-        } else {
-          button.removeAttribute('aria-current');
-        }
-      }
-    }
-    this.refreshModeLocks(this.getModeAccess());
-    if (this.elements.btnDaily) {
-      // The Daily card shows its state in the reward chip; the card keeps its title and text.
-      writeRewardChip(this.elements.dailyReward, this.describeDailyRewardChip());
-      const todayKey = SeededRandom.getTodayDateKey();
-      const streak = this.storageManager.getDailyStreak?.(todayKey) || 0;
-      const graceHint = formatStreakGraceText(streak, this.storageManager.getDailyStreakGrace?.(todayKey), todayKey);
-      if (graceHint) {
-        setAttributeIfChanged(this.elements.btnDaily, 'title', graceHint);
-      } else {
-        this.elements.btnDaily.removeAttribute?.('title');
-      }
-    }
-
-    const overchargePct = Math.min(
-      FULL_PERCENT,
-      Math.round((engine.overcharge / this.gameConfig.scoring.overchargeMax) * FULL_PERCENT)
-    );
-    setTextIfChanged(this.elements.overchargePct, t('hud.stats.overcharge.pct', { pct: overchargePct }));
-    this.elements.overchargeFill.style.width = `${overchargePct}%`;
-
-    let bestScore;
-    if (engine.mode === GAME_MODES.CAMPAIGN) {
-      bestScore = this.storageManager.getLevelStats()[engine.currentLevelId]?.bestScore || 0;
-    } else if (engine.mode === GAME_MODES.DAILY) {
-      bestScore = this.storageManager.getDailyHighScore(engine.dailySeedKey || SeededRandom.getTodayDateKey());
-    } else if (engine.mode === GAME_MODES.FLUX) {
-      // A Weekly Flux run is measured against this week's best, not the all-time Flux record.
-      bestScore = isWeeklyRun
-        ? this.getWeeklyFluxBestScore(engine.weeklyWeekKey)
-        : this.storageManager.getFluxHighScore();
-    } else if (engine.mode === GAME_MODES.PUZZLE) {
-      bestScore = this.storageManager.getPuzzleStageStats?.()?.[engine.currentPuzzleStage]?.bestScore || 0;
-    } else if (engine.mode === GAME_MODES.BLITZ) {
-      bestScore = this.storageManager.getBlitzHighScore();
-    } else if (engine.mode === GAME_MODES.BOSS_RUSH) {
-      bestScore = this.storageManager.getBossRushHighScore();
-    } else if (engine.mode === GAME_MODES.CASCADE) {
-      bestScore = this.storageManager.getCascadeHighScore();
-    } else if (engine.mode === GAME_MODES.CLASSIC) {
-      bestScore = this.storageManager.getClassicHighScore();
-    } else if (engine.mode === GAME_MODES.HEX_GRID) {
-      bestScore = this.storageManager.getHexGridHighScore?.() || 0;
-    } else if (engine.mode === GAME_MODES.ORBITAL) {
-      bestScore = this.storageManager.getOrbitalHighScore?.() || 0;
-    } else if (engine.mode === GAME_MODES.PINBALL) {
-      bestScore = this.storageManager.getPinballHighScore?.() || 0;
-    } else if (engine.mode === GAME_MODES.CONVOY) {
-      bestScore = this.storageManager.getConvoyHighScore?.() || 0;
-    } else if (engine.mode === GAME_MODES.MERGE) {
-      bestScore = this.storageManager.getMergeHighScore?.() || 0;
-    } else if (engine.mode === GAME_MODES.SLINGSHOT) {
-      bestScore = this.storageManager.getSlingshotHighScore?.() || 0;
-    } else {
-      bestScore = this.storageManager.getEndlessHighScore();
-    }
-
-    setTextIfChanged(this.elements.highScoreValue, formatNumber(Math.max(bestScore, engine.score)));
-
-    if (this.elements.polarityBtn) {
-      const polState = engine.isPolarityFlipped ? 'inverted' : 'normal';
-      this.setLauncherButton(
-        this.elements.polarityBtn,
-        'hud.launcher.polarity.icon',
-        `hud.launcher.polarity.${polState}`,
-        'hud.launcher.polarity.shortcut',
-        `hud.launcher.polarity.caption.${polState}`
-      );
-      this.elements.polarityBtn.classList.toggle('active', Boolean(engine.isPolarityFlipped));
-    }
-
-    if (this.elements.swapBtn) {
-      const isSwapLocked = engine.mode === GAME_MODES.PUZZLE;
-      this.elements.swapBtn.disabled = isSwapLocked;
-    }
-
-    const warningShotsThreshold = this.gameConfig.canvas.survivalWaveWarningThreshold;
-
-    const coreRescueSuffix =
-      engine.currentObjective === OBJECTIVE_TYPES.CORE_RESCUE && engine.targetCoreCount > 0
-        ? ` • ${t('hud.stats.mode.coreRescueProgress', {
-            rescued: formatNumber(Math.min(engine.targetCoreCount, engine.rescuedCores || 0)),
-            total: formatNumber(engine.targetCoreCount)
-          })}`
-        : '';
-
-    if (engine.mode === GAME_MODES.CAMPAIGN) {
-      const lvl = engine.levelCatalog.summarize(engine.currentLevelId);
-      setTextIfChanged(
-        this.elements.modeBanner,
-        `${t('hud.stats.mode.campaign', {
-          level: engine.currentLevelId,
-          name: lvl ? this.formatLevelName(lvl) : ''
-        })}${coreRescueSuffix}`
-      );
-      if (this.elements.shotsLabel) {
-        setTextIfChanged(this.elements.shotsLabel, t('hud.stats.shots.label'));
-      }
-      setTextIfChanged(this.elements.shotsValue, formatNumber(engine.shotsRemaining));
-      this.elements.shotsValue.classList.toggle(
-        'warning',
-        engine.shotsRemaining <= warningShotsThreshold
-      );
-
-      if (this.elements.starProgress) {
-        const thresholds = engine.getStarThresholds();
-        const maxStars = this.gameConfig.scoring.maxStars;
-        const currentStars = engine.computeStars(engine.score);
-        const nextThreshold = thresholds.find((th) => th > engine.score);
-        this.updateStarMeter(engine.score, thresholds, nextThreshold);
-        // Two unbreakable parts, so a narrow HUD wraps between them and never inside one.
-        this.renderStarGlyphs(this.elements.starGlyphs, currentStars, maxStars);
-        // The glyphs are hidden from screen readers; this hidden text states the count.
-        setTextIfChanged(
-          this.elements.starCount,
-          t('hud.stats.score.starsAria', {
-            stars: formatNumber(Math.max(0, Math.min(maxStars, currentStars))),
-            maxStars: formatNumber(maxStars)
-          })
-        );
-        setTextIfChanged(
-          this.elements.starNext,
-          nextThreshold !== undefined
-            ? t('hud.stats.score.nextThreshold', { next: formatNumber(nextThreshold) })
-            : t('hud.stats.score.maxReached')
-        );
-        this.elements.starProgress.classList.remove('hidden');
-      }
-    } else if (engine.mode === GAME_MODES.PUZZLE) {
-      setTextIfChanged(
-        this.elements.modeBanner,
-        `${t('hud.stats.mode.puzzle', {
-          stage: engine.currentPuzzleStage,
-          total: this.gameConfig.puzzles?.length || 1
-        })}${coreRescueSuffix}`
-      );
-      if (this.elements.shotsLabel) {
-        setTextIfChanged(this.elements.shotsLabel, t('hud.stats.shots.label'));
-      }
-      setTextIfChanged(this.elements.shotsValue, formatNumber(engine.shotsRemaining));
-      this.elements.shotsValue.classList.toggle('warning', engine.shotsRemaining <= warningShotsThreshold);
-      if (this.elements.starProgress) {
-        const thresholds = engine.getStarThresholds();
-        const maxStars = this.gameConfig.scoring.maxStars;
-        const currentStars = engine.computeStars(engine.score);
-        const nextThreshold = thresholds.find((th) => th > engine.score);
-        this.updateStarMeter(engine.score, thresholds, nextThreshold);
-        this.renderStarGlyphs(this.elements.starGlyphs, currentStars, maxStars);
-        setTextIfChanged(
-          this.elements.starCount,
-          t('hud.stats.score.starsAria', {
-            stars: formatNumber(Math.max(0, Math.min(maxStars, currentStars))),
-            maxStars: formatNumber(maxStars)
-          })
-        );
-        setTextIfChanged(
-          this.elements.starNext,
-          nextThreshold !== undefined
-            ? t('hud.stats.score.nextThreshold', { next: formatNumber(nextThreshold) })
-            : t('hud.stats.score.maxReached')
-        );
-        this.elements.starProgress.classList.remove('hidden');
-      }
-    } else if (engine.mode === GAME_MODES.BLITZ) {
-      const fps = this.gameConfig.blitz.framesPerSecond;
-      const secondsLeft = Math.max(0, Math.ceil(engine.blitzFramesRemaining / fps));
-      setTextIfChanged(
-        this.elements.modeBanner,
-        t('hud.stats.mode.blitz', { wave: formatNumber(engine.waveCount) })
-      );
-      if (this.elements.shotsLabel) {
-        setTextIfChanged(this.elements.shotsLabel, t('hud.stats.time.label'));
-      }
-      setTextIfChanged(this.elements.shotsValue, t('hud.stats.time.seconds', { seconds: formatNumber(secondsLeft) }));
-      this.elements.shotsValue.classList.toggle(
-        'warning',
-        secondsLeft <= this.gameConfig.blitz.warningSeconds
-      );
-      if (this.elements.starProgress) {
-        this.elements.starProgress.classList.add('hidden');
-      }
-    } else if (engine.mode === GAME_MODES.FLUX) {
-      setTextIfChanged(
-        this.elements.modeBanner,
-        t(getFluxBannerKey(engine.fluxIsBossStage, magnetarView), {
-          stage: engine.fluxStage,
-          shape: this.formatFluxShapeName(engine.fluxShapeIds),
-          moorings: magnetarView ? formatNumber(magnetarView.moorings) : ''
-        })
-      );
-      if (this.elements.shotsLabel) {
-        setTextIfChanged(this.elements.shotsLabel, t('hud.stats.shots.label'));
-      }
-      setTextIfChanged(this.elements.shotsValue, formatNumber(engine.shotsRemaining));
-      this.elements.shotsValue.classList.toggle('warning', engine.shotsRemaining <= warningShotsThreshold);
-      if (this.elements.starProgress) {
-        this.elements.starProgress.classList.add('hidden');
-      }
-    } else if (engine.mode === GAME_MODES.PINBALL) {
-      const remainingCores = engine.modeState?.corePegsRemaining ?? 0;
-      setTextIfChanged(
-        this.elements.modeBanner,
-        t('hud.stats.mode.pinball', {
-          stage: formatNumber(engine.pinballStage || 1),
-          cores: formatNumber(remainingCores)
-        })
-      );
-      if (this.elements.shotsLabel) {
-        setTextIfChanged(this.elements.shotsLabel, t('hud.stats.shots.label'));
-      }
-      setTextIfChanged(this.elements.shotsValue, formatNumber(engine.shotsRemaining));
-      this.elements.shotsValue.classList.toggle('warning', engine.shotsRemaining <= warningShotsThreshold);
-      if (this.elements.starProgress) {
-        this.elements.starProgress.classList.add('hidden');
-      }
-    } else if (engine.mode === GAME_MODES.SLINGSHOT) {
-      const remainingCores = Array.isArray(engine.physicsWorld?.balls)
-        ? engine.physicsWorld.balls.reduce((sum, b) => sum + (b.slingshotCore ? 1 : 0), 0)
-        : 0;
-      setTextIfChanged(
-        this.elements.modeBanner,
-        t('hud.stats.mode.slingshot', {
-          stage: formatNumber(engine.slingshotStage || 1),
-          cores: formatNumber(remainingCores)
-        })
-      );
-      if (this.elements.shotsLabel) {
-        setTextIfChanged(this.elements.shotsLabel, t('hud.stats.shots.label'));
-      }
-      setTextIfChanged(this.elements.shotsValue, formatNumber(engine.shotsRemaining));
-      this.elements.shotsValue.classList.toggle('warning', engine.shotsRemaining <= warningShotsThreshold);
-      if (this.elements.starProgress) {
-        this.elements.starProgress.classList.add('hidden');
-      }
-    } else {
-      if (engine.mode === GAME_MODES.DAILY) {
-        const mutatorLabel = engine.activeMutatorKey
-          ? t(`gameplay.mutators.${engine.activeMutatorKey}`)
-          : '';
-        setTextIfChanged(
-          this.elements.modeBanner,
-          t('hud.stats.mode.daily', {
-            mutator: mutatorLabel,
-            wave: engine.waveCount
-          })
-        );
-      } else if (engine.mode === GAME_MODES.BOSS_RUSH) {
-        const shields = engine.getBossBall()?.armorHits || 0;
-        let bannerText;
-        if (magnetarView) {
-          const isResting = magnetarView.phase === 'rest' && Number.isFinite(magnetarView.restLeft);
-          bannerText = t(isResting ? 'hud.stats.mode.bossRushMagnetarRest' : 'hud.stats.mode.bossRushMagnetar', {
-            wave: engine.bossRushWave,
-            moorings: formatNumber(magnetarView.moorings),
-            ...(isResting ? { rest: formatNumber(magnetarView.restLeft) } : {})
-          });
-        } else {
-          bannerText = t('hud.stats.mode.bossRush', {
-            wave: engine.bossRushWave,
-            shields: formatNumber(shields)
-          });
-        }
-        setTextIfChanged(this.elements.modeBanner, bannerText);
-      } else if (engine.mode === GAME_MODES.CASCADE) {
-        setTextIfChanged(
-          this.elements.modeBanner,
-          t('hud.stats.mode.cascade', {
-            wave: engine.waveCount
-          })
-        );
-      } else if (engine.mode === GAME_MODES.CLASSIC) {
-        setTextIfChanged(
-          this.elements.modeBanner,
-          t('hud.stats.mode.classic', {
-            stage: formatNumber(engine.classicStage)
-          })
-        );
-      } else if (engine.mode === GAME_MODES.HEX_GRID) {
-        setTextIfChanged(
-          this.elements.modeBanner,
-          t('hud.stats.mode.hexGrid', {
-            wave: formatNumber(engine.waveCount)
-          })
-        );
-      } else if (engine.mode === GAME_MODES.ORBITAL) {
-        setTextIfChanged(
-          this.elements.modeBanner,
-          t('hud.stats.mode.orbital', {
-            wave: formatNumber(engine.waveCount)
-          })
-        );
-      } else if (engine.mode === GAME_MODES.CONVOY) {
-        setTextIfChanged(
-          this.elements.modeBanner,
-          t('hud.stats.mode.convoy', {
-            wave: formatNumber(engine.waveCount)
-          })
-        );
-      } else if (engine.mode === GAME_MODES.MERGE) {
-        setTextIfChanged(
-          this.elements.modeBanner,
-          t('hud.stats.mode.merge', {
-            tier: formatNumber(engine.mergeBestTier || 1)
-          })
-        );
-      } else {
-        setTextIfChanged(
-          this.elements.modeBanner,
-          t('hud.stats.mode.endless', {
-            wave: engine.waveCount
-          })
-        );
-      }
-      const sag = engine.getSagState?.();
-      if (sag?.active) {
-        this.refreshSagMeter(engine, sag);
-      } else {
-        const shakeLeft = engine.mode === GAME_MODES.MERGE ? engine.getMergeShakeRemaining?.() : null;
-        if (this.elements.shotsLabel) {
-          let shotsLabelKey = 'hud.stats.shots.waveLabel';
-          if (engine.mode === GAME_MODES.BOSS_RUSH) {
-            shotsLabelKey = 'hud.stats.shots.shieldsLabel';
-          } else if (engine.mode === GAME_MODES.CONVOY) {
-            shotsLabelKey = 'hud.stats.shots.convoyLabel';
-          } else if (engine.mode === GAME_MODES.MERGE) {
-            shotsLabelKey = shakeLeft !== null && shakeLeft !== undefined
-              ? 'hud.stats.shots.shakeLabel'
-              : 'hud.stats.shots.mergesLabel';
-          }
-          setTextIfChanged(this.elements.shotsLabel, t(shotsLabelKey));
-        }
-        let waveCountdown = 0;
-        let waveValueText = null;
-        let isShotsWarning;
-        if (engine.mode === GAME_MODES.CASCADE) {
-          waveCountdown = engine.cascadeTurnsUntilDrop;
-          isShotsWarning = waveCountdown <= warningShotsThreshold;
-        } else if (engine.mode === GAME_MODES.BOSS_RUSH) {
-          waveCountdown = engine.getBossBall()?.armorHits || 0;
-          isShotsWarning = waveCountdown <= warningShotsThreshold;
-        } else if (engine.mode === GAME_MODES.HEX_GRID) {
-          waveCountdown = engine.modeState?.shotsUntilDescent ?? 0;
-          isShotsWarning = waveCountdown <= warningShotsThreshold;
-        } else if (engine.mode === GAME_MODES.ORBITAL) {
-          waveCountdown = engine.modeState?.turnsUntilWave ?? 0;
-          isShotsWarning = waveCountdown <= warningShotsThreshold || Boolean(engine.modeState?.nearDanger);
-        } else if (engine.mode === GAME_MODES.CONVOY) {
-          waveCountdown = engine.physicsWorld.balls.length + (engine.modeState?.spawnRemaining ?? 0);
-          isShotsWarning = Boolean(engine.modeState?.nearDanger);
-        } else if (engine.mode === GAME_MODES.MERGE) {
-          if (shakeLeft !== null && shakeLeft !== undefined) {
-            waveValueText = shakeLeft === 0 ? t('hud.stats.shots.shakeReady') : formatNumber(shakeLeft);
-          } else {
-            waveCountdown = engine.modeState?.mergesCount ?? 0;
-          }
-          isShotsWarning = Boolean(engine.modeState?.nearDanger);
-        } else {
-          isShotsWarning = waveCountdown <= warningShotsThreshold;
-        }
-        setTextIfChanged(this.elements.shotsValue, waveValueText ?? formatNumber(waveCountdown));
-        this.elements.shotsValue.classList.toggle('warning', isShotsWarning);
-      }
-      if (this.elements.starProgress) {
-        this.elements.starProgress.classList.add('hidden');
-      }
-    }
-
-    const sagActive = Boolean(engine.getSagState?.().active);
-    if (!sagActive) {
-      this.hideSagMeter();
-    }
-    updatePressureMeter(this, engine, sagActive);
-    this.refreshMagnetarHud(engine, magnetarView);
-    if (
-      engine.state === GAME_STATES.PLAYING
-      && (engine.mode === GAME_MODES.CONVOY || engine.mode === GAME_MODES.ORBITAL || engine.mode === GAME_MODES.MERGE)
-    ) {
-      const nextNearDanger = Boolean(engine.modeState?.nearDanger);
-      if (this.nearDangerAnnouncedMode !== engine.mode) {
-        this.nearDangerAnnouncedMode = engine.mode;
-        this.nearDangerWasActive = nextNearDanger;
-      } else if (nextNearDanger && !this.nearDangerWasActive) {
-        this.nearDangerWasActive = true;
-        this.announce(t(`hud.announcer.nearDanger.${engine.mode}`));
-      } else if (!nextNearDanger) {
-        this.nearDangerWasActive = false;
-      }
-    } else {
-      this.nearDangerAnnouncedMode = null;
-      this.nearDangerWasActive = false;
-    }
-
-    if (this.elements.modeBanner) {
-      setAttributeIfChanged(
-        this.elements.modeBanner,
-        'aria-label',
-        `${this.elements.modeBanner.textContent} (${t('hud.stats.mode.switchHint')})`
-      );
-    }
-
-    if (engine.combo > 1) {
-      setTextIfChanged(this.elements.comboBadge, t('hud.stats.combo.label', { count: engine.combo }));
-      this.elements.comboBadge.classList.remove('hidden');
-    } else {
-      this.elements.comboBadge.classList.add('hidden');
-    }
-
-    this.refreshMergeEventBadge(engine);
-    this.refreshMergeContractBadge(engine);
-    this.announceMergePressureChanges(engine.getMergePressureState?.() ?? null);
-
-    const convoyFrozenSec = engine.mode === GAME_MODES.CONVOY
-      ? Math.ceil(engine.modeState?.freezeTimerSec || 0)
-      : 0;
-    const freezeDisplayCount = engine.freezeTurnsRemaining > 0 ? engine.freezeTurnsRemaining : convoyFrozenSec;
-    if (freezeDisplayCount > 0) {
-      setTextIfChanged(
-        this.elements.frozenBadge,
-        t('hud.stats.frozen.label', { turns: freezeDisplayCount })
-      );
-      this.elements.frozenBadge.classList.remove('hidden');
-    } else {
-      this.elements.frozenBadge.classList.add('hidden');
-    }
-
-    // Both banners are polite live regions: rewriting identical text on every
-    // engine event would make screen readers repeat them.
-    if (this.elements.tutorialBanner) {
-      const hintText = engine.activeDiscoveryId
-        ? resolveHintText(engine.activeDiscoveryId, this.gameConfig.onboarding, this.ballsConfig, t, this.inputMode)
-        : '';
-      if (hintText && engine.state === GAME_STATES.PLAYING) {
-        revealLiveRegion({
-          region: this.elements.tutorialBanner,
-          textElement: this.elements.tutorialBannerText,
-          text: hintText,
-          schedule: scheduleNextFrame
-        });
-      } else {
-        this.elements.tutorialBanner.classList.add('hidden');
-      }
-    }
-
-    if (this.elements.specialEquippedBanner) {
-      const equippedType = engine.currentBall?.specialType;
-      if (equippedType && engine.state === GAME_STATES.PLAYING) {
-        const spec = this.ballsConfig.specialTypes[equippedType];
-        revealLiveRegion({
-          region: this.elements.specialEquippedBanner,
-          textElement: this.elements.specialEquippedBanner,
-          text: t('hud.launcher.specialEquipped.hint', {
-            icon: spec?.icon || '',
-            name: t(`hud.powerups.${equippedType}.name`),
-            desc: t(`hud.powerups.${equippedType}.tooltip`),
-            unequip: t(`hud.launcher.specialEquipped.unequip.${this.getHintInputMode('hud.launcher.specialEquipped.unequip')}`)
-          }),
-          schedule: scheduleNextFrame
-        });
-      } else {
-        this.elements.specialEquippedBanner.classList.add('hidden');
-      }
-    }
-
-    this.updateDiscoveryPulse(engine);
-    this.updateHintReplayButton(engine);
-    this.updateLevelIntro(engine);
-
-    this.updateAimState(engine);
-
-    // A level that hands out no special ball shows no empty slots to a new player.
-    const offersSpecialBalls = engine.offersSpecialBalls();
-    this.elements.powerupsContainer.classList.toggle('hidden', !offersSpecialBalls);
-    this.elements.powerupsHeader?.classList.toggle('hidden', !offersSpecialBalls);
-    // The panel keeps its place in the layout, so it says why it is empty.
-    // Purist modes (Classic, Hex Grid, Merge) have no specials at all: no empty-panel message and no overcharge bar.
-    const behaviorHidesOvercharge = Boolean(engine.getModeBehavior?.()?.hidesOvercharge?.(engine));
-    const isPurist = engine.mode === GAME_MODES.CLASSIC || behaviorHidesOvercharge;
-    this.elements.powerupsEmpty?.classList.toggle('hidden', offersSpecialBalls || isPurist);
-    // Puzzle runs carry no Overcharge either: the bar would never move.
-    const hidesOvercharge = isPurist || engine.mode === GAME_MODES.PUZZLE;
-    this.elements.overchargeFill?.closest?.('.overcharge-widget')?.classList.toggle('hidden', hidesOvercharge);
-    this.elements.overchargePct?.classList.toggle('hidden', hidesOvercharge);
-
-    this.syncShopAmmoAvailability();
-    this.updateTiltButton();
-    this.refreshMergeShakeControls?.();
-    this.updatePowerupButtons(engine);
+    refreshHeaderMetrics(this, engine);
+    refreshModeSelectionHighlights(this, engine);
+    const bestScore = refreshOverchargeAndBestScore(this, engine);
+    refreshLauncherControls.call(this, engine);
+    refreshModeHudSection.call(this, engine, magnetarView);
+    refreshLiveStatusBadgesAndBanners(this, engine);
 
     const transitionedState = this.prevEngineState !== engine.state;
     this.prevEngineState = engine.state;
 
-    if (extra.magnetarAnnouncement) {
-      this.announceMagnetarEvent(extra.magnetarAnnouncement);
-      // Announced once: a refresh re-run with lastExtra must not repeat it.
-      delete this.lastExtra.magnetarAnnouncement;
+    announceRefreshEvents.call(this, extra, oneShot);
+    const modalMaskBefore = getRoundModalVisibilityMask(this);
+    syncRoundStateModals(this, engine, extra, bestScore, transitionedState);
+    const modalMaskAfter = getRoundModalVisibilityMask(this);
+    refreshFooterAndDrawerSync(this, engine, transitionedState);
+    if (this.lastRoundModalMask === undefined || modalMaskAfter !== modalMaskBefore || modalMaskAfter !== this.lastRoundModalMask) {
+      this.lastRoundModalMask = modalMaskAfter;
+      this.syncModalInertState();
     }
-
-    if (extra.ghostAnnouncement) {
-      this.announceGhostEvent(extra.ghostAnnouncement);
-      // Announced once: a refresh re-run with lastExtra must not repeat it.
-      delete this.lastExtra.ghostAnnouncement;
-    }
-
-    if (fluxStageCleared) {
-      this.announce(t('hud.announcer.round.fluxStageCleared', { stage: fluxStageCleared }));
-    }
-
-    if (classicStageCleared) {
-      this.announce(t('hud.announcer.round.classicStageCleared', { stage: classicStageCleared }));
-    }
-
-    if (slingshotStageCleared) {
-      this.announce(t('hud.announcer.round.slingshotStageCleared', { stage: slingshotStageCleared }));
-    }
-
-    if (fluxPerkChosen) {
-      this.announce(
-        t('hud.announcer.flux.perkChosen', { name: t(`gameplay.flux.perks.${fluxPerkChosen}.name`) })
-      );
-    }
-
-    if (Array.isArray(extra.completedBounties) && extra.completedBounties.length > 0) {
-      const coinsTotal = extra.completedBounties.reduce((sum, item) => sum + (item.coins || 0), 0);
-      const labelList = extra.completedBounties
-        .map((item) => t(`modals.play.bounties.items.${item.id}.title`, { target: formatNumber(item.target) }))
-        .join(t('gameplay.feedback.achievement.listSeparator'));
-      this.announce(t('gameplay.feedback.bounty.completed', { name: labelList, coins: formatNumber(coinsTotal) }));
-      delete this.lastExtra.completedBounties;
-    }
-
-    if (Array.isArray(unlockedAchievementIds) && unlockedAchievementIds.length > 0) {
-      const rewardCoins = unlockedAchievementIds.reduce(
-        (sum, id) => sum + (this.gameConfig.achievements?.[id]?.rewardCoins || 0),
-        0
-      );
-      const names = unlockedAchievementIds
-        .map((id) => t(`modals.shop.achievements.items.${id}.name`))
-        .join(t('gameplay.feedback.achievement.listSeparator'));
-      const announceKey = unlockedAchievementIds.length === 1
-        ? 'hud.announcer.achievement.unlocked'
-        : 'hud.announcer.achievement.unlockedMany';
-      this.announce(t(announceKey, { name: names, coins: formatNumber(rewardCoins) }));
-    }
-
-    if (engine.state === GAME_STATES.PAUSED && !this.isRunHeldByUi() && !this.isAnyOverlayModalOpen()) {
-      setTextIfChanged(this.elements.pauseInstructionTip, t(engine.getModeBehavior().getPauseTipKey()));
-      this.updateInputHints();
-      if (this.elements.pauseLevelTip) {
-        if (engine.levelTutorialKey) {
-          setTextIfChanged(
-            this.elements.pauseLevelTip,
-            t('modals.pause.levelTip', {
-              tip: t(engine.levelTutorialKey)
-            })
-          );
-          this.elements.pauseLevelTip.classList.remove('hidden');
-        } else {
-          this.elements.pauseLevelTip.classList.add('hidden');
-        }
-      }
-      if (transitionedState) {
-        this.saveLastFocusedElement();
-      }
-      this.elements.modalPause.classList.remove('hidden');
-      if (transitionedState && this.elements.btnResume) {
-        this.elements.btnResume.focus();
-      }
-    } else {
-      this.elements.modalPause.classList.add('hidden');
-    }
-
-    syncFluxPerkModal.call(this, engine);
-
-    // The modal waits for the post-victory celebration, and for any menu opened meanwhile:
-    // closing that menu reveals it (see closeOverlayModal).
-    const canRevealVictory =
-      engine.state === GAME_STATES.VICTORY &&
-      !engine.isVictoryCelebrating() &&
-      !this.isAnyOverlayModalOpen();
-    const isVictoryJustRevealed = canRevealVictory && !this.isVictoryModalRevealed;
-    if (engine.state !== GAME_STATES.VICTORY || canRevealVictory) {
-      this.isVictoryModalRevealed = canRevealVictory;
-    }
-
-    if (engine.state !== GAME_STATES.VICTORY && this.isVictoryPresented) {
-      this.isVictoryPresented = false;
-      this.stopScoreCountUp();
-    }
-
-    if (canRevealVictory) {
-      // The run is over: the menu goes away without resuming anything.
-      this.closeDrawer({ resume: false });
-      const summary = engine.victorySummary || extra;
-      const stars = summary.stars || engine.computeStars(engine.score);
-      const maxStars = this.gameConfig.scoring.maxStars;
-      const scoreText = formatNumber(engine.score);
-      const isNewRecord = Boolean(summary.isNewRecord);
-      // Score roll-up and star pops play once per victory, the first time the window
-      // shows; later refreshes only keep the texts current (e.g. after a language switch).
-      if (!this.isVictoryPresented) {
-        this.isVictoryPresented = true;
-        this.buildVictoryStars(stars, maxStars);
-        this.startScoreCountUp(engine.score, isNewRecord);
-      } else {
-        this.elements.victoryScore?.classList.toggle('is-new-record', isNewRecord);
-        if (this.scoreCountUpFrame === null) {
-          setTextIfChanged(this.elements.victoryScore, this.formatVictoryScoreText(engine.score, isNewRecord));
-        }
-        setTextIfChanged(this.victoryStarsLabel, t('modals.victory.stats.stars', { stars, maxStars }));
-      }
-      if (this.elements.victoryNextStar && summary) {
-        this.elements.victoryNextStar.classList.remove('hidden');
-        if (summary.nextStarTarget !== null && summary.nextStarTarget !== undefined) {
-          this.elements.victoryNextStar.textContent = t('modals.victory.nextStarHint', {
-            star: summary.nextStarNumber,
-            target: formatNumber(summary.nextStarTarget),
-            points: formatNumber(summary.pointsToNextStar)
-          });
-          this.elements.victoryNextStar.classList.remove('is-all-stars');
-        } else {
-          this.elements.victoryNextStar.textContent = t('modals.victory.allStarsEarned');
-          this.elements.victoryNextStar.classList.add('is-all-stars');
-        }
-      }
-      setTextIfChanged(
-        this.elements.victoryBonus,
-        t('modals.victory.stats.shotsBonus', {
-          bonus: formatNumber(summary.victoryBonus || 0),
-          coins: formatNumber(summary.earnedCoins || 0)
-        })
-      );
-      this.updateNextLevelButton(engine);
-      const unlockedModes = summary.unlockedModes ?? [];
-      const unlockText = formatUnlockedModesText(unlockedModes, t);
-      if (this.elements.victoryUnlock) {
-        setTextIfChanged(this.elements.victoryUnlock, unlockText);
-        this.elements.victoryUnlock.classList.toggle('hidden', !unlockText);
-      }
-      if (isVictoryJustRevealed) {
-        this.saveLastFocusedElement();
-        const victoryResult = t('hud.announcer.round.victory', { score: scoreText, stars, maxStars });
-        const unlockedNames = formatUnlockedModeNames(unlockedModes, t);
-        this.announce(
-          unlockedNames
-            ? `${victoryResult} ${t('hud.announcer.modeUnlocked', { modes: unlockedNames })}`
-            : victoryResult
-        );
-      }
-      this.elements.modalVictory.classList.remove('hidden');
-      if (isVictoryJustRevealed) {
-        const nextButton = this.elements.btnNextLevel;
-        // Hidden after the last Puzzle stage: the other-modes button takes the focus.
-        this.focusInTopModal(nextButton?.classList.contains('hidden') ? this.elements.btnLevelsVictory : nextButton);
-      }
-    }
-
-    if (engine.state !== GAME_STATES.GAME_OVER || engine.mode !== GAME_MODES.DAILY) {
-      this.stopDailyCountdown();
-    }
-
-    if (engine.state === GAME_STATES.GAME_OVER) {
-      this.closeDrawer({ resume: false });
-      const summary = engine.gameOverSummary;
-      const reasonKey = gameOverReasonKey(extra.gameOverReason || summary?.reasonKey);
-      const scoreText = formatNumber(engine.score);
-      setTextIfChanged(this.elements.gameOverReason, t(reasonKey));
-      setTextIfChanged(this.elements.gameOverScore, t('modals.gameOver.stats.score', { score: scoreText }));
-      const highScoreText = t('modals.gameOver.stats.highScore', {
-        highScore: formatNumber(Math.max(bestScore, engine.score))
-      });
-      const isNewRecord = Boolean(summary?.isNewRecord);
-      setTextIfChanged(
-        this.elements.gameOverBest,
-        isNewRecord ? `${highScoreText} - ${t('modals.gameOver.stats.newRecordBadge')}` : highScoreText
-      );
-      this.elements.gameOverBest?.classList.toggle('is-new-record', isNewRecord);
-      if (this.elements.gameoverRemaining) {
-        const showRemaining = engine.usesShotBudget() && summary?.remainingSpheres > 0;
-        if (showRemaining) {
-          setTextIfChanged(
-            this.elements.gameoverRemaining,
-            t('modals.gameOver.stats.remainingSpheres', { count: formatNumber(summary.remainingSpheres) })
-          );
-          this.elements.gameoverRemaining.classList.remove('hidden');
-        } else {
-          this.elements.gameoverRemaining.classList.add('hidden');
-        }
-      }
-      if (this.elements.gameOverStage) {
-        const stageSummaryText = this.formatGameOverStageSummary(engine, summary);
-        if (stageSummaryText) {
-          setTextIfChanged(this.elements.gameOverStage, stageSummaryText);
-        }
-        this.elements.gameOverStage.classList.toggle('hidden', !stageSummaryText);
-      }
-      let nearMissText = '';
-      if (this.elements.gameOverNearMiss) {
-        nearMissText = formatNearMissText(summary?.nearMiss);
-        if (nearMissText) {
-          setTextIfChanged(this.elements.gameOverNearMiss, nearMissText);
-        }
-        this.elements.gameOverNearMiss.classList.toggle('hidden', !nearMissText);
-      }
-      const duelText = this.refreshGameOverDuel(summary);
-      if (this.elements.gameOverDailyNext) {
-        const isDaily = engine.mode === GAME_MODES.DAILY;
-        if (isDaily) {
-          this.startDailyCountdown();
-        }
-        this.elements.gameOverDailyNext.classList.toggle('hidden', !isDaily);
-      }
-      // Every mode but the campaign has a result worth sharing.
-      this.elements.btnShareGameOver?.classList.toggle('hidden', engine.mode === GAME_MODES.CAMPAIGN);
-      this.elements.btnDailyHistoryGameOver?.classList.toggle('hidden', engine.mode !== GAME_MODES.DAILY);
-      if (this.elements.btnContinueGameOver) {
-        const canContinue = Boolean(engine.canContinueOutOfShots?.());
-        if (canContinue) {
-          const pack = engine.getContinuePackSpec();
-          const canAfford = this.storageManager.getCoins() >= pack.costCoins;
-          setTextIfChanged(
-            this.elements.btnContinueGameOver,
-            t('modals.gameOver.button.continueShots', {
-              shots: formatNumber(pack.shots),
-              cost: formatNumber(pack.costCoins)
-            })
-          );
-          this.elements.btnContinueGameOver.disabled = !canAfford;
-        }
-        this.elements.btnContinueGameOver.classList.toggle('hidden', !canContinue);
-      }
-      if (this.elements.btnSameSeedGameOver) {
-        const hasFluxSeed = engine.mode === GAME_MODES.FLUX && Boolean(engine.fluxSeed);
-        if (hasFluxSeed) {
-          setTextIfChanged(
-            this.elements.btnSameSeedGameOver,
-            t('modals.gameOver.button.sameSeed', { seed: engine.fluxSeed })
-          );
-        }
-        this.elements.btnSameSeedGameOver.classList.toggle('hidden', !hasFluxSeed);
-      }
-      if (transitionedState) {
-        this.shareCopied = false;
-        this.refreshChallengeUrl();
-        this.updateShareButtonLabel();
-        this.elements.gameOverShareFallback?.classList.add('hidden');
-        this.saveLastFocusedElement();
-        const gameOverResult = t('hud.announcer.round.gameOver', { reason: t(reasonKey), score: scoreText });
-        const roundResult = duelText ? `${gameOverResult} ${duelText}` : gameOverResult;
-        this.announce(
-          nearMissText
-            ? t('hud.announcer.round.withNearMiss', { result: roundResult, nearMiss: nearMissText })
-            : roundResult
-        );
-      }
-      this.elements.modalGameOver.classList.remove('hidden');
-      if (transitionedState) {
-        this.focusInTopModal(this.elements.btnRetry);
-      }
-    } else {
-      this.elements.modalGameOver.classList.add('hidden');
-    }
-
-    // During a duel the rival badge takes the best-run marker's place in the badge row.
-    const isDuelBadgeShown = this.refreshGhostBadge(engine);
-    const bestRunText = engine.state !== GAME_STATES.VICTORY && engine.state !== GAME_STATES.GAME_OVER && !isDuelBadgeShown
-      ? formatBestRunMarker(engine.getRunBestMarker?.())
-      : '';
-    if (this.isDuelCardOpen()) {
-      this.renderDuelCard();
-    }
-    if (this.elements.bestRunBadge) {
-      setTextIfChanged(this.elements.bestRunBadge, bestRunText);
-      this.elements.bestRunBadge.classList.toggle('hidden', !bestRunText);
-    }
-    setTextIfChanged(
-      this.elements.compactInfo,
-      t('hud.stats.compactLine', {
-        mode: this.elements.modeBanner.textContent,
-        coins: this.elements.coinsValue.textContent,
-        best: this.elements.highScoreValue.textContent
-      })
-    );
-    const transitionedRoundEnd = transitionedState
-      && (engine.state === GAME_STATES.VICTORY || engine.state === GAME_STATES.GAME_OVER);
-    updateQuotaWarning(this, engine, transitionedRoundEnd);
-    this.syncDrawerStats();
-    this.syncModalInertState();
   },
 
   /** Best score of the given Weekly Flux week (this week when none is given), 0 when none yet. */

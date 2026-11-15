@@ -27,7 +27,8 @@ import {
   isCurrentWeeklyRun,
   isModeUnlocked,
   setAttributeIfChanged,
-  setTextIfChanged
+  setTextIfChanged,
+  syncFluxSeedValidationError
 } from './UIHelpers.js';
 
 /*
@@ -695,6 +696,9 @@ export const uiPlayHubMethods = {
       panel?.classList.toggle(HIDDEN_CLASS, !isOpen);
       toggle?.setAttribute('aria-expanded', String(isOpen));
     }
+    if (name !== 'seed' || !open) {
+      syncFluxSeedValidationError(this.elements);
+    }
     return open;
   },
 
@@ -703,6 +707,7 @@ export const uiPlayHubMethods = {
     for (const name of Object.keys(PLAY_HUB_DISCLOSURES)) {
       this.togglePlayHubDisclosure(name, false);
     }
+    syncFluxSeedValidationError(this.elements);
   },
 
   /**

@@ -188,11 +188,67 @@ test('Classic is wired like the other gated modes', () => {
     assert.ok(dictionary.modals.levelSelect.arcade.classicBest.includes('{{stage}}'));
   }
   assert.equal(gameConfig.modeUnlocks.campaignLevelCleared.classic, 4);
-  const bindings = readText('../src/ui/UIInputBindings.js');
-  assert.match(
-    bindings,
-    /bindModeCard\(this, this\.elements\.btnModeClassic, \{[\s\S]{0,120}accessKey: GAME_MODES\.CLASSIC[\s\S]{0,200}startClassicMode\(\)/
-  );
+  const previousDocument = globalThis.document;
+  const previousWindow = globalThis.window;
+  globalThis.document = { addEventListener: () => {} };
+  globalThis.window = { addEventListener: () => {} };
+  try {
+    const makeInteractive = (initialClasses = []) => {
+      const listeners = new Map();
+      const base = fakeElement(initialClasses);
+      return {
+        ...base,
+        addEventListener: (type, fn) => listeners.set(type, fn),
+        click: () => listeners.get('click')?.(),
+        querySelectorAll: () => [],
+        contains: () => false
+      };
+    };
+    let unlockedClassic = false;
+    let startedClassic = 0;
+    const elements = new Proxy({
+      btnModeClassic: makeInteractive(),
+      playHubHint: fakeElement(['hidden']),
+      modalLevels: makeInteractive(['hidden']),
+      modalPlay: makeInteractive()
+    }, {
+      get(target, prop) {
+        if (!(prop in target)) {
+          target[prop] = makeInteractive(['hidden']);
+        }
+        return target[prop];
+      }
+    });
+    const ui = Object.create(UIManager.prototype);
+    ui.gameConfig = gameConfig;
+    ui.elements = elements;
+    ui.engine = {
+      startClassicMode: () => { startedClassic += 1; }
+    };
+    ui.storageManager = {
+      getClearedCampaignLevel: () => (unlockedClassic ? 4 : 0),
+      getModeAccess: () => ({
+        [GAME_MODES.CLASSIC]: { unlocked: unlockedClassic, requiredLevel: 4, isNew: false }
+      })
+    };
+    ui.bindStatsEvents = () => {};
+    ui.getShopTabs = () => [];
+    ui.hideAllModals = () => {};
+    ui.requestDestructiveAction = (fn) => fn();
+    ui.announce = () => {};
+    ui.bindEvents();
+
+    elements.btnModeClassic.click();
+    assert.equal(startedClassic, 0, 'locked Classic card does not start Classic mode');
+    assert.equal(elements.playHubHint.classList.contains('hidden'), false);
+
+    unlockedClassic = true;
+    elements.btnModeClassic.click();
+    assert.equal(startedClassic, 1, 'unlocked Classic card starts Classic mode via click');
+  } finally {
+    globalThis.document = previousDocument;
+    globalThis.window = previousWindow;
+  }
 });
 
 test('the markup carries the Sag meter in the shots box and the Classic card right after Survival in the Play hub arcade', () => {

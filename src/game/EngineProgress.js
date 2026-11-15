@@ -17,8 +17,8 @@
 import { GAME_MODES, GAME_STATES, MATH_CONSTANTS } from '../core/Constants.js';
 import { t } from '../core/I18n.js';
 import { getUtcIsoWeekKey, getWeeklyFluxSeed } from './WeeklyFlux.js';
-import { buildRunOutcomeDelta } from './PlayerStats.js';
-import { createShotTimeline, appendTimelineSample, markTimelineComplete } from './ShotTimeline.js';
+import { buildRunOutcomeDelta } from '../core/PlayerStats.js';
+import { createShotTimeline, appendTimelineSample, markTimelineComplete } from '../core/ShotTimeline.js';
 
 const OUTCOME_LOSS = 'loss';
 const OUTCOME_QUIT = 'quit';

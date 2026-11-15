@@ -1080,6 +1080,13 @@ describe('Polarity Duel (desktop)', () => {
       await page.click('#btn-versus-pause');
       await waitShown(page, '#modal-duel-pause');
       await page.click('#btn-versus-quit');
+      await waitShown(page, '#modal-confirm');
+      await page.click('#btn-confirm-no');
+      await waitShown(page, '#modal-duel-pause');
+      assert.equal(await isShown(page, '#versus-screen'), true, 'cancelling confirm keeps the duel paused');
+      await page.click('#btn-versus-quit');
+      await waitShown(page, '#modal-confirm');
+      await page.click('#btn-confirm-yes');
       await page.waitForFunction(() => document.querySelector('#versus-screen').classList.contains('hidden'));
       await waitShown(page, '#modal-pause');
       const stats = await page.evaluate(
@@ -1122,7 +1129,10 @@ describe('Polarity Duel (desktop)', () => {
       await page.waitForFunction(() => document.querySelector('#modal-duel-result').classList.contains('hidden'));
       assert.equal(await isShown(page, '#versus-screen'), true, 'a rematch stays on the screen');
       await page.click('#btn-versus-pause');
+      await waitShown(page, '#modal-duel-pause');
       await page.click('#btn-versus-quit');
+      await waitShown(page, '#modal-confirm');
+      await page.click('#btn-confirm-yes');
       await page.waitForFunction(() => document.querySelector('#versus-screen').classList.contains('hidden'));
       await page.click('#btn-resume');
       await clickMenuButton(page, desktop, '#btn-stats');
@@ -2656,6 +2666,13 @@ describe('Polarity Duel first-duel tutorial', () => {
       await page.click('#btn-versus-pause');
       await waitShown(page, '#modal-duel-pause');
       await page.click('#btn-versus-quit');
+      await waitShown(page, '#modal-confirm');
+      await page.click('#btn-confirm-no');
+      await waitShown(page, '#modal-duel-pause');
+      assert.equal(await isShown(page, '#versus-screen'), true, 'cancelling confirm keeps the duel paused');
+      await page.click('#btn-versus-quit');
+      await waitShown(page, '#modal-confirm');
+      await page.click('#btn-confirm-yes');
       await page.waitForFunction(() => document.querySelector('#versus-screen').classList.contains('hidden'));
       await page.evaluate(() => {
         window.__versusUpdates = 0;
@@ -3521,10 +3538,16 @@ describe('play hub (desktop)', () => {
       await page.click('#btn-flux-seed-go');
       await page.waitForFunction(() => {
         const hint = document.querySelector('#play-hub-hint');
-        return !hint.classList.contains('hidden') && hint.textContent.trim().length > 0;
+        const err = document.querySelector('#flux-seed-error');
+        return !hint.classList.contains('hidden') && hint.textContent.trim().length > 0 && !err.classList.contains('hidden');
       });
+      assert.equal(await page.getAttribute('#input-flux-seed', 'aria-invalid'), 'true');
       assert.equal(await page.evaluate(() => window.__fluxEngine.mode), modeBefore, 'an invalid seed starts nothing');
       assert.equal(await isShown(page, '#modal-play'), true, 'the hub stays open');
+
+      await page.fill('#input-flux-seed', SHARED_FLUX_SEED.slice(0, 2));
+      assert.equal(await isShown(page, '#flux-seed-error'), false, 'typing clears the inline error');
+      assert.equal(await page.getAttribute('#input-flux-seed', 'aria-invalid'), null);
 
       await page.click('#btn-puzzle-stages-toggle');
       await waitShown(page, '#puzzle-stages-strip');
@@ -4214,6 +4237,32 @@ describe('Lot E and audit smoke checks', () => {
       assert.ok(
         portraitGeometry.canvasWidth >= portraitGeometry.viewportWidth - 60,
         `expected wider portrait canvas (${portraitGeometry.canvasWidth} vs ${portraitGeometry.viewportWidth})`
+      );
+
+      // Verify 44px touch targets and vertical fit across both control rows on narrow 360px phone.
+      await openPlayHub(phone.page, phoneViewport);
+      await phone.page.click('#btn-endless');
+      await phone.page.waitForFunction((expected) => window.__fluxEngine.mode === expected, GAME_MODES.ENDLESS);
+      await phone.page.setViewportSize({ width: 360, height: 800 });
+      await assertLayoutFits(phone.page, `${GAME_MODES.ENDLESS}-360`);
+      await assertBoardFillsStage(phone.page, `${GAME_MODES.ENDLESS}-360`);
+      const narrowMetrics = await phone.page.evaluate(() => {
+        const buttons = ['#btn-polarity', '#btn-swap-ball', ...Array.from(document.querySelectorAll('#powerups-bar .powerup-btn'))]
+          .map((item) => (typeof item === 'string' ? document.querySelector(item) : item))
+          .filter(Boolean)
+          .map((el) => el.getBoundingClientRect());
+        return {
+          minWidth: Math.min(...buttons.map((rect) => rect.width)),
+          minHeight: Math.min(...buttons.map((rect) => rect.height)),
+          maxBottom: Math.max(...buttons.map((rect) => rect.bottom)),
+          viewportHeight: window.innerHeight
+        };
+      });
+      assert.ok(narrowMetrics.minWidth >= 43.5, `narrow phone button minWidth ${narrowMetrics.minWidth} >= 44`);
+      assert.ok(narrowMetrics.minHeight >= 43.5, `narrow phone button minHeight ${narrowMetrics.minHeight} >= 44`);
+      assert.ok(
+        narrowMetrics.maxBottom <= narrowMetrics.viewportHeight + 1,
+        `both control rows fit vertically (${narrowMetrics.maxBottom} <= ${narrowMetrics.viewportHeight})`
       );
       assert.deepEqual(phone.errors, []);
     } finally {

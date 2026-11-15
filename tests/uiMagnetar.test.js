@@ -41,18 +41,26 @@ const css = readText('../styles/main.css');
 
 function fakeElement(initialClasses = []) {
   const classes = new Set(initialClasses);
+  const attributes = new Map();
   return {
     textContent: '',
+    disabled: false,
+    style: { setProperty: () => {} },
     classList: {
       classes,
       contains: (name) => classes.has(name),
-      remove: (name) => classes.delete(name),
-      add: (name) => classes.add(name),
-      toggle: (name, force) => (force ? classes.add(name) : classes.delete(name))
+      remove: (...names) => names.forEach((name) => classes.delete(name)),
+      add: (...names) => names.forEach((name) => classes.add(name)),
+      toggle: (name, force) => (force === undefined
+        ? (classes.has(name) ? (classes.delete(name), false) : (classes.add(name), true))
+        : (force ? classes.add(name) : classes.delete(name), Boolean(force)))
     },
-    getAttribute: () => null,
-    setAttribute: () => {},
-    removeAttribute: () => {}
+    getAttribute: (name) => attributes.get(name) ?? null,
+    setAttribute: (name, value) => attributes.set(name, String(value)),
+    removeAttribute: (name) => attributes.delete(name),
+    closest: () => null,
+    querySelector: () => null,
+    focus: () => {}
   };
 }
 
@@ -169,8 +177,81 @@ test('arming is announced with its counter, the last Mooring and the fall once e
 });
 
 test('the announcement is read from one refresh only', () => {
-  const source = readText('../src/ui/UIHudRefresh.js');
-  assert.match(source, /delete this\.lastExtra\.magnetarAnnouncement/);
+  withEnglish(() => {
+    const ui = makeUi();
+    ui.gameConfig = gameConfig;
+    ui.ballsConfig = ballsConfig;
+    ui.announced = [];
+    ui.prevEngineState = 'playing';
+    ui.storageManager = {
+      getCoins: () => 0,
+      getBossRushHighScore: () => 0,
+      getEndlessHighScore: () => 0,
+      hasQuotaExceeded: () => false,
+      getDailyStreak: () => 0,
+      getDailyStreakGrace: () => null
+    };
+    const explicit = {
+      shotsLabel: ui.elements.shotsLabel,
+      shotsValue: ui.elements.shotsValue,
+      magnetarTelegraph: ui.elements.magnetarTelegraph,
+      modalPause: fakeElement(['hidden']),
+      modalFluxPerk: fakeElement(['hidden']),
+      modalVictory: fakeElement(['hidden']),
+      modalGameOver: fakeElement(['hidden']),
+      appDrawer: fakeElement(['hidden']),
+      overchargeFill: { style: {}, closest: () => fakeElement() }
+    };
+    ui.elements = new Proxy(explicit, {
+      get(target, prop) {
+        if (!(prop in target)) {
+          target[prop] = fakeElement(['hidden']);
+        }
+        return target[prop];
+      }
+    });
+    ui.getModeAccess = () => ({});
+    ui.refreshModeLocks = () => {};
+    ui.getAffordableUpgradeCount = () => 0;
+    ui.setLauncherButton = () => {};
+    ui.updateTiltButton = () => {};
+    ui.syncShopAmmoAvailability = () => {};
+    ui.updatePowerupButtons = () => {};
+    ui.updateDiscoveryPulse = () => {};
+    ui.updateHintReplayButton = () => {};
+    ui.updateLevelIntro = () => {};
+    ui.updateAimState = () => {};
+    ui.stopDailyCountdown = () => {};
+    ui.refreshGhostBadge = () => false;
+    ui.isDuelCardOpen = () => false;
+    ui.syncDrawerStats = () => {};
+    ui.syncModalInertState = () => {};
+    ui.closeDrawer = () => {};
+    ui.isRunHeldByUi = () => false;
+    ui.isAnyOverlayModalOpen = () => false;
+    ui.getOverlayModals = () => [];
+    ui.refreshMergeShakeControls = () => {};
+    const engine = {
+      mode: GAME_MODES.BOSS_RUSH,
+      state: 'playing',
+      score: 0,
+      overcharge: 0,
+      waveCount: 2,
+      shotsRemaining: 4,
+      combo: 0,
+      freezeTurnsRemaining: 0,
+      offersSpecialBalls: () => false,
+      getSagState: () => ({ active: false }),
+      getBossBall: () => null,
+      getMagnetarView: () => viewOf({ moorings: 3 })
+    };
+    ui.engine = engine;
+    ui.refresh(engine, { magnetarAnnouncement: { kind: 'down' } });
+    assert.deepEqual(ui.announced, ['Magnetar down.']);
+    assert.equal(ui.lastExtra.magnetarAnnouncement, undefined);
+    ui.refresh(engine, ui.lastExtra);
+    assert.deepEqual(ui.announced, ['Magnetar down.']);
+  });
 });
 
 test('the chip is hidden, aria-hidden and sits in the badges row, so no column is added', () => {

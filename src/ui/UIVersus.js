@@ -25,7 +25,7 @@ import { GAME_MODES, GAME_STATES, INPUT_MODES, MATH_CONSTANTS, SPECIAL_TYPES_ORD
 import { GAMEPAD_ACTIONS, GAMEPAD_EVENTS } from '../core/GamepadInput.js';
 import { t, formatNumber } from '../core/I18n.js';
 import { buildShareText } from '../game/DailyShare.js';
-import { buildRunOutcomeDelta } from '../game/PlayerStats.js';
+import { buildRunOutcomeDelta } from '../core/PlayerStats.js';
 import { Renderer } from '../game/Renderer.js';
 import { MATCH_EVENTS, createVersusMatch } from '../game/VersusMatch.js';
 import { bindCanvasInput } from './CanvasInput.js';
@@ -39,6 +39,7 @@ import {
   slotForPad
 } from './LocalInput.js';
 import { UI_SCENES } from './UIInputBindings.js';
+import { openConfirmationModal } from './UIModals.js';
 import { isAriaDisabled, revealLiveRegion, scheduleNextFrame, setTextIfChanged } from './UIHelpers.js';
 import { describeLocalDevice } from './UIVersusLocal.js';
 import {
@@ -80,6 +81,41 @@ const SCREEN_PHASES = Object.freeze({
 });
 
 /** Methods installed on UIManager.prototype by UIManager.js. */
+const VERSUS_PAUSE_ACTIONS = Object.freeze({
+  RESTART: 'restart',
+  QUIT: 'quit'
+});
+
+/** Asks for confirmation before Pause Restart or Quit abandons an active Polarity Duel. */
+function confirmVersusPauseAction(ui, kind) {
+  const v = ui.versus;
+  const runAction = () => (kind === VERSUS_PAUSE_ACTIONS.RESTART ? ui.restartVersus() : ui.quitVersus());
+  if (!v || v.result || !ui.elements?.modalConfirm) {
+    runAction();
+    return;
+  }
+  const hasProgress = (v.controller?.getState?.().frame || 0) > 0;
+  if (kind === VERSUS_PAUSE_ACTIONS.RESTART && !hasProgress) {
+    runAction();
+    return;
+  }
+  const isLocal = v.kind === VERSUS_KINDS.LOCAL;
+  const confirmLabelKey = kind === VERSUS_PAUSE_ACTIONS.RESTART ? 'versus.pause.restart' : 'versus.pause.quit';
+  const messageKey =
+    kind === VERSUS_PAUSE_ACTIONS.RESTART
+      ? isLocal
+        ? 'versus.pause.confirm.localRestartMessage'
+        : 'versus.pause.confirm.restartMessage'
+      : isLocal
+        ? 'versus.pause.confirm.localQuitMessage'
+        : 'versus.pause.confirm.quitMessage';
+  openConfirmationModal(ui, runAction, () => t(confirmLabelKey), {
+    pauseEngine: false,
+    titleKey: 'versus.pause.confirm.title',
+    messageKey
+  });
+}
+
 export const uiVersusMethods = {
   /** True while the versus screen is open. */
   isVersusActive() {
@@ -138,8 +174,8 @@ export const uiVersusMethods = {
     });
     els.btnVersusPause?.addEventListener('click', () => this.pauseVersus());
     els.btnVersusResume?.addEventListener('click', () => this.resumeVersus());
-    els.btnVersusRestart?.addEventListener('click', () => this.restartVersus());
-    els.btnVersusQuit?.addEventListener('click', () => this.quitVersus());
+    els.btnVersusRestart?.addEventListener('click', () => confirmVersusPauseAction(this, VERSUS_PAUSE_ACTIONS.RESTART));
+    els.btnVersusQuit?.addEventListener('click', () => confirmVersusPauseAction(this, VERSUS_PAUSE_ACTIONS.QUIT));
     els.btnVersusRematch?.addEventListener('click', () => {
       // The primary button of the local result card ignores presses until the guard time is over.
       if (!isAriaDisabled(els.btnVersusRematch)) {

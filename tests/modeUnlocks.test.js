@@ -20,7 +20,7 @@ import fs from 'node:fs';
 import { configRegistry } from '../src/core/ConfigRegistry.js';
 import { GAME_MODES } from '../src/core/Constants.js';
 import { StorageManager } from '../src/core/StorageManager.js';
-import { resolveModeAccess, computeNewlyEarned } from '../src/game/ModeUnlocks.js';
+import { resolveModeAccess, computeNewlyEarned } from '../src/core/ModeUnlocks.js';
 
 const loadJson = (p) => JSON.parse(fs.readFileSync(p, 'utf8'));
 const gameConfig = loadJson('./configs/game.json');

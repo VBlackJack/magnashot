@@ -1131,3 +1131,43 @@ test('the My stats overview lists the matches played between two players', () =>
   );
   assert.equal(none.modes.length, 0);
 });
+
+test('Duel pause Quit and Restart clicks ask confirmation mid-match without hiding duel pause when cancelled', () => {
+  const { ui, controller, els, recorded } = makeUi();
+  els.modalConfirmTitle = { textContent: '' };
+  els.modalConfirmMessage = { textContent: '' };
+  els.btnConfirmYes = { textContent: '' };
+  els.btnConfirmNo = { focus() {} };
+  let restartClick = null;
+  let quitClick = null;
+  els.btnVersusRestart = { addEventListener: (_type, fn) => { restartClick = fn; } };
+  els.btnVersusQuit = { addEventListener: (_type, fn) => { quitClick = fn; } };
+  ui.bindVersusEvents();
+
+  ui.pauseVersus();
+  assert.equal(els.modalDuelPause.classList.contains('hidden'), false);
+
+  quitClick();
+  assert.equal(els.modalConfirm.classList.contains('hidden'), false, 'Quit opens confirmation dialog');
+  assert.equal(els.modalConfirmTitle.textContent, i18n.t('versus.pause.confirm.title'));
+  assert.equal(els.modalConfirmMessage.textContent, i18n.t('versus.pause.confirm.quitMessage'));
+  assert.equal(els.btnConfirmYes.textContent, i18n.t('versus.pause.quit'));
+  assert.deepEqual(recorded.stats, [], 'opening quit confirm records no quit');
+
+  UIManager.prototype.dismissConfirm.call(ui);
+  assert.equal(els.modalConfirm.classList.contains('hidden'), true);
+  assert.equal(els.modalConfirmTitle.textContent, i18n.t('modals.confirm.title.main'), 'dismiss restores default confirm copy');
+  assert.equal(els.modalDuelPause.classList.contains('hidden'), false, 'cancelling confirm keeps duel pause open');
+
+  restartClick();
+  assert.equal(els.modalConfirm.classList.contains('hidden'), false, 'Restart opens confirmation dialog');
+  assert.equal(els.modalConfirmMessage.textContent, i18n.t('versus.pause.confirm.restartMessage'));
+  const confirmCallback = ui.pendingConfirmCallback;
+  ui.pendingConfirmCallback = null;
+  ui.pendingConfirmCopy = null;
+  ui.pendingConfirmLabelResolver = null;
+  ui.updateConfirmButtonLabel();
+  confirmCallback();
+  assert.equal(recorded.stats[0].modes[GAME_MODES.VERSUS].quits, 1);
+  assert.equal(controller.log.some((entry) => entry[0] === 'restart'), true);
+});

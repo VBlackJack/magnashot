@@ -357,7 +357,16 @@ export const SPECIAL_AMMO_BLOCK_REASON_KEYS = Object.freeze({
 });
 
 /** Keys whose action is a one-shot toggle or trigger; auto-repeat must not re-fire them. */
-export const REPEAT_SENSITIVE_KEY_CODES = new Set(['Space', 'KeyF', 'Enter', 'NumpadEnter', 'Escape']);
+export const REPEAT_SENSITIVE_KEY_CODES = new Set([
+  'Space',
+  'KeyF',
+  'KeyP',
+  'KeyM',
+  'KeyW',
+  'Enter',
+  'NumpadEnter',
+  'Escape'
+]);
 export const SPECIAL_BALL_KEY_PATTERN = /^Digit\d$/;
 
 /**
@@ -578,6 +587,29 @@ export function revealLiveRegion({ region, textElement, text, schedule }) {
       setTextIfChanged(textElement, latest);
     }
   });
+}
+
+/** Shows or clears the inline validation state and message on the shared Flux seed input. */
+export function syncFluxSeedValidationError(elements, message = '') {
+  const input = elements?.inputFluxSeed;
+  const errorEl = elements?.fluxSeedError;
+  const hasError = Boolean(message);
+  if (errorEl) {
+    setTextIfChanged(errorEl, message);
+    errorEl.classList.toggle('hidden', !hasError);
+  }
+  if (!input) {
+    return;
+  }
+  if (hasError) {
+    setAttributeIfChanged(input, 'aria-invalid', 'true');
+    if (errorEl) {
+      setAttributeIfChanged(input, 'aria-describedby', errorEl.id || 'flux-seed-error');
+    }
+  } else {
+    input.removeAttribute?.('aria-invalid');
+    input.removeAttribute?.('aria-describedby');
+  }
 }
 
 /** Runs a callback on the next frame, or at once where frames are not available. */

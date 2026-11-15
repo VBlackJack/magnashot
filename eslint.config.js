@@ -34,6 +34,45 @@ export default [
     languageOptions: { globals: globals.browser }
   },
   {
+    // Complexity and function-length guardrails enforced on refactored and clean core/UI modules.
+    files: [
+      'src/core/AliasSanitizer.js',
+      'src/core/AudioChannel.js',
+      'src/core/AudioManager.js',
+      'src/core/BountiesCatalog.js',
+      'src/core/ConfigRegistry.js',
+      'src/core/Constants.js',
+      'src/core/FullscreenState.js',
+      'src/core/HapticFeedback.js',
+      'src/core/I18n.js',
+      'src/core/ModeUnlocks.js',
+      'src/core/SeededRandom.js',
+      'src/core/StorageView.js',
+      'src/core/WorldGeometry.js',
+      'src/entities/Ball.js',
+      'src/entities/Obstacle.js',
+      'src/game/RendererMagnetarCharges.js',
+      'src/physics/SpatialHashGrid.js',
+      'src/ui/ProgressBackupView.js',
+      'src/ui/UICalibration.js',
+      'src/ui/UIHudRefresh.js',
+      'src/ui/UIInputBindings.js',
+      'src/ui/WorkshopView.js'
+    ],
+    rules: {
+      complexity: ['error', 15],
+      'max-lines-per-function': ['error', { max: 80, skipBlankLines: true, skipComments: true }]
+    }
+  },
+  {
+    // Legacy ceiling on MergeBehavior prevents regression of the decomposed physics step.
+    files: ['src/game/modes/MergeBehavior.js'],
+    rules: {
+      complexity: ['error', 28],
+      'max-lines-per-function': ['error', { max: 130, skipBlankLines: true, skipComments: true }]
+    }
+  },
+  {
     // A classic service worker script, registered without `type: 'module'`.
     files: ['sw.js'],
     languageOptions: { sourceType: 'script', globals: { ...globals.browser, ...globals.serviceworker } }

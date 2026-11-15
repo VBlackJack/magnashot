@@ -29,6 +29,10 @@
  * varint continues, [varint aliasByteLength, alias UTF-8], 2-byte checksum.
  */
 
+import { ALIAS_ALLOWED_PATTERN, sanitizeAlias } from '../core/AliasSanitizer.js';
+
+export { sanitizeAlias };
+
 export const DUEL_STATUS = Object.freeze({
   NONE: 'none',
   VALID: 'valid',
@@ -81,12 +85,6 @@ const FIRST_STEP_LOG2 = 0;
 const HASH_PREFIX = '#';
 const QUERY_PREFIX = '?';
 
-const ALIAS_ALLOWED_PATTERN = /^[\p{L}\p{N} ]+$/u;
-const ALIAS_DISALLOWED_PATTERN = /[^\p{L}\p{N}\s]/gu;
-const WHITESPACE_RUN_PATTERN = /\s+/gu;
-const ALIAS_SEPARATOR = ' ';
-const ALIAS_NORMAL_FORM = 'NFC';
-
 class DuelDecodeError extends Error {}
 
 function fail(message) {
@@ -125,25 +123,6 @@ export function resolveReplayContentVersion(cfg, settleCfg, mode, cv) {
     return current;
   }
   return mode === MODE_FLUX && cv === settleCfg.sinceContentVersion - 1 ? cv : current;
-}
-
-/**
- * Cleans an alias: Unicode letters, digits and single spaces only, trimmed and cut to the
- * configured length (in code points). Never throws.
- * @param {unknown} raw - Candidate alias.
- * @param {{aliasMaxLength: number}} cfg - The `ghostDuel` config section.
- * @returns {string} The clean alias, or an empty string when nothing usable remains.
- */
-export function sanitizeAlias(raw, cfg) {
-  if (typeof raw !== 'string') {
-    return '';
-  }
-  const cleaned = raw
-    .normalize(ALIAS_NORMAL_FORM)
-    .replace(ALIAS_DISALLOWED_PATTERN, '')
-    .replace(WHITESPACE_RUN_PATTERN, ALIAS_SEPARATOR)
-    .trim();
-  return Array.from(cleaned).slice(0, cfg.aliasMaxLength).join('').trim();
 }
 
 function isCleanAlias(alias, cfg) {

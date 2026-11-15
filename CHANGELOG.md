@@ -4,6 +4,21 @@ All notable changes to **MagnaShot** are documented in this file.
 
 ## [Unreleased]
 
+### Added
+- Desktop keyboard navigation shortcuts during active play: `P` toggles Pause/Resume, `M` opens the Play Hub, and `W` opens the Workshop (QWERTY and AZERTY layout compatible, with repeat and interactive-focus guards), documented in the Pause instructions and `README`.
+- Polarity Duel pause confirmation: Restart (after frame 0 while running) and Quit actions in single-player CPU and local 2-player Polarity Duel pause dialogs now ask for confirmation via `#modal-confirm` with dedicated prompts and clean copy restoration on cancel or confirm.
+- Inline Flux seed validation (`#flux-seed-error` with `aria-invalid` and `aria-describedby` inside `#flux-seed-entry`), clearing on typing or disclosure collapse without scrolling the Play Hub modal away from the input.
+- Unit tests covering `ProgressBackupView`, `RendererMagnetarCharges`, `UICalibration`, `UIMagnetar` / `UISag` announcements, Merge Basin posture hints, Flux seed validation, Polarity Duel confirmations, and desktop shortcuts, plus Playwright narrow-phone layout and modal confirmation checks.
+
+### Changed
+- Isolated core domain modules under `src/core/` (`ModeUnlocks.js`, `PlayerStats.js`, `ShotTimeline.js`, `ModeConfig.js`, plus extracted `AliasSanitizer.js`, `BountiesStore.js`, and `ConfigRegistry.countCampaignLevels`), eliminating `src/game/` imports from `src/core/` and `src/physics/` and updating `sw.js` `PRECACHE_ASSETS`.
+- Added ESLint `complexity` and `max-lines-per-function` guardrails in `eslint.config.js` and decomposed `UIHudRefresh.js` and `WorkshopView.js` into focused helpers and lookup tables.
+
+### Fixed
+- Portrait phone (`<= 680px` and `<= 389px`) control ergonomics: explicit CSS `order` rows prevent empty-grid gaps when powerups or Overcharge are hidden, enforce 44 px touch targets on all stage controls, and drive `--stage-reserve-y` accurately via `:has(...)`.
+- Merge Basin aim cancel and control copy: `#cancel-aim-banner` switches to top posture (`data-posture="top"`) with `hud.launcher.cancel.dropHint` and wrapping width so the drop-rail cancel cue fits narrow canvases, and Merge Pause instructions (`mergeAim` / `mergeSwap`) accurately describe dragging above the drop rail and tapping the Next sphere.
+- Locked level and mode hints (`showLockedLevelHint`, `showModeLockHint`) now scroll into view (`block: 'nearest'`) instead of remaining off-screen.
+
 ## [1.29.0] - 2026-11-14
 
 ### Added

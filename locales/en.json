@@ -261,7 +261,8 @@
         }
       },
       "cancel": {
-        "hint": "Release here to cancel shot"
+        "hint": "Release here to cancel shot",
+        "dropHint": "Release here to cancel drop"
       },
       "specialEquipped": {
         "hint": "{{icon}} {{name}}: {{desc}} ({{unequip}})",
@@ -1627,9 +1628,17 @@
           "pointer": "Aim & Shoot: move the mouse, click to shoot",
           "touch": "Aim & Shoot: drag on the board, release to shoot"
         },
+        "mergeAim": {
+          "pointer": "Position & Drop: move the mouse across the rail, click to drop",
+          "touch": "Position & Drop: drag across the basin, release to drop"
+        },
         "swap": {
           "pointer": "Swap Projectile: click the launcher or press Space",
           "touch": "Swap Projectile: tap the launcher or the Swap button"
+        },
+        "mergeSwap": {
+          "pointer": "Swap Sphere: click the Next sphere or press Space",
+          "touch": "Swap Sphere: tap the Next sphere or the Swap button"
         },
         "cancel": {
           "pointer": "Cancel a shot: release the click below the launcher",
@@ -1648,12 +1657,12 @@
           "touch": "Cancel a drop: drag above the drop rail before releasing"
         },
         "keyboard": {
-          "pointer": "Keyboard & Arsenal: Left/Right to fine-tune aim (Shift: faster), Enter to shoot, F (or 🧲) to invert polarity, 1-7 for Special Spheres",
+          "pointer": "Keyboard & Shortcuts: Left/Right to fine-tune aim (Shift: faster), Enter to shoot, Space to swap, F (or 🧲) to invert polarity, 1-7 for Special Spheres, P to pause, M for Play, W for Workshop",
           "touch": "Polarity & Arsenal: tap 🧲 to flip how spheres pull your shot (it curves the other way), or tap a Special Sphere charged by Overcharge"
         },
         "physics": "Tip: Sever anchor links or unbalance rotors to trigger chain reactions!",
         "mergeKeyboard": {
-          "pointer": "Keyboard: Left/Right to move the rail, Enter to drop, F (or 🧲) to pull identical calibres together, G to shake the basin",
+          "pointer": "Keyboard: Left/Right to move the rail, Enter to drop, F (or 🧲) to pull identical calibres together, G to shake the basin, P to pause, M for Play, W for Workshop",
           "touch": "Polarity & Shake: tap 🧲 to pull identical calibres together, or tap Shake when it is ready"
         },
         "mergeTip": "Tip: Two identical calibres fuse into the next one. Use the Shake when it is ready to throw the pile towards the emptier side!",
@@ -2296,7 +2305,14 @@
       "title": "Match paused",
       "resume": "Resume",
       "restart": "Restart match",
-      "quit": "Quit"
+      "quit": "Quit",
+      "confirm": {
+        "title": "Abandon Current Duel?",
+        "restartMessage": "Restarting mid-match abandons the current duel and counts as a quit.",
+        "quitMessage": "Quitting mid-match abandons the current duel and counts as a quit.",
+        "localRestartMessage": "Restarting mid-match resets the current local duel score.",
+        "localQuitMessage": "Quitting mid-match ends the current local duel."
+      }
     },
     "result": {
       "wonTitle": "Match won",

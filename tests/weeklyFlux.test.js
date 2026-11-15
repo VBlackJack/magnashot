@@ -20,7 +20,7 @@ import fs from 'node:fs';
 import { configRegistry } from '../src/core/ConfigRegistry.js';
 import { StorageManager } from '../src/core/StorageManager.js';
 import { parseFluxSeedInput } from '../src/game/DailyShare.js';
-import { createShotTimeline, appendTimelineSample, markTimelineComplete } from '../src/game/ShotTimeline.js';
+import { createShotTimeline, appendTimelineSample, markTimelineComplete } from '../src/core/ShotTimeline.js';
 import { getUtcIsoWeekKey, getWeeklyFluxSeed, getMsUntilNextWeekly } from '../src/game/WeeklyFlux.js';
 
 const loadJson = (p) => JSON.parse(fs.readFileSync(p, 'utf8'));
