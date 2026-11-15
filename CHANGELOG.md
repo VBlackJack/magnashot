@@ -4,6 +4,8 @@ All notable changes to **MagnaShot** are documented in this file.
 
 ## [Unreleased]
 
+## [1.29.2] - 2026-11-15
+
 ### Changed
 - Redesigned MagnaShot's visual identity around a cyan (`+`) and violet (`-`) dipole magnetic sphere with glowing plasma seam and orbital flux field loops across `icons/icon.svg`, `icons/icon-maskable.svg`, `icons/logo-mark.svg`, `icons/logo-banner.svg`, and generated 192 px / 512 px standard and maskable PNGs (`manifest.webmanifest`, `sw.js`).
 - Added the `.brand-mark` emblem lockup beside `MAGNASHOT` in the app drawer (`index.html`, `styles/main.css`) and the hero banner to `README.md` / `README.fr.md`.
