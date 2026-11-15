@@ -4,6 +4,13 @@ All notable changes to **MagnaShot** are documented in this file.
 
 ## [Unreleased]
 
+## [1.31.1] - 2026-11-15
+
+### Fixed
+- Aligned the Play Hub modal header (`.play-hub-header`) horizontally so the Close button sits at the top-right opposite the modal title instead of stacking vertically (`styles/modals.css`).
+- Balanced the desktop (`>= 900px`) Play Hub grid (`styles/responsive.css`) by placing the `Duel` section directly below `Campaign` on the left column opposite `Challenges`, eliminating the vertical gap under the Campaign card, and updated `forced-colors` rules for `.mode-mastery-meter` and `.mode-mastery-fill`.
+- Top-aligned Play Hub Arcade cards (`align-content: start`) and moved `.mode-mastery-meter` into normal column-2 grid flow directly beneath record and reward lines, preventing reward overlap on Daily Challenges and vertical misalignment beside disclosure toggles (`styles/modals.css`).
+
 ## [1.31.0] - 2026-11-15
 
 ### Added
