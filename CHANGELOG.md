@@ -4,6 +4,8 @@ All notable changes to **MagnaShot** are documented in this file.
 
 ## [Unreleased]
 
+## [1.29.1] - 2026-11-15
+
 ### Added
 - Desktop keyboard navigation shortcuts during active play: `P` toggles Pause/Resume, `M` opens the Play Hub, and `W` opens the Workshop (QWERTY and AZERTY layout compatible, with repeat and interactive-focus guards), documented in the Pause instructions and `README`.
 - Polarity Duel pause confirmation: Restart (after frame 0 while running) and Quit actions in single-player CPU and local 2-player Polarity Duel pause dialogs now ask for confirmation via `#modal-confirm` with dedicated prompts and clean copy restoration on cancel or confirm.
