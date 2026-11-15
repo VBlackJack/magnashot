@@ -193,3 +193,32 @@ test('normalizeBountiesState and StorageManager preserve valid daily contracts a
   assert.ok(keptStarted);
   assert.equal(keptStarted.progress, 2);
 });
+
+test('expanded bounties catalog covers classic, puzzle, blitz, cascade, and versus with valid EN/FR keys', () => {
+  const expected = [
+    { id: 'classic_stages', eventKey: 'classic_stage_cleared', mode: 'classic' },
+    { id: 'puzzle_clears', eventKey: 'puzzle_stage_cleared', mode: 'puzzle' },
+    { id: 'blitz_fevers', eventKey: 'blitz_fever_triggered', mode: 'blitz' },
+    { id: 'cascade_shelves', eventKey: 'cascade_shelf_cleared', mode: 'cascade' },
+    { id: 'versus_wins', eventKey: 'versus_cpu_won', mode: 'versus' }
+  ];
+  const catalogById = new Map(gameConfig.bounties.catalog.map((b) => [b.id, b]));
+  const sm = createTestStorage();
+  const dateKey = '2026-11-16';
+  const startCoins = sm.getCoins();
+
+  for (const spec of expected) {
+    const entry = catalogById.get(spec.id);
+    assert.ok(entry, `missing bounty ${spec.id}`);
+    assert.equal(entry.eventKey, spec.eventKey);
+    assert.equal(entry.mode, spec.mode);
+    assert.ok(entry.target >= 1 && entry.coins > 0);
+  }
+
+  // Simulate completing an active bounty directly via recordBountyProgress on its eventKey.
+  const state = sm.getDailyBountiesState(dateKey);
+  const first = state.items[0];
+  const completed = sm.recordBountyProgress(first.eventKey, first.target, dateKey);
+  assert.equal(completed.length, 1);
+  assert.equal(sm.getCoins(), startCoins + first.coins);
+});

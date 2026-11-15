@@ -247,3 +247,47 @@ test('Pinball 1-bounce ballistic aim reflects off first peg, avoids snapTarget, 
   pinballBehavior.refundBucketCatch(engine, cfg.launcherX, cfg.bucketY);
   assert.ok(engine.overcharge > overchargeBefore, 'collector bucket catch grants overcharge');
 });
+
+test('Pinball rotates structured peg layouts across stages 1-3, grants combo milestone overcharge, and pays stage clear coins', () => {
+  const engine = createEngine();
+  engine.startPinballMode(1);
+  const cfg = modesConfig.pinball;
+  const sig = () =>
+    engine.physicsWorld.balls
+      .filter((b) => typeof b.pinballLit === 'boolean')
+      .map((p) => `${Math.round(p.x)}:${Math.round(p.y)}`)
+      .sort()
+      .join(',');
+
+  const stage1Sig = sig();
+  pinballBehavior.buildStageBoard(engine, 2);
+  const stage2Sig = sig();
+  pinballBehavior.buildStageBoard(engine, 3);
+  const stage3Sig = sig();
+
+  assert.notEqual(stage1Sig, stage2Sig, 'stage 2 uses diamond layout distinct from stage 1');
+  assert.notEqual(stage2Sig, stage3Sig, 'stage 3 uses channels layout distinct from stage 2');
+  assert.notEqual(stage1Sig, stage3Sig, 'stage 1 and stage 3 differ');
+
+  // Lighting comboMilestoneEvery distinct pegs grants comboOverchargeBonus overcharge.
+  engine.overcharge = 0;
+  engine.combo = 0;
+  const pegs = engine.physicsWorld.balls.filter((b) => typeof b.pinballLit === 'boolean');
+  for (let i = 0; i < cfg.comboMilestoneEvery; i++) {
+    const peg = pegs[i];
+    peg.pinballLit = false;
+    pinballBehavior.lightPeg(engine, peg);
+  }
+  assert.ok(
+    engine.overcharge >= cfg.comboOverchargeBonus,
+    `expected at least ${cfg.comboOverchargeBonus} overcharge at combo milestone, got ${engine.overcharge}`
+  );
+
+  // Stage clear awards at least stageClearCoinBonus coins.
+  const coinsBefore = engine.storageManager.getCoins();
+  pinballBehavior.completePinballStage(engine);
+  assert.ok(
+    engine.storageManager.getCoins() >= coinsBefore + cfg.stageClearCoinBonus,
+    'completing a Pinball stage awards stageClearCoinBonus'
+  );
+});

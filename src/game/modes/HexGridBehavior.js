@@ -534,6 +534,7 @@ export class HexGridBehavior extends ModeBehavior {
     const cfg = engine.modesConfig.hexGrid;
     const bonus = cfg.waveClearBonus * engine.waveCount;
     engine.addScore(bonus);
+    engine.awardRunCoins(cfg.waveClearCoinBonus || 0);
     engine.waveCount++;
     const paletteSize = this.getPaletteCountForWave(
       engine.waveCount,
@@ -558,6 +559,7 @@ export class HexGridBehavior extends ModeBehavior {
     engine.unlockAchievementTiers('hexGridWaves', engine.waveCount);
     reportBountyEvent(engine, 'hex_wave_cleared', 1);
     engine.persistRunHighScore();
+    engine.saveRunSnapshot({ force: true });
   }
 
   descendCeilingRow(engine) {

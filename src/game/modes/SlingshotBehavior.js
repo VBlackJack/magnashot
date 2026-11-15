@@ -578,6 +578,7 @@ export class SlingshotBehavior extends ModeBehavior {
 
     const bonus = cfg.stageClearBonusBase * clearedStage + engine.shotsRemaining * cfg.stageClearShotBonus;
     engine.addScore(bonus);
+    engine.awardRunCoins(cfg.stageClearCoinBonus || 0);
     engine.audioManager.playEffect('victory');
     engine.particleSystem.spawnFloatingText(
       engine.gameConfig.canvas.logicalWidth * MATH_CONSTANTS.HALF,
@@ -710,7 +711,8 @@ export class SlingshotBehavior extends ModeBehavior {
     const flipSign = engine.isPolarityFlipped ? -1 : 1;
     const whipRadius = this.getEffectiveWhipRadius(engine);
     const whippedIds = engine.modeState?.whippedWellIds || [];
-    const hasProjectile = Boolean(engine.physicsWorld.projectile);
+    const projectile = engine.physicsWorld.projectile;
+    const hasProjectile = Boolean(projectile);
     const phase = engine.isReducedMotion ? MATH_CONSTANTS.HALF : (now * WELL_PULSE_SPEED) % 1;
 
     ctx.save();
@@ -737,10 +739,12 @@ export class SlingshotBehavior extends ModeBehavior {
       ctx.arc(well.x, well.y, waveRadius, 0, MATH_CONSTANTS.TWO_PI);
       ctx.stroke();
 
-      // Polarity Whip zone indicator while a projectile is in flight
+      // Polarity Whip zone indicator while a projectile is in flight; pulses brightly when inside whip range
       if (hasProjectile && !whippedIds.includes(well.id)) {
+        const inRange = Math.hypot(projectile.x - well.x, projectile.y - well.y) <= whipRadius;
         ctx.strokeStyle = theme.overchargePopupColor;
-        ctx.globalAlpha = WELL_WHIP_READY_ALPHA;
+        ctx.globalAlpha = inRange ? 0.96 : WELL_WHIP_READY_ALPHA;
+        ctx.lineWidth = inRange ? WELL_CORE_LINE_WIDTH : WELL_FIELD_LINE_WIDTH;
         ctx.setLineDash(WHIP_RING_DASH);
         ctx.beginPath();
         ctx.arc(well.x, well.y, whipRadius, 0, MATH_CONSTANTS.TWO_PI);

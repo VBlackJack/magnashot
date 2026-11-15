@@ -60,6 +60,7 @@ import { t } from '../src/core/I18n.js';
 import { buildCodexPane } from '../src/ui/CodexView.js';
 import { formatAchievementDescription, groupAchievementTiers, renderWorkshopContents } from '../src/ui/WorkshopView.js';
 import { syncFluxPerkModal } from '../src/ui/FluxPerkView.js';
+import { MATCH_EVENTS } from '../src/game/VersusMatch.js';
 import { parseFluxSeedInput, stripFluxSeedFromUrl } from '../src/game/DailyShare.js';
 
 const loadJson = (p) => JSON.parse(readFileSync(p, 'utf8'));
@@ -3289,7 +3290,19 @@ test('arcade mode intro banners localize cleanly and dismiss after first shotles
     for (const locale of ['en', 'fr']) {
       i18n.dictionaries.set(locale, loadJson(`./locales/${locale}.json`));
       i18n.currentLocale = locale;
-      for (const mode of [GAME_MODES.HEX_GRID, GAME_MODES.ORBITAL, GAME_MODES.PINBALL, GAME_MODES.CONVOY, GAME_MODES.MERGE]) {
+      for (const mode of [
+        GAME_MODES.CLASSIC,
+        GAME_MODES.BLITZ,
+        GAME_MODES.BOSS_RUSH,
+        GAME_MODES.CASCADE,
+        GAME_MODES.FLUX,
+        GAME_MODES.HEX_GRID,
+        GAME_MODES.ORBITAL,
+        GAME_MODES.PINBALL,
+        GAME_MODES.CONVOY,
+        GAME_MODES.MERGE,
+        GAME_MODES.SLINGSHOT
+      ]) {
         const text = buildLevelIntroText({ arcadeMode: mode }, t);
         assert.ok(typeof text === 'string' && text.length > 10, `${locale}: ${mode} intro text`);
       }
@@ -3794,5 +3807,105 @@ test('desktop P, M, and W shortcuts open Pause, Play Hub, and Workshop on QWERTY
     assert.equal(playOpened, 1, 'shortcuts stay disabled during victory celebration');
   } finally {
     globalThis.document = prevDoc;
+  }
+});
+
+test('modes audit UI additions: i18n keys, Play Hub subheads, Merge HUD spec, Puzzle swap tooltip, and Versus coin element', () => {
+  const html = readFileSync('./index.html', 'utf8');
+  assert.match(html, /data-i18n="modals\.play\.arcadeSubhead\.core"/);
+  assert.match(html, /data-i18n="modals\.play\.arcadeSubhead\.labs"/);
+  assert.match(html, /id="versus-result-coins"/);
+
+  for (const locale of ['en', 'fr']) {
+    const dict = loadJson(`./locales/${locale}.json`);
+    assert.ok(dict.hud?.stats?.mode?.merge?.includes('{{merges}}'), `${locale}: merge HUD includes {{merges}}`);
+    assert.ok(typeof dict.hud?.launcher?.swap?.lockedPuzzle === 'string', `${locale}: puzzle swap tooltip key`);
+    assert.ok(typeof dict.modals?.play?.arcadeSubhead?.core === 'string', `${locale}: arcade core subhead`);
+    assert.ok(typeof dict.modals?.play?.arcadeSubhead?.labs === 'string', `${locale}: arcade labs subhead`);
+    assert.ok(dict.versus?.result?.coins?.includes('{{coins}}'), `${locale}: versus result coins key`);
+    for (const mode of ['classic', 'blitz', 'boss_rush', 'cascade', 'flux']) {
+      assert.ok(typeof dict.hud?.levelIntro?.arcadeModes?.[mode] === 'string', `${locale}: ${mode} intro text`);
+    }
+  }
+});
+
+test('finishVersusMatch pays tier coin rewards on CPU win only and syncs versusResultCoins', () => {
+  const storage = {
+    coins: 0,
+    getCoins() { return this.coins; },
+    addCoins(n) { this.coins += n; },
+    recordVersusResult() {}
+  };
+  const makeEl = () => {
+    const classes = new Set();
+    return {
+      textContent: '',
+      classList: {
+        add: (c) => classes.add(c),
+        remove: (c) => classes.delete(c),
+        contains: (c) => classes.has(c),
+        toggle: (c, f) => {
+          const on = f === undefined ? !classes.has(c) : Boolean(f);
+          if (on) { classes.add(c); } else { classes.delete(c); }
+          return on;
+        }
+      },
+      setAttribute() {},
+      removeAttribute() {},
+      focus() {}
+    };
+  };
+  const coinsEl = makeEl();
+  const ctx = {
+    gameConfig,
+    storageManager: storage,
+    elements: {
+      versusResultCoins: coinsEl,
+      versusResultTitle: makeEl(),
+      versusResultScore: makeEl(),
+      versusResultTier: makeEl(),
+      versusResultNeutralised: makeEl(),
+      versusResultPulses: makeEl(),
+      versusResultNeutralisedB: makeEl(),
+      versusResultPulsesB: makeEl(),
+      btnVersusShare: makeEl(),
+      btnVersusChangePlayers: makeEl(),
+      btnVersusRematch: makeEl(),
+      modalDuelResult: makeEl(),
+      versusResultShareFallback: makeEl()
+    },
+    versus: {
+      kind: 'cpu',
+      tier: 'hard',
+      controller: {
+        getState: () => ({
+          boards: [
+            { matchStats: { neutralised: 8, pulsesSent: 2 } },
+            { matchStats: { neutralised: 4, pulsesSent: 1 } }
+          ]
+        })
+      }
+    },
+    recordVersusOutcome() {},
+    showVersusModal() {},
+    fillVersusResult: UIManager.prototype.fillVersusResult
+  };
+
+  const coinsBefore = storage.getCoins();
+  const prevLocale = i18n.currentLocale;
+  i18n.dictionaries.set('en', loadJson('./locales/en.json'));
+  i18n.currentLocale = 'en';
+  try {
+    UIManager.prototype.finishVersusMatch.call(ctx, { type: MATCH_EVENTS.MATCH_WON, wins: [2, 0] });
+    assert.equal(storage.getCoins(), coinsBefore + gameConfig.versus.rewards.winCoinsByTier.hard);
+    assert.equal(coinsEl.classList.contains('hidden'), false);
+    assert.match(coinsEl.textContent, new RegExp(String(gameConfig.versus.rewards.winCoinsByTier.hard)));
+
+    const coinsAfterWin = storage.getCoins();
+    UIManager.prototype.finishVersusMatch.call(ctx, { type: MATCH_EVENTS.MATCH_LOST, wins: [0, 2] });
+    assert.equal(storage.getCoins(), coinsAfterWin, 'CPU loss pays 0 coins');
+    assert.equal(coinsEl.classList.contains('hidden'), true, 'versusResultCoins hides when earnedCoins is 0');
+  } finally {
+    i18n.currentLocale = prevLocale;
   }
 });

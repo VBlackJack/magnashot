@@ -319,3 +319,41 @@ test('Convoy Chain Snapback Surge escalates chain multiplier, pushes surviving s
   assert.equal(restored.restoreSavedRun(), true);
   assert.equal(restored.modeState.snapbackChain, 2);
 });
+
+test('Convoy drawOverlay draws insertion reticle when snapTarget is set and wave clear pays coins', () => {
+  const engine = createEngine();
+  engine.startConvoyMode();
+  const cfg = modesConfig.convoy;
+  const lut = convoyBehavior.getTrackLut(engine, engine.modeState.trackId);
+  const sample = sampleTrackAt(lut, 120);
+  const arcs = [];
+  const ctx = {
+    save() {},
+    restore() {},
+    setLineDash() {},
+    beginPath() {},
+    arc: (x, y, r) => arcs.push({ x, y, r }),
+    stroke() {}
+  };
+  const theme = { targetHighlightColor: '#ffd166', aimLineColor: '#ffffff' };
+
+  engine.aimPoints = null;
+  convoyBehavior.drawOverlay(ctx, engine, null, theme);
+  assert.equal(arcs.length, 0, 'no reticle without snapTarget');
+
+  engine.currentBall = { colorId: 'red' };
+  engine.aimPoints = {
+    landingX: sample.x + sample.tx * 20,
+    landingY: sample.y + sample.ty * 20,
+    snapTarget: { convoyS: 120 }
+  };
+  convoyBehavior.drawOverlay(ctx, engine, null, theme);
+  assert.equal(arcs.length, 1, 'draws insertion reticle arc when snapTarget has convoyS');
+
+  const coinsBefore = engine.storageManager.getCoins();
+  convoyBehavior.completeConvoyWave(engine);
+  assert.ok(
+    engine.storageManager.getCoins() >= coinsBefore + cfg.waveClearCoinBonus,
+    'completing a Convoy wave pays waveClearCoinBonus'
+  );
+});

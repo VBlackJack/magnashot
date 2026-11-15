@@ -419,6 +419,8 @@
   },
   "playHub": {
     "mastery": {
+      "campaignStars": 30,
+      "dailyStreak": 3,
       "endlessScore": 5000,
       "classicStage": 5,
       "blitzScore": 4000,
@@ -447,6 +449,11 @@
       { "id": "flux_stages", "eventKey": "flux_stage_cleared", "target": 3, "coins": 40, "mode": "flux" },
       { "id": "boss_rush_waves", "eventKey": "boss_rush_wave_cleared", "target": 2, "coins": 45, "mode": "boss_rush" },
       { "id": "campaign_levels", "eventKey": "campaign_level_cleared", "target": 2, "coins": 35, "mode": "campaign" },
+      { "id": "classic_stages", "eventKey": "classic_stage_cleared", "target": 3, "coins": 40, "mode": "classic" },
+      { "id": "puzzle_clears", "eventKey": "puzzle_stage_cleared", "target": 2, "coins": 40, "mode": "puzzle" },
+      { "id": "blitz_fevers", "eventKey": "blitz_fever_triggered", "target": 2, "coins": 40, "mode": "blitz" },
+      { "id": "cascade_shelves", "eventKey": "cascade_shelf_cleared", "target": 2, "coins": 40, "mode": "cascade" },
+      { "id": "versus_wins", "eventKey": "versus_cpu_won", "target": 1, "coins": 45, "mode": "versus" },
       { "id": "any_groups", "eventKey": "match_group_cleared", "target": 12, "coins": 35, "mode": null },
       { "id": "any_avalanches", "eventKey": "avalanche_balls", "target": 20, "coins": 35, "mode": null },
       { "id": "overcharge_bursts", "eventKey": "overcharge_full", "target": 4, "coins": 40, "mode": null },
@@ -623,6 +630,7 @@
     "overlapRadiusFactor": 1.5,
     "shotsBeforeDrop": 2,
     "shelfClearBonus": 150,
+    "shelfClearCoinBonus": 2,
     "polarityDriftPerStep": 0.22,
     "dropCountPerWave": 3,
     "initialDropRows": 3,
@@ -2081,6 +2089,7 @@
     "maxPalette": 6,
     "descentStepY": 48,
     "stageClearBonusBase": 500,
+    "stageClearCoinBonus": 6,
     "seedPrefix": "classic"
   },
   "versus": {
@@ -2148,6 +2157,13 @@
     "overchargeMaxMultiplier": 5,
     "suddenDeath": { "startSeconds": 180, "intervalSeconds": 20 },
     "roundsToWin": 2,
+    "rewards": {
+      "winCoinsByTier": {
+        "easy": 15,
+        "normal": 25,
+        "hard": 40
+      }
+    },
     "cpu": {
       "easy": {
         "thinkFrames": { "mean": 70, "jitter": 20 },
@@ -2253,14 +2269,14 @@
       "puzzle": 5,
       "blitz": 7,
       "flux": 8,
-      "cascade": 10,
-      "boss_rush": 12,
-      "hex_grid": 13,
-      "pinball": 14,
-      "orbital": 15,
-      "convoy": 16,
-      "merge": 17,
-      "slingshot": 18
+      "cascade": 8,
+      "boss_rush": 9,
+      "hex_grid": 9,
+      "pinball": 10,
+      "orbital": 10,
+      "convoy": 11,
+      "merge": 11,
+      "slingshot": 12
     },
     "recordKeys": {
       "endless": ["endlessHighScore"],
@@ -2281,12 +2297,12 @@
     "introduced": {
       "classic": 4,
       "versus": 6,
-      "hex_grid": 13,
-      "pinball": 14,
-      "orbital": 15,
-      "convoy": 16,
-      "merge": 17,
-      "slingshot": 18
+      "hex_grid": 9,
+      "pinball": 10,
+      "orbital": 10,
+      "convoy": 11,
+      "merge": 11,
+      "slingshot": 12
     },
     "stateNew": "new",
     "stateSeen": "seen",

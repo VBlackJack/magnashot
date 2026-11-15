@@ -36,7 +36,12 @@ import {
 
 /** Version of the discovery list that predates versioning: its seeding is never redone. */
 const LEGACY_DISCOVERIES_VERSION = 1;
-const ARCADE_INTRO_MODES = new Set([
+export const ARCADE_INTRO_MODES = new Set([
+  GAME_MODES.CLASSIC,
+  GAME_MODES.BLITZ,
+  GAME_MODES.BOSS_RUSH,
+  GAME_MODES.CASCADE,
+  GAME_MODES.FLUX,
   GAME_MODES.HEX_GRID,
   GAME_MODES.ORBITAL,
   GAME_MODES.PINBALL,

@@ -431,3 +431,42 @@ test('A perk bonus reads zero on an engine without a Flux config', () => {
   engine.fluxConfig = undefined;
   assert.equal(engine.getFluxPerkBonus(FLUX_PERK_IDS.BLAST), 0);
 });
+
+test('Combo Amplifier and Salvage Magnet integrate cleanly with Flux perk progression', () => {
+  const engine = startRun();
+  offer(engine, FLUX_PERK_IDS.COMBO);
+  assert.equal(engine.chooseFluxPerk(FLUX_PERK_IDS.COMBO), true);
+  assert.equal(engine.getFluxPerkBonus(FLUX_PERK_IDS.COMBO), perksCfg.catalog.combo.step);
+
+  // Combo multiplier applies when combo > 1 during resolveColorMatchCluster.
+  const firstBall = engine.physicsWorld.balls[0];
+  if (firstBall) {
+    engine.combo = 2;
+    const scoreBefore = engine.score;
+    engine.resolveColorMatchCluster([firstBall], firstBall);
+    assert.ok(engine.score > scoreBefore, 'combo perk resolves match cluster cleanly');
+  }
+
+  // Salvage Magnet refunds 1 shot only when at least minDrops spheres detach in an avalanche.
+  offer(engine, FLUX_PERK_IDS.SALVAGE);
+  assert.equal(engine.chooseFluxPerk(FLUX_PERK_IDS.SALVAGE), true);
+  engine.isRestoringRun = false;
+  const origDetach = engine.physicsWorld.detachUnanchoredBalls.bind(engine.physicsWorld);
+  try {
+    const sampleBalls = Array.from({ length: perksCfg.catalog.salvage.minDrops }, (_, i) => ({
+      x: 200 + i * 10,
+      y: 200,
+      colorId: 'red'
+    }));
+    engine.shotsRemaining = 4;
+    engine.physicsWorld.detachUnanchoredBalls = () => sampleBalls.slice(0, perksCfg.catalog.salvage.minDrops - 1);
+    engine.detachAndRewardAvalanche();
+    assert.equal(engine.shotsRemaining, 4, 'below minDrops grants no refund');
+
+    engine.physicsWorld.detachUnanchoredBalls = () => sampleBalls;
+    engine.detachAndRewardAvalanche();
+    assert.equal(engine.shotsRemaining, 5, 'meeting minDrops refunds 1 shot');
+  } finally {
+    engine.physicsWorld.detachUnanchoredBalls = origDetach;
+  }
+});

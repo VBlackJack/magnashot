@@ -224,6 +224,16 @@
   border-style: dashed;
   border-color: var(--accent-danger);
   color: var(--text-danger-soft);
+  animation: versus-threat-pulse 1.1s ease-in-out infinite alternate;
+}
+
+@keyframes versus-threat-pulse {
+  from {
+    box-shadow: 0 0 0 transparent;
+  }
+  to {
+    box-shadow: 0 0 8px var(--accent-danger);
+  }
 }
 
 .versus-pulse {

@@ -19,6 +19,7 @@
     "prismDescentDelay": 2,
     "prismMaxBuffer": 2,
     "waveClearBonus": 250,
+    "waveClearCoinBonus": 6,
     "nearMissRowsFromDanger": 1,
     "aimPreviewAlpha": 0.48,
     "cellGuideAlpha": 0.08
@@ -52,7 +53,10 @@
     "collectorCatchThickness": 26,
     "collectorBonusPoints": 60,
     "collectorOverchargeGain": 6,
-    "waveClearBonus": 300
+    "polarityNudgeSpeed": 90,
+    "polaritySpinKick": 0.025,
+    "waveClearBonus": 300,
+    "waveClearCoinBonus": 6
   },
   "pinball": {
     "launcherX": 235,
@@ -70,8 +74,11 @@
     "pegHitCooldownSec": 0.06,
     "pegHitPoints": 25,
     "corePegPoints": 120,
+    "comboMilestoneEvery": 4,
+    "comboOverchargeBonus": 6,
     "stageClearBonusBase": 400,
     "stageClearShotBonus": 100,
+    "stageClearCoinBonus": 8,
     "startingShots": 10,
     "stageRefillShots": 5,
     "maxShotsCap": 16,
@@ -128,6 +135,7 @@
     "maxColorCount": 6,
     "wavesPerExtraColor": 2,
     "waveClearBonus": 350,
+    "waveClearCoinBonus": 6,
     "tracks": [
       "spiral",
       "serpent",
@@ -179,6 +187,7 @@
     "polarityPulseSec": 0.65,
     "spawnMaxTierIndex": 4,
     "supernovaBonus": 4000,
+    "supernovaCoins": 15,
     "supernovaShockwaveImpulse": 340,
     "chain": {
       "shakeAdvanceAt": 3
@@ -231,6 +240,7 @@
       "gapMaxDrops": 10,
       "durationDrops": 8,
       "rewardShakeDrops": 2,
+      "rewardCoins": 8,
       "lastDropGraceSec": 2.5,
       "types": {
         "fuseCalibre": { "offsetBelowBest": 2, "minCalibre": 7, "maxCalibre": 10, "pointsPerCalibre": 300 },
@@ -446,6 +456,7 @@
     "corePoints": 220,
     "stageClearBonusBase": 450,
     "stageClearShotBonus": 100,
+    "stageClearCoinBonus": 8,
     "whipScoreMultiplier": 1.5,
     "whipBoostFactor": 1.22,
     "maxProjectileSpeed": 24,

@@ -209,3 +209,33 @@ test('Orbital collectorMagnet widens collector arc span and nearDanger draws dan
   assert.ok(arcs.length >= 2 + cfg.collectorArcCount);
   assert.ok(arcs.every((a) => Number.isFinite(a.span)), '4-arg drawUnderlay handles missing now cleanly');
 });
+
+test('Orbital onPolarityFlipped kicks rotor spin and radial drift, and wave clear saves snapshot and awards coins', () => {
+  const engine = createEngine();
+  engine.startOrbitalMode();
+  const cfg = modesConfig.orbital;
+  const pivot = orbitalBehavior.getCorePivot(engine);
+  pivot.angularVelocity = 0;
+  const driftBall = new Ball({ x: cfg.coreX + 80, y: cfg.coreY, radius: 18, colorId: 'red' });
+  driftBall.vx = 0;
+  driftBall.vy = 0;
+  engine.modeState.driftingBalls = [driftBall];
+  engine.isPolarityFlipped = true;
+
+  orbitalBehavior.onPolarityFlipped(engine);
+  assert.notEqual(pivot.angularVelocity, 0, 'polarity flip kicks central rotor angularVelocity');
+  assert.ok(Math.abs(driftBall.vx) > 0, 'polarity flip nudges drifting spheres radially');
+
+  const coinsBefore = engine.storageManager.getCoins();
+  for (const b of [...engine.physicsWorld.balls]) {
+    engine.physicsWorld.removeBall(b);
+  }
+  engine.modeState.wave = 1;
+  orbitalBehavior.onTurnCleanedUp(engine, {});
+  assert.ok(
+    engine.storageManager.getCoins() >= coinsBefore + cfg.waveClearCoinBonus,
+    'clearing an Orbital wave pays waveClearCoinBonus coins'
+  );
+  const snap = engine.storageManager.loadRunSnapshot();
+  assert.ok(snap && snap.mode === GAME_MODES.ORBITAL, 'wave clear persists an Orbital run snapshot');
+});

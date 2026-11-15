@@ -250,6 +250,8 @@ test('isNewRecord is per stage: a record on one stage does not flag another', ()
 
 test('first clear pays 40 per new star, a replay pays 0 for no new star, and Puzzle pays no run coins', () => {
   const storage = createTestStorage();
+  // Isolate star payout from calendar-seeded daily bounty completion on replay.
+  storage.recordBountyProgress = () => [];
   const engine = createTestEngine(storage);
   engine.startPuzzleMode(PLAIN_STAGE);
   const before = storage.getCoins();

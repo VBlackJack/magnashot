@@ -568,6 +568,7 @@ export class MergeBehavior extends ModeBehavior {
       return;
     }
     engine.addScore(points);
+    engine.awardRunCoins(engine.modesConfig.merge.contracts.rewardCoins || 0);
     if (state.shakeRemaining > 0) {
       state.shakeRemaining = Math.max(0, state.shakeRemaining - engine.modesConfig.merge.contracts.rewardShakeDrops);
     }
@@ -1593,6 +1594,7 @@ export class MergeBehavior extends ModeBehavior {
         const pts = cfg.supernovaBonus * Math.max(1, engine.combo);
         engine.addScore(pts);
         engine.modeState.supernovas = (engine.modeState.supernovas || 0) + 1;
+        engine.awardRunCoins(cfg.supernovaCoins || 0);
         this.recordFusedCalibre(engine, cfg.tiers.length);
         this.recordContractFusion(engine, cfg.tiers.length, mx, my);
         engine.waveCount = engine.mergeBestTier;

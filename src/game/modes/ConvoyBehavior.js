@@ -646,6 +646,7 @@ export class ConvoyBehavior extends ModeBehavior {
     const clearedWave = engine.waveCount;
     const bonus = cfg.waveClearBonus * clearedWave;
     engine.addScore(bonus);
+    engine.awardRunCoins(cfg.waveClearCoinBonus || 0);
     engine.audioManager.playEffect('victory');
     engine.particleSystem.spawnFloatingText(
       cfg.turretX,
@@ -825,6 +826,43 @@ export class ConvoyBehavior extends ModeBehavior {
       ctx.arc(0, 0, cfg.vortexRadius * VORTEX_INNER_RADIUS_FACTOR, armAngle, armAngle + VORTEX_ARM_ARC_RAD);
       ctx.stroke();
     }
+    ctx.restore();
+  }
+
+  /** Shows the exact track insertion reticle when the aim line strikes a sphere in the Convoy chain. */
+  drawOverlay(ctx, engine, _renderer, theme) {
+    if (
+      !engine.isRunPlaying()
+      || engine.physicsWorld.projectile
+      || engine.isAimCancelled
+      || !engine.currentBall
+      || !engine.aimPoints?.snapTarget
+    ) {
+      return;
+    }
+    const target = engine.aimPoints.snapTarget;
+    if (!Number.isFinite(target.convoyS)) {
+      return;
+    }
+    const cfg = engine.modesConfig.convoy;
+    const lut = this.getTrackLut(engine, engine.modeState?.trackId || cfg.tracks[0]);
+    const sample = sampleTrackAt(lut, target.convoyS);
+    const dot = (engine.aimPoints.landingX - sample.x) * sample.tx + (engine.aimPoints.landingY - sample.y) * sample.ty;
+    const insertS = dot >= 0
+      ? Math.min(lut.totalLength, target.convoyS + cfg.ballSpacing * MATH_CONSTANTS.HALF)
+      : Math.max(0, target.convoyS - cfg.ballSpacing * MATH_CONSTANTS.HALF);
+    const pos = sampleTrackAt(lut, insertS);
+    const r = engine.physicsConfig.ball.radius;
+
+    ctx.save();
+    ctx.strokeStyle = theme.targetHighlightColor || theme.aimLineColor;
+    ctx.globalAlpha = 0.72;
+    ctx.lineWidth = 2.5;
+    ctx.setLineDash([4, 4]);
+    ctx.beginPath();
+    ctx.arc(pos.x, pos.y, r * 0.92, 0, MATH_CONSTANTS.TWO_PI);
+    ctx.stroke();
+    ctx.setLineDash([]);
     ctx.restore();
   }
 

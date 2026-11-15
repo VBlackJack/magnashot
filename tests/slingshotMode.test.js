@@ -339,3 +339,57 @@ test('Magnetic Slingshot enforces maxFlightSubsteps anti-orbit timeout, renders 
   rejectedShort.storageManager = engine.storageManager;
   assert.equal(rejectedShort.restoreSavedRun(), false);
 });
+
+test('Slingshot drawUnderlay highlights whip ring when projectile is inside whipRadius and stage clear pays coins', () => {
+  const engine = createEngine();
+  engine.startSlingshotMode();
+  const cfg = modesConfig.slingshot;
+  const well = engine.modeState.wells[0];
+  assert.ok(well, 'slingshot stage has at least one dipole well');
+  const whipRadius = slingshotBehavior.getEffectiveWhipRadius(engine);
+
+  const captureWhipStrokes = () => {
+    const strokes = [];
+    const ctx = {
+      globalAlpha: 1,
+      lineWidth: 1,
+      strokeStyle: '',
+      fillStyle: '',
+      font: '',
+      textAlign: '',
+      textBaseline: '',
+      save() {},
+      restore() {},
+      setLineDash() {},
+      beginPath() {},
+      arc() {},
+      moveTo() {},
+      lineTo() {},
+      fill() {},
+      stroke() {
+        strokes.push({ alpha: this.globalAlpha, lineWidth: this.lineWidth, strokeStyle: this.strokeStyle });
+      },
+      fillText() {}
+    };
+    const theme = { coinPopupColor: '#ffd166', aimLineColor: '#ffffff', overchargePopupColor: '#7be0ff', anchorCoreColor: '#000000' };
+    slingshotBehavior.drawUnderlay(ctx, engine, null, theme, 0);
+    return strokes.filter((s) => s.strokeStyle === theme.overchargePopupColor);
+  };
+
+  engine.physicsWorld.projectile = new Ball({ x: well.x + whipRadius + 60, y: well.y, radius: 16, colorId: 'red' });
+  const farWhipStrokes = captureWhipStrokes();
+  assert.ok(farWhipStrokes.length > 0);
+  const farMaxAlpha = Math.max(...farWhipStrokes.map((s) => s.alpha));
+
+  engine.physicsWorld.projectile = new Ball({ x: well.x + whipRadius * 0.4, y: well.y, radius: 16, colorId: 'red' });
+  const nearWhipStrokes = captureWhipStrokes();
+  const nearMaxAlpha = Math.max(...nearWhipStrokes.map((s) => s.alpha));
+  assert.ok(nearMaxAlpha > farMaxAlpha, `near alpha (${nearMaxAlpha}) > far alpha (${farMaxAlpha})`);
+
+  const coinsBefore = engine.storageManager.getCoins();
+  slingshotBehavior.completeSlingshotStage(engine);
+  assert.ok(
+    engine.storageManager.getCoins() >= coinsBefore + cfg.stageClearCoinBonus,
+    'completing a Slingshot stage pays stageClearCoinBonus'
+  );
+});

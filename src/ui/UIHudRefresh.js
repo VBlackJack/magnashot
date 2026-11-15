@@ -165,7 +165,10 @@ const WAVE_BANNER_SPECS = Object.freeze({
   }),
   [GAME_MODES.MERGE]: (engine) => ({
     key: 'hud.stats.mode.merge',
-    params: { tier: formatNumber(engine.mergeBestTier || 1) }
+    params: {
+      tier: formatNumber(engine.mergeBestTier || 1),
+      merges: formatNumber(engine.modeState?.mergesCount || 0)
+    }
   })
 });
 
@@ -282,6 +285,11 @@ function refreshLauncherControls(engine) {
   if (this.elements.swapBtn) {
     const isSwapLocked = engine.mode === GAME_MODES.PUZZLE;
     this.elements.swapBtn.disabled = isSwapLocked;
+    if (isSwapLocked) {
+      setAttributeIfChanged(this.elements.swapBtn, 'title', t('hud.launcher.swap.lockedPuzzle'));
+    } else {
+      this.elements.swapBtn.removeAttribute?.('title');
+    }
   }
 }
 

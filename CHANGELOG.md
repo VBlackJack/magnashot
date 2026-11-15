@@ -4,6 +4,17 @@ All notable changes to **MagnaShot** are documented in this file.
 
 ## [Unreleased]
 
+### Added
+- Two new Flux perks (`Catalyst` for `+20%` combo points per stack, `Salvage` for `+1` shot on avalanches of `5+` spheres per stack), bringing Flux Mode to 8 selectable perks (`configs/flux.json`, `FLUX_PERK_IDS`, `locales/*.json`).
+- Coin progression rewards across previously unrewarded Arcade and Duel modes: Purist stage clears (`+6`), Cascade empty-shelf clears (`+2`), Hex Grid / Orbital Spin / Magnetic Convoy wave clears (`+6`), Magnetic Pinball / Magnetic Slingshot stage clears (`+8`), Merge Basin Supernovas (`+15`), and CPU Polarity Duel match wins (`15 / 25 / 40` coins by difficulty, shown on `#versus-result-coins`).
+- Play Hub Arcade subhead grouping (`Core & Timed` / `Physics Labs`), extended mastery badges for Campaign (`30` stars) and Daily Challenge (`3`-day streak), proportional mastery progress meters (`.mode-mastery-meter` via `resolveModeMasteryProgress`) on unlocked mode cards, and 5 new Daily Contracts (`classic_stages`, `puzzle_clears`, `blitz_fevers`, `cascade_shelves`, `versus_wins`) expanding the daily pool to 19 contracts.
+- Mode-specific gameplay and visual feedback upgrades: 3 alternating peg layouts (Diamond, Funnel, Twin Pillars) and combo Overcharge milestone bursts in Magnetic Pinball, deterministic Polarity Pulse impulse on Polarity flip (`F`) in Orbital Spin, snapback destination reticle and gap-bridge preview in Magnetic Convoy, proximity whip-range well highlight in Magnetic Slingshot, and live merge counter in the Merge Basin HUD banner.
+- Locked Swap explanation (`Queue locked in Puzzle`), first-attempt 3-star Puzzle tip, and first-visit arcade mode intro banners across Core Arcade modes (`classic`, `blitz`, `boss_rush`, `cascade`, `flux`).
+
+### Changed
+- Compressed progressive campaign unlock levels for Arcade modes so all modes open by campaign level 12 (`cascade: 8`, `boss_rush: 9`, `hex_grid: 9`, `pinball: 10`, `orbital: 10`, `convoy: 11`, `merge: 11`, `slingshot: 12`), preserving existing player unlocks.
+- Expanded unit and Playwright browser test suites covering Play Hub mastery progress meters, Convoy overlays and wave coin rewards, Slingshot whip halos and stage coin rewards, Polarity Duel CPU win coins, Pinball layouts and combo bursts, Orbital Polarity Pulses, Flux Catalyst/Salvage perks, and the new Daily Contracts.
+
 ## [1.30.0] - 2026-11-15
 
 ### Added

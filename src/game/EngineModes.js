@@ -21,7 +21,8 @@ import {
   OBSTACLE_TYPES,
   SPECIAL_TYPES,
   CLUSTER_MODIFIERS,
-  MATH_CONSTANTS
+  MATH_CONSTANTS,
+  FLUX_PERK_IDS
 } from '../core/Constants.js';
 import { t } from '../core/I18n.js';
 import { SeededRandom } from '../core/SeededRandom.js';
@@ -55,15 +56,8 @@ const isCurrentWeeklyFluxSeed = (engine, seed, contentVersion, weekKey) => {
   return seed === getWeeklyFluxSeed(effectiveWeek, engine.fluxConfig.seed, engine.gameConfig.weeklyFlux.seedSalt);
 };
 
-/** Flux perk ids; the specs (step, maxStacks, icon) live in configs/flux.json. */
-export const FLUX_PERK_IDS = Object.freeze({
-  RESERVE: 'reserve',
-  REFILL: 'refill',
-  BLAST: 'blast',
-  OVERCHARGE: 'overcharge',
-  ARSENAL: 'arsenal',
-  GOLDEN: 'golden'
-});
+/** Re-exported from Constants so callers importing EngineModes keep working. */
+export { FLUX_PERK_IDS };
 
 /**
  * Returns a one-time first-run objective banner payload for modes without authored levels.
@@ -73,7 +67,7 @@ export const FLUX_PERK_IDS = Object.freeze({
  * @returns {{ arcadeMode: string } | null}
  */
 function maybeBuildArcadeModeIntro(engine, mode) {
-  if (!engine.introducedModes || engine.introducedModes.has(mode)) {
+  if (engine.isRestoringRun || engine.activeDiscoveryId || !engine.introducedModes || engine.introducedModes.has(mode)) {
     return null;
   }
   engine.introducedModes.add(mode);
@@ -217,6 +211,7 @@ export const engineModeMethods = {
     this.state = GAME_STATES.PLAYING;
     const canvasCfg = this.gameConfig.canvas;
     this.updateAim(canvasCfg.launcherX, canvasCfg.launcherY + canvasCfg.initialAimOffsetY);
+    this.levelIntro = versusState ? null : maybeBuildArcadeModeIntro(this, GAME_MODES.CLASSIC);
     this.notifyUI();
   },
 
@@ -284,6 +279,8 @@ export const engineModeMethods = {
     const clearedStage = this.classicStage;
     const points = classicCfg.stageClearBonusBase * clearedStage;
     this.addScore(points);
+    this.awardRunCoins(classicCfg.stageClearCoinBonus || 0);
+    reportBountyEvent(this, 'classic_stage_cleared', 1);
     this.audioManager.playEffect('victory');
     this.particleSystem.spawnFloatingText(
       this.gameConfig.canvas.logicalWidth * MATH_CONSTANTS.HALF,
@@ -460,6 +457,7 @@ export const engineModeMethods = {
     const canvasCfg = this.gameConfig.canvas;
     this.updateAim(canvasCfg.launcherX, canvasCfg.launcherY + canvasCfg.initialAimOffsetY);
     this.refreshDiscovery();
+    this.levelIntro = maybeBuildArcadeModeIntro(this, GAME_MODES.BLITZ);
     this.notifyUI();
   },
 
@@ -490,6 +488,7 @@ export const engineModeMethods = {
     const canvasCfg = this.gameConfig.canvas;
     this.updateAim(canvasCfg.launcherX, canvasCfg.launcherY + canvasCfg.initialAimOffsetY);
     this.refreshDiscovery();
+    this.levelIntro = maybeBuildArcadeModeIntro(this, GAME_MODES.BOSS_RUSH);
     this.notifyUI();
   },
 
@@ -633,6 +632,7 @@ export const engineModeMethods = {
     const canvasCfg = this.gameConfig.canvas;
     this.updateAim(canvasCfg.launcherX, canvasCfg.launcherY + canvasCfg.initialAimOffsetY);
     this.refreshDiscovery();
+    this.levelIntro = maybeBuildArcadeModeIntro(this, GAME_MODES.CASCADE);
     this.notifyUI();
   },
 
@@ -770,6 +770,7 @@ export const engineModeMethods = {
     if (isWeekly && !isRestart && !this.isRestoringRun) {
       this.payWeeklyFluxBonus(this.weeklyWeekKey);
     }
+    this.levelIntro = isRestart ? null : maybeBuildArcadeModeIntro(this, GAME_MODES.FLUX);
     this.notifyUI();
   },
 
