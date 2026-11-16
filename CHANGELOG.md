@@ -4,6 +4,8 @@ All notable changes to **MagnaShot** are documented in this file.
 
 ## [Unreleased]
 
+## [1.32.1] - 2026-11-16
+
 ### Fixed
 - Kept Polarity Duel layout measurement, `Renderer` sizing, canvas aiming coordinates, and local-duel room checks anchored to the authored `versusConfigs.gameConfig` board height rather than single-player's portrait-adapted `logicalHeight` (`src/ui/UIVersus.js`, `src/ui/UIVersusLocal.js`).
 
