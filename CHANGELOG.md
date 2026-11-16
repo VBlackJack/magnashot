@@ -4,6 +4,8 @@ All notable changes to **MagnaShot** are documented in this file.
 
 ## [Unreleased]
 
+## [1.32.0] - 2026-11-16
+
 ### Added
 - Right-side slide-out drawer (`#btn-powerups-drawer`, `#powerups-panel`) on portrait phones (`<= 680 px`) housing the Overcharge gauge, Polarity toggle, and a 2-column Special Spheres grid (`index.html`, `src/ui/UIHelpers.js`, `src/ui/UIInputBindings.js`, `styles/responsive.css`, `locales/*.json`), with live stock badge, equipped special icon, and auto-dismiss on selection, canvas tap, or `Escape`.
 - Adaptive portrait world height (`syncAdaptiveCanvasHeight` in `src/ui/UIHelpers.js`, `configs/game.json` `maxAdaptiveLogicalHeight: 1100`): dynamically scales `canvas.logicalHeight` and `applyWorldGeometry` on tall portrait screens so the board fills the available stage height without stretching spheres, with matching bottom-tracking in `OrbitalBehavior.js` and `PinballBehavior.js`.
