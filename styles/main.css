@@ -751,6 +751,7 @@ body {
  * instead of a guessed viewport offset.
  */
 .stage-container {
+  position: relative;
   flex: 1 1 auto;
   min-height: 0;
   container-type: size;
@@ -813,7 +814,8 @@ body {
 }
 
 .swap-floating-btn,
-.polarity-floating-btn {
+.polarity-floating-btn,
+.powerups-drawer-btn {
   flex: 1;
   background: var(--bg-panel-alpha-90);
   color: var(--text-secondary);
@@ -828,12 +830,18 @@ body {
   transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
 }
 
+.powerups-drawer-btn {
+  display: none;
+}
+
 .swap-floating-btn:hover:not(:disabled),
-.polarity-floating-btn:hover:not(:disabled) {
+.polarity-floating-btn:hover:not(:disabled),
+.powerups-drawer-btn:hover:not(:disabled) {
   border-color: var(--accent-blue);
   color: var(--text-bright);
 }
 
+.powerups-drawer-btn:disabled,
 .swap-floating-btn:disabled,
 .polarity-floating-btn:disabled {
   opacity: 0.45;
@@ -846,6 +854,17 @@ body {
   background: var(--accent-danger-alpha-22);
   border-color: var(--accent-danger);
   color: var(--text-danger-soft);
+}
+
+.powerups-drawer-btn[aria-expanded='true'] {
+  border-color: var(--accent-blue);
+  color: var(--text-bright);
+}
+
+.powerups-drawer-btn.active {
+  background: var(--accent-amber-alpha-16);
+  border-color: var(--accent-amber);
+  color: var(--text-gold);
 }
 
 /*

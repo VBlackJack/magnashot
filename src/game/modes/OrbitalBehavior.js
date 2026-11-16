@@ -86,7 +86,7 @@ export class OrbitalBehavior extends ModeBehavior {
     return {
       ...base,
       x: cfg.coreX,
-      y: cfg.launcherY,
+      y: Math.max(cfg.launcherY, engine.gameConfig.canvas.launcherY),
       posture: LAUNCHER_POSTURES.UPWARD,
       nextOffsetX: NEXT_BALL_OFFSET_X,
       nextOffsetY: NEXT_BALL_OFFSET_Y

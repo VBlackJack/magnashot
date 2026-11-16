@@ -14,8 +14,9 @@
  * limitations under the License.
  */
 
-import { BOARD_MECHANICS, GAME_MODES, GAME_OVER_REASONS, INPUT_MODES } from '../core/Constants.js';
+import { BOARD_MECHANICS, GAME_MODES, GAME_OVER_REASONS, GAME_STATES, INPUT_MODES, SPECIAL_TYPES_ORDER } from '../core/Constants.js';
 import { t, formatNumber } from '../core/I18n.js';
+import { applyWorldGeometry } from '../core/WorldGeometry.js';
 import { LEVEL_FORMATS } from '../game/LevelCatalog.js';
 
 /** Percent scale of the HUD gauges (star progress, overcharge, tutorial offset, achievements). */
@@ -921,4 +922,151 @@ export function formatUnlockedModesText(modes, translate) {
 /** True when a control carries aria-disabled="true" (a locked mode: focusable, but inert). */
 export function isAriaDisabled(element) {
   return element?.getAttribute?.('aria-disabled') === 'true';
+}
+
+/**
+ * Refreshes the mobile special-balls drawer trigger with the equipped special or total stock.
+ * @param {object} ui - UIManager instance.
+ * @param {object} engine - Game engine.
+ */
+export function refreshPowerupsDrawerButton(ui, engine) {
+  const toggleBtn = ui.elements?.btnPowerupsDrawer;
+  if (!toggleBtn || !engine) {
+    return;
+  }
+  const offersSpecials = Boolean(engine.offersSpecialBalls?.());
+  const inventory = engine.specialInventory || {};
+  let totalCount = 0;
+  for (const type of SPECIAL_TYPES_ORDER) {
+    if (engine.isSpecialTypeAllowed?.(type) === false) {
+      continue;
+    }
+    const qty = inventory[type];
+    if (Number.isFinite(qty) && qty > 0) {
+      totalCount += qty;
+    }
+  }
+  const equippedType = engine.currentBall?.specialType || null;
+  const equippedSpec = equippedType ? ui.ballsConfig?.specialTypes?.[equippedType] : null;
+  const fallbackIcon = offersSpecials ? t('hud.powerups.drawer.icon') : t('hud.launcher.polarity.icon');
+  const iconText = equippedSpec?.icon || fallbackIcon;
+  const countText = formatNumber(totalCount);
+
+  setTextIfChanged(ui.elements.powerupsDrawerIcon, iconText);
+  setTextIfChanged(ui.elements.powerupsDrawerCount, countText);
+  ui.elements.powerupsDrawerCount?.classList.toggle('hidden', !offersSpecials || totalCount <= 0);
+  toggleBtn.classList.toggle('active', Boolean(equippedType) || Boolean(engine.isPolarityFlipped));
+  toggleBtn.classList.toggle('has-stock', offersSpecials && totalCount > 0);
+  let ariaLabel;
+  if (ui.isPowerupsDrawerOpen) {
+    ariaLabel = t('hud.powerups.drawer.closeAria');
+  } else if (offersSpecials) {
+    ariaLabel = t('hud.powerups.drawer.openAria', { count: countText });
+  } else {
+    ariaLabel = t('hud.powerups.drawer.openControlsAria');
+  }
+  setAttributeIfChanged(toggleBtn, 'aria-label', ariaLabel);
+}
+
+/**
+ * Opens or closes the mobile side drawer overlay holding controls and special spheres.
+ * @param {object} ui - UIManager instance.
+ * @param {boolean} isOpen - Target drawer state.
+ */
+export function setPowerupsDrawerOpen(ui, isOpen) {
+  const canOpen =
+    Boolean(isOpen)
+    && ui.engine?.state === GAME_STATES.PLAYING
+    && !ui.isAnyModalOpen?.()
+    && !ui.isDrawerOpen
+    && !ui.engine?.isVictoryCelebrating?.();
+  ui.isPowerupsDrawerOpen = canOpen;
+  ui.elements?.stageContainer?.classList.toggle('powerups-drawer-open', canOpen);
+  const toggleBtn = ui.elements?.btnPowerupsDrawer;
+  if (toggleBtn) {
+    setAttributeIfChanged(toggleBtn, 'aria-expanded', String(canOpen));
+    refreshPowerupsDrawerButton(ui, ui.engine);
+  }
+}
+
+/** Toggles the mobile special-balls drawer overlay. */
+export function togglePowerupsDrawer(ui) {
+  setPowerupsDrawerOpen(ui, !ui.isPowerupsDrawerOpen);
+}
+
+function resolveStageDockReservePx(ui) {
+  const dock = ui.elements?.launcherControlsDock;
+  if (!dock || typeof getComputedStyle !== 'function' || typeof dock.getBoundingClientRect !== 'function') {
+    return 0;
+  }
+  const style = getComputedStyle(dock);
+  if (style.display === 'none' || style.position === 'absolute') {
+    return 0;
+  }
+  const stageStyle = getComputedStyle(ui.elements.stageContainer);
+  const gap = Number.parseFloat(stageStyle.rowGap) || 0;
+  return dock.getBoundingClientRect().height + gap;
+}
+
+/** True when the current viewport is a portrait phone eligible for adaptive board height. */
+export function isPortraitAdaptiveViewport(ui) {
+  const maxWidth = ui.gameConfig?.canvas?.adaptivePortraitMaxWidth;
+  return (
+    typeof window !== 'undefined'
+    && Number.isFinite(maxWidth)
+    && window.innerWidth <= maxWidth
+    && (typeof window.innerHeight !== 'number' || window.innerHeight >= window.innerWidth)
+  );
+}
+
+function computeAdaptiveLogicalHeight(ui, stageRect) {
+  const canvasCfg = ui.gameConfig.canvas;
+  const baseH = ui.baseLogicalHeight ?? canvasCfg.logicalHeight;
+  const maxH = canvasCfg.maxAdaptiveLogicalHeight ?? baseH;
+  if (stageRect.width <= 0 || stageRect.height <= 0) {
+    return canvasCfg.logicalHeight;
+  }
+  if (!isPortraitAdaptiveViewport(ui)) {
+    return baseH;
+  }
+  const dockReserve = resolveStageDockReservePx(ui);
+  const borderReserve =
+    typeof getComputedStyle === 'function' && typeof document !== 'undefined' && document.documentElement
+      ? Number.parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--canvas-border')) || 0
+      : 0;
+  const availH = Math.max(1, stageRect.height - dockReserve - borderReserve);
+  const fittedH = Math.round(canvasCfg.logicalWidth * (availH / stageRect.width));
+  return Math.max(baseH, Math.min(maxH, fittedH));
+}
+
+/**
+ * Adapts the logical board height to fill tall portrait screens without stretching spheres.
+ * Desktop, tablet and landscape viewports keep the authored base height.
+ * @param {object} ui - UIManager instance.
+ */
+export function syncAdaptiveCanvasHeight(ui) {
+  const canvasCfg = ui.gameConfig?.canvas;
+  const stage = ui.elements?.stageContainer;
+  if (!canvasCfg || !stage || typeof stage.getBoundingClientRect !== 'function') {
+    return;
+  }
+  if (ui.baseLogicalHeight === undefined) {
+    ui.baseLogicalHeight = canvasCfg.logicalHeight;
+  }
+  const targetH = computeAdaptiveLogicalHeight(ui, stage.getBoundingClientRect());
+  if (canvasCfg.logicalHeight === targetH) {
+    return;
+  }
+  canvasCfg.logicalHeight = targetH;
+  applyWorldGeometry(ui.gameConfig);
+  if (ui.renderer) {
+    ui.renderer.logicalWidth = canvasCfg.logicalWidth;
+    ui.renderer.logicalHeight = canvasCfg.logicalHeight;
+    ui.renderer.staticLayerDirty = true;
+    ui.renderer.resolutionDirty = true;
+  }
+  ui.applyCanvasLayoutVariables?.();
+  if (ui.engine && typeof ui.engine.updateAimFromAngle === 'function') {
+    ui.engine.updateAimFromAngle(ui.engine.aimAngle);
+  }
 }

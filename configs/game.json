@@ -2,6 +2,8 @@
   "canvas": {
     "logicalWidth": 470,
     "logicalHeight": 820,
+    "maxAdaptiveLogicalHeight": 1100,
+    "adaptivePortraitMaxWidth": 680,
     "designWidth": 540,
     "launcherBottomOffset": 75,
     "dangerLineBottomOffset": 145,

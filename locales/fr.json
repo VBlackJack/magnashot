@@ -321,6 +321,12 @@
         "buyAria": "{{name}} : aucune en stock. Ouvrir l'Atelier pour en acheter",
         "emptyMark": "+"
       },
+      "drawer": {
+        "icon": "⚡",
+        "openAria": "Ouvrir les commandes et sphères spéciales ({{count}} prêtes)",
+        "openControlsAria": "Ouvrir le tiroir des commandes et de la Surcharge",
+        "closeAria": "Fermer le tiroir latéral des commandes"
+      },
       "empty": "Aucune sphère spéciale dans ce niveau."
     },
     "canvas": {
