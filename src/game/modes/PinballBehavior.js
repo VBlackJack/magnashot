@@ -475,23 +475,25 @@ export class PinballBehavior extends ModeBehavior {
 
     // Check Magnetic Collector Bucket catch at bottom
     const bucketX = state ? state.bucketX : cfg.launcherX;
+    const bucketY = this.resolveBucketY(engine, cfg);
+    const floorOutY = Math.max(cfg.floorOutY, engine.gameConfig.canvas.logicalHeight + p.radius);
     const halfBucketW = this.getEffectiveBucketWidth(engine) * MATH_CONSTANTS.HALF;
     const halfBucketH = cfg.bucketHeight * MATH_CONSTANTS.HALF;
     if (
       p.vy >= 0
-      && p.y + p.radius >= cfg.bucketY - halfBucketH
-      && p.y - p.radius <= cfg.bucketY + halfBucketH
+      && p.y + p.radius >= bucketY - halfBucketH
+      && p.y - p.radius <= bucketY + halfBucketH
       && Math.abs(p.x - bucketX) <= halfBucketW
     ) {
       world.projectile = null;
       p.isProjectile = false;
-      this.refundBucketCatch(engine, bucketX, cfg.bucketY);
+      this.refundBucketCatch(engine, bucketX, bucketY);
       this.settlePinballTurn(engine, true);
       return true;
     }
 
     if (
-      p.y > cfg.floorOutY
+      p.y > floorOutY
       || (state && state.flightElapsedSec > cfg.maxFlightSeconds)
       || world.isFlightExhausted(p)
     ) {
@@ -689,6 +691,15 @@ export class PinballBehavior extends ModeBehavior {
     this.recountCorePegs(engine);
   }
 
+  /** Keeps the catch bucket near the bottom edge when portrait height adapts beyond 820 px. */
+  resolveBucketY(engine, cfg) {
+    const canvasCfg = engine.gameConfig?.canvas;
+    const adaptiveY = Number.isFinite(canvasCfg?.logicalHeight) && Number.isFinite(canvasCfg?.launcherBottomOffset)
+      ? canvasCfg.logicalHeight - canvasCfg.launcherBottomOffset
+      : cfg.bucketY;
+    return Math.max(cfg.bucketY, adaptiveY);
+  }
+
   drawOverlay(ctx, engine, renderer, theme, now) {
     const cfg = engine.modesConfig.pinball;
     const pulse = CORE_PULSE_MIN_ALPHA
@@ -716,9 +727,10 @@ export class PinballBehavior extends ModeBehavior {
 
     // Draw oscillating Magnetic Collector Bucket at the bottom
     const bucketX = engine.modeState?.bucketX ?? cfg.launcherX;
+    const bucketY = this.resolveBucketY(engine, cfg);
     const bucketW = this.getEffectiveBucketWidth(engine);
     const left = bucketX - bucketW * MATH_CONSTANTS.HALF;
-    const top = cfg.bucketY - cfg.bucketHeight * MATH_CONSTANTS.HALF;
+    const top = bucketY - cfg.bucketHeight * MATH_CONSTANTS.HALF;
 
     ctx.globalAlpha = BUCKET_GLOW_ALPHA;
     ctx.fillStyle = theme.overchargePopupColor;

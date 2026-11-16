@@ -21,10 +21,14 @@ import { fluxPerkIndexForKey } from './FluxPerkView.js';
 import {
   ARCADE_CARD_SPECS,
   inputModeForPointerType,
+  isPortraitAdaptiveViewport,
   shouldIgnoreRepeatedKey,
   isBrowserShortcut,
   resolveNextCampaignTarget,
+  setPowerupsDrawerOpen,
+  syncAdaptiveCanvasHeight,
   syncFluxSeedValidationError,
+  togglePowerupsDrawer,
   WEEKLY_ACCESS_KEY
 } from './UIHelpers.js';
 import { CONTINUE_KINDS, PLAY_HUB_DISCLOSURES } from './PlayHubView.js';
@@ -381,6 +385,7 @@ function bindLauncherAndHintControls(ui) {
   els.swapBtn.addEventListener('click', () => ui.engine.swapLauncherBalls());
   els.polarityBtn?.addEventListener('click', () => ui.engine.togglePolarityFlip());
   els.mergeShakeBtn?.addEventListener('click', () => ui.tryMergeShake());
+  els.btnPowerupsDrawer?.addEventListener('click', () => togglePowerupsDrawer(ui));
   els.hintReplayBtn?.addEventListener('click', () => ui.engine.replayLevelHints?.());
   els.btnDismissLevelIntro?.addEventListener('click', () => ui.engine.dismissLevelIntro?.());
   els.btnResetHints?.addEventListener('click', () => {
@@ -558,19 +563,39 @@ function bindRoundFlowControls(ui) {
 }
 
 function bindGlobalWindowListeners(ui) {
+  const els = ui.elements;
   // Capture phase: the mode must switch even when a handler below stops the event.
   window.addEventListener(
     'pointerdown',
-    (e) => ui.setInputMode(inputModeForPointerType(e.pointerType)),
+    (e) => {
+      ui.setInputMode(inputModeForPointerType(e.pointerType));
+      if (
+        ui.isPowerupsDrawerOpen
+        && !els.powerupsPanel?.contains(e.target)
+        && !els.launcherControlsDock?.contains(e.target)
+        && !els.btnPowerupsDrawer?.contains(e.target)
+      ) {
+        setPowerupsDrawerOpen(ui, false);
+        e.stopPropagation();
+      }
+    },
     { capture: true }
   );
   // A window that shrinks or turns while the hub is open may no longer fit two boards.
   for (const type of ['resize', 'orientationchange']) {
     window.addEventListener(type, () => {
+      if (ui.isPowerupsDrawerOpen && !isPortraitAdaptiveViewport(ui)) {
+        setPowerupsDrawerOpen(ui, false);
+      }
+      syncAdaptiveCanvasHeight(ui);
       if (ui.isPlayHubOpen()) {
         ui.syncPlayHubVersusLocal();
       }
     });
+  }
+  if (typeof ResizeObserver === 'function' && els.stageContainer) {
+    ui.stageResizeObserver = new ResizeObserver(() => syncAdaptiveCanvasHeight(ui));
+    ui.stageResizeObserver.observe(els.stageContainer);
   }
   window.addEventListener('keydown', (e) => ui.handleKeyDown(e));
   window.addEventListener('keyup', (e) => ui.handleKeyUp(e));
@@ -891,6 +916,10 @@ export const uiInputBindingMethods = {
    */
   handleBackAction() {
     if (dismissTopBackLayer(this)) {
+      return;
+    }
+    if (this.isPowerupsDrawerOpen) {
+      setPowerupsDrawerOpen(this, false);
       return;
     }
     if (this.isDrawerOpen) {

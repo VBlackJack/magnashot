@@ -110,7 +110,7 @@ class Application {
         gameConfig,
         ballsConfig,
         versusConfigs: {
-          gameConfig,
+          gameConfig: structuredClone(gameConfig),
           physicsConfig,
           ballsConfig,
           obstaclesConfig,

@@ -321,6 +321,12 @@
         "buyAria": "{{name}}: none left. Open the Workshop to buy more",
         "emptyMark": "+"
       },
+      "drawer": {
+        "icon": "⚡",
+        "openAria": "Open controls and special spheres ({{count}} ready)",
+        "openControlsAria": "Open controls and Overcharge drawer",
+        "closeAria": "Close side controls drawer"
+      },
       "empty": "No special sphere in this level."
     },
     "canvas": {

@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-import { GAME_MODES, GAME_STATES, OBJECTIVE_TYPES } from '../core/Constants.js';
+import { GAME_MODES, GAME_STATES, INPUT_MODES, LAUNCHER_POSTURES, OBJECTIVE_TYPES } from '../core/Constants.js';
 import { t, formatNumber } from '../core/I18n.js';
 import { SeededRandom } from '../core/SeededRandom.js';
 import { resolveHintText } from '../game/Discovery.js';
@@ -33,6 +33,8 @@ import {
   MODE_LOCKED_CLASS,
   MODE_NEW_CLASS,
   describeModeLock,
+  setPowerupsDrawerOpen,
+  syncAdaptiveCanvasHeight,
   setModeLabel,
   formatUnlockedModesText,
   formatUnlockedModeNames,
@@ -594,6 +596,25 @@ function refreshTutorialAndSpecialBanners(ui, engine) {
   }
 }
 
+function syncLauncherPostureAndDrawer(ui, engine, offersSpecialBalls, hidesOvercharge) {
+  const posture = engine.getLauncherSpec?.()?.posture || LAUNCHER_POSTURES.UPWARD;
+  const isBottomDock = ui.inputMode === INPUT_MODES.GAMEPAD || posture === LAUNCHER_POSTURES.DROP_RAIL;
+  const hasSideDrawerContent = !isBottomDock || offersSpecialBalls || !hidesOvercharge;
+  ui.elements.btnPowerupsDrawer?.classList.toggle('hidden', !hasSideDrawerContent);
+  if (!hasSideDrawerContent || engine.state !== GAME_STATES.PLAYING) {
+    setPowerupsDrawerOpen(ui, false);
+  }
+  const dataset = ui.elements.stageContainer?.dataset;
+  if (dataset) {
+    dataset.launcherPosture = posture;
+  }
+  if (ui.lastAdaptivePosture !== posture || ui.lastAdaptiveInputMode !== ui.inputMode) {
+    ui.lastAdaptivePosture = posture;
+    ui.lastAdaptiveInputMode = ui.inputMode;
+    syncAdaptiveCanvasHeight(ui);
+  }
+}
+
 function refreshSpecialPanelsVisibility(ui, engine) {
   // A level that hands out no special ball shows no empty slots to a new player.
   const offersSpecialBalls = engine.offersSpecialBalls();
@@ -607,6 +628,7 @@ function refreshSpecialPanelsVisibility(ui, engine) {
   const hidesOvercharge = isPurist || engine.mode === GAME_MODES.PUZZLE;
   ui.elements.overchargeFill?.closest?.('.overcharge-widget')?.classList.toggle('hidden', hidesOvercharge);
   ui.elements.overchargePct?.classList.toggle('hidden', hidesOvercharge);
+  syncLauncherPostureAndDrawer(ui, engine, offersSpecialBalls, hidesOvercharge);
 }
 
 function refreshLiveStatusBadgesAndBanners(ui, engine) {

@@ -74,7 +74,7 @@
   - **Tilt Control** on phones and tablets, on by default: tilting the device leans gravity sideways. On iPhone and iPad, the first tap on the board asks for the motion permission. It can be turned off in **Settings**.
   - Screen reader support: labelled toggles with `aria-pressed`, named power-ups and level stars, and polite announcements for achievements and round results.
   - Full mouse, touch (with vertical finger offset and pull-down shot cancellation), and keyboard controls; held action keys do not auto-repeat. The arrows fine-tune a mouse aim: after an arrow, small mouse movements leave the aim alone and a click shoots along it.
-  - Zero-scroll layout on desktop, phones and landscape phones, with 44 px touch targets and a unified slide-in burger menu (`☰`) across all viewports (grouping *Play*, *My stats*, *Settings* and *Current Round* actions while pausing the run). On portrait phones the board spans the full width and a compact line under the score keeps the round, coins and best score in view. The board takes the shape of the 470 x 820 world. On landscape desktops the board uses the full window height, centered between two columns of the same width: the burger menu button, interactive mode selector pill (`▾`) and round stats on the left, overcharge, special spheres, Polarity and Swap on the right.
+  - Zero-scroll layout on desktop, phones and landscape phones, with 44 px touch targets and a unified slide-in burger menu (`☰`) across all viewports (grouping *Play*, *My stats*, *Settings* and *Current Round* actions while pausing the run). On portrait phones the top HUD stays on a single compact line (with round, coins and best score kept in the slide-in menu), and Overcharge, Polarity and Special Spheres tuck into a right-side slide-out drawer (`◀`) so the board fills the full width and adapts its logical height (`820` to `1100` px) to tall screens while keeping circular spheres. On landscape desktops the board uses the full window height, centered between two columns of the same width: the burger menu button, interactive mode selector pill (`▾`) and round stats on the left, overcharge, special spheres, Polarity and Swap on the right.
   - The run in progress survives a reload or a discarded tab and resumes paused.
 - **Installable & Offline**:
   - Installable Progressive Web App with standard and maskable icons; **Settings** offers an Install button where the browser allows it, and a hint for iPhone and iPad.
@@ -89,9 +89,9 @@
 | **Aim** | Move pointer / Drag finger | `Left` / `Right` for fine steps (`+ Shift` for bigger ones) |
 | **Shoot** | Release pointer / finger | `Enter` |
 | **Cancel Aim** | Drag below the launcher ring (above the top launcher in Pinball, above the drop rail in Merge Basin, or onto the central turret in Convoy) | - |
-| **Swap Sphere** | Click secondary sphere or **Swap** button | `Space` |
-| **Flip Polarity** | Click **Polarity** button | `F` |
-| **Equip / Unequip Special Sphere** | Click Special Sphere slot (click again to stash) | `1` to `7` |
+| **Swap Sphere** | Click launcher or secondary sphere (or **Swap** button) | `Space` |
+| **Flip Polarity** | Click **Polarity** button (inside the `◀` side drawer on portrait touch phones) | `F` |
+| **Equip / Unequip Special Sphere** | Click Special Sphere slot (inside the `◀` side drawer on portrait touch phones; click again to stash) | `1` to `7` |
 | **Shake the basin (Merge Basin)** | Click **Shake** | `G` |
 | **Play Hub** | Click **Play** in menu | `M` |
 | **Workshop** | Click **Workshop** in menu | `W` |

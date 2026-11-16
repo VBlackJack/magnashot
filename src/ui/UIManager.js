@@ -55,7 +55,10 @@ import {
   scheduleNextFrame,
   renderedStarGlyphs,
   setTextIfChanged,
-  setAttributeIfChanged
+  setAttributeIfChanged,
+  setPowerupsDrawerOpen,
+  refreshPowerupsDrawerButton,
+  syncAdaptiveCanvasHeight
 } from './UIHelpers.js';
 import { uiGamepadMethods } from './UIGamepad.js';
 import { uiInputBindingMethods } from './UIInputBindings.js';
@@ -191,6 +194,10 @@ function cacheControlAndDrawerElements() {
     swapBtn: document.getElementById('btn-swap-ball'),
     polarityBtn: document.getElementById('btn-polarity'),
     mergeShakeBtn: document.getElementById('btn-merge-shake'),
+    btnPowerupsDrawer: document.getElementById('btn-powerups-drawer'),
+    powerupsPanel: document.getElementById('powerups-panel'),
+    powerupsDrawerIcon: document.getElementById('powerups-drawer-icon'),
+    powerupsDrawerCount: document.getElementById('powerups-drawer-count'),
     hintReplayBtn: document.getElementById('btn-hint-replay'),
     levelIntroBanner: document.getElementById('level-intro-banner'),
     levelIntroText: document.getElementById('level-intro-text'),
@@ -201,6 +208,7 @@ function cacheControlAndDrawerElements() {
     btnCloseDrawer: document.getElementById('btn-close-drawer'),
     hudBar: document.querySelector('.hud-bar'),
     stageContainer: document.querySelector('.stage-container'),
+    launcherControlsDock: document.querySelector('.launcher-controls-dock'),
     drawerMode: document.getElementById('drawer-mode'),
     drawerStarProgress: document.getElementById('drawer-star-progress'),
     drawerCoins: document.getElementById('drawer-coins'),
@@ -502,6 +510,7 @@ function initUiRuntimeState(ui, engine, renderer) {
   ui.padFocusEl = null;
   ui.toastTimer = null;
   ui.isDrawerOpen = false;
+  ui.isPowerupsDrawerOpen = false;
   ui.drawerStarParts = null;
   ui.activeStatsTab = STATS_TABS.OVERVIEW;
   ui.statsOpener = null;
@@ -829,6 +838,7 @@ export class UIManager {
   }
 
   init() {
+    syncAdaptiveCanvasHeight(this);
     this.applyCanvasLayoutVariables();
     this.applyInputMode();
     this.buildPowerupButtons();
@@ -1062,6 +1072,7 @@ export class UIManager {
         if (btn.getAttribute('aria-disabled') === 'true') {
           return;
         }
+        setPowerupsDrawerOpen(this, false);
         // An empty stock leads to where more can be bought.
         if (btn.classList.contains(EMPTY_POWERUP_CLASS)) {
           this.openShopModal(SHOP_TABS.AMMO);
@@ -1090,6 +1101,7 @@ export class UIManager {
     for (const btn of buttons) {
       updateSinglePowerupButton(this, engine, btn, context);
     }
+    refreshPowerupsDrawerButton(this, engine);
   }
 
   getPowerupAriaLabel(type, count) {

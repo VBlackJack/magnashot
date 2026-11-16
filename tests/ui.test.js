@@ -22,6 +22,11 @@ import { join } from 'node:path';
 import { GAME_MODES, GAME_OVER_REASONS, GAME_STATES, INPUT_MODES, SPECIAL_TYPES_ORDER } from '../src/core/Constants.js';
 import { I18nService, i18n, resolveInitialLocale } from '../src/core/I18n.js';
 import {
+  refreshPowerupsDrawerButton,
+  setPowerupsDrawerOpen,
+  syncAdaptiveCanvasHeight
+} from '../src/ui/UIHelpers.js';
+import {
   DISCOVERY_PULSE_CLASS,
   HIGH_CONTRAST_CLASS,
   INPUT_ARIA_HINTS,
@@ -3906,6 +3911,106 @@ test('finishVersusMatch pays tier coin rewards on CPU win only and syncs versusR
     assert.equal(storage.getCoins(), coinsAfterWin, 'CPU loss pays 0 coins');
     assert.equal(coinsEl.classList.contains('hidden'), true, 'versusResultCoins hides when earnedCoins is 0');
   } finally {
+    i18n.currentLocale = prevLocale;
+  }
+});
+
+test('side drawer helpers update trigger state, stock badge and adaptive portrait canvas height', () => {
+  const prevLocale = i18n.currentLocale;
+  const prevWindow = globalThis.window;
+  i18n.dictionaries.set('en', loadJson('./locales/en.json'));
+  i18n.currentLocale = 'en';
+
+  const ballsConfig = loadJson('./configs/balls.json');
+  const stageContainer = makeUiDomNode('div');
+  stageContainer.getBoundingClientRect = () => ({ width: 384, height: 749 });
+  const btnPowerupsDrawer = makeUiDomNode('button');
+  const powerupsDrawerIcon = makeUiDomNode('span');
+  const powerupsDrawerCount = makeUiDomNode('span');
+
+  const cfg = structuredClone(gameConfig);
+  const renderer = {
+    logicalWidth: cfg.canvas.logicalWidth,
+    logicalHeight: cfg.canvas.logicalHeight,
+    staticLayerDirty: false,
+    resolutionDirty: false
+  };
+  let layoutSyncCount = 0;
+  let aimUpdates = 0;
+  const ui = {
+    ballsConfig,
+    gameConfig: cfg,
+    renderer,
+    isPowerupsDrawerOpen: false,
+    engine: {
+      state: GAME_STATES.PAUSED,
+      aimAngle: Math.PI / 2,
+      isPolarityFlipped: false,
+      currentBall: { specialType: null },
+      specialInventory: { bomb: 2, lightning: 1 },
+      offersSpecialBalls: () => false,
+      updateAimFromAngle: () => {
+        aimUpdates += 1;
+      }
+    },
+    elements: {
+      stageContainer,
+      btnPowerupsDrawer,
+      powerupsDrawerIcon,
+      powerupsDrawerCount
+    },
+    applyCanvasLayoutVariables: () => {
+      layoutSyncCount += 1;
+    }
+  };
+
+  try {
+    setPowerupsDrawerOpen(ui, true);
+    assert.equal(ui.isPowerupsDrawerOpen, false, 'drawer stays closed when run is not playing');
+
+    ui.engine.state = GAME_STATES.PLAYING;
+    refreshPowerupsDrawerButton(ui, ui.engine);
+    assert.equal(powerupsDrawerIcon.textContent, t('hud.launcher.polarity.icon'));
+    assert.equal(powerupsDrawerCount.classList.contains('hidden'), true);
+    assert.equal(btnPowerupsDrawer.getAttribute('aria-label'), t('hud.powerups.drawer.openControlsAria'));
+
+    ui.engine.offersSpecialBalls = () => true;
+    ui.engine.isSpecialTypeAllowed = (type) => type !== 'lightning';
+    ui.engine.currentBall.specialType = 'bomb';
+    setPowerupsDrawerOpen(ui, true);
+    assert.equal(ui.isPowerupsDrawerOpen, true);
+    assert.equal(stageContainer.classList.contains('powerups-drawer-open'), true);
+    assert.equal(btnPowerupsDrawer.getAttribute('aria-expanded'), 'true');
+    assert.equal(powerupsDrawerIcon.textContent, ballsConfig.specialTypes.bomb.icon);
+    assert.equal(powerupsDrawerCount.textContent, '2', 'disallowed specials are excluded from drawer stock count');
+    assert.equal(powerupsDrawerCount.classList.contains('hidden'), false);
+    assert.equal(btnPowerupsDrawer.classList.contains('active'), true);
+    assert.equal(btnPowerupsDrawer.getAttribute('aria-label'), t('hud.powerups.drawer.closeAria'));
+
+    globalThis.window = { innerWidth: 384, innerHeight: 823 };
+    syncAdaptiveCanvasHeight(ui);
+    const expectedH = Math.round((cfg.canvas.logicalWidth * 749) / 384);
+    assert.equal(cfg.canvas.logicalHeight, expectedH);
+    assert.equal(cfg.canvas.launcherY, expectedH - cfg.canvas.launcherBottomOffset);
+    assert.equal(cfg.canvas.dangerLineY, expectedH - cfg.canvas.dangerLineBottomOffset);
+    assert.equal(renderer.logicalHeight, expectedH);
+    assert.equal(renderer.staticLayerDirty, true);
+    assert.equal(layoutSyncCount, 1);
+    assert.equal(aimUpdates, 1);
+
+    stageContainer.getBoundingClientRect = () => ({ width: 300, height: 900 });
+    syncAdaptiveCanvasHeight(ui);
+    assert.equal(cfg.canvas.logicalHeight, cfg.canvas.maxAdaptiveLogicalHeight, 'portrait logicalHeight clamps at maxAdaptiveLogicalHeight');
+
+    globalThis.window = { innerWidth: 660, innerHeight: 375 };
+    syncAdaptiveCanvasHeight(ui);
+    assert.equal(cfg.canvas.logicalHeight, gameConfig.canvas.logicalHeight, 'landscape phones keep base logicalHeight');
+
+    globalThis.window = { innerWidth: 1200, innerHeight: 850 };
+    syncAdaptiveCanvasHeight(ui);
+    assert.equal(cfg.canvas.logicalHeight, gameConfig.canvas.logicalHeight);
+  } finally {
+    globalThis.window = prevWindow;
     i18n.currentLocale = prevLocale;
   }
 });

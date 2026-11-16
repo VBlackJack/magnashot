@@ -165,7 +165,13 @@
         </div>
       </div>
 
-      <aside class="powerups-panel">
+      <button id="btn-powerups-drawer" type="button" class="powerups-drawer-btn" aria-controls="powerups-panel" aria-expanded="false">
+        <span class="powerups-drawer-chevron" aria-hidden="true">◀</span>
+        <span id="powerups-drawer-icon" class="launcher-icon" aria-hidden="true"></span>
+        <span id="powerups-drawer-count" class="powerup-count hidden"></span>
+      </button>
+
+      <aside id="powerups-panel" class="powerups-panel">
         <div class="overcharge-widget">
           <div class="overcharge-header">
             <span data-i18n="hud.stats.overcharge.label"></span>

@@ -44,8 +44,8 @@ const VIEWPORTS = Object.freeze([
   { name: 'tablet landscape', width: 1280, height: 800, isTouch: true, hasDrawer: true, hasRestartButton: true },
   { name: 'tablet portrait', width: 800, height: 1280, isTouch: true, hasDrawer: true, hasRestartButton: true },
   { name: 'phone landscape', width: 844, height: 390, isTouch: true, hasDrawer: true, hasRestartButton: true },
-  { name: 'phone portrait', width: 390, height: 844, isTouch: true, hasDrawer: true, hasRestartButton: true },
-  { name: 'narrow phone portrait', width: 360, height: 800, isTouch: true, hasDrawer: true, hasRestartButton: true }
+  { name: 'phone portrait', width: 390, height: 844, isTouch: true, hasDrawer: true, hasRestartButton: true, hasPowerupsDrawer: true },
+  { name: 'narrow phone portrait', width: 360, height: 800, isTouch: true, hasDrawer: true, hasRestartButton: true, hasPowerupsDrawer: true }
 ]);
 
 /** Controls whose text must fit: a clipped label is a layout regression. */
@@ -590,10 +590,28 @@ for (const viewport of VIEWPORTS) {
           // The star glyphs are hidden from screen readers; the hidden count speaks for them.
           const starCount = await page.evaluate(() => document.querySelector('#hud-star-count').textContent.trim());
           assert.match(starCount, /\d/, `level ${levelId} states its star count`);
-          // The bar itself is display: contents on portrait phones, so check one of its buttons.
-          assert.equal(await isShown(page, '#powerups-bar .powerup-btn'), showsSpecials, `level ${levelId} special ball slots`);
-          if (showsSpecials || EMPTY_SPECIALS_NOTE_VIEWPORTS.has(viewport.name)) {
-            assert.equal(await isShown(page, '#powerups-empty'), !showsSpecials, `level ${levelId} empty special balls note`);
+          // Portrait phones tuck the controls and specials bar into a side drawer until opened.
+          if (viewport.hasPowerupsDrawer) {
+            assert.equal(await isShown(page, '#btn-powerups-drawer'), true, `level ${levelId} side drawer handle shown`);
+            assert.equal(await isShown(page, '#powerups-bar .powerup-btn'), false, `level ${levelId} side drawer starts closed`);
+            const adaptedHeight = await page.evaluate(() => window.__fluxEngine.gameConfig.canvas.logicalHeight);
+            assert.ok(adaptedHeight > GAME_CONFIG.canvas.logicalHeight, `level ${levelId} adapts portrait logicalHeight (${adaptedHeight})`);
+            await page.click('#btn-powerups-drawer');
+            assert.equal(await isShown(page, '#powerups-bar .powerup-btn'), showsSpecials, `level ${levelId} side drawer specials`);
+            assert.equal(await isShown(page, '#powerups-empty'), !showsSpecials, `level ${levelId} side drawer empty note`);
+            await assertLayoutFits(page, `${levelId}-drawer`);
+            if (showsSpecials) {
+              // Tapping the board outside the drawer dismisses it.
+              await page.click('#game-canvas', { position: { x: 20, y: 20 } });
+              assert.equal(await isShown(page, '#powerups-bar .powerup-btn'), false, `level ${levelId} tapping canvas closes drawer`);
+            } else {
+              await page.click('#btn-powerups-drawer');
+            }
+          } else {
+            assert.equal(await isShown(page, '#powerups-bar .powerup-btn'), showsSpecials, `level ${levelId} special ball slots`);
+            if (showsSpecials || EMPTY_SPECIALS_NOTE_VIEWPORTS.has(viewport.name)) {
+              assert.equal(await isShown(page, '#powerups-empty'), !showsSpecials, `level ${levelId} empty special balls note`);
+            }
           }
           await assertLayoutFits(page, levelId);
           await assertBoardFillsStage(page, `level ${levelId}`);
@@ -4242,15 +4260,17 @@ describe('Lot E and audit smoke checks', () => {
         `expected wider portrait canvas (${portraitGeometry.canvasWidth} vs ${portraitGeometry.viewportWidth})`
       );
 
-      // Verify 44px touch targets and vertical fit across both control rows on narrow 360px phone.
+      // Verify 44px touch targets and fit on the side drawer handle and inside the open side drawer on narrow 360px phone.
       await openPlayHub(phone.page, phoneViewport);
       await phone.page.click('#btn-endless');
       await phone.page.waitForFunction((expected) => window.__fluxEngine.mode === expected, GAME_MODES.ENDLESS);
       await phone.page.setViewportSize({ width: 360, height: 800 });
       await assertLayoutFits(phone.page, `${GAME_MODES.ENDLESS}-360`);
       await assertBoardFillsStage(phone.page, `${GAME_MODES.ENDLESS}-360`);
+      await phone.page.click('#btn-powerups-drawer');
+      await assertLayoutFits(phone.page, `${GAME_MODES.ENDLESS}-360-drawer`);
       const narrowMetrics = await phone.page.evaluate(() => {
-        const buttons = ['#btn-polarity', '#btn-swap-ball', ...Array.from(document.querySelectorAll('#powerups-bar .powerup-btn'))]
+        const buttons = ['#btn-polarity', '#btn-powerups-drawer', ...Array.from(document.querySelectorAll('#powerups-bar .powerup-btn'))]
           .map((item) => (typeof item === 'string' ? document.querySelector(item) : item))
           .filter(Boolean)
           .map((el) => el.getBoundingClientRect());
