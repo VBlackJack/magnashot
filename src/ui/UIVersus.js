@@ -73,6 +73,11 @@ const TIER_RECORD_CLASS = 'versus-tier-record';
 const VERSUS_KINDS = Object.freeze({ CPU: 'cpu', LOCAL: 'local' });
 const FIRST_PLAYER_NUMBER = 1;
 
+/** Returns the authored duel config rather than single-player's portrait-adapted copy. */
+function getVersusGameConfig(ui) {
+  return ui.versusConfigs?.gameConfig ?? ui.gameConfig;
+}
+
 function awardVersusCpuWinCoins(storageManager, gameConfig, tier) {
   const byTier = gameConfig?.versus?.rewards?.winCoinsByTier || {};
   const coins = Math.max(0, Math.floor(Number(byTier[tier]) || 0));
@@ -622,7 +627,7 @@ export const uiVersusMethods = {
 
   /** The one pointer-controlled board of a match against the CPU. */
   bindCpuCanvas(v) {
-    return bindCanvasInput(this.elements.versusCanvas0, () => v.controller.engines[PLAYER_BOARD], this.gameConfig, {
+    return bindCanvasInput(this.elements.versusCanvas0, () => v.controller.engines[PLAYER_BOARD], getVersusGameConfig(this), {
       isBlocked: () => this.isAnyModalOpen() || v.controller.isPaused() || v.phase !== SCREEN_PHASES.PLAYING
     }).unbind;
   },
@@ -633,9 +638,10 @@ export const uiVersusMethods = {
    */
   bindLocalCanvases(v) {
     const canvases = [this.elements.versusCanvas0, this.elements.versusCanvas1];
+    const duelGameConfig = getVersusGameConfig(this);
     const unbinders = canvases.map(
       (canvas, board) =>
-        bindCanvasInput(canvas, () => v.controller.engines[board], this.gameConfig, {
+        bindCanvasInput(canvas, () => v.controller.engines[board], duelGameConfig, {
           isBlocked: () => this.isAnyModalOpen() || v.controller.isPaused() || v.phase !== SCREEN_PHASES.PLAYING,
           pointerOwnership: 'perCanvas',
           acceptPointer: (event) => acceptPointerForSlot(v.slots[board], board, event.pointerType)
@@ -714,8 +720,9 @@ export const uiVersusMethods = {
     const v = this.versus;
     const els = this.elements;
     const screen = els.versusScreen;
-    const layoutCfg = this.gameConfig.versus.layout;
-    const canvasCfg = this.gameConfig.canvas;
+    const duelGameConfig = getVersusGameConfig(this);
+    const layoutCfg = duelGameConfig.versus.layout;
+    const canvasCfg = duelGameConfig.canvas;
     const isLandscape = window.innerWidth > window.innerHeight;
     screen.dataset.orient = isLandscape ? VERSUS_ORIENTATIONS.LANDSCAPE : VERSUS_ORIENTATIONS.PORTRAIT;
     // Measured in the split arrangement: the room under the bar does not depend on the layout.
@@ -845,8 +852,9 @@ export const uiVersusMethods = {
   layoutVersusMini(isLandscape, boardsStyle) {
     const els = this.elements;
     const screen = els.versusScreen;
-    const layoutCfg = this.gameConfig.versus.layout;
-    const canvasCfg = this.gameConfig.canvas;
+    const duelGameConfig = getVersusGameConfig(this);
+    const layoutCfg = duelGameConfig.versus.layout;
+    const canvasCfg = duelGameConfig.canvas;
     // A phone portrait strip keeps the CPU board short so the player board gets the width and the height.
     const maxHeight = isLandscape ? Infinity : layoutCfg.portraitMiniMaxHeightPx;
     const nominal = computeMiniSize(canvasCfg, layoutCfg, maxHeight);
@@ -882,11 +890,12 @@ export const uiVersusMethods = {
   /** Creates the renderers the layout needs (disposing the ones it replaces) and the scene that draws them. */
   buildVersusRenderers(isCpuLite) {
     const v = this.versus;
-    const { gameConfig, ballsConfig, versusConfigs } = this;
+    const { ballsConfig, versusConfigs } = this;
+    const duelGameConfig = getVersusGameConfig(this);
     const make = (canvas, lite) => {
-      const renderer = new Renderer(canvas, gameConfig, ballsConfig, versusConfigs.obstaclesConfig, {
+      const renderer = new Renderer(canvas, duelGameConfig, ballsConfig, versusConfigs.obstaclesConfig, {
         lite,
-        maxDevicePixelRatio: getVersusDevicePixelRatioCap(gameConfig.versus.layout, v.layout) ?? undefined
+        maxDevicePixelRatio: getVersusDevicePixelRatioCap(duelGameConfig.versus.layout, v.layout) ?? undefined
       });
       renderer.setHighContrast(this.storageManager.getHighContrast());
       renderer.setColorPatterns(this.storageManager.getColorPatterns());
@@ -898,7 +907,7 @@ export const uiVersusMethods = {
     }
     v.renderers[CPU_BOARD]?.dispose();
     v.renderers[CPU_BOARD] = make(this.elements.versusCanvas1, isCpuLite);
-    const liteInterval = gameConfig.versus.layout.liteFrameInterval;
+    const liteInterval = duelGameConfig.versus.layout.liteFrameInterval;
     let liteFrame = 0;
     const cpuRenderer = v.renderers[CPU_BOARD];
     // The small board is redrawn every few frames: it is read at a glance, and two sims run on phones.
@@ -1415,7 +1424,7 @@ export const uiVersusMethods = {
     }
     const engine = this.versus.controller.engines[PLAYER_BOARD];
     const isButtonFocused = isInteractiveControlFocused();
-    const canvasCfg = this.gameConfig.canvas;
+    const canvasCfg = getVersusGameConfig(this).canvas;
     if (e.code === 'Space' && !isButtonFocused) {
       e.preventDefault();
       engine.swapLauncherBalls();

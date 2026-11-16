@@ -111,8 +111,9 @@ export const uiVersusLocalMethods = {
     if (typeof window === 'undefined') {
       return false;
     }
-    const versusCfg = this.gameConfig.versus;
-    return canHostLocalDuel(window.innerWidth, window.innerHeight, versusCfg.layout, versusCfg.local, this.gameConfig.canvas);
+    const duelGameConfig = this.versusConfigs?.gameConfig ?? this.gameConfig;
+    const versusCfg = duelGameConfig.versus;
+    return canHostLocalDuel(window.innerWidth, window.innerHeight, versusCfg.layout, versusCfg.local, duelGameConfig.canvas);
   },
 
   /** Indexes of the controllers the browser reports right now. */

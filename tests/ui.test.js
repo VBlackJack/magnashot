@@ -4014,3 +4014,48 @@ test('side drawer helpers update trigger state, stock badge and adaptive portrai
     i18n.currentLocale = prevLocale;
   }
 });
+
+test('Polarity Duel layout and local hostability keep versusConfigs base logicalHeight despite portrait adaptive scaling', () => {
+  const duelConfig = structuredClone(gameConfig);
+  const adaptedSingleConfig = structuredClone(gameConfig);
+  adaptedSingleConfig.canvas.logicalHeight = adaptedSingleConfig.canvas.maxAdaptiveLogicalHeight;
+
+  const styledProps = new Map();
+  const canvas0 = { style: {} };
+  const canvas1 = { style: {} };
+  const wrap0 = { clientWidth: 344, clientHeight: 500 };
+  canvas0.parentElement = wrap0;
+
+  const ui = Object.create(UIManager.prototype);
+  ui.gameConfig = adaptedSingleConfig;
+  ui.versusConfigs = { gameConfig: duelConfig };
+  ui.elements = {
+    versusScreen: { style: { setProperty: (k, v) => styledProps.set(k, v) } },
+    versusBoards: { clientWidth: 344, clientHeight: 700 },
+    versusHud1: { offsetHeight: 40 },
+    versusBar: { offsetHeight: 40 },
+    versusCanvas0: canvas0,
+    versusCanvas1: canvas1
+  };
+
+  ui.layoutVersusMini(false, { rowGap: '8px', columnGap: '8px' });
+  const expectedMiniWidth = Math.floor((500 * duelConfig.canvas.logicalWidth) / duelConfig.canvas.logicalHeight);
+  assert.equal(canvas0.style.width, `${expectedMiniWidth}px`, 'duel player canvas uses authored duel logicalHeight, not single-player adaptive height');
+  assert.ok(styledProps.get('--versus-mini-height').endsWith('px'));
+
+  const prevWindow = globalThis.window;
+  try {
+    const { layout, local } = duelConfig.versus;
+    const minDuelHeight = Math.ceil(
+      (local.entry.reservedHeightPx ?? 0) + (layout.splitMinBoardWidthPx * duelConfig.canvas.logicalHeight) / duelConfig.canvas.logicalWidth
+    );
+    const minAdaptedHeight = Math.floor(
+      (local.entry.reservedHeightPx ?? 0) + (layout.splitMinBoardWidthPx * adaptedSingleConfig.canvas.logicalHeight) / adaptedSingleConfig.canvas.logicalWidth
+    );
+    const testHeight = Math.floor((minDuelHeight + minAdaptedHeight) / 2);
+    globalThis.window = { innerWidth: Math.max(local.entry.minViewportWidthPx, testHeight), innerHeight: testHeight };
+    assert.equal(ui.canHostVersusLocal(), true);
+  } finally {
+    globalThis.window = prevWindow;
+  }
+});
