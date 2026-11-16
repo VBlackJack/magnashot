@@ -74,7 +74,7 @@
   - **Contrôle par inclinaison** sur téléphone et tablette, activé par défaut : incliner l'appareil penche la gravité sur le côté. Sur iPhone et iPad, le premier appui sur le plateau demande l'autorisation des mouvements. Il se désactive dans les **Réglages**.
   - Prise en charge des lecteurs d'écran : boutons bascules étiquetés avec `aria-pressed`, sphères spéciales et étoiles des niveaux nommées, annonces discrètes des succès et des fins de manche.
   - Contrôles complets à la souris, au tactile (décalage vertical du doigt et annulation du tir en glissant vers le bas) et au clavier ; une touche d'action maintenue ne se répète pas. Les flèches affinent une visée à la souris : après une flèche, les petits mouvements de souris laissent la visée en place et un clic tire dans cette direction.
-  - Mise en page sans défilement sur ordinateur, téléphone et téléphone en paysage, avec des zones tactiles de 44 px et un menu coulissant (☰) unifié sur toutes les tailles d'écran (regroupant *Jouer*, *Mes statistiques*, *Réglages* et *Partie en cours* tout en mettant la partie en pause). Sur téléphone en portrait, le plateau occupe toute la largeur et une ligne sous le score garde en vue la manche, les pièces et le record. Le plateau prend la forme du monde, 470 x 820. Sur un écran d'ordinateur en paysage, le plateau occupe toute la hauteur de la fenêtre, centré entre deux colonnes de même largeur : bouton menu (☰), sélecteur de mode interactif (`▾`) et statistiques de la manche à gauche, surcharge, sphères spéciales, Polarité et Échanger à droite.
+  - Mise en page sans défilement sur ordinateur, téléphone et téléphone en paysage, avec des zones tactiles de 44 px et un menu coulissant (`☰`) unifié sur toutes les tailles d'écran (regroupant *Jouer*, *Mes statistiques*, *Réglages* et *Partie en cours* tout en mettant la partie en pause). Sur téléphone en portrait, la barre du haut reste sur une seule ligne compacte (la manche, les pièces et le record restent visibles dans le menu coulissant) et la Surcharge, la Polarité ainsi que les sphères spéciales se rangent dans un tiroir latéral droit (`◀`) afin que le plateau occupe toute la largeur et adapte sa hauteur logique (`820` à `1100` px) aux écrans hauts tout en gardant des sphères rondes. Sur un écran d'ordinateur en paysage, le plateau occupe toute la hauteur de la fenêtre, centré entre deux colonnes de même largeur : bouton menu (`☰`), sélecteur de mode interactif (`▾`) et statistiques de la manche à gauche, surcharge, sphères spéciales, Polarité et Échanger à droite.
   - La partie en cours survit à un rechargement ou à un onglet fermé par le système, et reprend en pause.
 - **Installable et hors ligne** :
   - Application web progressive installable, avec icônes standard et adaptatives (maskable) ; **Réglages** propose un bouton Installer là où le navigateur l'autorise, et une aide pour iPhone et iPad.
@@ -89,9 +89,9 @@
 | **Viser** | Déplacer le pointeur / glisser le doigt | `Gauche` / `Droite` par petits pas (`+ Maj` pour de plus grands) |
 | **Tirer** | Relâcher le pointeur / le doigt | `Entrée` |
 | **Annuler la visée** | Glisser sous l'anneau du lanceur (au-dessus du lanceur en Flipper, au-dessus du rail en Bassin de Fusion, ou sur la tourelle centrale en Convoi) | - |
-| **Échanger la sphère** | Cliquer la sphère secondaire ou le bouton **Échanger** | `Espace` |
-| **Inverser la polarité** | Cliquer le bouton **Polarité** | `F` |
-| **Équiper / ranger une sphère spéciale** | Cliquer l'emplacement de la sphère spéciale (cliquer à nouveau pour la ranger) | `1` à `7` |
+| **Échanger la sphère** | Cliquer sur le lanceur ou la sphère secondaire (ou bouton **Échanger**) | `Espace` |
+| **Inverser la polarité** | Cliquer le bouton **Polarité** (dans le tiroir latéral `◀` sur téléphone en portrait) | `F` |
+| **Équiper / ranger une sphère spéciale** | Cliquer l'emplacement de la sphère spéciale (dans le tiroir latéral `◀` sur téléphone en portrait ; cliquer à nouveau pour la ranger) | `1` à `7` |
 | **Secouer le bassin (Bassin de Fusion)** | Cliquer **Secousse** | `G` |
 | **Hub Jouer** | Cliquer **Jouer** dans le menu | `M` |
 | **Atelier** | Cliquer **Atelier** dans le menu | `W` |
