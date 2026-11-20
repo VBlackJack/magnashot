@@ -15,7 +15,6 @@
  */
 
 import { configRegistry } from './ConfigRegistry.js';
-import { BALL_STYLES } from './Constants.js';
 import { installMethods } from './installMethods.js';
 import { SeededRandom } from './SeededRandom.js';
 import { countCampaignLevels } from './ConfigRegistry.js';
@@ -25,6 +24,7 @@ import { normalizeShotTimeline } from './ShotTimeline.js';
 import { normalizePlayerStats, applyPlayerStatsDelta } from './PlayerStats.js';
 import { advanceBountiesState, normalizeBountiesState } from './BountiesStore.js';
 import { SAVE_MIGRATIONS, CURRENT_SAVE_SCHEMA_VERSION, storageMigrationMethods } from './StorageMigrations.js';
+import { storageCosmeticsMethods } from './StorageCosmetics.js';
 
 export { SAVE_MIGRATIONS, CURRENT_SAVE_SCHEMA_VERSION };
 
@@ -1334,220 +1334,6 @@ export class StorageManager {
     return true;
   }
 
-  getUnlockedBallStyles() {
-    const defaultStyle = this.defaultsConfig?.ballStyle || BALL_STYLES.CLASSIC;
-    const key = this.storageConfig?.keys?.unlockedBallStyles;
-    const parsed = key ? this.readJsonObject(key) : {};
-    const unlocked = { [defaultStyle]: true };
-    for (const [styleId, value] of Object.entries(parsed)) {
-      if (value === true) {
-        unlocked[styleId] = true;
-      }
-    }
-    return unlocked;
-  }
-
-  isBallStyleUnlocked(styleId) {
-    if (!styleId || typeof styleId !== 'string') {
-      return false;
-    }
-    const unlocked = this.getUnlockedBallStyles();
-    return unlocked[styleId] === true;
-  }
-
-  getActiveBallStyle() {
-    const defaultStyle = this.defaultsConfig?.ballStyle || BALL_STYLES.CLASSIC;
-    const key = this.storageConfig?.keys?.activeBallStyle;
-    const stored = key ? this.safeGetItem(key) : null;
-    if (stored && this.isBallStyleUnlocked(stored)) {
-      return stored;
-    }
-    return defaultStyle;
-  }
-
-  setActiveBallStyle(styleId) {
-    if (!this.isBallStyleUnlocked(styleId)) {
-      return false;
-    }
-    const key = this.storageConfig?.keys?.activeBallStyle;
-    if (key) {
-      this.safeSetItem(key, styleId);
-    }
-    return true;
-  }
-
-  purchaseBallStyle(styleId, cost) {
-    const stylesCatalog = configRegistry.get('balls')?.styles || {};
-    const spec = stylesCatalog[styleId];
-    if (!spec) {
-      return false;
-    }
-    if (this.isBallStyleUnlocked(styleId)) {
-      this.setActiveBallStyle(styleId);
-      return false;
-    }
-    const cleanCost = Math.max(0, Math.floor(Number(cost ?? spec.cost) || 0));
-    const coins = this.getCoins();
-    if (coins < cleanCost) {
-      return false;
-    }
-    this.setCoins(coins - cleanCost);
-    const unlocked = this.getUnlockedBallStyles();
-    unlocked[styleId] = true;
-    const key = this.storageConfig?.keys?.unlockedBallStyles;
-    if (key) {
-      this.safeSetItem(key, JSON.stringify(unlocked));
-    }
-    this.setActiveBallStyle(styleId);
-    return true;
-  }
-
-  getUnlockedArenaThemes() {
-    const defaultTheme = this.defaultsConfig?.arenaTheme || 'deepSpace';
-    const key = this.storageConfig?.keys?.unlockedArenaThemes;
-    const parsed = key ? this.readJsonObject(key) : {};
-    const unlocked = { [defaultTheme]: true };
-    for (const [themeId, value] of Object.entries(parsed)) {
-      if (value === true) {
-        unlocked[themeId] = true;
-      }
-    }
-    return unlocked;
-  }
-
-  isArenaThemeUnlocked(themeId) {
-    if (!themeId || typeof themeId !== 'string') {
-      return false;
-    }
-    return this.getUnlockedArenaThemes()[themeId] === true;
-  }
-
-  getActiveArenaTheme() {
-    const defaultTheme = this.defaultsConfig?.arenaTheme || 'deepSpace';
-    const key = this.storageConfig?.keys?.activeArenaTheme;
-    const stored = key ? this.safeGetItem(key) : null;
-    return stored && this.isArenaThemeUnlocked(stored) ? stored : defaultTheme;
-  }
-
-  setActiveArenaTheme(themeId) {
-    if (!this.isArenaThemeUnlocked(themeId)) {
-      return false;
-    }
-    const key = this.storageConfig?.keys?.activeArenaTheme;
-    if (key) {
-      this.safeSetItem(key, themeId);
-    }
-    return true;
-  }
-
-  purchaseArenaTheme(themeId, cost) {
-    const catalog = configRegistry.get('game')?.arenaThemes || {};
-    const spec = catalog[themeId];
-    if (!spec) {
-      return false;
-    }
-    if (this.isArenaThemeUnlocked(themeId)) {
-      this.setActiveArenaTheme(themeId);
-      return false;
-    }
-    const cleanCost = Math.max(0, Math.floor(Number(cost ?? spec.cost) || 0));
-    const coins = this.getCoins();
-    if (coins < cleanCost) {
-      return false;
-    }
-    this.setCoins(coins - cleanCost);
-    const unlocked = this.getUnlockedArenaThemes();
-    unlocked[themeId] = true;
-    const key = this.storageConfig?.keys?.unlockedArenaThemes;
-    if (key) {
-      this.safeSetItem(key, JSON.stringify(unlocked));
-    }
-    this.setActiveArenaTheme(themeId);
-    return true;
-  }
-
-  getUnlockedLaserTrails() {
-    const defaultTrail = this.defaultsConfig?.laserTrail || 'classic';
-    const key = this.storageConfig?.keys?.unlockedLaserTrails;
-    const parsed = key ? this.readJsonObject(key) : {};
-    const unlocked = { [defaultTrail]: true };
-    for (const [trailId, value] of Object.entries(parsed)) {
-      if (value === true) {
-        unlocked[trailId] = true;
-      }
-    }
-    return unlocked;
-  }
-
-  isLaserTrailUnlocked(trailId) {
-    if (!trailId || typeof trailId !== 'string') {
-      return false;
-    }
-    return this.getUnlockedLaserTrails()[trailId] === true;
-  }
-
-  getActiveLaserTrail() {
-    const defaultTrail = this.defaultsConfig?.laserTrail || 'classic';
-    const key = this.storageConfig?.keys?.activeLaserTrail;
-    const stored = key ? this.safeGetItem(key) : null;
-    return stored && this.isLaserTrailUnlocked(stored) ? stored : defaultTrail;
-  }
-
-  setActiveLaserTrail(trailId) {
-    if (!this.isLaserTrailUnlocked(trailId)) {
-      return false;
-    }
-    const key = this.storageConfig?.keys?.activeLaserTrail;
-    if (key) {
-      this.safeSetItem(key, trailId);
-    }
-    return true;
-  }
-
-  purchaseLaserTrail(trailId, cost) {
-    const catalog = configRegistry.get('game')?.laserTrails || {};
-    const spec = catalog[trailId];
-    if (!spec) {
-      return false;
-    }
-    if (this.isLaserTrailUnlocked(trailId)) {
-      this.setActiveLaserTrail(trailId);
-      return false;
-    }
-    const cleanCost = Math.max(0, Math.floor(Number(cost ?? spec.cost) || 0));
-    const coins = this.getCoins();
-    if (coins < cleanCost) {
-      return false;
-    }
-    this.setCoins(coins - cleanCost);
-    const unlocked = this.getUnlockedLaserTrails();
-    unlocked[trailId] = true;
-    const key = this.storageConfig?.keys?.unlockedLaserTrails;
-    if (key) {
-      this.safeSetItem(key, JSON.stringify(unlocked));
-    }
-    this.setActiveLaserTrail(trailId);
-    return true;
-  }
-
-  hasClaimedDailyPuzzle(dateKey) {
-    const key = this.storageConfig?.keys?.dailyPuzzleClaimedDate;
-    return Boolean(key && typeof dateKey === 'string' && this.safeGetItem(key) === dateKey);
-  }
-
-  claimDailyPuzzleBonus(dateKey, bonusCoins) {
-    const key = this.storageConfig?.keys?.dailyPuzzleClaimedDate;
-    if (!key || typeof dateKey !== 'string' || this.hasClaimedDailyPuzzle(dateKey)) {
-      return false;
-    }
-    this.safeSetItem(key, dateKey);
-    const amount = Math.max(0, Math.floor(Number(bonusCoins) || 0));
-    if (amount > 0) {
-      this.addCoins(amount);
-    }
-    return true;
-  }
-
   /**
    * Whether the stored profile holds any progress, read straight from localStorage so a
    * restricted storage throws to the caller. Uses the configured grandfather progress keys.
@@ -2076,3 +1862,4 @@ export class StorageManager {
 }
 
 installMethods(StorageManager, storageMigrationMethods);
+installMethods(StorageManager, storageCosmeticsMethods);

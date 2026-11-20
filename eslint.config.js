@@ -44,6 +44,7 @@ export default [
       'src/core/I18n.js',
       'src/core/ModeUnlocks.js',
       'src/core/SeededRandom.js',
+      'src/core/StorageCosmetics.js',
       'src/core/StorageView.js',
       'src/core/WorldGeometry.js',
       'src/entities/Ball.js',

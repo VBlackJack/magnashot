@@ -66,6 +66,7 @@ const PRECACHE_ASSETS = [
   './src/core/installMethods.js',
   './src/core/SeededRandom.js',
   './src/core/StorageManager.js',
+  './src/core/StorageCosmetics.js',
   './src/core/StorageMigrations.js',
   './src/core/WorldGeometry.js',
   './src/entities/Ball.js',
