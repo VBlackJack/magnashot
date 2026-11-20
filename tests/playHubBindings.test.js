@@ -487,7 +487,7 @@ test('Back unwinds the campaign map, then the Play hub, then the Workshop', () =
     ui.isDuelCardOpen = () => false;
     ui.handleVersusBack = () => false;
     ui.isCalibrationOpen = () => false;
-    for (const key of ['modalConfirm', 'modalLevels', 'modalPlay', 'modalShop', 'modalSettings', 'modalStats']) {
+    for (const key of ['modalConfirm', 'modalLevels', 'modalPuzzleBuilder', 'modalPlay', 'modalShop', 'modalSettings', 'modalStats']) {
       elements[key].classList.add('hidden');
     }
     elements.modalLevels.classList.remove('hidden');

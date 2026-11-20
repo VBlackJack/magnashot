@@ -106,7 +106,10 @@ const PERSIST_HIGH_SCORE_HANDLERS = new Map([
 const RESTART_MODE_HANDLERS = new Map([
   [GAME_MODES.CAMPAIGN, (engine) => engine.startCampaignLevel(engine.currentLevelId)],
   [GAME_MODES.DAILY, (engine) => engine.startDailyChallenge(engine.dailySeedKey, true, { isRematch: engine.isDailyRematch })],
-  [GAME_MODES.PUZZLE, (engine) => engine.startPuzzleMode(engine.currentPuzzleStage)],
+  [GAME_MODES.PUZZLE, (engine) => engine.startPuzzleMode(
+    engine.currentPuzzleStage,
+    engine.isCustomPuzzle && engine.customPuzzleSpec ? { customSpec: engine.customPuzzleSpec } : null
+  )],
   [GAME_MODES.BLITZ, (engine) => engine.startBlitzMode()],
   [GAME_MODES.BOSS_RUSH, (engine) => engine.startBossRushMode(1)],
   [GAME_MODES.CASCADE, (engine) => engine.startCascadeMode()],
@@ -153,6 +156,9 @@ function persistFluxRunHighScore(engine) {
 }
 
 function persistPuzzleRunHighScore(engine) {
+  if (engine.isCustomPuzzle) {
+    return;
+  }
   const puzzles = engine.gameConfig.puzzles;
   const totalPuzzles = puzzles ? puzzles.length || 1 : 1;
   const reachedStage = engine.state === GAME_STATES.VICTORY && engine.currentPuzzleStage < totalPuzzles
@@ -527,7 +533,7 @@ function finalizeFiredProjectile(engine) {
     engine.shotsRemaining = Math.max(0, engine.shotsRemaining - 1);
   }
   engine.blitzIdleFrames = 0;
-  if (engine.mode === GAME_MODES.PUZZLE && !engine.hasFiredInRound) {
+  if (engine.mode === GAME_MODES.PUZZLE && !engine.hasFiredInRound && !engine.isCustomPuzzle) {
     // An attempt is the first shot of a round; a restored round already carries the flag.
     engine.storageManager.recordPuzzleAttempt?.(engine.currentPuzzleStage);
   }
@@ -1156,6 +1162,8 @@ export class GameEngine {
     this.flushPendingRunCoins();
     this.storageManager.clearRunSnapshot();
     this.mode = mode;
+    this.isCustomPuzzle = false;
+    this.customPuzzleSpec = null;
     // startVersusBoard sets the versus state again after this reset.
     this.versus = null;
     this.clearMagnetar();
