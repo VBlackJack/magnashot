@@ -113,8 +113,10 @@ function getWaveBanner(theme, waveType) {
 
 function finishVictoryState(engine, summary) {
   engine.state = GAME_STATES.VICTORY;
-  engine.persistRunHighScore();
-  engine.recordRunOutcome('win');
+  if (!engine.isCustomPuzzle) {
+    engine.persistRunHighScore();
+    engine.recordRunOutcome('win');
+  }
   engine.storageManager.clearRunSnapshot();
   engine.audioManager.playEffect('victory');
   engine.victorySummary = summary;
@@ -163,6 +165,37 @@ function evaluateCampaignRoundEnd(engine) {
   });
 }
 
+function evaluateCustomPuzzleVictory(engine, bonus) {
+  finishVictoryState(engine, {
+    victoryBonus: bonus,
+    stars: 0,
+    earnedCoins: 0,
+    isNewRecord: false,
+    isCustomPuzzle: true,
+    nextStarTarget: null,
+    nextStarNumber: null,
+    pointsToNextStar: 0
+  });
+}
+
+function awardPuzzleVictoryRewards(engine, stage, newlyEarnedStars, scoring) {
+  const starCoins = newlyEarnedStars * (scoring.coinsPerVictoryStar + scoring.firstTimeStarCoinBonus);
+  engine.storageManager.addCoins(starCoins);
+  const todayKey = SeededRandom.getTodayDateKey();
+  const dailyBonus = engine.gameConfig.dailyPuzzle?.firstClearBonusCoins || 0;
+  const isDailyPuzzle = stage === resolveDailyPuzzleStage(todayKey, engine.gameConfig.puzzles?.length || 1);
+  const dailyPuzzleCoins = isDailyPuzzle && engine.storageManager.claimDailyPuzzleBonus?.(todayKey, dailyBonus) ? dailyBonus : 0;
+  if (dailyPuzzleCoins > 0) {
+    const dailyCleared = engine.storageManager.incrementDailyPuzzlesCleared?.() || 1;
+    engine.unlockAchievementTiers?.('dailyPuzzles', dailyCleared);
+  }
+  const clearedCount = Object.values(engine.storageManager.getPuzzleStageStats?.() || {}).filter((s) => s?.cleared).length;
+  engine.unlockAchievementTiers?.('puzzleStages', clearedCount);
+  engine.flushPendingRunCoins();
+  reportBountyEvent(engine, 'puzzle_stage_cleared', 1);
+  return starCoins + dailyPuzzleCoins;
+}
+
 function evaluatePuzzleRoundEnd(engine) {
   if (!engine.isObjectiveCleared()) {
     engine.startOutOfShotsGraceIfNeeded();
@@ -172,10 +205,13 @@ function evaluatePuzzleRoundEnd(engine) {
   engine.releaseRemainingBoardAsAvalanche();
   const bonus = engine.shotsRemaining * engine.gameConfig.scoring.remainingShotBonus;
   engine.addScore(bonus);
+  if (engine.isCustomPuzzle) {
+    evaluateCustomPuzzleVictory(engine, bonus);
+    return;
+  }
   const stage = engine.currentPuzzleStage;
   const previous = engine.storageManager.getPuzzleStageStats()[stage] || { bestScore: 0, stars: 0, attempts: 0 };
   const scoring = engine.gameConfig.scoring;
-  // A snapshot saved before attempts were counted on the first shot holds 0: never better than a first try.
   const attemptsForStars = Math.max(1, previous.attempts);
   const stars = computePuzzleStars({
     attempts: attemptsForStars,
@@ -192,15 +228,7 @@ function evaluatePuzzleRoundEnd(engine) {
     scoring
   });
   const { newlyEarnedStars } = engine.storageManager.savePuzzleStageResult(stage, engine.score, stars);
-  const starCoins = newlyEarnedStars * (scoring.coinsPerVictoryStar + scoring.firstTimeStarCoinBonus);
-  engine.storageManager.addCoins(starCoins);
-  const todayKey = SeededRandom.getTodayDateKey();
-  const dailyBonus = engine.gameConfig.dailyPuzzle?.firstClearBonusCoins || 0;
-  const isDailyPuzzle = stage === resolveDailyPuzzleStage(todayKey, engine.gameConfig.puzzles?.length || 1);
-  const dailyPuzzleCoins = isDailyPuzzle && engine.storageManager.claimDailyPuzzleBonus?.(todayKey, dailyBonus) ? dailyBonus : 0;
-  const earnedCoins = starCoins + dailyPuzzleCoins;
-  engine.flushPendingRunCoins();
-  reportBountyEvent(engine, 'puzzle_stage_cleared', 1);
+  const earnedCoins = awardPuzzleVictoryRewards(engine, stage, newlyEarnedStars, scoring);
   finishVictoryState(engine, {
     victoryBonus: bonus,
     stars,

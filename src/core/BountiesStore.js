@@ -17,6 +17,10 @@
 import { SeededRandom } from './SeededRandom.js';
 
 const BOUNTY_SEED_SUFFIX = ':bounties';
+const WEEKLY_MASTERY_SEED_SUFFIX = ':weeklyMastery';
+const DEFAULT_WEEKLY_COUNT = 3;
+const DEFAULT_WEEKLY_TARGET_MULT = 3;
+const DEFAULT_WEEKLY_COIN_MULT = 2;
 
 function normalizeCatalogEntry(entry) {
   return {
@@ -29,65 +33,123 @@ function normalizeCatalogEntry(entry) {
 }
 
 function toUnlockedModeSet(unlockedModes) {
-  if (unlockedModes instanceof Set) {
-    return unlockedModes;
-  }
-  if (Array.isArray(unlockedModes)) {
-    return new Set(unlockedModes);
-  }
+  if (unlockedModes instanceof Set) return unlockedModes;
+  if (Array.isArray(unlockedModes)) return new Set(unlockedModes);
   return null;
+}
+
+function shuffleWithSeed(list, seedString) {
+  const pool = list.slice();
+  const rng = new SeededRandom(SeededRandom.hashString(seedString));
+  for (let i = pool.length - 1; i > 0; i--) {
+    const j = Math.floor(rng.next() * (i + 1));
+    [pool[i], pool[j]] = [pool[j], pool[i]];
+  }
+  return pool;
+}
+
+function pickDistinctEvents(pool, count) {
+  const picked = [];
+  const seenEvents = new Set();
+  for (const item of pool) {
+    if (seenEvents.has(item.eventKey)) continue;
+    seenEvents.add(item.eventKey);
+    picked.push(item);
+    if (picked.length >= count) break;
+  }
+  return picked;
+}
+
+function buildCatalogMap(catalog, targetMult = 1, coinMult = 1) {
+  const map = new Map();
+  for (const rawEntry of catalog) {
+    if (rawEntry && typeof rawEntry.id === 'string' && rawEntry.id) {
+      const spec = normalizeCatalogEntry(rawEntry);
+      map.set(spec.id, {
+        ...spec,
+        target: Math.max(1, spec.target * targetMult),
+        coins: Math.max(0, spec.coins * coinMult)
+      });
+    }
+  }
+  return map;
+}
+
+function hydrateSingleSavedItem(saved, catalogById, unlockedSet, seenIds, seenEvents) {
+  if (!saved || typeof saved.id !== 'string') return null;
+  const spec = catalogById.get(saved.id);
+  if (!spec || seenIds.has(spec.id) || seenEvents.has(spec.eventKey)) return null;
+  const rawProgress = Number.isFinite(Number(saved.progress)) ? Math.floor(Number(saved.progress)) : 0;
+  const progress = Math.max(0, Math.min(spec.target, rawProgress));
+  const completed = Boolean(saved.completed) || progress >= spec.target;
+  if (spec.mode !== null && unlockedSet && !unlockedSet.has(spec.mode) && !completed && progress === 0) return null;
+  return { ...spec, progress: completed ? spec.target : progress, completed };
+}
+
+function hydrateSavedItems(rawItems, catalogById, unlockedSet, count) {
+  const items = [];
+  const seenIds = new Set();
+  const seenEvents = new Set();
+  for (const saved of rawItems) {
+    const hydrated = hydrateSingleSavedItem(saved, catalogById, unlockedSet, seenIds, seenEvents);
+    if (!hydrated) continue;
+    seenIds.add(hydrated.id);
+    seenEvents.add(hydrated.eventKey);
+    items.push(hydrated);
+    if (items.length >= count) break;
+  }
+  return { items, seenIds, seenEvents };
+}
+
+function fillRemainingItems(items, seenIds, seenEvents, rolled, count) {
+  for (const spec of rolled) {
+    if (seenIds.has(spec.id) || seenEvents.has(spec.eventKey)) continue;
+    seenIds.add(spec.id);
+    seenEvents.add(spec.eventKey);
+    items.push({ ...spec, progress: 0, completed: false });
+    if (items.length >= count) break;
+  }
 }
 
 /**
  * Picks the deterministic list of daily bounties for the given UTC date key.
- * When `options.unlockedModes` is provided, mode-specific contracts whose mode is still locked
- * are skipped so players only receive contracts they can complete right away.
- * @param {object} bountiesConfig - Bounties configuration from game.json.
- * @param {string} [dateKey] - UTC date key (`YYYY-MM-DD`).
- * @param {{unlockedModes?: Set<string>|string[]|null}} [options] - Optional progression filter.
- * @returns {Array<{id: string, eventKey: string, target: number, coins: number, mode: string|null}>}
  */
 export function pickDailyBounties(bountiesConfig, dateKey = SeededRandom.getTodayDateKey(), options = {}) {
   const catalog = Array.isArray(bountiesConfig?.catalog) ? bountiesConfig.catalog : [];
   const count = Math.max(0, Math.min(catalog.length, Math.floor(Number(bountiesConfig?.dailyCount) || 0)));
-  if (count === 0) {
-    return [];
-  }
+  if (count === 0) return [];
   const normalizedCatalog = catalog.map(normalizeCatalogEntry);
   const unlockedSet = toUnlockedModeSet(options?.unlockedModes);
   const eligible = unlockedSet
     ? normalizedCatalog.filter((entry) => entry.mode === null || unlockedSet.has(entry.mode))
     : normalizedCatalog;
-  const pool = (eligible.length > 0 ? eligible : normalizedCatalog).slice();
-  const rng = new SeededRandom(SeededRandom.hashString(`${dateKey}${BOUNTY_SEED_SUFFIX}`));
-  for (let i = pool.length - 1; i > 0; i--) {
-    const j = Math.floor(rng.next() * (i + 1));
-    [pool[i], pool[j]] = [pool[j], pool[i]];
-  }
-  const picked = [];
-  const seenEvents = new Set();
-  for (const item of pool) {
-    if (seenEvents.has(item.eventKey)) {
-      continue;
-    }
-    seenEvents.add(item.eventKey);
-    picked.push(item);
-    if (picked.length >= count) {
-      break;
-    }
-  }
-  return picked;
+  const pool = shuffleWithSeed(eligible.length > 0 ? eligible : normalizedCatalog, `${dateKey}${BOUNTY_SEED_SUFFIX}`);
+  return pickDistinctEvents(pool, count);
+}
+
+/**
+ * Picks the deterministic Weekly Mastery Trio (3 scaled objectives across distinct modes).
+ */
+export function pickWeeklyMasteryTrio(bountiesConfig, weekKey, options = {}) {
+  const catalog = Array.isArray(bountiesConfig?.catalog) ? bountiesConfig.catalog : [];
+  const count = Math.max(0, Math.min(catalog.length, Math.floor(Number(bountiesConfig?.weeklyCount ?? DEFAULT_WEEKLY_COUNT))));
+  if (count === 0 || !weekKey) return [];
+  const targetMult = Math.max(1, Math.floor(Number(bountiesConfig?.weeklyTargetMultiplier ?? DEFAULT_WEEKLY_TARGET_MULT)));
+  const coinMult = Math.max(1, Math.floor(Number(bountiesConfig?.weeklyCoinMultiplier ?? DEFAULT_WEEKLY_COIN_MULT)));
+  const scaled = catalog.map((e) => {
+    const n = normalizeCatalogEntry(e);
+    return { ...n, target: n.target * targetMult, coins: n.coins * coinMult };
+  });
+  const unlockedSet = toUnlockedModeSet(options?.unlockedModes);
+  const eligible = unlockedSet
+    ? scaled.filter((entry) => entry.mode === null || unlockedSet.has(entry.mode))
+    : scaled;
+  const pool = shuffleWithSeed(eligible.length > 0 ? eligible : scaled, `${weekKey}${WEEKLY_MASTERY_SEED_SUFFIX}`);
+  return pickDistinctEvents(pool, count);
 }
 
 /**
  * Normalizes a persisted daily bounties state object for `dateKey`, resetting on roll-over.
- * Valid stored IDs for `dateKey` are re-hydrated from the canonical catalog and preserved across
- * mid-day mode unlocks so in-progress or completed contracts never vanish mid-day.
- * @param {object|null} rawState - Parsed JSON object from storage.
- * @param {object} bountiesConfig - Bounties configuration from game.json.
- * @param {string} [dateKey] - UTC date key (`YYYY-MM-DD`).
- * @param {{unlockedModes?: Set<string>|string[]|null}} [options] - Optional progression filter for fresh rolls.
- * @returns {{dateKey: string, items: Array<{id: string, eventKey: string, target: number, coins: number, mode: string|null, progress: number, completed: boolean}>}}
  */
 export function normalizeBountiesState(
   rawState,
@@ -97,77 +159,44 @@ export function normalizeBountiesState(
 ) {
   const catalog = Array.isArray(bountiesConfig?.catalog) ? bountiesConfig.catalog : [];
   const count = Math.max(0, Math.min(catalog.length, Math.floor(Number(bountiesConfig?.dailyCount) || 0)));
-  if (count === 0) {
-    return { dateKey, items: [] };
-  }
-  const catalogById = new Map();
-  for (const rawEntry of catalog) {
-    if (rawEntry && typeof rawEntry.id === 'string' && rawEntry.id) {
-      const spec = normalizeCatalogEntry(rawEntry);
-      catalogById.set(spec.id, spec);
-    }
-  }
+  if (count === 0) return { dateKey, items: [] };
+  const catalogById = buildCatalogMap(catalog);
   const unlockedSet = toUnlockedModeSet(options?.unlockedModes);
-
-  const items = [];
-  const seenIds = new Set();
-  const seenEvents = new Set();
-  if (rawState && rawState.dateKey === dateKey && Array.isArray(rawState.items)) {
-    for (const saved of rawState.items) {
-      if (!saved || typeof saved.id !== 'string') {
-        continue;
-      }
-      const spec = catalogById.get(saved.id);
-      if (!spec || seenIds.has(spec.id) || seenEvents.has(spec.eventKey)) {
-        continue;
-      }
-      const rawProgress = Number.isFinite(Number(saved.progress)) ? Math.floor(Number(saved.progress)) : 0;
-      const progress = Math.max(0, Math.min(spec.target, rawProgress));
-      const completed = Boolean(saved.completed) || progress >= spec.target;
-      if (spec.mode !== null && unlockedSet && !unlockedSet.has(spec.mode) && !completed && progress === 0) {
-        continue;
-      }
-      seenIds.add(spec.id);
-      seenEvents.add(spec.eventKey);
-      items.push({
-        ...spec,
-        progress: completed ? spec.target : progress,
-        completed
-      });
-      if (items.length >= count) {
-        break;
-      }
-    }
-  }
-
+  const rawItems = rawState && rawState.dateKey === dateKey && Array.isArray(rawState.items) ? rawState.items : [];
+  const { items, seenIds, seenEvents } = hydrateSavedItems(rawItems, catalogById, unlockedSet, count);
   if (items.length < count) {
-    const rolled = pickDailyBounties(bountiesConfig, dateKey, options);
-    for (const spec of rolled) {
-      if (seenIds.has(spec.id) || seenEvents.has(spec.eventKey)) {
-        continue;
-      }
-      seenIds.add(spec.id);
-      seenEvents.add(spec.eventKey);
-      items.push({
-        ...spec,
-        progress: 0,
-        completed: false
-      });
-      if (items.length >= count) {
-        break;
-      }
-    }
+    fillRemainingItems(items, seenIds, seenEvents, pickDailyBounties(bountiesConfig, dateKey, options), count);
   }
-
   return { dateKey, items };
+}
+
+function resolveWeeklyScaling(bountiesConfig) {
+  const catalog = Array.isArray(bountiesConfig?.catalog) ? bountiesConfig.catalog : [];
+  const count = Math.max(0, Math.min(catalog.length, Math.floor(Number(bountiesConfig?.weeklyCount ?? DEFAULT_WEEKLY_COUNT))));
+  const targetMult = Math.max(1, Math.floor(Number(bountiesConfig?.weeklyTargetMultiplier ?? DEFAULT_WEEKLY_TARGET_MULT)));
+  const coinMult = Math.max(1, Math.floor(Number(bountiesConfig?.weeklyCoinMultiplier ?? DEFAULT_WEEKLY_COIN_MULT)));
+  return { catalog, count, targetMult, coinMult };
+}
+
+/**
+ * Normalizes a persisted Weekly Mastery Trio state object for `weekKey`, resetting on new ISO week.
+ */
+export function normalizeWeeklyMasteryState(rawState, bountiesConfig, weekKey, options = {}) {
+  const { catalog, count, targetMult, coinMult } = resolveWeeklyScaling(bountiesConfig);
+  if (count === 0 || !weekKey) return { weekKey: weekKey || '', items: [], chestClaimed: false };
+  const catalogById = buildCatalogMap(catalog, targetMult, coinMult);
+  const unlockedSet = toUnlockedModeSet(options?.unlockedModes);
+  const isSameWeek = Boolean(rawState && rawState.weekKey === weekKey);
+  const rawItems = isSameWeek && Array.isArray(rawState.items) ? rawState.items : [];
+  const { items, seenIds, seenEvents } = hydrateSavedItems(rawItems, catalogById, unlockedSet, count);
+  if (items.length < count) {
+    fillRemainingItems(items, seenIds, seenEvents, pickWeeklyMasteryTrio(bountiesConfig, weekKey, options), count);
+  }
+  return { weekKey, items, chestClaimed: Boolean(isSameWeek && rawState.chestClaimed) };
 }
 
 /**
  * Pure state transition applying an incremental progress delta for `eventKey`.
- * @param {{dateKey: string, items: Array<object>}} state - Normalized bounties state.
- * @param {string} eventKey - Telemetry event identifier.
- * @param {number} [amount=1] - Positive delta to apply.
- * @returns {{nextState: {dateKey: string, items: Array<object>}, completed: Array<object>, changed: boolean}}
  */
 export function advanceBountiesState(state, eventKey, amount = 1) {
   const delta = Math.max(0, Math.floor(Number(amount) || 0));
@@ -177,24 +206,16 @@ export function advanceBountiesState(state, eventKey, amount = 1) {
   let changed = false;
   const completed = [];
   const nextItems = state.items.map((item) => {
-    if (item.completed || item.eventKey !== eventKey) {
-      return item;
-    }
+    if (item.completed || item.eventKey !== eventKey) return item;
     changed = true;
     const nextProgress = Math.min(item.target, item.progress + delta);
     const justCompleted = nextProgress >= item.target;
-    const updated = {
-      ...item,
-      progress: nextProgress,
-      completed: justCompleted
-    };
-    if (justCompleted) {
-      completed.push(updated);
-    }
+    const updated = { ...item, progress: nextProgress, completed: justCompleted };
+    if (justCompleted) completed.push(updated);
     return updated;
   });
   return {
-    nextState: changed ? { dateKey: state.dateKey, items: nextItems } : state,
+    nextState: changed ? { ...state, items: nextItems } : state,
     completed,
     changed
   };

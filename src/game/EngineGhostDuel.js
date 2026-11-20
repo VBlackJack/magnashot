@@ -37,27 +37,52 @@ const GHOST_MODE_FLUX = 'flux';
 const NO_SHOTS_EVALUATED = -1;
 const ORIGIN_SAMPLE_COUNT = 1;
 
+/** Arcade modes that persist a Personal Best ShotTimeline and support PB Ghost pacing. */
+export const PB_ARCADE_MODES = Object.freeze(new Set([
+  GAME_MODES.CLASSIC,
+  GAME_MODES.BLITZ,
+  GAME_MODES.ENDLESS,
+  GAME_MODES.SLINGSHOT
+]));
+
+function lookupDailyTimeline(storage, key) {
+  const history = storage.getDailyHistory?.() ?? [];
+  return history.find((item) => item?.d === key)?.tl ?? null;
+}
+
+function lookupWeeklyTimeline(storage, key, weekKey) {
+  const weekly = storage.getWeeklyFluxBest?.(weekKey);
+  return weekly?.seed === key ? (weekly.tl ?? null) : null;
+}
+
+function lookupPersonalBestTimeline(storage, mode, key, weekKey) {
+  if (mode === GHOST_MODE_DAILY && key) return lookupDailyTimeline(storage, key);
+  if (mode === GHOST_MODE_FLUX && key && weekKey) return lookupWeeklyTimeline(storage, key, weekKey);
+  if (PB_ARCADE_MODES.has(mode)) return storage.getPbTimeline?.(mode)?.tl ?? null;
+  return null;
+}
+
+function resolvePbGhostTarget(engine) {
+  if (engine.mode === GAME_MODES.DAILY) {
+    return { ghostMode: GHOST_MODE_DAILY, key: engine.dailySeedKey, weekKey: null };
+  }
+  if (engine.mode === GAME_MODES.FLUX && engine.isWeeklyFluxRun && engine.weeklyWeekKey) {
+    return { ghostMode: GHOST_MODE_FLUX, key: engine.fluxSeed, weekKey: engine.weeklyWeekKey };
+  }
+  if (PB_ARCADE_MODES.has(engine.mode)) {
+    return { ghostMode: engine.mode, key: engine.mode, weekKey: null };
+  }
+  return null;
+}
+
 /**
- * Builds a Personal Best ghost from the player's stored Daily or Weekly Flux timeline.
- * Returns null when no completed timeline exists for that seed.
+ * Builds a Personal Best ghost from the player's stored Daily, Weekly Flux, or arcade PB timeline.
+ * Returns null when no completed timeline exists for that mode/seed.
  */
 export function buildPersonalBestGhost(storage, mode, key, gameConfig, aliasLabel, weekKey = null) {
-  if (!storage || !gameConfig?.ghostDuel) {
-    return null;
-  }
-  let timeline = null;
-  if (mode === GHOST_MODE_DAILY && key) {
-    const entry = (storage.getDailyHistory?.() ?? []).find((item) => item?.d === key);
-    timeline = entry?.tl ?? null;
-  } else if (mode === GHOST_MODE_FLUX && key && weekKey) {
-    const weekly = storage.getWeeklyFluxBest?.(weekKey);
-    timeline = weekly?.seed === key ? (weekly.tl ?? null) : null;
-  } else if (mode === GAME_MODES.CLASSIC || mode === GAME_MODES.BLITZ) {
-    timeline = storage.getPbTimeline?.(mode)?.tl ?? null;
-  }
-  if (!timeline || !Array.isArray(timeline.s) || timeline.s.length === 0) {
-    return null;
-  }
+  if (!storage || !gameConfig?.ghostDuel) return null;
+  const timeline = lookupPersonalBestTimeline(storage, mode, key, weekKey);
+  if (!timeline || !Array.isArray(timeline.s) || timeline.s.length === 0) return null;
   const cv = mode === GHOST_MODE_DAILY || mode === GHOST_MODE_FLUX ? contentVersionFor(gameConfig.ghostDuel, mode) : 1;
   return {
     mode,
@@ -73,31 +98,31 @@ export function buildPersonalBestGhost(storage, mode, key, gameConfig, aliasLabe
   };
 }
 
-/** Attaches the player's own PB ghost on Daily/Weekly/Purist/Blitz runs when enabled. */
+/** Attaches the player's own PB ghost on Daily/Weekly/Purist/Blitz/Survival/Slingshot runs when enabled. */
 export function attachPersonalBestGhostIfEnabled(engine) {
-  if (!engine || engine.isVersusRole || engine.ghostDuel || engine.isDailyRematch) {
-    return false;
-  }
-  if (!engine.storageManager?.getPbGhostEnabled?.()) {
-    return false;
-  }
-  const isDaily = engine.mode === GAME_MODES.DAILY;
-  const isWeekly = engine.mode === GAME_MODES.FLUX && engine.isWeeklyFluxRun && engine.weeklyWeekKey;
-  const isArcadePb = engine.mode === GAME_MODES.CLASSIC || engine.mode === GAME_MODES.BLITZ;
-  if (!isDaily && !isWeekly && !isArcadePb) {
-    return false;
-  }
-  const ghostMode = isDaily ? GHOST_MODE_DAILY : (isWeekly ? GHOST_MODE_FLUX : engine.mode);
-  const key = isDaily ? engine.dailySeedKey : (isWeekly ? engine.fluxSeed : engine.mode);
+  if (!engine || engine.isVersusRole || engine.ghostDuel || engine.isDailyRematch) return false;
+  if (!engine.storageManager?.getPbGhostEnabled?.()) return false;
+  const target = resolvePbGhostTarget(engine);
+  if (!target) return false;
   const pbGhost = buildPersonalBestGhost(
     engine.storageManager,
-    ghostMode,
-    key,
+    target.ghostMode,
+    target.key,
     engine.gameConfig,
     t('duel.pbLabel'),
-    isWeekly ? engine.weeklyWeekKey : null
+    target.weekKey
   );
   return pbGhost ? engine.attachGhost(pbGhost) : false;
+}
+
+function doesGhostMatchEngine(engine, ghost) {
+  if (ghost.mode === GHOST_MODE_DAILY) {
+    return engine.mode === GAME_MODES.DAILY && engine.dailySeedKey === ghost.key;
+  }
+  if (ghost.mode === GHOST_MODE_FLUX) {
+    return engine.mode === GAME_MODES.FLUX && engine.fluxSeed === ghost.key;
+  }
+  return Boolean(ghost.isPersonalBest && PB_ARCADE_MODES.has(ghost.mode) && engine.mode === ghost.mode);
 }
 
 /** Ghost Duel methods installed on GameEngine: lifecycle of the rival run shown during a run. */
@@ -152,22 +177,10 @@ export const engineGhostDuelMethods = {
    */
   attachGhost(ghost) {
     this.ghostDuel = null;
-    if (this.isVersusRole || !ghost) {
+    if (this.isVersusRole || !ghost || !doesGhostMatchEngine(this, ghost)) {
       return false;
     }
-    const isDailyMatch = ghost.mode === GHOST_MODE_DAILY
-      && this.mode === GAME_MODES.DAILY
-      && this.dailySeedKey === ghost.key;
-    const isFluxMatch = ghost.mode === GHOST_MODE_FLUX
-      && this.mode === GAME_MODES.FLUX
-      && this.fluxSeed === ghost.key;
-    const isArcadePbMatch = ghost.isPersonalBest
-      && (ghost.mode === GAME_MODES.CLASSIC || ghost.mode === GAME_MODES.BLITZ)
-      && this.mode === ghost.mode;
-    if (!isDailyMatch && !isFluxMatch && !isArcadePbMatch) {
-      return false;
-    }
-    if (isFluxMatch && !ghost.isPersonalBest) {
+    if (ghost.mode === GHOST_MODE_FLUX && !ghost.isPersonalBest) {
       // Every duel on a seed shares one physics: the device tilt is locked.
       this.isSharedFluxRun = true;
     }

@@ -736,6 +736,15 @@ export const uiPlayHubMethods = {
     writeRewardChip(els.dailyReward, this.describeDailyRewardChip());
     writeRewardChip(els.weeklyReward, this.describeWeeklyRewardChip());
     renderDailyBounties(els.playBountiesList, storage.getDailyBountiesState?.());
+    const weeklyMastery = storage.getWeeklyMasteryState?.();
+    renderDailyBounties(els.playWeeklyMasteryList, weeklyMastery);
+    if (els.playWeeklyMasteryTitle) {
+      const bonus = this.gameConfig?.bounties?.weeklyChestBonusCoins || 60;
+      const titleKey = weeklyMastery?.chestClaimed
+        ? 'modals.play.weeklyMastery.titleClaimed'
+        : 'modals.play.weeklyMastery.titleBonus';
+      setTextIfChanged(els.playWeeklyMasteryTitle, t(titleKey, { coins: formatNumber(bonus) }));
+    }
     refreshPlayHubMastery(els, storage, this.gameConfig, this.playHubFilter);
   },
 

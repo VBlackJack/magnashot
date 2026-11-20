@@ -498,6 +498,7 @@ function buildBallStyleCard(ui, styleId, spec, activeStyle, coins, slotIndex) {
     actionBtn.addEventListener('click', () => {
       if (ui.storageManager.purchaseBallStyle(styleId, cost)) {
         ui.renderer?.setBallStyle?.(styleId);
+        ui.engine?.unlockAchievementTiers?.('cosmeticCollector', ui.storageManager.getUnlockedCosmeticCount?.() || 0);
         ui.audioManager.playEffect('match', 2);
         ui.refresh(ui.engine, ui.lastExtra);
         ui.announce(t('modals.shop.feedback.stylePurchased', { name: styleName }));
@@ -565,6 +566,7 @@ function buildArenaThemeCard(ui, themeId, spec, activeTheme, coins, slotIndex) {
     actionBtn.addEventListener('click', () => {
       if (ui.storageManager.purchaseArenaTheme?.(themeId, cost)) {
         ui.renderer?.setArenaTheme?.(themeId);
+        ui.engine?.unlockAchievementTiers?.('cosmeticCollector', ui.storageManager.getUnlockedCosmeticCount?.() || 0);
         ui.audioManager.playEffect('match', 2);
         ui.refresh(ui.engine, ui.lastExtra);
         ui.announce(t('modals.shop.feedback.arenaThemePurchased', { name: themeName }));
@@ -630,6 +632,7 @@ function buildLaserTrailCard(ui, trailId, spec, activeTrail, coins, slotIndex) {
     actionBtn.addEventListener('click', () => {
       if (ui.storageManager.purchaseLaserTrail?.(trailId, cost)) {
         ui.renderer?.setLaserTrail?.(trailId);
+        ui.engine?.unlockAchievementTiers?.('cosmeticCollector', ui.storageManager.getUnlockedCosmeticCount?.() || 0);
         ui.audioManager.playEffect('match', 2);
         ui.refresh(ui.engine, ui.lastExtra);
         ui.announce(t('modals.shop.feedback.laserTrailPurchased', { name: trailName }));

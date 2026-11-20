@@ -112,6 +112,8 @@ export const VERSUS_STORAGE_POLICY = Object.freeze({
   isLaserTrailUnlocked: P.FORWARD,
   getActiveLaserTrail: P.FORWARD,
   getPbTimeline: P.FORWARD,
+  getUnlockedCosmeticCount: P.FORWARD,
+  getDailyPuzzlesCleared: P.FORWARD,
   getRunSnapshotVersion: P.FORWARD,
   computeDailyStreakBonus: P.FORWARD,
 
@@ -260,6 +262,9 @@ export const VERSUS_STORAGE_POLICY = Object.freeze({
   hasClaimedWeeklyFluxBonus: P.TRUE,
   getDailyBountiesState: P.EMPTY_OBJECT,
   recordBountyProgress: P.EMPTY_ARRAY,
+  getWeeklyMasteryState: P.EMPTY_OBJECT,
+  recordWeeklyMasteryProgress: P.EMPTY_OBJECT,
+  incrementDailyPuzzlesCleared: P.ZERO,
 
   // Statistics and the run snapshot.
   getPlayerStats: P.EMPTY_OBJECT,
