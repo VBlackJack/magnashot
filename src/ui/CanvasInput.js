@@ -21,6 +21,28 @@ const POINTER_OWNERSHIP_PER_CANVAS = 'perCanvas';
 const MOUSE_POINTER_TYPE = 'mouse';
 
 /**
+ * Smooths small touch finger movements near the launcher (Vernier fine-aim mode) so
+ * mobile players can dial in tight Puzzle and Slingshot angles without thumb jitter.
+ */
+export function applyTouchFineAim(prevPos, nextPos, launcherSpec, fineCfg) {
+  if (!prevPos || !nextPos || !launcherSpec || !fineCfg) {
+    return nextPos;
+  }
+  const distToLauncher = Math.hypot(nextPos.x - launcherSpec.x, nextPos.y - launcherSpec.y);
+  const stepDist = Math.hypot(nextPos.x - prevPos.x, nextPos.y - prevPos.y);
+  const inProximity = distToLauncher <= (fineCfg.proximityRadiusPx || 0);
+  const isSlowMicroDrag = stepDist > 0 && stepDist <= (fineCfg.maxStepPx || 0);
+  if (!inProximity && !isSlowMicroDrag) {
+    return nextPos;
+  }
+  const factor = Math.max(0.1, Math.min(1, Number(fineCfg.slowdownFactor) || 0.35));
+  return {
+    x: prevPos.x + (nextPos.x - prevPos.x) * factor,
+    y: prevPos.y + (nextPos.y - prevPos.y) * factor
+  };
+}
+
+/**
  * Binds the pointer controls of a game canvas (aim, tap-to-swap, release-to-shoot) to the
  * engine returned by `getEngine` at the time of each event.
  *
@@ -133,6 +155,7 @@ export function bindCanvasInput(canvas, getEngine, gameConfig, options = {}) {
 
   let isPointerDownOnCanvas = false;
   let pointerDownPos = null;
+  let lastTouchAimPos = null;
   let ownedPointerId = null;
 
   // 'primary': only the primary pointer counts. 'perCanvas': only the owned pointer counts.
@@ -149,6 +172,7 @@ export function bindCanvasInput(canvas, getEngine, gameConfig, options = {}) {
   const clearOwnership = () => {
     isPointerDownOnCanvas = false;
     pointerDownPos = null;
+    lastTouchAimPos = null;
     ownedPointerId = null;
   };
 
@@ -164,7 +188,14 @@ export function bindCanvasInput(canvas, getEngine, gameConfig, options = {}) {
       return;
     }
     const rawPos = toLogicalCoords(e.clientX, e.clientY);
-    const aimPos = getAimAdjustedCoords(engine, e, rawPos);
+    let aimPos = getAimAdjustedCoords(engine, e, rawPos);
+    if (e.pointerType === 'touch' && isPointerDownOnCanvas && gameConfig.canvas?.touchFineAim) {
+      const spec = getLauncherSpec(engine);
+      if (spec.posture === LAUNCHER_POSTURES.UPWARD) {
+        aimPos = applyTouchFineAim(lastTouchAimPos, aimPos, spec, gameConfig.canvas.touchFineAim);
+        lastTouchAimPos = aimPos;
+      }
+    }
     if (aimsAtPointer(engine, e, aimPos)) {
       engine.updateAim(aimPos.x, aimPos.y);
       if (!isPointerDownOnCanvas) {

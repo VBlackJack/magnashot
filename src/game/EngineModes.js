@@ -60,17 +60,54 @@ const isCurrentWeeklyFluxSeed = (engine, seed, contentVersion, weekKey) => {
 /** Re-exported from Constants so callers importing EngineModes keep working. */
 export { FLUX_PERK_IDS };
 
+function applyLabMutators(engine, rawMutators) {
+  const catalog = engine.gameConfig.daily?.mutators || {};
+  const maxActive = engine.gameConfig.mutatorLab?.maxActive ?? 3;
+  const clean = Array.isArray(rawMutators)
+    ? [...new Set(rawMutators.filter((id) => typeof id === 'string' && Object.hasOwn(catalog, id)))].slice(0, maxActive)
+    : [];
+  engine.activeLabMutators = clean;
+  if (clean.length === 0) return;
+  const dailyCfg = engine.gameConfig.daily;
+  const pivotX = engine.gameConfig.canvas.logicalWidth * MATH_CONSTANTS.HALF;
+  const pivotY = engine.gameConfig.endless?.pivotY ?? 220;
+  for (const key of clean) {
+    const spec = catalog[key];
+    if (spec.clusterGravityMultiplier) {
+      engine.physicsWorld.gravityMultiplier *= spec.clusterGravityMultiplier;
+    }
+    if (spec.magnetismMultiplier) {
+      engine.physicsWorld.magnetismMultiplier *= spec.magnetismMultiplier;
+    }
+    if (spec.portalPair) {
+      engine.physicsWorld.obstacles.push(
+        new Obstacle({ type: OBSTACLE_TYPES.PORTAL, x: pivotX - dailyCfg.portalOffsetX, y: pivotY + dailyCfg.portalEntryOffsetY, pairId: dailyCfg.portalPairId }, engine.obstaclesConfig),
+        new Obstacle({ type: OBSTACLE_TYPES.PORTAL, x: pivotX + dailyCfg.portalOffsetX, y: pivotY + dailyCfg.portalExitOffsetY, pairId: dailyCfg.portalPairId }, engine.obstaclesConfig)
+      );
+    }
+    if (spec.bumperPair) {
+      engine.physicsWorld.obstacles.push(
+        new Obstacle({ type: OBSTACLE_TYPES.BUMPER, x: pivotX - dailyCfg.bumperOffsetX, y: pivotY + dailyCfg.bumperOffsetY }, engine.obstaclesConfig),
+        new Obstacle({ type: OBSTACLE_TYPES.BUMPER, x: pivotX + dailyCfg.bumperOffsetX, y: pivotY + dailyCfg.bumperOffsetY }, engine.obstaclesConfig)
+      );
+    }
+  }
+}
+
 function buildCustomPuzzleDef(customSpec, gameConfig) {
   const hasExplicitAnchors = customSpec.balls.some((b) => b.a === true);
   const hasRescueCores = customSpec.balls.some((b) => b.k === true);
   const presetKey = customSpec.obstaclePreset;
   const presets = gameConfig.puzzleBuilder?.obstaclePresets || {};
   const presetObstacles = presetKey && Array.isArray(presets[presetKey]) ? presets[presetKey] : [];
+  const freeObstacles = Array.isArray(customSpec.obstacles)
+    ? customSpec.obstacles.map((o) => ({ type: o.t, x: o.x, y: o.y }))
+    : [];
   return {
     objective: hasRescueCores ? OBJECTIVE_TYPES.CORE_RESCUE : OBJECTIVE_TYPES.CLEAR_ALL,
     shots: customSpec.shots,
     specialInventory: {},
-    obstacles: presetObstacles.map((o) => ({ ...o })),
+    obstacles: [...presetObstacles.map((o) => ({ ...o })), ...freeObstacles],
     balls: customSpec.balls.map((b, idx) => ({
       x: b.x,
       y: b.y,
@@ -244,10 +281,13 @@ export const engineModeMethods = {
     }
   },
 
-  startEndlessMode() {
+  startEndlessMode(options = null) {
     this.initSurvivalRun(GAME_MODES.ENDLESS, null);
+    applyLabMutators(this, options?.mutators);
     this.storageManager?.recordAchievementProgress?.({ endlessWave: this.waveCount });
-    attachPersonalBestGhostIfEnabled(this);
+    if (this.activeLabMutators.length === 0) {
+      attachPersonalBestGhostIfEnabled(this);
+    }
     this.notifyUI();
   },
 
@@ -256,12 +296,15 @@ export const engineModeMethods = {
    * stage boards. Misses fill the Sag meter and each full meter lowers the anchor rail.
    * @param {number} [stage=1] - 1-based stage to start on.
    */
-  startClassicMode(stage = 1) {
+  startClassicMode(stage = 1, options = null) {
     const drawRunSeed = this.seedSource || Math.random;
     // A run stream of its own (launcher draws) so the stage boards can be scoped: a stage
     // board never depends on the shots played before it.
     this.launchClassicBoard(stage, new SeededRandom(`${this.gameConfig.classic.seedPrefix}:run:${drawRunSeed()}`));
-    attachPersonalBestGhostIfEnabled(this);
+    applyLabMutators(this, options?.mutators);
+    if (this.activeLabMutators.length === 0) {
+      attachPersonalBestGhostIfEnabled(this);
+    }
   },
 
   /**
@@ -777,7 +820,7 @@ export const engineModeMethods = {
    *   the generation the shapes come from (the current one by default): a duel replays an older
    *   one so a link recorded before a generation change meets the shapes it was recorded on.
    */
-  startFluxRun(seed = null, { isShared = false, weekKey = undefined, isRestart = false, contentVersion = undefined } = {}) {
+  startFluxRun(seed = null, { isShared = false, weekKey = undefined, isRestart = false, contentVersion = undefined, mutators = null } = {}) {
     const currentVersion = this.gameConfig.ghostDuel.contentVersion.flux;
     const version = contentVersion ?? currentVersion;
     const runSeed = seed || this.createFluxSeed();
@@ -788,17 +831,20 @@ export const engineModeMethods = {
     // older shapes: the weekly board is the current one, so those runs never reach its records.
     const isWeekly = version === currentVersion && this.detectWeeklyFlux(runSeed, weekKey);
     this.buildFluxStage({ persist: false });
+    applyLabMutators(this, mutators);
     this.currentBall = this.createRandomLauncherBall();
     this.nextBall = this.createRandomLauncherBall();
     this.fillUpcomingColors();
     this.state = GAME_STATES.PLAYING;
     const canvasCfg = this.gameConfig.canvas;
     this.updateAim(canvasCfg.launcherX, canvasCfg.launcherY + canvasCfg.initialAimOffsetY);
-    if (isWeekly && !isRestart && !this.isRestoringRun) {
+    if (isWeekly && !isRestart && !this.isRestoringRun && this.activeLabMutators.length === 0) {
       this.payWeeklyFluxBonus(this.weeklyWeekKey);
     }
     this.levelIntro = isRestart ? null : maybeBuildArcadeModeIntro(this, GAME_MODES.FLUX);
-    attachPersonalBestGhostIfEnabled(this);
+    if (this.activeLabMutators.length === 0) {
+      attachPersonalBestGhostIfEnabled(this);
+    }
     this.notifyUI();
   },
 

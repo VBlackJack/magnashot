@@ -1962,3 +1962,81 @@
   text-align: center;
   max-width: var(--install-hint-width);
 }
+
+.play-hub-spotlight {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+  margin: 0 0 10px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--accent-amber);
+  background: var(--accent-amber-alpha-16);
+  color: var(--text-gold-soft);
+  font-size: 0.82rem;
+  font-weight: 700;
+  text-align: left;
+  cursor: pointer;
+}
+
+.play-hub-spotlight:hover,
+.play-hub-spotlight:focus-visible {
+  background: var(--accent-amber-alpha-20);
+  color: var(--text-bright);
+}
+
+.play-mutator-lab {
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.play-mutator-lab-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.play-mutator-lab-mult {
+  font-size: 0.78rem;
+  font-weight: 800;
+  color: var(--text-gold-soft);
+}
+
+.mutator-lab-panel {
+  margin-top: 8px;
+}
+
+.mutator-lab-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 6px 0 10px;
+}
+
+.mutator-lab-chip {
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--border-subtle);
+  background: var(--surface-sunken);
+  color: var(--text-secondary);
+  font-size: 0.74rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.mutator-lab-chip[aria-pressed='true'] {
+  border-color: var(--accent-purple);
+  background: var(--accent-purple-alpha-38);
+  color: var(--text-bright);
+}
+
+.mutator-lab-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}

@@ -222,8 +222,22 @@ function cacheControlAndDrawerElements() {
   };
 }
 
+function cacheMutatorLabElements() {
+  return {
+    playHubSpotlight: document.getElementById('play-hub-spotlight'),
+    mutatorLabToggle: document.getElementById('btn-mutator-lab-toggle'),
+    mutatorLabPanel: document.getElementById('mutator-lab-panel'),
+    mutatorLabChips: document.getElementById('mutator-lab-chips'),
+    mutatorLabMult: document.getElementById('mutator-lab-mult'),
+    btnLabEndless: document.getElementById('btn-lab-endless'),
+    btnLabFlux: document.getElementById('btn-lab-flux'),
+    btnLabClassic: document.getElementById('btn-lab-classic')
+  };
+}
+
 function cachePlayAndLevelsElements() {
   return {
+    ...cacheMutatorLabElements(),
     modalPlay: document.getElementById('modal-play'),
     modalPuzzleBuilder: document.getElementById('modal-puzzle-builder'),
     btnPuzzleBuilder: document.getElementById('btn-puzzle-builder'),

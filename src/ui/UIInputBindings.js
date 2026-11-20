@@ -386,6 +386,88 @@ function bindHeaderAndShellControls(ui) {
   });
 }
 
+function syncMutatorLabState(ui, selected) {
+  const els = ui.elements;
+  const perMutator = ui.gameConfig?.mutatorLab?.scoreMultiplierPerMutator ?? 0.25;
+  const mult = (1 + selected.size * perMutator).toFixed(2).replace(/\.00$/, '').replace(/0$/, '');
+  if (els.mutatorLabMult) {
+    els.mutatorLabMult.textContent = t('modals.play.mutatorLab.mult', { mult });
+  }
+  const hasAny = selected.size > 0;
+  for (const key of ['btnLabEndless', 'btnLabFlux', 'btnLabClassic']) {
+    if (els[key]) {
+      els[key].disabled = !hasAny;
+    }
+  }
+}
+
+function launchMutatorLabRun(ui, mode, selected) {
+  const mutators = Array.from(selected);
+  if (mutators.length === 0) {
+    return;
+  }
+  const startRun = () => {
+    ui.hideAllModals();
+    if (mode === GAME_MODES.FLUX) {
+      ui.engine.startFluxRun(null, { mutators });
+    } else if (mode === GAME_MODES.CLASSIC) {
+      ui.engine.startClassicMode(1, { mutators });
+    } else {
+      ui.engine.startEndlessMode({ mutators });
+    }
+  };
+  ui.requestDestructiveAction(startRun, () => t('modals.play.mutatorLab.toggle'));
+}
+
+function bindPlayHubMutatorLab(ui) {
+  const els = ui.elements;
+  const maxActive = ui.gameConfig?.mutatorLab?.maxActive ?? 3;
+  const selected = new Set();
+  syncMutatorLabState(ui, selected);
+  els.mutatorLabToggle?.addEventListener('click', () => {
+    const isOpen = els.mutatorLabPanel?.classList.toggle(HIDDEN_CLASS) === false;
+    els.mutatorLabToggle.setAttribute('aria-expanded', String(isOpen));
+  });
+  els.mutatorLabChips?.addEventListener('click', (e) => {
+    const chip = e.target?.closest?.('[data-lab-mutator]');
+    const key = chip?.dataset?.labMutator;
+    if (!key) {
+      return;
+    }
+    if (selected.has(key)) {
+      selected.delete(key);
+      chip.setAttribute('aria-pressed', 'false');
+    } else if (selected.size < maxActive) {
+      selected.add(key);
+      chip.setAttribute('aria-pressed', 'true');
+    }
+    syncMutatorLabState(ui, selected);
+  });
+  els.btnLabEndless?.addEventListener('click', () => launchMutatorLabRun(ui, GAME_MODES.ENDLESS, selected));
+  els.btnLabFlux?.addEventListener('click', () => launchMutatorLabRun(ui, GAME_MODES.FLUX, selected));
+  els.btnLabClassic?.addEventListener('click', () => launchMutatorLabRun(ui, GAME_MODES.CLASSIC, selected));
+}
+
+function bindPlayHubSpotlight(ui) {
+  const banner = ui.elements?.playHubSpotlight
+    || (typeof document !== 'undefined' ? document.getElementById?.('play-hub-spotlight') : null);
+  banner?.addEventListener('click', () => {
+    const kind = banner.dataset.spotlightKind;
+    if (kind === 'dailyPuzzle') {
+      document.getElementById?.('btn-daily-puzzle')?.click();
+    } else if (kind === 'campaign') {
+      ui.elements?.btnCampaignContinue?.click();
+    } else if (kind === 'mode') {
+      const cardKey = ARCADE_CARD_SPECS[banner.dataset.spotlightMode]?.card;
+      if (cardKey) {
+        ui.elements?.[cardKey]?.click();
+      }
+    } else if (kind === 'weeklyMastery') {
+      ui.elements?.btnWeekly?.click();
+    }
+  });
+}
+
 function bindPlayHubToolbar(ui) {
   const filterBar = typeof document !== 'undefined' ? document.getElementById?.('play-hub-filters') : null;
   filterBar?.addEventListener('click', (e) => {
@@ -415,6 +497,8 @@ function bindPlayHubToolbar(ui) {
       () => t('modals.play.dailyPuzzle.title')
     );
   });
+  bindPlayHubSpotlight(ui);
+  bindPlayHubMutatorLab(ui);
   bindPuzzleBuilderModal(ui);
 }
 

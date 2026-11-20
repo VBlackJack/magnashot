@@ -26,7 +26,7 @@ const CODEC_V1 = 1;
 const CODEC_V2 = 2;
 export const MAX_PAYLOAD_CHARS = 640;
 export const MAX_PUZZLE_BALLS = 28;
-export const MAX_PUZZLE_OBSTACLES = 2;
+export const MAX_PUZZLE_OBSTACLES = 3;
 const MAX_SHOTS = 12;
 const MIN_SHOTS = 1;
 const MIN_COORD = 0;
@@ -41,6 +41,9 @@ const MAX_FLAGS = FLAG_ANCHOR | FLAG_CORE;
 
 export const PUZZLE_QUERY_PARAM = 'puzzle';
 export const PUZZLE_OBSTACLE_KINDS = Object.freeze(['none', 'bumper', 'repulsor', 'portal']);
+const FREE_OBSTACLE_TO_CODE = Object.freeze({ bumper: 'b', repulsor: 'r', attractor: 'a' });
+const CODE_TO_FREE_OBSTACLE = Object.freeze({ b: 'bumper', r: 'repulsor', a: 'attractor' });
+const ALLOWED_FREE_OBSTACLES = new Set(Object.keys(FREE_OBSTACLE_TO_CODE));
 
 const COLOR_TO_CODE = Object.freeze({
   crimson: 'r',
@@ -109,26 +112,39 @@ function isValidObstaclePreset(preset) {
   return preset === undefined || preset === null || preset === 'none' || ALLOWED_OBSTACLE_PRESETS.has(preset);
 }
 
+function isValidFreeObstacle(obs) {
+  return Boolean(
+    obs &&
+    typeof obs === 'object' &&
+    ALLOWED_FREE_OBSTACLES.has(obs.t) &&
+    isValidCoord(obs.x) &&
+    isValidCoord(obs.y)
+  );
+}
+
+function hasValidFreeObstacles(obstacles) {
+  if (obstacles === undefined) {
+    return true;
+  }
+  return Array.isArray(obstacles) && obstacles.length <= MAX_PUZZLE_OBSTACLES && obstacles.every(isValidFreeObstacle);
+}
+
+function hasValidQueueAndBalls(spec) {
+  const validQueue = Array.isArray(spec.queue) && spec.queue.length >= MIN_SHOTS && spec.queue.length <= MAX_SHOTS
+    && spec.queue.every((color) => ALLOWED_COLORS.has(color));
+  const validBalls = Array.isArray(spec.balls) && spec.balls.length >= 1 && spec.balls.length <= MAX_PUZZLE_BALLS
+    && spec.balls.every(isValidBallEntry);
+  return validQueue && validBalls;
+}
+
 function isValidPuzzleSpec(spec) {
   if (!spec || typeof spec !== 'object') {
     return false;
   }
-  if (!Number.isInteger(spec.shots) || spec.shots < MIN_SHOTS || spec.shots > MAX_SHOTS) {
-    return false;
-  }
-  if (!Array.isArray(spec.queue) || spec.queue.length < MIN_SHOTS || spec.queue.length > MAX_SHOTS) {
-    return false;
-  }
-  if (!spec.queue.every((color) => ALLOWED_COLORS.has(color))) {
-    return false;
-  }
-  if (!Array.isArray(spec.balls) || spec.balls.length < 1 || spec.balls.length > MAX_PUZZLE_BALLS) {
-    return false;
-  }
-  if (!isValidObstaclePreset(spec.obstaclePreset)) {
-    return false;
-  }
-  return spec.balls.every(isValidBallEntry);
+  const validShots = Number.isInteger(spec.shots) && spec.shots >= MIN_SHOTS && spec.shots <= MAX_SHOTS;
+  const validVerified = spec.verified === undefined || typeof spec.verified === 'boolean';
+  return validShots && hasValidQueueAndBalls(spec) && isValidObstaclePreset(spec.obstaclePreset)
+    && hasValidFreeObstacles(spec.obstacles) && validVerified;
 }
 
 function encodeBallV2(ball) {
@@ -179,10 +195,35 @@ export function encodeCustomPuzzle(spec) {
   if (spec.obstaclePreset && ALLOWED_OBSTACLE_PRESETS.has(spec.obstaclePreset)) {
     canonical.o = spec.obstaclePreset;
   }
+  if (Array.isArray(spec.obstacles) && spec.obstacles.length > 0) {
+    canonical.obs = spec.obstacles.map(({ t, x, y }) => [FREE_OBSTACLE_TO_CODE[t], x, y]);
+  }
+  if (spec.verified === true) {
+    canonical.vok = 1;
+  }
   const body = JSON.stringify(canonical);
   const checksum = fnv1a16(body).toString(16).padStart(4, '0');
   const encoded = toBase64Url(`${checksum}.${body}`);
   return encoded.length <= MAX_PAYLOAD_CHARS ? encoded : null;
+}
+
+function decodeFreeObstacleEntry(entry) {
+  if (!Array.isArray(entry) || entry.length !== 3 || !CODE_TO_FREE_OBSTACLE[entry[0]]) {
+    return null;
+  }
+  return { t: CODE_TO_FREE_OBSTACLE[entry[0]], x: entry[1], y: entry[2] };
+}
+
+function attachV2Metadata(spec, parsed) {
+  if (parsed.o !== undefined) {
+    spec.obstaclePreset = parsed.o;
+  }
+  if (Array.isArray(parsed.obs) && parsed.obs.length > 0) {
+    spec.obstacles = parsed.obs.map(decodeFreeObstacleEntry);
+  }
+  if (parsed.vok === 1) {
+    spec.verified = true;
+  }
 }
 
 function decodeParsedBody(parsed) {
@@ -198,8 +239,8 @@ function decodeParsedBody(parsed) {
   }
   const balls = parsed.b.map((entry) => decodeBallEntry(entry, isV2));
   const spec = { shots: parsed.s, queue, balls };
-  if (isV2 && parsed.o !== undefined) {
-    spec.obstaclePreset = parsed.o;
+  if (isV2) {
+    attachV2Metadata(spec, parsed);
   }
   return isValidPuzzleSpec(spec) ? spec : null;
 }
