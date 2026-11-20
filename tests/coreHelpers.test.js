@@ -131,6 +131,12 @@ test('Play Hub arcade filters and next-unmastered smart picker classify modes ac
   assert.equal(weeklyPb?.isPersonalBest, true);
   assert.equal(weeklyPb?.key, 'abc123');
 
+  const arcadeStorage = { getPbTimeline: (m) => (m === 'blitz' ? { score: 800, tl: timeline } : null) };
+  const blitzPb = buildPersonalBestGhost(arcadeStorage, 'blitz', 'blitz', ghostCfg, 'PB');
+  assert.equal(blitzPb?.isPersonalBest, true);
+  assert.equal(blitzPb?.mode, 'blitz');
+  assert.equal(blitzPb?.final, 800);
+
   const stageA = resolveDailyPuzzleStage('2026-11-20', 20);
   const stageB = resolveDailyPuzzleStage('2026-11-20', 20);
   assert.equal(stageA, stageB);

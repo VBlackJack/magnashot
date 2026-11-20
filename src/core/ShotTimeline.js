@@ -21,7 +21,7 @@
  *   s: score per point (non-decreasing), b: spheres left per point }.
  */
 
-const TIMELINE_MODES = Object.freeze(['daily', 'flux']);
+const TIMELINE_MODES = Object.freeze(['daily', 'flux', 'classic', 'blitz']);
 const COMPLETE_FLAG = 1;
 const INCOMPLETE_FLAG = 0;
 const INITIAL_STEP = 1;

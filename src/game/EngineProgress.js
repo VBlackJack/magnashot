@@ -177,17 +177,23 @@ export const engineProgressMethods = {
    * @param {boolean} [isFinal] - True at game over: the timeline is then complete.
    */
   sampleShotTimeline(isFinal = false) {
-    const isDaily = this.mode === GAME_MODES.DAILY;
-    if (this.isVersusRole || (!isDaily && this.mode !== GAME_MODES.FLUX)) {
+    const allowed = this.mode === GAME_MODES.DAILY
+      || this.mode === GAME_MODES.FLUX
+      || this.mode === GAME_MODES.CLASSIC
+      || this.mode === GAME_MODES.BLITZ;
+    if (this.isVersusRole || !allowed) {
       return;
     }
     const cfg = this.gameConfig.shotTimeline;
     if (!this.shotTimeline) {
-      this.shotTimeline = createShotTimeline(isDaily ? GAME_MODES.DAILY : GAME_MODES.FLUX, cfg);
+      this.shotTimeline = createShotTimeline(this.mode, cfg);
     }
     appendTimelineSample(this.shotTimeline, this.score, this.physicsWorld.balls.length, cfg);
     if (isFinal) {
       this.shotTimeline = markTimelineComplete(this.shotTimeline);
+      if (this.mode === GAME_MODES.CLASSIC || this.mode === GAME_MODES.BLITZ) {
+        this.storageManager?.setPbTimeline?.(this.mode, this.score, this.shotTimeline);
+      }
     }
   }
 };

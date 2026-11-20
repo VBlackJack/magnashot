@@ -16,6 +16,7 @@
 
 import { ARENA_THEMES, BALL_STYLES, LASER_TRAILS } from './Constants.js';
 import { configRegistry } from './ConfigRegistry.js';
+import { normalizeShotTimeline } from './ShotTimeline.js';
 
 function getUnlockedCosmeticMap(storage, defaultId, unlockedKey) {
   const key = storage.storageConfig?.keys?.[unlockedKey];
@@ -154,6 +155,34 @@ export const storageCosmeticsMethods = {
     if (amount > 0) {
       this.addCoins(amount);
     }
+    return true;
+  },
+
+  getPbTimeline(mode) {
+    const key = this.storageConfig?.keys?.pbTimelines;
+    const all = key ? this.readJsonObject(key) : {};
+    const entry = typeof mode === 'string' ? all[mode] : null;
+    if (!entry || typeof entry !== 'object') {
+      return null;
+    }
+    const tl = normalizeShotTimeline(entry.tl, this.shotTimelineConfig);
+    return tl ? { score: Math.max(0, Math.floor(Number(entry.score) || 0)), tl } : null;
+  },
+
+  setPbTimeline(mode, score, timeline) {
+    const key = this.storageConfig?.keys?.pbTimelines;
+    const cleanScore = Math.max(0, Math.floor(Number(score) || 0));
+    const normalized = normalizeShotTimeline(timeline, this.shotTimelineConfig);
+    if (!key || typeof mode !== 'string' || !normalized || cleanScore <= 0) {
+      return false;
+    }
+    const current = this.getPbTimeline(mode);
+    if (current && cleanScore < current.score) {
+      return false;
+    }
+    const all = this.readJsonObject(key);
+    all[mode] = { score: cleanScore, tl: normalized };
+    this.safeSetItem(key, JSON.stringify(all));
     return true;
   }
 };

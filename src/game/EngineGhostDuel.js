@@ -42,24 +42,27 @@ const ORIGIN_SAMPLE_COUNT = 1;
  * Returns null when no completed timeline exists for that seed.
  */
 export function buildPersonalBestGhost(storage, mode, key, gameConfig, aliasLabel, weekKey = null) {
-  if (!storage || !key || !gameConfig?.ghostDuel) {
+  if (!storage || !gameConfig?.ghostDuel) {
     return null;
   }
   let timeline = null;
-  if (mode === GHOST_MODE_DAILY) {
+  if (mode === GHOST_MODE_DAILY && key) {
     const entry = (storage.getDailyHistory?.() ?? []).find((item) => item?.d === key);
     timeline = entry?.tl ?? null;
-  } else if (mode === GHOST_MODE_FLUX && weekKey) {
+  } else if (mode === GHOST_MODE_FLUX && key && weekKey) {
     const weekly = storage.getWeeklyFluxBest?.(weekKey);
     timeline = weekly?.seed === key ? (weekly.tl ?? null) : null;
+  } else if (mode === GAME_MODES.CLASSIC || mode === GAME_MODES.BLITZ) {
+    timeline = storage.getPbTimeline?.(mode)?.tl ?? null;
   }
   if (!timeline || !Array.isArray(timeline.s) || timeline.s.length === 0) {
     return null;
   }
+  const cv = mode === GHOST_MODE_DAILY || mode === GHOST_MODE_FLUX ? contentVersionFor(gameConfig.ghostDuel, mode) : 1;
   return {
     mode,
-    key,
-    cv: contentVersionFor(gameConfig.ghostDuel, mode),
+    key: key || mode,
+    cv,
     n: Number.isInteger(timeline.n) && timeline.n > 0 ? timeline.n : timeline.s.length,
     step: Number.isInteger(timeline.step) && timeline.step > 0 ? timeline.step : 1,
     s: [...timeline.s],
@@ -70,7 +73,7 @@ export function buildPersonalBestGhost(storage, mode, key, gameConfig, aliasLabe
   };
 }
 
-/** Attaches the player's own PB ghost on Daily/Weekly runs when enabled and no friend duel is active. */
+/** Attaches the player's own PB ghost on Daily/Weekly/Purist/Blitz runs when enabled. */
 export function attachPersonalBestGhostIfEnabled(engine) {
   if (!engine || engine.isVersusRole || engine.ghostDuel || engine.isDailyRematch) {
     return false;
@@ -80,11 +83,12 @@ export function attachPersonalBestGhostIfEnabled(engine) {
   }
   const isDaily = engine.mode === GAME_MODES.DAILY;
   const isWeekly = engine.mode === GAME_MODES.FLUX && engine.isWeeklyFluxRun && engine.weeklyWeekKey;
-  if (!isDaily && !isWeekly) {
+  const isArcadePb = engine.mode === GAME_MODES.CLASSIC || engine.mode === GAME_MODES.BLITZ;
+  if (!isDaily && !isWeekly && !isArcadePb) {
     return false;
   }
-  const ghostMode = isDaily ? GHOST_MODE_DAILY : GHOST_MODE_FLUX;
-  const key = isDaily ? engine.dailySeedKey : engine.fluxSeed;
+  const ghostMode = isDaily ? GHOST_MODE_DAILY : (isWeekly ? GHOST_MODE_FLUX : engine.mode);
+  const key = isDaily ? engine.dailySeedKey : (isWeekly ? engine.fluxSeed : engine.mode);
   const pbGhost = buildPersonalBestGhost(
     engine.storageManager,
     ghostMode,
@@ -157,7 +161,10 @@ export const engineGhostDuelMethods = {
     const isFluxMatch = ghost.mode === GHOST_MODE_FLUX
       && this.mode === GAME_MODES.FLUX
       && this.fluxSeed === ghost.key;
-    if (!isDailyMatch && !isFluxMatch) {
+    const isArcadePbMatch = ghost.isPersonalBest
+      && (ghost.mode === GAME_MODES.CLASSIC || ghost.mode === GAME_MODES.BLITZ)
+      && this.mode === ghost.mode;
+    if (!isDailyMatch && !isFluxMatch && !isArcadePbMatch) {
       return false;
     }
     if (isFluxMatch && !ghost.isPersonalBest) {

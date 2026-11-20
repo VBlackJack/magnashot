@@ -182,6 +182,7 @@ export const engineModeMethods = {
     // A run stream of its own (launcher draws) so the stage boards can be scoped: a stage
     // board never depends on the shots played before it.
     this.launchClassicBoard(stage, new SeededRandom(`${this.gameConfig.classic.seedPrefix}:run:${drawRunSeed()}`));
+    attachPersonalBestGhostIfEnabled(this);
   },
 
   /**
@@ -474,6 +475,7 @@ export const engineModeMethods = {
     this.updateAim(canvasCfg.launcherX, canvasCfg.launcherY + canvasCfg.initialAimOffsetY);
     this.refreshDiscovery();
     this.levelIntro = maybeBuildArcadeModeIntro(this, GAME_MODES.BLITZ);
+    attachPersonalBestGhostIfEnabled(this);
     this.notifyUI();
   },
 
