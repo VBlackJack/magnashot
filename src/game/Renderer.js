@@ -31,6 +31,7 @@ import { SAG_STEPS } from './SagMeter.js';
 import { ringVisual } from './Resonance.js';
 import { resolveModesConfig } from './modes/index.js';
 import { installMethods } from '../core/installMethods.js';
+import { rendererArenaMethods } from './RendererArena.js';
 import { rendererMagnetarChargesMethods } from './RendererMagnetarCharges.js';
 import { rendererParticlesMethods } from './RendererParticles.js';
 
@@ -218,6 +219,7 @@ function prepareFrameCanvas(renderer, engineState, theme, width, height) {
 }
 
 function renderBoardChrome(renderer, ctx, engineState, width, height, theme, behavior, chrome, now, alpha) {
+  renderer.drawAnimatedArenaAmbient(ctx, width, height, now);
   if (!chrome || chrome.ambientLiquid) {
     renderer.drawLiquid(ctx, engineState.particleSystem, width, height);
   }
@@ -318,6 +320,7 @@ function renderForegroundChrome(renderer, ctx, engineState, width, height, theme
   if (magnetarView && magnetarView.charges?.length) {
     renderer.drawMagnetarCharges(ctx, engineState, magnetarView);
   }
+  renderer.drawComboTierAura(ctx, engineState, width, height, now);
 }
 
 function strokeMagneticFieldLines(renderer, ctx, physicsWorld, theme, pulse, fieldMaxDistSq, alpha) {
@@ -1295,62 +1298,6 @@ export class Renderer {
     return null;
   }
 
-  /**
-   * Pre-renders the static background gradient, grid and walls at backing-store
-   * resolution so each frame blits one image instead of redrawing them.
-   */
-  buildStaticLayer() {
-    if (!this.staticLayer) {
-      this.staticLayer = this.createLayerCanvas();
-    }
-    this.staticLayer.width = this.canvas.width;
-    this.staticLayer.height = this.canvas.height;
-    const layerCtx = this.staticLayer.getContext('2d');
-    const override = this.activeArenaTheme && this.activeArenaTheme !== 'deepSpace'
-      ? this.gameConfig.arenaThemes?.[this.activeArenaTheme]
-      : null;
-    const theme = override ? { ...this.gameConfig.theme, ...override } : this.gameConfig.theme;
-    const width = this.logicalWidth;
-    const height = this.logicalHeight;
-
-    layerCtx.setTransform(this.scaleX, 0, 0, this.scaleY, 0, 0);
-    const bgGradient = layerCtx.createLinearGradient(0, 0, 0, height);
-    bgGradient.addColorStop(0, theme.backgroundTop);
-    bgGradient.addColorStop(1, theme.backgroundBottom);
-    layerCtx.fillStyle = bgGradient;
-    layerCtx.fillRect(0, 0, width, height);
-    if (theme.horizonGlowColor && theme.transparentColor && typeof layerCtx.createRadialGradient === 'function') {
-      const launcherY = this.gameConfig.canvas.launcherY ?? (height - (this.gameConfig.canvas.launcherBottomOffset || 0));
-      const glowRadius = width * (theme.horizonGlowRadiusFactor);
-      const horizonGrad = layerCtx.createRadialGradient(
-        width * MATH_CONSTANTS.HALF,
-        launcherY,
-        0,
-        width * MATH_CONSTANTS.HALF,
-        launcherY,
-        glowRadius
-      );
-      horizonGrad.addColorStop(0, theme.horizonGlowColor);
-      horizonGrad.addColorStop(1, theme.transparentColor);
-      layerCtx.fillStyle = horizonGrad;
-      layerCtx.fillRect(0, 0, width, height);
-    }
-    this.drawGrid(layerCtx, width, height, theme);
-    if (theme.vignetteColor && theme.transparentColor && typeof layerCtx.createRadialGradient === 'function') {
-      const cx = width * MATH_CONSTANTS.HALF;
-      const cy = height * MATH_CONSTANTS.HALF;
-      const innerR = width * (theme.vignetteInnerRadiusFactor);
-      const outerR = height * (theme.vignetteOuterRadiusFactor);
-      const vignetteGrad = layerCtx.createRadialGradient(cx, cy, innerR, cx, cy, outerR);
-      vignetteGrad.addColorStop(0, theme.transparentColor);
-      vignetteGrad.addColorStop(1, theme.vignetteColor);
-      layerCtx.fillStyle = vignetteGrad;
-      layerCtx.fillRect(0, 0, width, height);
-    }
-    this.drawWalls(layerCtx, width, height, theme);
-    this.staticLayerDirty = false;
-  }
-
   /** Rebuilds the style/pattern/contrast part of the sprite key; call whenever one of them changes. */
   refreshBallSpriteKeySuffix() {
     const styleKey = this.activeBallStyle || BALL_STYLES.CLASSIC;
@@ -1553,34 +1500,6 @@ export class Renderer {
     }
   }
 
-  drawGrid(ctx, width, height, theme) {
-    ctx.strokeStyle = theme.gridLineColor;
-    ctx.lineWidth = theme.gridLineWidth;
-    const step = theme.gridSize;
-
-    ctx.beginPath();
-    for (let x = step; x < width; x += step) {
-      ctx.moveTo(x, 0);
-      ctx.lineTo(x, height);
-    }
-    for (let y = step; y < height; y += step) {
-      ctx.moveTo(0, y);
-      ctx.lineTo(width, y);
-    }
-    ctx.stroke();
-
-    if (theme.gridNodeColor && theme.gridNodeSize) {
-      const nodeSize = theme.gridNodeSize;
-      const halfNode = nodeSize * MATH_CONSTANTS.HALF;
-      ctx.fillStyle = theme.gridNodeColor;
-      for (let x = step; x < width; x += step) {
-        for (let y = step; y < height; y += step) {
-          ctx.fillRect(x - halfNode, y - halfNode, nodeSize, nodeSize);
-        }
-      }
-    }
-  }
-
   isBallInDangerWarning(ball, warningThresholdY, alpha) {
     return !ball.isDropping && this.interpolate(ball.prevY, ball.y, alpha) + ball.radius >= warningThresholdY;
   }
@@ -1642,42 +1561,6 @@ export class Renderer {
       }
     }
     ctx.restore();
-  }
-
-  drawWalls(ctx, width, height, theme) {
-    const margin = this.gameConfig.canvas.wallMargin;
-    ctx.strokeStyle = theme.wallGlowColor;
-    ctx.lineWidth = theme.wallGlowLineWidth;
-    ctx.strokeRect(margin * MATH_CONSTANTS.HALF, margin * MATH_CONSTANTS.HALF, width - margin, height - margin);
-
-    ctx.strokeStyle = theme.wallColor;
-    ctx.lineWidth = theme.wallLineWidth;
-    ctx.strokeRect(margin * MATH_CONSTANTS.HALF, margin * MATH_CONSTANTS.HALF, width - margin, height - margin);
-
-    if (theme.wallCornerColor && theme.wallCornerLength) {
-      const inset = margin * MATH_CONSTANTS.HALF;
-      const left = inset;
-      const top = inset;
-      const right = width - inset;
-      const bottom = height - inset;
-      const len = theme.wallCornerLength;
-      ctx.strokeStyle = theme.wallCornerColor;
-      ctx.lineWidth = theme.wallCornerLineWidth || theme.wallLineWidth;
-      ctx.beginPath();
-      ctx.moveTo(left, top + len);
-      ctx.lineTo(left, top);
-      ctx.lineTo(left + len, top);
-      ctx.moveTo(right - len, top);
-      ctx.lineTo(right, top);
-      ctx.lineTo(right, top + len);
-      ctx.moveTo(left, bottom - len);
-      ctx.lineTo(left, bottom);
-      ctx.lineTo(left + len, bottom);
-      ctx.moveTo(right - len, bottom);
-      ctx.lineTo(right, bottom);
-      ctx.lineTo(right, bottom - len);
-      ctx.stroke();
-    }
   }
 
   drawMagneticBonds(ctx, physicsWorld, theme, now, alpha = 1.0) {
@@ -2457,5 +2340,6 @@ export class Renderer {
   }
 }
 
+installMethods(Renderer, rendererArenaMethods);
 installMethods(Renderer, rendererMagnetarChargesMethods);
 installMethods(Renderer, rendererParticlesMethods);
