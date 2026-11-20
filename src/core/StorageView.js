@@ -111,6 +111,7 @@ export const VERSUS_STORAGE_POLICY = Object.freeze({
   getUnlockedLaserTrails: P.FORWARD,
   isLaserTrailUnlocked: P.FORWARD,
   getActiveLaserTrail: P.FORWARD,
+  getPbTimeline: P.FORWARD,
   getRunSnapshotVersion: P.FORWARD,
   computeDailyStreakBonus: P.FORWARD,
 
@@ -141,6 +142,7 @@ export const VERSUS_STORAGE_POLICY = Object.freeze({
   purchaseLaserTrail: P.FALSE,
   hasClaimedDailyPuzzle: P.FALSE,
   claimDailyPuzzleBonus: P.FALSE,
+  setPbTimeline: P.NOOP,
 
   // Daily.
   hasPlayedDailyToday: P.FALSE,

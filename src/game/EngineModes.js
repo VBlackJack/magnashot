@@ -182,6 +182,7 @@ export const engineModeMethods = {
     // A run stream of its own (launcher draws) so the stage boards can be scoped: a stage
     // board never depends on the shots played before it.
     this.launchClassicBoard(stage, new SeededRandom(`${this.gameConfig.classic.seedPrefix}:run:${drawRunSeed()}`));
+    attachPersonalBestGhostIfEnabled(this);
   },
 
   /**
@@ -308,15 +309,30 @@ export const engineModeMethods = {
    * Starts a deterministic One-Shot / Puzzle challenge stage from configs/game.json.
    * @param {number} [stageIndex=1] - 1-based puzzle stage index.
    */
-  startPuzzleMode(stageIndex = 1) {
+  startPuzzleMode(stageIndex = 1, options = null) {
     const puzzles = this.gameConfig.puzzles || [];
-    if (puzzles.length === 0) {
+    const customSpec = options?.customSpec || null;
+    if (!customSpec && puzzles.length === 0) {
       this.startCampaignLevel(1);
       return;
     }
     const cleanStage = Math.max(1, Math.floor(Number(stageIndex) || 1));
-    const boundedStage = ((cleanStage - 1) % puzzles.length) + 1;
-    const puzzleDef = puzzles[boundedStage - 1];
+    const boundedStage = customSpec ? 1 : ((cleanStage - 1) % puzzles.length) + 1;
+    const puzzleDef = customSpec
+      ? {
+          objective: OBJECTIVE_TYPES.CLEAR_ALL,
+          shots: customSpec.shots,
+          specialInventory: {},
+          obstacles: [],
+          balls: customSpec.balls.map((b, idx) => ({
+            x: b.x,
+            y: b.y,
+            colorId: b.c,
+            isAnchor: idx === 0 || b.y <= 140
+          })),
+          queue: customSpec.queue.map((colorId) => ({ colorId }))
+        }
+      : puzzles[boundedStage - 1];
 
     this.resetRunState(GAME_MODES.PUZZLE);
     this.currentPuzzleStage = boundedStage;
@@ -459,6 +475,7 @@ export const engineModeMethods = {
     this.updateAim(canvasCfg.launcherX, canvasCfg.launcherY + canvasCfg.initialAimOffsetY);
     this.refreshDiscovery();
     this.levelIntro = maybeBuildArcadeModeIntro(this, GAME_MODES.BLITZ);
+    attachPersonalBestGhostIfEnabled(this);
     this.notifyUI();
   },
 

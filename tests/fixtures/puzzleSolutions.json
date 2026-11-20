@@ -11,7 +11,12 @@
     "14": { "special": "rocket", "flip": false, "from": 41.1, "to": 69.3 },
     "15": { "special": null, "flip": false, "from": 54.8, "to": 67.1 },
     "17": { "special": "brush", "flip": false, "from": 85.0, "to": 95.0 },
-    "18": { "special": "bomb", "flip": true, "from": 41.2, "to": 43.5 }
+    "18": { "special": "bomb", "flip": true, "from": 41.2, "to": 43.5 },
+    "21": { "special": null, "flip": false, "from": 20.0, "to": 28.0 },
+    "22": { "special": null, "flip": false, "from": 58.0, "to": 68.0 },
+    "23": { "special": "rocket", "flip": false, "from": 64.0, "to": 70.0 },
+    "24": { "special": "lightning", "flip": false, "from": 39.5, "to": 43.0 },
+    "25": { "special": null, "flip": false, "from": 114.0, "to": 123.0 }
   },
   "twoShot": {
     "4": {

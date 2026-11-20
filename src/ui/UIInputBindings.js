@@ -18,6 +18,7 @@ import { GAME_MODES, GAME_STATES, INPUT_MODES, SPECIAL_TYPES_ORDER } from '../co
 import { i18n, t } from '../core/I18n.js';
 import { SeededRandom } from '../core/SeededRandom.js';
 import { resolveDailyPuzzleStage } from './PlayHubView.js';
+import { bindPuzzleBuilderModal } from './PuzzleBuilderView.js';
 import { SHOP_TABS } from './WorkshopView.js';
 import { fluxPerkIndexForKey } from './FluxPerkView.js';
 import {
@@ -413,6 +414,7 @@ function bindPlayHubToolbar(ui) {
       () => t('modals.play.dailyPuzzle.title')
     );
   });
+  bindPuzzleBuilderModal(ui);
 }
 
 function bindLauncherAndHintControls(ui) {

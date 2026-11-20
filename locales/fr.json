@@ -421,7 +421,12 @@
         "stage17": "Peignez l'ancre liée en cramoisi avec le Pinceau pour déclencher la réaction.",
         "stage18": "Contournez la Singularité avec la Bombe en polarité inversée.",
         "stage19": "Passez par le relais portail à droite, puis éliminez la grappe à gauche.",
-        "stage20": "Déverrouillez le bouclier du rotor à droite, puis décrochez le noyau central."
+        "stage20": "Déverrouillez le bouclier du rotor à droite, puis décrochez le noyau central.",
+        "stage21": "Passez par le portail droit pour faire éclater les ancres émeraude derrière la barrière.",
+        "stage22": "Laissez la singularité courber votre tir cobalt autour de la barrière pour libérer le noyau.",
+        "stage23": "Glissez la fusée dans l'ouverture pour percer l'armure et déclencher la bombe dormante.",
+        "stage24": "Équipez l'Éclair et frappez les ancres liées pour faire chuter les deux grappes d'un coup.",
+        "stage25": "Rebondissez hors du champ anti-aimant pour briser les ancres violettes et libérer le noyau."
       },
       "arcadeModes": {
         "classic": "Puriste : tirs limités par étape, sans boutique ni Atelier. Videz le plateau pour recharger.",
@@ -914,7 +919,7 @@
       },
       "arcade": {
         "puzzle": "Puzzle",
-        "puzzleDesc": "20 défis d'adresse • 1 ou 2 tirs",
+        "puzzleDesc": "25 défis d'adresse • 1 ou 2 tirs",
         "puzzleRecord": "Puzzle {{stage}}/{{total}} • Étoiles : {{stars}}/{{maxStars}}",
         "puzzleStage": "Puzzle {{stage}}",
         "puzzleStageLocked": "Terminez le Puzzle {{previous}} pour débloquer.",
@@ -1830,7 +1835,7 @@
       },
       "vibration": "Vibration (téléphone et manette)",
       "leftHanded": "Tiroir mobile gaucher",
-      "pbGhost": "Affronter mon fantôme record (Défi du jour & Hebdo)",
+      "pbGhost": "Affronter mon fantôme record (Défi, Hebdo, Puriste, Blitz)",
       "musicPreviewOffHint": "Activez le son et la musique pour écouter l'aperçu Pulse."
     },
     "fluxPerk": {
@@ -2015,6 +2020,26 @@
         "merge": "🫧",
         "slingshot": "🏹",
         "versus": "⚔"
+      }
+    },
+    "puzzleBuilder": {
+      "openButton": "Créer un puzzle",
+      "title": "Éditeur de puzzle",
+      "subtitle": "Touchez les cases pour placer ou retirer des sphères, réglez la file de tir, puis jouez ou copiez le lien.",
+      "paletteAria": "Palette de couleurs des sphères",
+      "queueAria": "File de tir du lanceur",
+      "shotsLabel": "Tirs :",
+      "playButton": "Jouer ce puzzle",
+      "copyButton": "Copier le lien",
+      "copied": "Lien du puzzle copié dans le presse-papiers.",
+      "emptyError": "Placez au moins une sphère sur le plateau.",
+      "colors": {
+        "crimson": "Carmin",
+        "cobalt": "Cobalt",
+        "emerald": "Émeraude",
+        "amber": "Ambre",
+        "violet": "Violet",
+        "cyan": "Cyan"
       }
     }
   },

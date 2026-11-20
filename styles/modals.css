@@ -729,6 +729,105 @@
   background: var(--accent-emerald);
 }
 
+.play-hub-head-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.puzzle-builder-palette,
+.puzzle-builder-queue {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  justify-content: center;
+  margin: 6px 0;
+}
+
+.puzzle-builder-swatch,
+.puzzle-builder-queue-pill,
+.puzzle-builder-cell {
+  font-family: inherit;
+  font-size: 0.76rem;
+  font-weight: 700;
+  padding: 6px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--border-subtle);
+  background: var(--surface-sunken);
+  color: var(--text-main);
+  cursor: pointer;
+}
+
+.puzzle-builder-swatch[aria-pressed='true'] {
+  border-color: var(--accent-blue);
+  background: var(--accent-blue-alpha-22);
+}
+
+.puzzle-builder-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 6px;
+  margin: 8px 0;
+}
+
+.puzzle-builder-cell {
+  min-height: 36px;
+  padding: 0;
+}
+
+.puzzle-builder-cell[data-ball-color='crimson'],
+.puzzle-builder-queue-pill[data-ball-color='crimson'] {
+  border-color: var(--accent-danger);
+  color: var(--accent-danger-text);
+}
+
+.puzzle-builder-cell[data-ball-color='cobalt'],
+.puzzle-builder-queue-pill[data-ball-color='cobalt'] {
+  border-color: var(--accent-blue);
+  color: var(--accent-blue);
+}
+
+.puzzle-builder-cell[data-ball-color='emerald'],
+.puzzle-builder-queue-pill[data-ball-color='emerald'] {
+  border-color: var(--accent-emerald);
+  color: var(--accent-emerald);
+}
+
+.puzzle-builder-cell[data-ball-color='amber'],
+.puzzle-builder-queue-pill[data-ball-color='amber'] {
+  border-color: var(--accent-amber);
+  color: var(--text-gold);
+}
+
+.puzzle-builder-cell[data-ball-color='violet'],
+.puzzle-builder-queue-pill[data-ball-color='violet'] {
+  border-color: var(--accent-purple);
+  color: var(--text-purple-soft);
+}
+
+.puzzle-builder-cell[data-ball-color='cyan'],
+.puzzle-builder-queue-pill[data-ball-color='cyan'] {
+  border-color: var(--text-info-soft);
+  color: var(--text-info-bright);
+}
+
+.puzzle-builder-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.puzzle-builder-shots-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+}
+
 .play-hub-subhead {
   grid-column: 1 / -1;
   margin: 4px 0 0;

@@ -242,7 +242,10 @@
         <section class="play-hub-section play-hub-arcade" aria-labelledby="play-section-arcade-title">
           <div class="play-hub-arcade-head">
             <h3 id="play-section-arcade-title" class="play-section-title" data-i18n="modals.play.section.arcade"></h3>
-            <button id="btn-play-next-unmastered" type="button" class="nav-btn badge-btn play-hub-smart-btn hidden"></button>
+            <div class="play-hub-head-actions">
+              <button id="btn-puzzle-builder" type="button" class="nav-btn badge-btn play-hub-smart-btn" aria-haspopup="dialog" data-i18n="modals.puzzleBuilder.openButton"></button>
+              <button id="btn-play-next-unmastered" type="button" class="nav-btn badge-btn play-hub-smart-btn hidden"></button>
+            </div>
           </div>
           <div id="play-hub-filters" class="play-hub-filters" role="group" data-i18n-aria-label="modals.play.filters.aria">
             <button type="button" class="play-hub-filter-chip" data-arcade-filter="all" aria-pressed="true" data-i18n="modals.play.filters.all"></button>
@@ -903,6 +906,44 @@
         <button id="btn-versus-share" type="button" class="modal-btn" data-i18n="modals.gameOver.button.share"></button>
         <button id="btn-versus-change-players" type="button" class="modal-btn hidden" data-i18n="versus.local.result.changePlayers"></button>
         <button id="btn-versus-back" type="button" class="modal-btn" data-i18n="versus.result.backToMenu"></button>
+      </div>
+    </div>
+  </div>
+
+  <div id="modal-puzzle-builder" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="modal-puzzle-builder-title">
+    <div class="modal-card puzzle-builder-modal">
+      <div class="play-hub-header">
+        <h2 id="modal-puzzle-builder-title" class="modal-title" data-i18n="modals.puzzleBuilder.title"></h2>
+        <button id="btn-close-puzzle-builder" type="button" class="modal-btn" data-i18n="modals.levelSelect.button.close"></button>
+      </div>
+      <p class="modal-subtext" data-i18n="modals.puzzleBuilder.subtitle"></p>
+      <div id="puzzle-builder-palette" class="puzzle-builder-palette" role="group" data-i18n-aria-label="modals.puzzleBuilder.paletteAria">
+        <button type="button" class="puzzle-builder-swatch" data-builder-color="crimson" aria-pressed="true" data-i18n="modals.puzzleBuilder.colors.crimson"></button>
+        <button type="button" class="puzzle-builder-swatch" data-builder-color="cobalt" aria-pressed="false" data-i18n="modals.puzzleBuilder.colors.cobalt"></button>
+        <button type="button" class="puzzle-builder-swatch" data-builder-color="emerald" aria-pressed="false" data-i18n="modals.puzzleBuilder.colors.emerald"></button>
+        <button type="button" class="puzzle-builder-swatch" data-builder-color="amber" aria-pressed="false" data-i18n="modals.puzzleBuilder.colors.amber"></button>
+        <button type="button" class="puzzle-builder-swatch" data-builder-color="violet" aria-pressed="false" data-i18n="modals.puzzleBuilder.colors.violet"></button>
+        <button type="button" class="puzzle-builder-swatch" data-builder-color="cyan" aria-pressed="false" data-i18n="modals.puzzleBuilder.colors.cyan"></button>
+      </div>
+      <div id="puzzle-builder-grid" class="puzzle-builder-grid"></div>
+      <div class="puzzle-builder-controls">
+        <label class="puzzle-builder-shots-label">
+          <span data-i18n="modals.puzzleBuilder.shotsLabel"></span>
+          <select id="puzzle-builder-shots">
+            <option value="1">1</option>
+            <option value="2" selected>2</option>
+            <option value="3">3</option>
+            <option value="4">4</option>
+            <option value="5">5</option>
+            <option value="6">6</option>
+          </select>
+        </label>
+        <div id="puzzle-builder-queue" class="puzzle-builder-queue" role="group" data-i18n-aria-label="modals.puzzleBuilder.queueAria"></div>
+      </div>
+      <p id="puzzle-builder-status" class="modal-subtext" role="status" aria-live="polite"></p>
+      <div class="modal-actions">
+        <button id="btn-puzzle-builder-play" type="button" class="modal-btn primary" data-i18n="modals.puzzleBuilder.playButton"></button>
+        <button id="btn-puzzle-builder-copy" type="button" class="modal-btn" data-i18n="modals.puzzleBuilder.copyButton"></button>
       </div>
     </div>
   </div>

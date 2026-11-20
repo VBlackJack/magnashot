@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-const APP_VERSION = '1.33.0';
+const APP_VERSION = '1.34.0';
 const CACHE_NAME = `magnashot-cache-v${APP_VERSION}`;
 
 // The service worker cannot read configs/*.json before it has a cache, so its
@@ -66,6 +66,7 @@ const PRECACHE_ASSETS = [
   './src/core/installMethods.js',
   './src/core/SeededRandom.js',
   './src/core/StorageManager.js',
+  './src/core/StorageCosmetics.js',
   './src/core/StorageMigrations.js',
   './src/core/WorldGeometry.js',
   './src/entities/Ball.js',
@@ -126,6 +127,7 @@ const PRECACHE_ASSETS = [
   './src/ui/FluxPerkView.js',
   './src/ui/UIGamepad.js',
   './src/ui/PlayHubView.js',
+  './src/ui/PuzzleBuilderView.js',
   './src/ui/PulseDriver.js',
   './src/ui/UICalibration.js',
   './src/ui/RhythmCalibration.js',
