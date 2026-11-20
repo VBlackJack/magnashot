@@ -44,8 +44,114 @@ const isShieldedBossCore = (ball) =>
  *   cleared first; the renderer reuses its own between frames.
  * @returns {{highlight: object[], destroyedIds: Set<number>, isMatch: boolean}}
  */
+function predictRadiusSpecial(specType, specCfg, ctx, out) {
+  const radiusFactor = specType === SPECIAL_TYPES.BOMB ? specCfg.blastRadiusFactor : specCfg.freezeRadiusFactor;
+  const aoeRadius = ctx.currentBall.radius * radiusFactor * ctx.blastMult;
+  for (const b of ctx.physicsWorld.balls) {
+    if (Math.hypot(b.x - ctx.endX, b.y - ctx.endY) <= aoeRadius) {
+      out.highlight.push(b);
+      if (specType === SPECIAL_TYPES.BOMB && !isShieldedBossCore(b)) {
+        out.destroyedIds.add(b.id);
+      }
+    }
+  }
+}
+
+function predictLightningSpecial(specCfg, ctx, out) {
+  const bandHalf = ctx.currentBall.radius * specCfg.bandHalfHeightFactor * ctx.blastMult;
+  for (const b of ctx.physicsWorld.balls) {
+    if (Math.abs(b.y - ctx.endY) <= bandHalf) {
+      out.highlight.push(b);
+      if (!isShieldedBossCore(b)) {
+        out.destroyedIds.add(b.id);
+      }
+    }
+  }
+}
+
+function predictRainbowSpecial(specCfg, ctx, out) {
+  const neighborRadius = ctx.currentBall.radius * specCfg.neighborRadiusFactor;
+  const seen = new Set();
+  for (const other of ctx.physicsWorld.balls) {
+    if (seen.has(other.id) || !other.colorId || Math.hypot(other.x - ctx.endX, other.y - ctx.endY) > neighborRadius) {
+      continue;
+    }
+    for (const member of ctx.physicsWorld.findColorCluster(other)) {
+      if (!seen.has(member.id)) {
+        seen.add(member.id);
+        out.highlight.push(member);
+        if (member.armorHits <= 1 && !isShieldedBossCore(member)) {
+          out.destroyedIds.add(member.id);
+        }
+      }
+    }
+  }
+}
+
+function predictAnvilSpecial(specCfg, ctx, out) {
+  const pierceRadius = ctx.currentBall.radius * specCfg.pierceRadiusFactor;
+  const pierceRadiusSq = pierceRadius * pierceRadius;
+  for (const b of ctx.physicsWorld.balls) {
+    const hit = ctx.points.some((pt) => (b.x - pt.x) ** 2 + (b.y - pt.y) ** 2 <= pierceRadiusSq);
+    if (hit) {
+      out.highlight.push(b);
+      if (!isShieldedBossCore(b)) {
+        out.destroyedIds.add(b.id);
+      }
+    }
+  }
+}
+
+function predictRocketSpecial(specCfg, ctx, out) {
+  const targets = pickRocketTargets({ x: ctx.endX, y: ctx.endY }, ctx.physicsWorld.balls, specCfg.rocketCount);
+  for (const target of targets) {
+    out.highlight.push(target);
+    if (!isShieldedBossCore(target)) {
+      out.destroyedIds.add(target.id);
+    }
+  }
+}
+
+function predictBrushSpecial(specCfg, ctx, out) {
+  const aoeRadius = ctx.currentBall.radius * specCfg.paintRadiusFactor * ctx.blastMult;
+  for (const b of ctx.physicsWorld.balls) {
+    if ((b.colorId || b.clusterModifier === CLUSTER_MODIFIERS.RUST) && Math.hypot(b.x - ctx.endX, b.y - ctx.endY) <= aoeRadius) {
+      out.highlight.push(b);
+    }
+  }
+}
+
+const SPECIAL_IMPACT_PREDICTORS = Object.freeze({
+  [SPECIAL_TYPES.BOMB]: (specCfg, ctx, out) => predictRadiusSpecial(SPECIAL_TYPES.BOMB, specCfg, ctx, out),
+  [SPECIAL_TYPES.FREEZE]: (specCfg, ctx, out) => predictRadiusSpecial(SPECIAL_TYPES.FREEZE, specCfg, ctx, out),
+  [SPECIAL_TYPES.LIGHTNING]: predictLightningSpecial,
+  [SPECIAL_TYPES.RAINBOW]: predictRainbowSpecial,
+  [SPECIAL_TYPES.ANVIL]: predictAnvilSpecial,
+  [SPECIAL_TYPES.ROCKET]: predictRocketSpecial,
+  [SPECIAL_TYPES.BRUSH]: predictBrushSpecial
+});
+
+function predictRegularSnapImpact(ctx, out) {
+  const target = ctx.points.snapTarget;
+  const isMatchingColor = Boolean(ctx.currentBall.colorId && ctx.currentBall.colorId === target.colorId);
+  if (isMatchingColor) {
+    out.highlight.push(...ctx.physicsWorld.findColorCluster(target));
+  } else {
+    out.highlight.push(target);
+  }
+  const isMatch = Boolean(isMatchingColor && out.highlight.length + 1 >= ctx.matchMinCount);
+  if (isMatch) {
+    for (const member of out.highlight) {
+      if (member.armorHits <= 1 && !isShieldedBossCore(member)) {
+        out.destroyedIds.add(member.id);
+      }
+    }
+  }
+  return isMatch;
+}
+
 export function predictImpact(
-  { points, currentBall, physicsWorld, endX, endY, blastMult, specialTypes, matchMinCount },
+  ctx,
   out = { highlight: [], destroyedIds: new Set() }
 ) {
   const { highlight, destroyedIds } = out;
@@ -53,100 +159,12 @@ export function predictImpact(
   destroyedIds.clear();
   let isMatch = false;
 
-  if (currentBall.specialType) {
-    const specType = currentBall.specialType;
-    const specCfg = specialTypes[specType];
-    if (specType === SPECIAL_TYPES.BOMB || specType === SPECIAL_TYPES.FREEZE) {
-      const radiusFactor = specType === SPECIAL_TYPES.BOMB
-        ? specCfg.blastRadiusFactor
-        : specCfg.freezeRadiusFactor;
-      const aoeRadius = currentBall.radius * radiusFactor * blastMult;
-      for (const b of physicsWorld.balls) {
-        if (Math.hypot(b.x - endX, b.y - endY) <= aoeRadius) {
-          highlight.push(b);
-          if (specType === SPECIAL_TYPES.BOMB && !isShieldedBossCore(b)) {
-            destroyedIds.add(b.id);
-          }
-        }
-      }
-    } else if (specType === SPECIAL_TYPES.LIGHTNING) {
-      const bandHalf = currentBall.radius * specCfg.bandHalfHeightFactor * blastMult;
-      for (const b of physicsWorld.balls) {
-        if (Math.abs(b.y - endY) <= bandHalf) {
-          highlight.push(b);
-          if (!isShieldedBossCore(b)) {
-            destroyedIds.add(b.id);
-          }
-        }
-      }
-    } else if (specType === SPECIAL_TYPES.RAINBOW) {
-      const neighborRadius = currentBall.radius * specCfg.neighborRadiusFactor;
-      const seen = new Set();
-      for (const other of physicsWorld.balls) {
-        if (seen.has(other.id) || !other.colorId || Math.hypot(other.x - endX, other.y - endY) > neighborRadius) {
-          continue;
-        }
-        for (const member of physicsWorld.findColorCluster(other)) {
-          if (!seen.has(member.id)) {
-            seen.add(member.id);
-            highlight.push(member);
-            if (member.armorHits <= 1 && !isShieldedBossCore(member)) {
-              destroyedIds.add(member.id);
-            }
-          }
-        }
-      }
-    } else if (specType === SPECIAL_TYPES.ANVIL) {
-      const pierceRadius = currentBall.radius * specCfg.pierceRadiusFactor;
-      const pierceRadiusSq = pierceRadius * pierceRadius;
-      for (const b of physicsWorld.balls) {
-        for (const pt of points) {
-          const dx = b.x - pt.x;
-          const dy = b.y - pt.y;
-          if (dx * dx + dy * dy <= pierceRadiusSq) {
-            highlight.push(b);
-            if (!isShieldedBossCore(b)) {
-              destroyedIds.add(b.id);
-            }
-            break;
-          }
-        }
-      }
-    } else if (specType === SPECIAL_TYPES.ROCKET) {
-      const targets = pickRocketTargets({ x: endX, y: endY }, physicsWorld.balls, specCfg.rocketCount);
-      for (const target of targets) {
-        highlight.push(target);
-        if (!isShieldedBossCore(target)) {
-          destroyedIds.add(target.id);
-        }
-      }
-    } else if (specType === SPECIAL_TYPES.BRUSH) {
-      const aoeRadius = currentBall.radius * specCfg.paintRadiusFactor * blastMult;
-      for (const b of physicsWorld.balls) {
-        if ((b.colorId || b.clusterModifier === CLUSTER_MODIFIERS.RUST) && Math.hypot(b.x - endX, b.y - endY) <= aoeRadius) {
-          highlight.push(b);
-        }
-      }
-    }
+  if (ctx.currentBall.specialType) {
+    const specType = ctx.currentBall.specialType;
+    SPECIAL_IMPACT_PREDICTORS[specType]?.(ctx.specialTypes[specType], ctx, out);
     isMatch = true;
-  } else if (points.snapTarget) {
-    const target = points.snapTarget;
-    const isMatchingColor = currentBall.colorId && currentBall.colorId === target.colorId;
-    if (isMatchingColor) {
-      for (const member of physicsWorld.findColorCluster(target)) {
-        highlight.push(member);
-      }
-    } else {
-      highlight.push(target);
-    }
-    isMatch = Boolean(isMatchingColor && highlight.length + 1 >= matchMinCount);
-    if (isMatch) {
-      for (const member of highlight) {
-        if (member.armorHits <= 1 && !isShieldedBossCore(member)) {
-          destroyedIds.add(member.id);
-        }
-      }
-    }
+  } else if (ctx.points.snapTarget) {
+    isMatch = predictRegularSnapImpact(ctx, out);
   }
 
   return { highlight, destroyedIds, isMatch };
