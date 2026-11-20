@@ -446,6 +446,10 @@ export const engineModeMethods = {
     this.isCustomPuzzle = Boolean(customSpec);
     this.customPuzzleSpec = customSpec ? structuredClone(customSpec) : null;
     this.currentPuzzleStage = boundedStage;
+    const ghostKey = customSpec
+      ? `custom:${customSpec.balls?.length || 0}:${customSpec.shots || 0}`
+      : `stage:${boundedStage}`;
+    this.puzzleGhostAngle = this.lastPuzzleShot?.key === ghostKey ? this.lastPuzzleShot.angle : null;
     this.currentObjective = puzzleDef.objective || OBJECTIVE_TYPES.CLEAR_ALL;
     this.shotsRemaining = puzzleDef.shots;
     this.specialInventory = { ...puzzleDef.specialInventory };

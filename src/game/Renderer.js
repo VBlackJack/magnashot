@@ -277,6 +277,27 @@ function shouldRenderAimTrajectory(renderer, chrome, engineState) {
   );
 }
 
+function drawPuzzleGhostAngle(ctx, engineState, theme, canvasCfg) {
+  if (engineState.mode !== GAME_MODES.PUZZLE || !Number.isFinite(engineState.puzzleGhostAngle)) {
+    return;
+  }
+  const ghostCfg = canvasCfg?.puzzleGhostLine || { lengthPx: 175, alpha: 0.34, dash: [5, 7], lineWidth: 1.8 };
+  const spec = typeof engineState.getLauncherSpec === 'function' ? engineState.getLauncherSpec() : null;
+  const lx = spec ? spec.x : canvasCfg.launcherX;
+  const ly = spec ? spec.y : canvasCfg.launcherY;
+  const angle = engineState.puzzleGhostAngle;
+  ctx.save();
+  ctx.globalAlpha = ghostCfg.alpha;
+  ctx.strokeStyle = theme.launcherAccentColor || '#94a3b8';
+  ctx.lineWidth = ghostCfg.lineWidth;
+  ctx.setLineDash(ghostCfg.dash);
+  ctx.beginPath();
+  ctx.moveTo(lx, ly);
+  ctx.lineTo(lx + Math.cos(angle) * ghostCfg.lengthPx, ly + Math.sin(angle) * ghostCfg.lengthPx);
+  ctx.stroke();
+  ctx.restore();
+}
+
 function renderForegroundAction(renderer, ctx, engineState, theme, behavior, chrome, now, alpha) {
   for (const ball of engineState.physicsWorld.droppingBalls) {
     renderer.drawBall(ctx, ball, now, alpha);
@@ -286,6 +307,7 @@ function renderForegroundAction(renderer, ctx, engineState, theme, behavior, chr
     renderer.drawShatteringBalls(ctx, engineState.particleSystem, now, alpha);
   }
   if (shouldRenderAimTrajectory(renderer, chrome, engineState)) {
+    drawPuzzleGhostAngle(ctx, engineState, theme, renderer.gameConfig.canvas);
     renderer.drawAimTrajectory(
       ctx,
       engineState.aimPoints,

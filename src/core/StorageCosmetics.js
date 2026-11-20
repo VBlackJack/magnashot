@@ -245,5 +245,45 @@ export const storageCosmeticsMethods = {
     const coinsTotal = completed.reduce((sum, item) => sum + (item.coins || 0), 0) + chestAwarded;
     if (coinsTotal > 0) this.addCoins(coinsTotal);
     return { completed, chestAwarded };
+  },
+
+  getSavedPuzzles() {
+    const key = this.storageConfig?.keys?.savedPuzzles;
+    if (!key) return [];
+    const raw = this.safeGetItem(key);
+    if (!raw) return [];
+    try {
+      const parsed = JSON.parse(raw);
+      return Array.isArray(parsed) ? parsed.filter((e) => e && typeof e.code === 'string' && e.code.length > 0) : [];
+    } catch {
+      return [];
+    }
+  },
+
+  saveCustomPuzzle(entry) {
+    const key = this.storageConfig?.keys?.savedPuzzles;
+    if (!key || !entry || typeof entry.code !== 'string' || entry.code.length === 0) {
+      return false;
+    }
+    const maxSaved = configRegistry.get('game')?.puzzleBuilder?.maxSavedPuzzles || 10;
+    const list = this.getSavedPuzzles().filter((item) => item.code !== entry.code);
+    list.unshift({
+      code: entry.code,
+      balls: Math.max(1, Math.floor(Number(entry.balls) || 1)),
+      shots: Math.max(1, Math.floor(Number(entry.shots) || 1)),
+      verified: Boolean(entry.verified)
+    });
+    this.safeSetItem(key, JSON.stringify(list.slice(0, maxSaved)));
+    return true;
+  },
+
+  deleteSavedPuzzle(code) {
+    const key = this.storageConfig?.keys?.savedPuzzles;
+    if (!key || typeof code !== 'string') return false;
+    const current = this.getSavedPuzzles();
+    const next = current.filter((item) => item.code !== code);
+    if (next.length === current.length) return false;
+    this.safeSetItem(key, JSON.stringify(next));
+    return true;
   }
 };

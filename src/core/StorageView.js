@@ -114,6 +114,9 @@ export const VERSUS_STORAGE_POLICY = Object.freeze({
   getPbTimeline: P.FORWARD,
   getUnlockedCosmeticCount: P.FORWARD,
   getDailyPuzzlesCleared: P.FORWARD,
+  getSavedPuzzles: P.EMPTY_ARRAY,
+  saveCustomPuzzle: P.FALSE,
+  deleteSavedPuzzle: P.FALSE,
   getRunSnapshotVersion: P.FORWARD,
   computeDailyStreakBonus: P.FORWARD,
 

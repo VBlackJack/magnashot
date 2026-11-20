@@ -20,6 +20,7 @@ import {
   PUZZLE_OBSTACLE_KINDS,
   buildCustomPuzzleUrl,
   decodeCustomPuzzle,
+  encodeCustomPuzzle,
   extractPuzzlePayload
 } from '../game/PuzzleShareCodec.js';
 
@@ -289,13 +290,54 @@ function collectBuilderElements() {
     openBtn: byId('btn-puzzle-builder'),
     closeBtn: byId('btn-close-puzzle-builder'),
     playBtn: byId('btn-puzzle-builder-play'),
-    copyBtn: byId('btn-puzzle-builder-copy')
+    saveBtn: byId('btn-puzzle-builder-save'),
+    copyBtn: byId('btn-puzzle-builder-copy'),
+    libraryEl: byId('puzzle-builder-library')
   };
 }
 
-function syncBuilderControls(els, state, cfg, render) {
+function renderSavedPuzzleLibrary(ui, els, state, cfg, render) {
+  const libEl = els.libraryEl;
+  if (!libEl) return;
+  const saved = ui.storageManager?.getSavedPuzzles?.() || [];
+  libEl.replaceChildren();
+  libEl.classList.toggle('hidden', saved.length === 0);
+  saved.forEach((entry, idx) => {
+    const slot = document.createElement('span');
+    slot.className = 'puzzle-builder-slot';
+    const loadBtn = document.createElement('button');
+    loadBtn.type = 'button';
+    loadBtn.className = 'puzzle-builder-slot-load';
+    loadBtn.textContent = t('modals.puzzleBuilder.librarySlot', {
+      index: idx + 1,
+      balls: entry.balls,
+      verified: entry.verified ? ' ✓' : ''
+    });
+    loadBtn.addEventListener('click', () => {
+      const decoded = decodeCustomPuzzle(entry.code);
+      if (!decoded) return;
+      applySpecToBuilderState(state, decoded, cfg);
+      if (els.statusEl) els.statusEl.textContent = t('modals.puzzleBuilder.imported');
+      render();
+    });
+    const delBtn = document.createElement('button');
+    delBtn.type = 'button';
+    delBtn.className = 'puzzle-builder-slot-del';
+    delBtn.textContent = '×';
+    delBtn.setAttribute('aria-label', t('modals.puzzleBuilder.deleteSlotAria', { index: idx + 1 }));
+    delBtn.addEventListener('click', () => {
+      ui.storageManager?.deleteSavedPuzzle?.(entry.code);
+      render();
+    });
+    slot.append(loadBtn, delBtn);
+    libEl.appendChild(slot);
+  });
+}
+
+function syncBuilderControls(ui, els, state, cfg, render) {
   renderGridCells(els.gridEl, state, cfg, render);
   renderQueuePills(els.queueEl, state, cfg, render);
+  renderSavedPuzzleLibrary(ui, els, state, cfg, render);
   if (els.shotsSelect) els.shotsSelect.value = String(state.shots);
   if (els.obstacleSelect) els.obstacleSelect.value = state.obstaclePreset;
   if (els.countEl) {
@@ -359,6 +401,21 @@ function bindBuilderActionListeners(ui, els, state, cfg, render) {
     ui.hideAllModals();
     ui.engine.startPuzzleMode(1, { customSpec: spec });
   });
+  els.saveBtn?.addEventListener('click', () => {
+    const spec = buildSpecFromBuilderState(state, cfg);
+    if (spec.balls.length === 0) {
+      if (els.statusEl) els.statusEl.textContent = t('modals.puzzleBuilder.emptyError');
+      return;
+    }
+    const code = encodeCustomPuzzle(spec);
+    if (!code) {
+      if (els.statusEl) els.statusEl.textContent = t('modals.puzzleBuilder.tooLargeError');
+      return;
+    }
+    ui.storageManager?.saveCustomPuzzle?.({ code, balls: spec.balls.length, shots: spec.shots, verified: Boolean(spec.verified) });
+    if (els.statusEl) els.statusEl.textContent = t('modals.puzzleBuilder.saved');
+    render();
+  });
   els.copyBtn?.addEventListener('click', () => handleCopyShareLink(els, state, cfg));
 }
 
@@ -373,7 +430,7 @@ export function bindPuzzleBuilderModal(ui) {
   }
   const cfg = resolveBuilderConfig(ui);
   const state = createInitialBuilderState(cfg);
-  const render = () => syncBuilderControls(els, state, cfg, render);
+  const render = () => syncBuilderControls(ui, els, state, cfg, render);
   const openBuilder = (spec = null) => {
     if (spec) applySpecToBuilderState(state, spec, cfg);
     render();

@@ -2040,3 +2040,36 @@
   flex-wrap: wrap;
   gap: 6px;
 }
+
+.puzzle-builder-library {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 4px 0 8px;
+}
+
+.puzzle-builder-slot {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 6px;
+  border-radius: 8px;
+  border: 1px solid var(--border-subtle);
+  background: var(--surface-sunken);
+}
+
+.puzzle-builder-slot-load,
+.puzzle-builder-slot-del {
+  background: transparent;
+  border: 0;
+  color: var(--text-secondary);
+  font-size: 0.74rem;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 2px 4px;
+}
+
+.puzzle-builder-slot-load:hover,
+.puzzle-builder-slot-del:hover {
+  color: var(--text-bright);
+}
