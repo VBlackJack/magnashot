@@ -247,6 +247,7 @@ export function isRunSnapshotable(engine) {
   const isRunActive = engine.state === GAME_STATES.PLAYING || engine.state === GAME_STATES.PAUSED;
   return (
     isRunActive &&
+    !engine.isCustomPuzzle &&
     !engine.physicsWorld.projectile &&
     !(engine.stageTransitionFrames > 0) &&
     !engine.pendingBossRushWave &&

@@ -19,6 +19,7 @@ import { t } from '../core/I18n.js';
 import { getUtcIsoWeekKey, getWeeklyFluxSeed } from './WeeklyFlux.js';
 import { buildRunOutcomeDelta } from '../core/PlayerStats.js';
 import { createShotTimeline, appendTimelineSample, markTimelineComplete } from '../core/ShotTimeline.js';
+import { PB_ARCADE_MODES } from './EngineGhostDuel.js';
 
 const OUTCOME_LOSS = 'loss';
 const OUTCOME_QUIT = 'quit';
@@ -179,8 +180,7 @@ export const engineProgressMethods = {
   sampleShotTimeline(isFinal = false) {
     const allowed = this.mode === GAME_MODES.DAILY
       || this.mode === GAME_MODES.FLUX
-      || this.mode === GAME_MODES.CLASSIC
-      || this.mode === GAME_MODES.BLITZ;
+      || PB_ARCADE_MODES.has(this.mode);
     if (this.isVersusRole || !allowed) {
       return;
     }
@@ -191,7 +191,7 @@ export const engineProgressMethods = {
     appendTimelineSample(this.shotTimeline, this.score, this.physicsWorld.balls.length, cfg);
     if (isFinal) {
       this.shotTimeline = markTimelineComplete(this.shotTimeline);
-      if (this.mode === GAME_MODES.CLASSIC || this.mode === GAME_MODES.BLITZ) {
+      if (PB_ARCADE_MODES.has(this.mode)) {
         this.storageManager?.setPbTimeline?.(this.mode, this.score, this.shotTimeline);
       }
     }

@@ -4,6 +4,23 @@ All notable changes to **MagnaShot** are documented in this file.
 
 ## [Unreleased]
 
+### Added
+- **Custom Puzzle Builder v2** (`src/ui/PuzzleBuilderView.js`, `src/game/PuzzleShareCodec.js`, `configs/game.json`): anchor (`⚓`) and Rescue Core (`💎`) placement tools, obstacle presets (`Bumper`, `Repulsor`, linked `Portal pair`), compact v2 share codec supporting full 28-cell boards, URL/code import for remixing, Clear button, live sphere counter, 44px touch targets, colorblind symbols + ARIA labels, full keyboard grid navigation (`Arrow` keys + `1`-`6`), and in-run **Edit puzzle** actions.
+- **Weekly Mastery Trio** (`src/core/BountiesStore.js`, `src/core/StorageCosmetics.js`, `src/game/Bounties.js`, `src/ui/PlayHubView.js`): 3 deterministic scaled weekly objectives across distinct modes with a `+60` coin bonus chest on full completion.
+- **Puzzle Pack 3 (`P26` to `P35`)** (`configs/game.json`, `tests/fixtures/puzzleSolutions.json`, `locales/*.json`): 10 solver-verified trick-shot stages (attractor/repulsor curves, linked portals, bumper ricochet, anvil chute, bomb blast, portal prism, singularity whip, portal rocket finale), expanding Puzzle Mode to 35 stages.
+- **Animated Arena Theme ambient layers & Combo Tier Aura** (`src/game/RendererArena.js`): subtle procedural ambient effects for *Solar Forge*, *Cryo Lab*, and *Synthwave Grid* (disabled under Reduced Motion), plus 5x/10x combo perimeter escalation.
+- **12 new Achievements** (`puzzleStages`, `dailyPuzzles`, `cosmeticCollector`, and `weeklyMasteryChest` bronze/silver/gold tiers) bringing total achievements to 60.
+- **Personal Best Ghost** extended to **Survival** (`endless`) and **Magnetic Slingshot** (`slingshot`) (`src/core/ShotTimeline.js`, `src/game/EngineGhostDuel.js`, `src/game/EngineProgress.js`, `src/game/EngineModes.js`).
+- **Desktop & Flow Ergonomics**: `R` quick-restart shortcut (with confirmation guard) and one-click **Next contract** CTA on Victory and Game Over dialogs (`src/ui/UIInputBindings.js`, `src/ui/UIHudRefresh.js`).
+- Direct unit tests for Custom Puzzle isolation/codec/builder (`tests/puzzleBuilder.test.js`) and Weekly Mastery Trio / PB Ghost (`tests/weeklyMastery.test.js`).
+
+### Changed
+- Split arena static/ambient/combo rendering into `src/game/RendererArena.js` and Merge Basin canvas rendering into `src/game/modes/MergeRenderer.js` (`sw.js`, `eslint.config.js`), and added `src/core/BountiesStore.js` and `src/game/EngineGhostDuel.js` to the ESLint `complexity <= 15` / `max-lines-per-function <= 80` guardrail.
+
+### Fixed
+- Isolated Custom Puzzle runs (`isCustomPuzzle`) from official Puzzle Stage 1 progression, coin/Daily Puzzle rewards, Daily Contracts, and saved-run snapshots, and preserved `customPuzzleSpec` on replay (`src/game/GameEngine.js`, `src/game/EngineModes.js`, `src/game/EngineRoundFlow.js`, `src/game/RunSnapshot.js`, `src/game/Bounties.js`).
+- Routed `#modal-puzzle-builder` through `UIModals` (`Escape` dismiss, backdrop click, focus trap/restore, inert background), distinguished payload-size errors from empty-board errors, and added saved-run confirmation + invalid-link feedback for `?puzzle=` boot links (`src/main.js`, `src/ui/UIModals.js`, `src/ui/UIInputBindings.js`).
+
 ## [1.34.0] - 2026-11-20
 
 ### Added

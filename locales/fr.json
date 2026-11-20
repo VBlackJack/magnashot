@@ -152,6 +152,7 @@
         "fluxBoss": "Flux • Forme {{stage}} : {{shape}} (Boss)",
         "fluxBossMagnetar": "Flux • Forme {{stage}} : {{shape}} (Boss, {{moorings}} amarres)",
         "puzzle": "Puzzle {{stage}} / {{total}}",
+        "customPuzzle": "Puzzle personnalisé",
         "blitz": "Blitz 90s • Vague {{wave}}",
         "bossRush": "Boss Rush • Vague {{wave}} (👑 {{shields}})",
         "bossRushMagnetar": "Boss Rush • Vague {{wave}} ({{moorings}} amarres)",
@@ -426,7 +427,17 @@
         "stage22": "Laissez la singularité courber votre tir cobalt autour de la barrière pour libérer le noyau.",
         "stage23": "Glissez la fusée dans l'ouverture pour percer l'armure et déclencher la bombe dormante.",
         "stage24": "Équipez l'Éclair et frappez les ancres liées pour faire chuter les deux grappes d'un coup.",
-        "stage25": "Rebondissez hors du champ anti-aimant pour briser les ancres violettes et libérer le noyau."
+        "stage25": "Rebondissez hors du champ anti-aimant pour briser les ancres violettes et libérer le noyau.",
+        "stage26": "Laissez l'attracteur courber votre tir cobalt autour de la barrière vers les ancres.",
+        "stage27": "Utilisez la déviation du répulseur pour briser les ancres carmin et faire exploser le baril.",
+        "stage28": "Tirez dans le portail gauche pour frapper les ancres ambre derrière la barrière.",
+        "stage29": "Rebondissez sur le bumper central pour casser les ancres émeraude et libérer le noyau.",
+        "stage30": "Utilisez l'Enclume pour écraser la colonne blindée jusqu'au baril.",
+        "stage31": "Placez la Bombe au centre des ancres liées pour faire tomber tout le groupe.",
+        "stage32": "Courbez autour du répulseur pour briser les ancres violettes et sauver le noyau.",
+        "stage33": "Envoyez le Prisme dans le portail pour casser les ancres carmin et sauver le noyau.",
+        "stage34": "Exploitez la singularité droite pour contourner la barrière et casser les ancres émeraude.",
+        "stage35": "Envoyez la Fusée dans le portail pour transpercer le baril protégé."
       },
       "arcadeModes": {
         "classic": "Puriste : tirs limités par étape, sans boutique ni Atelier. Videz le plateau pour recharger.",
@@ -919,7 +930,7 @@
       },
       "arcade": {
         "puzzle": "Puzzle",
-        "puzzleDesc": "25 défis d'adresse • 1 ou 2 tirs",
+        "puzzleDesc": "35 défis d'adresse • 1 ou 2 tirs",
         "puzzleRecord": "Puzzle {{stage}}/{{total}} • Étoiles : {{stars}}/{{maxStars}}",
         "puzzleStage": "Puzzle {{stage}}",
         "puzzleStageLocked": "Terminez le Puzzle {{previous}} pour débloquer.",
@@ -1546,6 +1557,54 @@
           "slingshotStagesGold": {
             "name": "Maître de la Fronde III",
             "description": "Atteindre l'Étape {{target}} en Fronde Magnétique."
+          },
+          "puzzleStages": {
+            "name": "Apprenti du Tir Précis",
+            "description": "Réussir {{target}} niveaux Puzzle distincts."
+          },
+          "puzzleStagesSilver": {
+            "name": "Spécialiste du Tir Précis",
+            "description": "Réussir {{target}} niveaux Puzzle distincts."
+          },
+          "puzzleStagesGold": {
+            "name": "Grand Maître du Puzzle",
+            "description": "Réussir {{target}} niveaux Puzzle distincts."
+          },
+          "dailyPuzzles": {
+            "name": "Tacticien du Jour I",
+            "description": "Réussir {{target}} Puzzle tactique du jour."
+          },
+          "dailyPuzzlesSilver": {
+            "name": "Tacticien du Jour II",
+            "description": "Réussir {{target}} Puzzles tactiques du jour."
+          },
+          "dailyPuzzlesGold": {
+            "name": "Tacticien du Jour III",
+            "description": "Réussir {{target}} Puzzles tactiques du jour."
+          },
+          "cosmeticCollector": {
+            "name": "Collectionneur de l'Atelier I",
+            "description": "Débloquer {{target}} styles, thèmes ou faisceaux dans l'Atelier."
+          },
+          "cosmeticCollectorSilver": {
+            "name": "Collectionneur de l'Atelier II",
+            "description": "Débloquer {{target}} styles, thèmes ou faisceaux dans l'Atelier."
+          },
+          "cosmeticCollectorGold": {
+            "name": "Collectionneur de l'Atelier III",
+            "description": "Débloquer {{target}} styles, thèmes ou faisceaux dans l'Atelier."
+          },
+          "weeklyMasteryChest": {
+            "name": "Champion du Trio Hebdo I",
+            "description": "Remporter {{target}} coffre bonus du Trio de maîtrise hebdomadaire."
+          },
+          "weeklyMasteryChestSilver": {
+            "name": "Champion du Trio Hebdo II",
+            "description": "Remporter {{target}} coffres bonus du Trio de maîtrise hebdomadaire."
+          },
+          "weeklyMasteryChestGold": {
+            "name": "Champion du Trio Hebdo III",
+            "description": "Remporter {{target}} coffres bonus du Trio de maîtrise hebdomadaire."
           }
         },
         "tier": {
@@ -1965,6 +2024,7 @@
       },
       "bounties": {
         "title": "Contrats du jour",
+        "nextCta": "Contrat suivant : {{title}}",
         "progress": "{{progress}}/{{target}}",
         "done": "Fait ✓",
         "reward": "+{{coins}} ⬡",
@@ -1995,6 +2055,11 @@
         "fluxDesc": "Formes générées, un bonus à choisir après chacune.",
         "fluxRecord": "Forme {{stage}} • Record : {{score}}"
       },
+      "weeklyMastery": {
+        "title": "Trio de maîtrise hebdo",
+        "titleBonus": "Trio de maîtrise hebdo (coffre +{{coins}} ⬡)",
+        "titleClaimed": "Trio de maîtrise hebdo (coffre remporté ✓)"
+      },
       "puzzle": {
         "stagesToggle": "Choisir un puzzle"
       },
@@ -2024,15 +2089,42 @@
     },
     "puzzleBuilder": {
       "openButton": "Créer un puzzle",
+      "editButton": "Modifier le puzzle",
       "title": "Éditeur de puzzle",
-      "subtitle": "Touchez les cases pour placer ou retirer des sphères, réglez la file de tir, puis jouez ou copiez le lien.",
+      "subtitle": "Touchez les cases pour placer sphères, ancres ou noyaux, choisissez un obstacle, puis jouez ou partagez.",
       "paletteAria": "Palette de couleurs des sphères",
+      "toolsAria": "Outil de placement",
+      "gridAria": "Plateau du puzzle personnalisé",
       "queueAria": "File de tir du lanceur",
       "shotsLabel": "Tirs :",
+      "obstacleLabel": "Obstacle :",
+      "count": "{{count}} / {{max}} sphères",
       "playButton": "Jouer ce puzzle",
       "copyButton": "Copier le lien",
+      "clearButton": "Effacer",
+      "importLabel": "Importer un lien ou code de puzzle",
+      "importPlaceholder": "Collez un lien ?puzzle=... ou code",
+      "importButton": "Importer",
+      "imported": "Puzzle importé dans l'éditeur.",
       "copied": "Lien du puzzle copié dans le presse-papiers.",
       "emptyError": "Placez au moins une sphère sur le plateau.",
+      "tooLargeError": "Le puzzle dépasse la taille maximale du lien. Retirez quelques sphères.",
+      "invalidImportError": "Lien ou code de puzzle invalide ou corrompu.",
+      "invalidLink": "Impossible de charger ce lien de puzzle personnalisé.",
+      "cellEmptyAria": "Ligne {{row}}, colonne {{col}} : vide",
+      "cellFilledAria": "Ligne {{row}}, colonne {{col}} : {{color}} ({{kind}})",
+      "queuePillAria": "Tir {{index}} : {{color}}. Cliquez pour changer la couleur.",
+      "tools": {
+        "sphere": "Sphère",
+        "anchor": "Ancre ⚓",
+        "core": "Noyau 💎"
+      },
+      "obstacles": {
+        "none": "Aucun",
+        "bumper": "Bumper",
+        "repulsor": "Répulseur",
+        "portal": "Paire de portails"
+      },
       "colors": {
         "crimson": "Carmin",
         "cobalt": "Cobalt",

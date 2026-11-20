@@ -124,7 +124,9 @@ const BEST_SCORE_GETTERS = Object.freeze({
       ? ui.getWeeklyFluxBestScore(engine.weeklyWeekKey)
       : storage.getFluxHighScore()
   ),
-  [GAME_MODES.PUZZLE]: (storage, engine) => storage.getPuzzleStageStats?.()?.[engine.currentPuzzleStage]?.bestScore || 0,
+  [GAME_MODES.PUZZLE]: (storage, engine) => (
+    engine.isCustomPuzzle ? 0 : (storage.getPuzzleStageStats?.()?.[engine.currentPuzzleStage]?.bestScore || 0)
+  ),
   [GAME_MODES.BLITZ]: (storage) => storage.getBlitzHighScore(),
   [GAME_MODES.BOSS_RUSH]: (storage) => storage.getBossRushHighScore(),
   [GAME_MODES.CASCADE]: (storage) => storage.getCascadeHighScore(),
@@ -357,10 +359,12 @@ const STAGE_MODE_BANNER_BUILDERS = Object.freeze({
       name: lvl ? ui.formatLevelName(lvl) : ''
     })}${formatCoreRescueSuffix(engine)}`;
   },
-  [GAME_MODES.PUZZLE]: (ui, engine) => `${t('hud.stats.mode.puzzle', {
-    stage: engine.currentPuzzleStage,
-    total: ui.gameConfig.puzzles?.length || 1
-  })}${formatCoreRescueSuffix(engine)}`,
+  [GAME_MODES.PUZZLE]: (ui, engine) => `${engine.isCustomPuzzle
+    ? t('hud.stats.mode.customPuzzle')
+    : t('hud.stats.mode.puzzle', {
+        stage: engine.currentPuzzleStage,
+        total: ui.gameConfig.puzzles?.length || 1
+      })}${formatCoreRescueSuffix(engine)}`,
   [GAME_MODES.BLITZ]: (_ui, engine) => t('hud.stats.mode.blitz', { wave: formatNumber(engine.waveCount) }),
   [GAME_MODES.FLUX]: (ui, engine, magnetarView) => t(getFluxBannerKey(engine.fluxIsBossStage, magnetarView), {
     stage: engine.fluxStage,
@@ -402,7 +406,7 @@ function refreshStageModeHud(ui, engine, magnetarView, warningShotsThreshold) {
   } else {
     refreshStandardShotCounter(ui, engine, warningShotsThreshold);
   }
-  if (engine.mode === GAME_MODES.CAMPAIGN || engine.mode === GAME_MODES.PUZZLE) {
+  if ((engine.mode === GAME_MODES.CAMPAIGN || engine.mode === GAME_MODES.PUZZLE) && !engine.isCustomPuzzle) {
     refreshStarProgress.call(ui, engine);
   } else {
     hideStarProgress(ui);
@@ -719,11 +723,31 @@ function announceRefreshEvents(extra, oneShot) {
   }
 }
 
+function syncNextContractCta(ui, buttonEl, engine) {
+  if (!buttonEl) {
+    return;
+  }
+  const items = ui.storageManager?.getDailyBountiesState?.()?.items;
+  const next = !engine.isCustomPuzzle && Array.isArray(items)
+    ? items.find((item) => !item.completed)
+    : null;
+  if (!next) {
+    buttonEl.classList.add('hidden');
+    return;
+  }
+  const title = t(`modals.play.bounties.items.${next.id}.title`, { target: formatNumber(next.target) });
+  buttonEl.dataset.bountyMode = next.mode || '';
+  buttonEl.dataset.bountyEvent = next.event || '';
+  setTextIfChanged(buttonEl, t('modals.play.bounties.nextCta', { title }));
+  buttonEl.classList.remove('hidden');
+}
+
 function syncPauseModal(ui, engine, transitionedState) {
   if (engine.state !== GAME_STATES.PAUSED || ui.isRunHeldByUi() || ui.isAnyOverlayModalOpen()) {
     ui.elements.modalPause.classList.add('hidden');
     return;
   }
+  ui.elements.btnEditPuzzlePause?.classList.toggle('hidden', !engine.isCustomPuzzle);
   setTextIfChanged(ui.elements.pauseInstructionTip, t(engine.getModeBehavior().getPauseTipKey()));
   ui.updateInputHints();
   if (ui.elements.pauseLevelTip) {
@@ -805,6 +829,8 @@ function revealVictoryContent(ui, engine, summary, isVictoryJustRevealed) {
   }
   ui.elements.modalVictory.classList.remove('hidden');
   if (isVictoryJustRevealed) {
+    ui.elements.btnEditPuzzleVictory?.classList.toggle('hidden', !engine.isCustomPuzzle);
+    syncNextContractCta(ui, ui.elements.btnNextContractVictory, engine);
     const nextButton = ui.elements.btnNextLevel;
     // Hidden after the last Puzzle stage: the other-modes button takes the focus.
     ui.focusInTopModal(nextButton?.classList.contains('hidden') ? ui.elements.btnLevelsVictory : nextButton);
@@ -861,6 +887,8 @@ function syncGameOverActionButtons(ui, engine) {
     }
     ui.elements.btnSameSeedGameOver.classList.toggle('hidden', !hasFluxSeed);
   }
+  ui.elements.btnEditPuzzleGameOver?.classList.toggle('hidden', !engine.isCustomPuzzle);
+  syncNextContractCta(ui, ui.elements.btnNextContractGameOver, engine);
 }
 
 function syncGameOverStatsSummary(ui, engine, extra, bestScore) {

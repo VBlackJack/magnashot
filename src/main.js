@@ -25,7 +25,11 @@ import { GameEngine } from './game/GameEngine.js';
 import { UIManager, isSharedFluxOverSavedRun } from './ui/UIManager.js';
 import { createGameLoop } from './game/GameLoop.js';
 import { FLUX_SEED_QUERY_PARAM, readFluxSeedFromSearch, stripFluxSeedFromUrl } from './game/DailyShare.js';
-import { readCustomPuzzleFromSearch } from './game/PuzzleShareCodec.js';
+import {
+  PUZZLE_QUERY_PARAM,
+  hasCustomPuzzleParam,
+  readCustomPuzzleFromSearch
+} from './game/PuzzleShareCodec.js';
 import { DUEL_STATUS, readDuelFromSearch } from './game/GhostCodec.js';
 import { GAME_MODES } from './core/Constants.js';
 import { bindCanvasInput } from './ui/CanvasInput.js';
@@ -99,6 +103,15 @@ class Application {
           if (urlFluxSeed && (eng.mode !== GAME_MODES.FLUX || eng.fluxSeed !== urlFluxSeed)) {
             window.history?.replaceState?.(null, '', stripFluxSeedFromUrl(window.location?.href));
           }
+          if (hasCustomPuzzleParam(window.location?.search) && !eng.isCustomPuzzle) {
+            try {
+              const cleaned = new URL(window.location.href);
+              cleaned.searchParams.delete(PUZZLE_QUERY_PARAM);
+              window.history?.replaceState?.(null, '', cleaned.toString());
+            } catch {
+              // Ignore malformed URLs in non-browser environments.
+            }
+          }
           if (uiManager) {
             uiManager.refresh(eng, extra);
           }
@@ -167,6 +180,7 @@ class Application {
         fluxParam: FLUX_SEED_QUERY_PARAM
       });
       const hasValidDuel = duelRead.status === DUEL_STATUS.VALID;
+      const rawPuzzlePresent = !hasValidDuel && hasCustomPuzzleParam(window.location?.search);
       const sharedCustomPuzzle = hasValidDuel ? null : readCustomPuzzleFromSearch(window.location?.search);
       const sharedFluxSeed = hasValidDuel || sharedCustomPuzzle ? null : readFluxSeedFromSearch(window.location?.search, fluxConfig.seed);
       const savedSnapshot = storageManager.loadRunSnapshot();
@@ -205,6 +219,16 @@ class Application {
           () => t('app.nav.button.flux'),
           { always: true }
         );
+      } else if (sharedCustomPuzzle && savedSnapshot && engine.restoreSavedRun()) {
+        hasRestoredRun = true;
+        uiManager.requestDestructiveAction(
+          () => {
+            uiManager.hideAllModals();
+            engine.startPuzzleMode(1, { customSpec: sharedCustomPuzzle });
+          },
+          () => t('modals.puzzleBuilder.playButton'),
+          { always: true }
+        );
       } else {
         hasRestoredRun = !sharedCustomPuzzle && canRestoreSaved && engine.restoreSavedRun();
         if (!hasRestoredRun) {
@@ -216,6 +240,9 @@ class Application {
             engine.startCampaignLevel(storageManager.getUnlockedLevel());
           }
         }
+      }
+      if (rawPuzzlePresent && !sharedCustomPuzzle) {
+        uiManager.announce(t('modals.puzzleBuilder.invalidLink'));
       }
 
       // The card goes on top of the normal boot: the explicit start of a duel, or why it cannot start.

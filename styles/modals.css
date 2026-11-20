@@ -737,12 +737,33 @@
 }
 
 .puzzle-builder-palette,
+.puzzle-builder-tools,
 .puzzle-builder-queue {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
   justify-content: center;
+  align-items: center;
   margin: 6px 0;
+}
+
+.puzzle-builder-count {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  margin-left: 6px;
+}
+
+.puzzle-builder-import-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  margin: 8px 0 4px;
+}
+
+.puzzle-builder-import-row .flux-seed-input {
+  flex: 1 1 160px;
+  min-width: 0;
 }
 
 .puzzle-builder-swatch,
@@ -751,6 +772,7 @@
   font-family: inherit;
   font-size: 0.76rem;
   font-weight: 700;
+  min-height: var(--touch-target);
   padding: 6px 10px;
   border-radius: 8px;
   border: 1px solid var(--border-subtle);
@@ -772,7 +794,7 @@
 }
 
 .puzzle-builder-cell {
-  min-height: 36px;
+  min-height: var(--touch-target);
   padding: 0;
 }
 

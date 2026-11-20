@@ -221,6 +221,7 @@ function bindPlayHubEvents(ui) {
     ui.openPlayHubVersusLocal();
   });
   els.playBountiesList?.addEventListener('click', (e) => handleBountyButtonClick(ui, e));
+  els.playWeeklyMasteryList?.addEventListener('click', (e) => handleBountyButtonClick(ui, e));
 }
 
 /** Campaign map: chapter switcher, jump, filter, the tile grid (one delegated listener) and the detail Play. */
@@ -277,7 +278,7 @@ const MODE_CARD_BINDINGS = Object.freeze([
   ['btnModeSlingshot', GAME_MODES.SLINGSHOT, GAME_MODES.SLINGSHOT, 'modals.levelSelect.arcade.slingshot', (ui) => ui.engine.startSlingshotMode()]
 ]);
 
-const OVERLAY_DISMISS_KEYS = ['modalPlay', 'modalLevels', 'modalShop', 'modalSettings', 'modalStats'];
+const OVERLAY_DISMISS_KEYS = ['modalPuzzleBuilder', 'modalPlay', 'modalLevels', 'modalShop', 'modalSettings', 'modalStats'];
 
 /** @this {import('./UIManager.js').UIManager} */
 function bindAllModeCards() {
@@ -547,6 +548,19 @@ function bindRoundFlowControls(ui) {
     ui.hideAllModals();
     ui.engine.restartCurrent();
   });
+  const openCurrentCustomPuzzle = () => {
+    ui.hideAllModals();
+    ui.openPuzzleBuilder?.(ui.engine.customPuzzleSpec);
+  };
+  els.btnEditPuzzleVictory?.addEventListener('click', openCurrentCustomPuzzle);
+  els.btnEditPuzzleGameOver?.addEventListener('click', openCurrentCustomPuzzle);
+  els.btnEditPuzzlePause?.addEventListener('click', openCurrentCustomPuzzle);
+  const launchContractFromButton = (btn) => {
+    ui.hideAllModals();
+    handleBountyButtonClick(ui, { target: { closest: () => btn } });
+  };
+  els.btnNextContractVictory?.addEventListener('click', () => launchContractFromButton(els.btnNextContractVictory));
+  els.btnNextContractGameOver?.addEventListener('click', () => launchContractFromButton(els.btnNextContractGameOver));
   els.btnLevelsVictory.addEventListener('click', () => {
     const mode = ui.engine.mode;
     ui.hideAllModals();
@@ -705,7 +719,15 @@ function tryNonInteractiveActionKey(ui, e, isInteractiveFocused) {
 const DESKTOP_NAV_SHORTCUTS = Object.freeze([
   { key: 'p', code: 'KeyP', run: (ui) => ui.engine.togglePause() },
   { key: 'm', code: 'KeyM', run: (ui) => ui.openPlayHub() },
-  { key: 'w', code: 'KeyW', run: (ui) => ui.openShopModal() }
+  { key: 'w', code: 'KeyW', run: (ui) => ui.openShopModal() },
+  {
+    key: 'r',
+    code: 'KeyR',
+    run: (ui) => ui.requestDestructiveAction(() => {
+      ui.hideAllModals();
+      ui.engine.restartCurrent();
+    }, () => t('app.nav.button.restart'))
+  }
 ]);
 
 function isDesktopShortcutMatch(e, key, code) {
@@ -752,7 +774,7 @@ function handleLauncherGameplayKey(ui, e) {
   }
 }
 
-const BACK_UNWIND_MODAL_KEYS = ['modalLevels', 'modalPlay', 'modalShop', 'modalSettings', 'modalStats'];
+const BACK_UNWIND_MODAL_KEYS = ['modalLevels', 'modalPuzzleBuilder', 'modalPlay', 'modalShop', 'modalSettings', 'modalStats'];
 
 function dismissTopBackLayer(ui) {
   if (ui.elements.modalConfirm && !ui.elements.modalConfirm.classList.contains(HIDDEN_CLASS)) {

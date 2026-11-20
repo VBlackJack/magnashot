@@ -17,25 +17,40 @@
 import { MATH_CONSTANTS } from '../core/Constants.js';
 import { formatNumber, t } from '../core/I18n.js';
 
-export { pickDailyBounties, normalizeBountiesState, advanceBountiesState } from '../core/BountiesStore.js';
+export {
+  pickDailyBounties,
+  pickWeeklyMasteryTrio,
+  normalizeBountiesState,
+  normalizeWeeklyMasteryState,
+  advanceBountiesState
+} from '../core/BountiesStore.js';
 
 /**
- * Reports an in-game bounty event from an active engine without polluting Versus or restores.
+ * Reports an in-game bounty event from an active engine without polluting Versus, restores, or custom puzzles.
+ * Advances both Daily Contracts and the Weekly Mastery Trio.
  * @param {object} engine - GameEngine instance.
  * @param {string} eventKey - Bounty event key.
  * @param {number} [amount=1] - Progress increment.
  * @returns {Array<object>} Newly completed bounties.
  */
 export function reportBountyEvent(engine, eventKey, amount = 1) {
-  if (!engine || engine.isVersusRole || engine.isRestoringRun || !eventKey) {
+  if (!engine || engine.isVersusRole || engine.isRestoringRun || engine.isCustomPuzzle || !eventKey) {
     return [];
   }
   const completed = engine.storageManager?.recordBountyProgress?.(eventKey, amount) || [];
-  if (completed.length === 0) {
+  const weekly = engine.storageManager?.recordWeeklyMasteryProgress?.(eventKey, amount) || {
+    completed: [],
+    chestAwarded: 0
+  };
+  if (weekly.chestAwarded > 0) {
+    engine.unlockAchievementTiers?.('weeklyMasteryChest', 1);
+  }
+  const allCompleted = [...completed, ...(weekly.completed || [])];
+  if (allCompleted.length === 0 && !weekly.chestAwarded) {
     return [];
   }
-  const coinsTotal = completed.reduce((sum, item) => sum + (item.coins || 0), 0);
-  const labelList = completed
+  const coinsTotal = allCompleted.reduce((sum, item) => sum + (item.coins || 0), 0) + (weekly.chestAwarded || 0);
+  const labelList = allCompleted
     .map((item) => t(`modals.play.bounties.items.${item.id}.title`, { target: formatNumber(item.target) }))
     .join(t('gameplay.feedback.achievement.listSeparator'));
   engine.audioManager?.playEffect('achievement');
@@ -48,6 +63,6 @@ export function reportBountyEvent(engine, eventKey, amount = 1) {
       engine.gameConfig.theme?.coinPopupColor
     );
   }
-  engine.notifyUI?.({ completedBounties: completed });
-  return completed;
+  engine.notifyUI?.({ completedBounties: allCompleted });
+  return allCompleted;
 }

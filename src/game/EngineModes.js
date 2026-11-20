@@ -60,6 +60,84 @@ const isCurrentWeeklyFluxSeed = (engine, seed, contentVersion, weekKey) => {
 /** Re-exported from Constants so callers importing EngineModes keep working. */
 export { FLUX_PERK_IDS };
 
+function buildCustomPuzzleDef(customSpec, gameConfig) {
+  const hasExplicitAnchors = customSpec.balls.some((b) => b.a === true);
+  const hasRescueCores = customSpec.balls.some((b) => b.k === true);
+  const presetKey = customSpec.obstaclePreset;
+  const presets = gameConfig.puzzleBuilder?.obstaclePresets || {};
+  const presetObstacles = presetKey && Array.isArray(presets[presetKey]) ? presets[presetKey] : [];
+  return {
+    objective: hasRescueCores ? OBJECTIVE_TYPES.CORE_RESCUE : OBJECTIVE_TYPES.CLEAR_ALL,
+    shots: customSpec.shots,
+    specialInventory: {},
+    obstacles: presetObstacles.map((o) => ({ ...o })),
+    balls: customSpec.balls.map((b, idx) => ({
+      x: b.x,
+      y: b.y,
+      colorId: b.c,
+      isAnchor: hasExplicitAnchors ? Boolean(b.a) : idx === 0 || b.y <= 140,
+      clusterModifier: b.k ? CLUSTER_MODIFIERS.RESCUE_CORE : null
+    })),
+    queue: customSpec.queue.map((colorId) => ({ colorId }))
+  };
+}
+
+function collectPuzzlePalette(engine, puzzleDef) {
+  const paletteIds = new Set();
+  for (const bSpec of puzzleDef.balls || []) {
+    if (bSpec.colorId) paletteIds.add(bSpec.colorId);
+  }
+  for (const qItem of puzzleDef.queue || []) {
+    if (qItem.colorId) paletteIds.add(qItem.colorId);
+  }
+  return paletteIds.size > 0
+    ? [...paletteIds]
+    : engine.ballsConfig.standardColors.slice(0, engine.gameConfig.defaults.matchMinCount).map((c) => c.id);
+}
+
+function populatePuzzleBoard(engine, puzzleDef) {
+  const centerX = engine.gameConfig.canvas.logicalWidth * MATH_CONSTANTS.HALF;
+  const r = engine.physicsConfig.ball.radius;
+  for (const obsDef of puzzleDef.obstacles || []) {
+    const x = obsDef.x !== undefined ? obsDef.x : centerX + (obsDef.dx || 0);
+    engine.physicsWorld.obstacles.push(new Obstacle({ ...obsDef, x }, engine.obstaclesConfig));
+  }
+  const pivots = engine.physicsWorld.obstacles.filter((o) => o.type === OBSTACLE_TYPES.PIVOT);
+  for (const bSpec of puzzleDef.balls || []) {
+    const mod = bSpec.clusterModifier || null;
+    const x = bSpec.x !== undefined ? bSpec.x : centerX + (bSpec.dx || 0);
+    const y = bSpec.y;
+    const pivotRef = bSpec.pivotIndex !== undefined ? pivots[bSpec.pivotIndex] || null : null;
+    engine.physicsWorld.addBall(new Ball({
+      x,
+      y,
+      radius: r,
+      colorId: engine.isColorlessModifier(mod) ? null : bSpec.colorId,
+      clusterModifier: mod,
+      armorHits: bSpec.armorHits !== undefined ? bSpec.armorHits : engine.getInitialArmor(mod),
+      isAnchor: Boolean(bSpec.isAnchor),
+      railMinX: bSpec.railHalfWidth > 0 ? x - bSpec.railHalfWidth : null,
+      railMaxX: bSpec.railHalfWidth > 0 ? x + bSpec.railHalfWidth : null,
+      pivotRef,
+      pivotRadius: pivotRef ? Math.hypot(x - pivotRef.x, y - pivotRef.y) : 0,
+      pivotAngle: pivotRef ? Math.atan2(y - pivotRef.y, x - pivotRef.x) - pivotRef.angle : 0
+    }));
+  }
+  engine.physicsWorld.rebuildInitialBonds();
+}
+
+function initPuzzleLauncherQueue(engine, puzzleDef) {
+  const queueSpecs = puzzleDef.queue?.length > 0
+    ? puzzleDef.queue.map((item) => ({ ...item }))
+    : [{ colorId: engine.activePalette[0], specialType: null }];
+  const firstSpec = queueSpecs.shift();
+  const secondSpec = queueSpecs.shift() || { ...firstSpec };
+  engine.puzzleQueue = queueSpecs;
+  engine.currentBall = engine.createRandomLauncherBall(firstSpec.specialType || null, firstSpec.colorId);
+  engine.nextBall = engine.createRandomLauncherBall(secondSpec.specialType || null, secondSpec.colorId);
+  engine.upcomingColorIds = engine.puzzleQueue.map((item) => item.colorId || engine.activePalette[0]);
+}
+
 /**
  * Returns a one-time first-run objective banner payload for modes without authored levels.
  * Replay via `?` uses `EngineDiscovery.replayLevelHints` independently of `introducedModes`.
@@ -169,6 +247,7 @@ export const engineModeMethods = {
   startEndlessMode() {
     this.initSurvivalRun(GAME_MODES.ENDLESS, null);
     this.storageManager?.recordAchievementProgress?.({ endlessWave: this.waveCount });
+    attachPersonalBestGhostIfEnabled(this);
     this.notifyUI();
   },
 
@@ -318,98 +397,27 @@ export const engineModeMethods = {
     }
     const cleanStage = Math.max(1, Math.floor(Number(stageIndex) || 1));
     const boundedStage = customSpec ? 1 : ((cleanStage - 1) % puzzles.length) + 1;
-    const puzzleDef = customSpec
-      ? {
-          objective: OBJECTIVE_TYPES.CLEAR_ALL,
-          shots: customSpec.shots,
-          specialInventory: {},
-          obstacles: [],
-          balls: customSpec.balls.map((b, idx) => ({
-            x: b.x,
-            y: b.y,
-            colorId: b.c,
-            isAnchor: idx === 0 || b.y <= 140
-          })),
-          queue: customSpec.queue.map((colorId) => ({ colorId }))
-        }
-      : puzzles[boundedStage - 1];
+    const puzzleDef = customSpec ? buildCustomPuzzleDef(customSpec, this.gameConfig) : puzzles[boundedStage - 1];
 
     this.resetRunState(GAME_MODES.PUZZLE);
+    this.isCustomPuzzle = Boolean(customSpec);
+    this.customPuzzleSpec = customSpec ? structuredClone(customSpec) : null;
     this.currentPuzzleStage = boundedStage;
     this.currentObjective = puzzleDef.objective || OBJECTIVE_TYPES.CLEAR_ALL;
     this.shotsRemaining = puzzleDef.shots;
     this.specialInventory = { ...puzzleDef.specialInventory };
 
-    const centerX = this.gameConfig.canvas.logicalWidth * MATH_CONSTANTS.HALF;
-    const r = this.physicsConfig.ball.radius;
     this.audioManager.stopAll();
     this.physicsWorld.clear();
     this.particleSystem.clear();
+    this.activePalette = collectPuzzlePalette(this, puzzleDef);
+    populatePuzzleBoard(this, puzzleDef);
 
-    for (const obsDef of puzzleDef.obstacles || []) {
-      const obs = new Obstacle(
-        {
-          ...obsDef,
-          x: obsDef.x !== undefined ? obsDef.x : centerX + (obsDef.dx || 0)
-        },
-        this.obstaclesConfig
-      );
-      this.physicsWorld.obstacles.push(obs);
-    }
-
-    const paletteIds = new Set();
-    for (const bSpec of puzzleDef.balls || []) {
-      if (bSpec.colorId) {
-        paletteIds.add(bSpec.colorId);
-      }
-    }
-    for (const qItem of puzzleDef.queue || []) {
-      if (qItem.colorId) {
-        paletteIds.add(qItem.colorId);
-      }
-    }
-    this.activePalette = paletteIds.size > 0
-      ? [...paletteIds]
-      : this.ballsConfig.standardColors.slice(0, this.gameConfig.defaults.matchMinCount).map((c) => c.id);
-
-    const pivots = this.physicsWorld.obstacles.filter((o) => o.type === OBSTACLE_TYPES.PIVOT);
-    for (const bSpec of puzzleDef.balls || []) {
-      const mod = bSpec.clusterModifier || null;
-      const x = bSpec.x !== undefined ? bSpec.x : centerX + (bSpec.dx || 0);
-      const y = bSpec.y;
-      const pivotRef = bSpec.pivotIndex !== undefined ? pivots[bSpec.pivotIndex] || null : null;
-      const ball = new Ball({
-        x,
-        y,
-        radius: r,
-        colorId: this.isColorlessModifier(mod) ? null : bSpec.colorId,
-        clusterModifier: mod,
-        armorHits: bSpec.armorHits !== undefined ? bSpec.armorHits : this.getInitialArmor(mod),
-        isAnchor: Boolean(bSpec.isAnchor),
-        railMinX: bSpec.railHalfWidth > 0 ? x - bSpec.railHalfWidth : null,
-        railMaxX: bSpec.railHalfWidth > 0 ? x + bSpec.railHalfWidth : null,
-        pivotRef,
-        pivotRadius: pivotRef ? Math.hypot(x - pivotRef.x, y - pivotRef.y) : 0,
-        pivotAngle: pivotRef ? Math.atan2(y - pivotRef.y, x - pivotRef.x) - pivotRef.angle : 0
-      });
-      this.physicsWorld.addBall(ball);
-    }
-
-    this.physicsWorld.rebuildInitialBonds();
     this.levelStartBallCount = this.physicsWorld.balls.length;
     this.targetCoreCount = this.physicsWorld.balls.filter(
       (b) => b.clusterModifier === CLUSTER_MODIFIERS.RESCUE_CORE
     ).length;
-
-    const queueSpecs = puzzleDef.queue?.length > 0
-      ? puzzleDef.queue.map((item) => ({ ...item }))
-      : [{ colorId: this.activePalette[0], specialType: null }];
-    const firstSpec = queueSpecs.shift();
-    const secondSpec = queueSpecs.shift() || { ...firstSpec };
-    this.puzzleQueue = queueSpecs;
-    this.currentBall = this.createRandomLauncherBall(firstSpec.specialType || null, firstSpec.colorId);
-    this.nextBall = this.createRandomLauncherBall(secondSpec.specialType || null, secondSpec.colorId);
-    this.upcomingColorIds = this.puzzleQueue.map((item) => item.colorId || this.activePalette[0]);
+    initPuzzleLauncherQueue(this, puzzleDef);
 
     this.state = GAME_STATES.PLAYING;
     const canvasCfg = this.gameConfig.canvas;
@@ -417,7 +425,7 @@ export const engineModeMethods = {
     this.refreshDiscovery();
     // The attempt is counted on the first shot (see fire), not here; the intro stays built behind
     // a discovery card (the UI defers it).
-    this.levelIntro = this.isRestoringRun ? null : this.buildPuzzleIntro(boundedStage, puzzleDef);
+    this.levelIntro = this.isRestoringRun || this.isCustomPuzzle ? null : this.buildPuzzleIntro(boundedStage, puzzleDef);
     this.notifyUI();
   },
 
@@ -1160,6 +1168,7 @@ export const engineModeMethods = {
     this.updateAimFromAngle(spec.defaultAngle);
     this.refreshDiscovery();
     this.levelIntro = maybeBuildArcadeModeIntro(this, GAME_MODES.SLINGSHOT);
+    attachPersonalBestGhostIfEnabled(this);
     this.notifyUI();
   },
 };

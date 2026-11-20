@@ -194,8 +194,8 @@ export const uiModalMethods = {
     );
     if (engine.mode === GAME_MODES.PUZZLE) {
       const totalPuzzles = this.gameConfig.puzzles?.length || 0;
-      // After the last puzzle there is no next one: the button offers the other modes.
-      const hasNextStage = engine.currentPuzzleStage < totalPuzzles;
+      // Custom puzzles and the last official stage have no next stage.
+      const hasNextStage = !engine.isCustomPuzzle && engine.currentPuzzleStage < totalPuzzles;
       const labelKey = hasNextStage
         ? VICTORY_NEXT_LABEL_KEYS[VICTORY_NEXT_ACTIONS.NEXT_LEVEL]
         : 'modals.play.changeMode';
@@ -371,6 +371,7 @@ export const uiModalMethods = {
       this.elements.modalVersusLocal,
       this.elements.modalVersusTiers,
       this.elements.modalLevels,
+      this.elements.modalPuzzleBuilder,
       this.elements.modalPlay,
       this.elements.modalShop,
       this.elements.modalSettings,
@@ -576,6 +577,12 @@ export const uiModalMethods = {
       const hub = this.elements.modalPlay;
       if (hub && !hub.classList.contains('hidden')) {
         this.stackedModalOpener = this.elements.btnCampaignMap;
+      }
+    }
+    if (modalElement === this.elements.modalPuzzleBuilder) {
+      const hub = this.elements.modalPlay;
+      if (hub && !hub.classList.contains('hidden') && this.elements.btnPuzzleBuilder) {
+        this.stackedModalOpener = this.elements.btnPuzzleBuilder;
       }
     }
     if (modalElement === this.elements.modalPlay) {

@@ -17,6 +17,17 @@
 import { ARENA_THEMES, BALL_STYLES, LASER_TRAILS } from './Constants.js';
 import { configRegistry } from './ConfigRegistry.js';
 import { normalizeShotTimeline } from './ShotTimeline.js';
+import { advanceBountiesState, normalizeWeeklyMasteryState } from './BountiesStore.js';
+
+function getCurrentUtcWeekKey(nowMs = Date.now()) {
+  const d = new Date(nowMs);
+  const utc = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
+  const day = utc.getUTCDay() || 7;
+  utc.setUTCDate(utc.getUTCDate() + 4 - day);
+  const yearStart = new Date(Date.UTC(utc.getUTCFullYear(), 0, 1));
+  const weekNo = Math.ceil((((utc - yearStart) / 86400000) + 1) / 7);
+  return `${utc.getUTCFullYear()}-W${String(weekNo).padStart(2, '0')}`;
+}
 
 function getUnlockedCosmeticMap(storage, defaultId, unlockedKey) {
   const key = storage.storageConfig?.keys?.[unlockedKey];
@@ -184,5 +195,55 @@ export const storageCosmeticsMethods = {
     all[mode] = { score: cleanScore, tl: normalized };
     this.safeSetItem(key, JSON.stringify(all));
     return true;
+  },
+
+  getUnlockedCosmeticCount() {
+    const styles = Object.keys(this.getUnlockedBallStyles()).length;
+    const themes = Object.keys(this.getUnlockedArenaThemes()).length;
+    const trails = Object.keys(this.getUnlockedLaserTrails()).length;
+    return styles + themes + trails;
+  },
+
+  getDailyPuzzlesCleared() {
+    const key = this.storageConfig?.keys?.dailyPuzzlesCleared;
+    if (!key) return 0;
+    const parsed = Number(this.safeGetItem(key));
+    return Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : 0;
+  },
+
+  incrementDailyPuzzlesCleared() {
+    const key = this.storageConfig?.keys?.dailyPuzzlesCleared;
+    if (!key) return 0;
+    const next = this.getDailyPuzzlesCleared() + 1;
+    this.safeSetItem(key, String(next));
+    return next;
+  },
+
+  getWeeklyMasteryState(weekKey = getCurrentUtcWeekKey()) {
+    const bountiesCfg = configRegistry.get('game')?.bounties;
+    const key = this.storageConfig?.keys?.weeklyMastery;
+    const raw = key ? this.readJsonObject(key) : null;
+    const unlockedModes = this.getUnlockedModes?.() ?? null;
+    return normalizeWeeklyMasteryState(raw, bountiesCfg, weekKey, { unlockedModes });
+  },
+
+  recordWeeklyMasteryProgress(eventKey, amount = 1, weekKey = getCurrentUtcWeekKey()) {
+    const key = this.storageConfig?.keys?.weeklyMastery;
+    const bountiesCfg = configRegistry.get('game')?.bounties;
+    if (!key || !bountiesCfg) return { completed: [], chestAwarded: 0 };
+    const state = this.getWeeklyMasteryState(weekKey);
+    const { nextState, completed, changed } = advanceBountiesState(state, eventKey, amount);
+    if (!changed) return { completed: [], chestAwarded: 0 };
+    let chestAwarded = 0;
+    const allDone = nextState.items.length > 0 && nextState.items.every((item) => item.completed);
+    const finalState = { ...nextState };
+    if (allDone && !finalState.chestClaimed) {
+      finalState.chestClaimed = true;
+      chestAwarded = Math.max(0, Math.floor(Number(bountiesCfg.weeklyChestBonusCoins) || 0));
+    }
+    this.safeSetItem(key, JSON.stringify(finalState));
+    const coinsTotal = completed.reduce((sum, item) => sum + (item.coins || 0), 0) + chestAwarded;
+    if (coinsTotal > 0) this.addCoins(coinsTotal);
+    return { completed, chestAwarded };
   }
 };

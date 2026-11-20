@@ -16,7 +16,17 @@
     "22": { "special": null, "flip": false, "from": 58.0, "to": 68.0 },
     "23": { "special": "rocket", "flip": false, "from": 64.0, "to": 70.0 },
     "24": { "special": "lightning", "flip": false, "from": 39.5, "to": 43.0 },
-    "25": { "special": null, "flip": false, "from": 114.0, "to": 123.0 }
+    "25": { "special": null, "flip": false, "from": 114.0, "to": 123.0 },
+    "26": { "special": null, "flip": false, "from": 102.0, "to": 108.0 },
+    "27": { "special": null, "flip": false, "from": 103.0, "to": 113.0 },
+    "28": { "special": null, "flip": false, "from": 40.0, "to": 46.0 },
+    "29": { "special": null, "flip": false, "from": 55.0, "to": 60.0 },
+    "30": { "special": "anvil", "flip": false, "from": 88.0, "to": 92.0 },
+    "31": { "special": "bomb", "flip": false, "from": 19.0, "to": 25.0 },
+    "32": { "special": null, "flip": false, "from": 65.0, "to": 77.0 },
+    "33": { "special": "rainbow", "flip": false, "from": 154.0, "to": 165.0 },
+    "34": { "special": null, "flip": false, "from": 113.0, "to": 122.0 },
+    "35": { "special": "rocket", "flip": false, "from": 152.0, "to": 165.0 }
   },
   "twoShot": {
     "4": {
