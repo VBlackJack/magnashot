@@ -4,6 +4,8 @@ All notable changes to **MagnaShot** are documented in this file.
 
 ## [Unreleased]
 
+## [1.35.1] - 2026-11-20
+
 ### Fixed
 - Rebalanced and streamlined the Play Hub (`index.html`, `styles/modals.css`, `styles/responsive.css`, `src/ui/PlayHubView.js`, `src/ui/UIInputBindings.js`, `src/core/StorageCosmetics.js`): placed Campaign and Duel side by side, spanned Challenges full-width in 3 equal columns (removing the legacy `#btn-weekly` full-row override), collapsed Daily Contracts and Weekly Mastery Trio behind a live summary toggle (`#btn-contracts-toggle`), compacted Puzzle/Flux sub-actions and Arcade card descriptions (hidden on mastered cards), and added a 3-slot Recently Played quick-launch bar (`#play-hub-recent`).
 
