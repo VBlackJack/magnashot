@@ -4,6 +4,8 @@ All notable changes to **MagnaShot** are documented in this file.
 
 ## [Unreleased]
 
+## [1.34.0] - 2026-11-20
+
 ### Added
 - Custom Puzzle Builder modal (`#modal-puzzle-builder`, `src/ui/PuzzleBuilderView.js`, `#btn-puzzle-builder`) and `?puzzle=...` share link boot support (`src/game/PuzzleShareCodec.js`, `src/game/EngineModes.js`, `src/main.js`) allowing players to place spheres and anchors on a grid using `configs/balls.json` `standardColors`, configure 1-3 shots and objectives, test live, and copy compact checksummed share URLs.
 - Puzzle Pack 2 (`P21` to `P25` in `configs/game.json`), adding 5 solver-verified 1-shot trick-shot stages (portal avalanche, singularity curve, rocket piercer, lightning tether, antimagnet bank rescue) with localized hints (`locales/*.json`) and pinned winning windows (`tests/fixtures/puzzleSolutions.json`), bringing Puzzle Mode to 25 stages.
