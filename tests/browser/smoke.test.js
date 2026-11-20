@@ -4312,6 +4312,8 @@ describe('Lot E and audit smoke checks', () => {
       );
 
       // Clicking an interactive Daily Contract launches or resumes a playable run immediately.
+      await page.click('#btn-contracts-toggle');
+      await waitShown(page, '#play-contracts-panel');
       await page.click('#play-bounty-0');
       await page.waitForFunction(() => document.querySelector('#modal-play')?.classList.contains('hidden'));
       assert.equal(

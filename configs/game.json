@@ -2959,7 +2959,8 @@
       "bounties": "bounties",
       "weeklyMastery": "weekly_mastery",
       "dailyPuzzlesCleared": "daily_puzzles_cleared",
-      "savedPuzzles": "saved_puzzles"
+      "savedPuzzles": "saved_puzzles",
+      "recentModes": "recent_modes"
     },
     "runSnapshotVersion": 1,
     "legacyMigration": {

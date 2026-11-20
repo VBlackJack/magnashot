@@ -887,15 +887,19 @@
   .play-hub-arcade {
     --play-hub-columns: 3;
   }
+  .play-bounties-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
 }
 
 @media (min-width: 900px) {
   .play-hub-layout {
-    grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr);
-    grid-template-rows: auto minmax(0, 1fr);
+    grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
+    grid-template-rows: auto;
     grid-template-areas:
-      'campaign challenges'
-      'duel challenges'
+      'campaign duel'
+      'challenges challenges'
       'arcade arcade';
   }
   .play-hub-campaign {
@@ -903,7 +907,7 @@
   }
   .play-hub-challenges {
     grid-area: challenges;
-    --play-hub-columns: 1;
+    --play-hub-columns: 3;
   }
   .play-hub-arcade {
     grid-area: arcade;
@@ -911,7 +915,7 @@
   }
   .play-hub-duel {
     grid-area: duel;
-    align-self: start;
+    align-self: stretch;
     --play-hub-columns: 2;
   }
 }

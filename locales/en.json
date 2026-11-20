@@ -2068,6 +2068,11 @@
         "campaignUnlock": "Almost there: clear Campaign Level {{level}} to unlock a new mode ->",
         "nextMastery": "Next mastery target: {{mode}} ->"
       },
+      "contractsToggle": "Contracts: {{dailyDone}}/{{dailyTotal}} • Weekly Trio: {{weeklyDone}}/{{weeklyTotal}} ▾",
+      "recent": {
+        "aria": "Recently played modes",
+        "label": "Recent:"
+      },
       "mutatorLab": {
         "toggle": "Mutator Lab",
         "subtitle": "Combine 1 to 3 modifiers for a score multiplier (standard records stay separate).",

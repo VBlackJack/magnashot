@@ -300,8 +300,7 @@
   }
 }
 
-/* The Weekly Flux button and the status line take a full row of the mode grid. */
-#btn-weekly,
+/* The status line takes a full row of the mode grid. */
 .nav-lock-hint {
   grid-column: 1 / -1;
 }
@@ -584,16 +583,16 @@
 .play-hub-layout {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
-  gap: 12px;
+  gap: 8px;
 }
 
 .play-hub-section {
   --play-hub-columns: 2;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
   min-width: 0;
-  padding: 10px 12px;
+  padding: 8px 10px;
   background: var(--surface-sunken);
   border: 1px solid var(--border-subtle);
   border-radius: 10px;
@@ -894,6 +893,78 @@
   flex: 1 1 auto;
 }
 
+.play-hub-cell > .arcade-card-toggle {
+  align-self: flex-end;
+  padding: 2px 8px;
+  font-size: 0.68rem;
+  min-height: 24px;
+  margin-top: -2px;
+}
+
+#modal-play .play-hub-arcade .arcade-mode-card:not(.is-locked) .arcade-card-desc {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 1;
+  line-clamp: 1;
+  overflow: hidden;
+}
+
+#modal-play .play-hub-arcade .arcade-mode-card.is-mastered:not(.is-locked) .arcade-card-desc {
+  display: none;
+}
+
+.play-contracts-toggle {
+  width: 100%;
+  padding: 5px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--border-subtle);
+  background: var(--surface-raised);
+  color: var(--text-secondary);
+  font-family: inherit;
+  font-size: 0.74rem;
+  font-weight: 700;
+  text-align: left;
+  cursor: pointer;
+}
+
+.play-contracts-toggle:hover,
+.play-contracts-toggle:focus-visible {
+  border-color: var(--accent-blue);
+  color: var(--text-bright);
+}
+
+.play-hub-recent {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0 0 6px;
+}
+
+.play-hub-recent-label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--text-muted);
+}
+
+.play-hub-recent-chip {
+  padding: 3px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--border-subtle);
+  background: var(--surface-raised);
+  color: var(--text-main);
+  font-family: inherit;
+  font-size: 0.72rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.play-hub-recent-chip:hover,
+.play-hub-recent-chip:focus-visible {
+  border-color: var(--accent-blue);
+  color: var(--text-bright);
+}
+
 .play-hub-campaign-actions {
   display: flex;
   flex-wrap: wrap;
@@ -923,7 +994,7 @@
   gap: 2px 0;
   min-width: 0;
   min-height: var(--touch-target);
-  padding: 8px 10px;
+  padding: 6px 8px;
   overflow-wrap: anywhere;
   white-space: normal;
   transition: transform 0.12s ease, border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
@@ -1025,18 +1096,25 @@
   line-height: 1.6;
 }
 
-.play-bounties {
-  margin-top: 6px;
-  padding-top: 8px;
+.play-bounties-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 6px;
+  margin-top: 2px;
+  padding-top: 6px;
   border-top: 1px solid var(--border-subtle);
+}
+
+.play-bounties {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 4px;
+  min-width: 0;
 }
 
 .play-bounties-title {
   margin: 0;
-  font-size: 0.72rem;
+  font-size: 0.7rem;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.05em;
@@ -1049,7 +1127,7 @@
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 5px;
+  gap: 3px;
 }
 
 .play-bounty-row {
@@ -1967,15 +2045,15 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 10px;
+  gap: 8px;
   width: 100%;
-  margin: 0 0 10px;
-  padding: 8px 12px;
-  border-radius: 10px;
+  margin: 0 0 6px;
+  padding: 5px 10px;
+  border-radius: 8px;
   border: 1px solid var(--accent-amber);
   background: var(--accent-amber-alpha-16);
   color: var(--text-gold-soft);
-  font-size: 0.82rem;
+  font-size: 0.78rem;
   font-weight: 700;
   text-align: left;
   cursor: pointer;

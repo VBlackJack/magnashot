@@ -285,5 +285,26 @@ export const storageCosmeticsMethods = {
     if (next.length === current.length) return false;
     this.safeSetItem(key, JSON.stringify(next));
     return true;
+  },
+
+  getRecentModes() {
+    const key = this.storageConfig?.keys?.recentModes;
+    if (!key) return [];
+    const raw = this.safeGetItem(key);
+    if (!raw) return [];
+    try {
+      const parsed = JSON.parse(raw);
+      return Array.isArray(parsed) ? parsed.filter((m) => typeof m === 'string' && m.length > 0).slice(0, 3) : [];
+    } catch {
+      return [];
+    }
+  },
+
+  recordRecentMode(modeKey) {
+    const key = this.storageConfig?.keys?.recentModes;
+    if (!key || typeof modeKey !== 'string' || modeKey.length === 0) return;
+    const list = this.getRecentModes().filter((m) => m !== modeKey);
+    list.unshift(modeKey);
+    this.safeSetItem(key, JSON.stringify(list.slice(0, 3)));
   }
 };

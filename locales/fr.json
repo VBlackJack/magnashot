@@ -2068,6 +2068,11 @@
         "campaignUnlock": "Bientôt débloqué : terminez le Niveau {{level}} pour ouvrir un mode ->",
         "nextMastery": "Prochaine maîtrise : {{mode}} ->"
       },
+      "contractsToggle": "Contrats : {{dailyDone}}/{{dailyTotal}} • Trio hebdo : {{weeklyDone}}/{{weeklyTotal}} ▾",
+      "recent": {
+        "aria": "Modes joués récemment",
+        "label": "Récents :"
+      },
       "mutatorLab": {
         "toggle": "Labo de mutateurs",
         "subtitle": "Combinez 1 à 3 modificateurs pour un multiplicateur de score (records standards séparés).",

@@ -1169,6 +1169,9 @@ export class GameEngine {
     this.customPuzzleSpec = null;
     this.puzzleGhostAngle = null;
     this.activeLabMutators = [];
+    if (mode && mode !== GAME_MODES.CAMPAIGN && !this.isVersusRole) {
+      this.storageManager?.recordRecentMode?.(mode);
+    }
     // startVersusBoard sets the versus state again after this reset.
     this.versus = null;
     this.clearMagnetar();
