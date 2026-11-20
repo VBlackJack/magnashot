@@ -345,6 +345,26 @@ export class StorageManager {
     this.safeSetItem(this.storageConfig.keys.gamepadRumble, Boolean(enabled));
   }
 
+  /** @returns {boolean} Whether portrait mobile controls mirror to the left edge (default off). */
+  getLeftHanded() {
+    const raw = this.safeGetItem(this.storageConfig.keys.leftHanded);
+    return raw === 'true';
+  }
+
+  setLeftHanded(enabled) {
+    this.safeSetItem(this.storageConfig.keys.leftHanded, Boolean(enabled));
+  }
+
+  /** @returns {boolean} Whether Daily/Weekly runs race the player's own PB timeline (default off). */
+  getPbGhostEnabled() {
+    const raw = this.safeGetItem(this.storageConfig.keys.pbGhost);
+    return raw === 'true';
+  }
+
+  setPbGhostEnabled(enabled) {
+    this.safeSetItem(this.storageConfig.keys.pbGhost, Boolean(enabled));
+  }
+
   /**
    * @returns {number} Stored animation speed multiplier, or the configured default (1x).
    */
@@ -1379,6 +1399,152 @@ export class StorageManager {
       this.safeSetItem(key, JSON.stringify(unlocked));
     }
     this.setActiveBallStyle(styleId);
+    return true;
+  }
+
+  getUnlockedArenaThemes() {
+    const defaultTheme = this.defaultsConfig?.arenaTheme || 'deepSpace';
+    const key = this.storageConfig?.keys?.unlockedArenaThemes;
+    const parsed = key ? this.readJsonObject(key) : {};
+    const unlocked = { [defaultTheme]: true };
+    for (const [themeId, value] of Object.entries(parsed)) {
+      if (value === true) {
+        unlocked[themeId] = true;
+      }
+    }
+    return unlocked;
+  }
+
+  isArenaThemeUnlocked(themeId) {
+    if (!themeId || typeof themeId !== 'string') {
+      return false;
+    }
+    return this.getUnlockedArenaThemes()[themeId] === true;
+  }
+
+  getActiveArenaTheme() {
+    const defaultTheme = this.defaultsConfig?.arenaTheme || 'deepSpace';
+    const key = this.storageConfig?.keys?.activeArenaTheme;
+    const stored = key ? this.safeGetItem(key) : null;
+    return stored && this.isArenaThemeUnlocked(stored) ? stored : defaultTheme;
+  }
+
+  setActiveArenaTheme(themeId) {
+    if (!this.isArenaThemeUnlocked(themeId)) {
+      return false;
+    }
+    const key = this.storageConfig?.keys?.activeArenaTheme;
+    if (key) {
+      this.safeSetItem(key, themeId);
+    }
+    return true;
+  }
+
+  purchaseArenaTheme(themeId, cost) {
+    const catalog = configRegistry.get('game')?.arenaThemes || {};
+    const spec = catalog[themeId];
+    if (!spec) {
+      return false;
+    }
+    if (this.isArenaThemeUnlocked(themeId)) {
+      this.setActiveArenaTheme(themeId);
+      return false;
+    }
+    const cleanCost = Math.max(0, Math.floor(Number(cost ?? spec.cost) || 0));
+    const coins = this.getCoins();
+    if (coins < cleanCost) {
+      return false;
+    }
+    this.setCoins(coins - cleanCost);
+    const unlocked = this.getUnlockedArenaThemes();
+    unlocked[themeId] = true;
+    const key = this.storageConfig?.keys?.unlockedArenaThemes;
+    if (key) {
+      this.safeSetItem(key, JSON.stringify(unlocked));
+    }
+    this.setActiveArenaTheme(themeId);
+    return true;
+  }
+
+  getUnlockedLaserTrails() {
+    const defaultTrail = this.defaultsConfig?.laserTrail || 'classic';
+    const key = this.storageConfig?.keys?.unlockedLaserTrails;
+    const parsed = key ? this.readJsonObject(key) : {};
+    const unlocked = { [defaultTrail]: true };
+    for (const [trailId, value] of Object.entries(parsed)) {
+      if (value === true) {
+        unlocked[trailId] = true;
+      }
+    }
+    return unlocked;
+  }
+
+  isLaserTrailUnlocked(trailId) {
+    if (!trailId || typeof trailId !== 'string') {
+      return false;
+    }
+    return this.getUnlockedLaserTrails()[trailId] === true;
+  }
+
+  getActiveLaserTrail() {
+    const defaultTrail = this.defaultsConfig?.laserTrail || 'classic';
+    const key = this.storageConfig?.keys?.activeLaserTrail;
+    const stored = key ? this.safeGetItem(key) : null;
+    return stored && this.isLaserTrailUnlocked(stored) ? stored : defaultTrail;
+  }
+
+  setActiveLaserTrail(trailId) {
+    if (!this.isLaserTrailUnlocked(trailId)) {
+      return false;
+    }
+    const key = this.storageConfig?.keys?.activeLaserTrail;
+    if (key) {
+      this.safeSetItem(key, trailId);
+    }
+    return true;
+  }
+
+  purchaseLaserTrail(trailId, cost) {
+    const catalog = configRegistry.get('game')?.laserTrails || {};
+    const spec = catalog[trailId];
+    if (!spec) {
+      return false;
+    }
+    if (this.isLaserTrailUnlocked(trailId)) {
+      this.setActiveLaserTrail(trailId);
+      return false;
+    }
+    const cleanCost = Math.max(0, Math.floor(Number(cost ?? spec.cost) || 0));
+    const coins = this.getCoins();
+    if (coins < cleanCost) {
+      return false;
+    }
+    this.setCoins(coins - cleanCost);
+    const unlocked = this.getUnlockedLaserTrails();
+    unlocked[trailId] = true;
+    const key = this.storageConfig?.keys?.unlockedLaserTrails;
+    if (key) {
+      this.safeSetItem(key, JSON.stringify(unlocked));
+    }
+    this.setActiveLaserTrail(trailId);
+    return true;
+  }
+
+  hasClaimedDailyPuzzle(dateKey) {
+    const key = this.storageConfig?.keys?.dailyPuzzleClaimedDate;
+    return Boolean(key && typeof dateKey === 'string' && this.safeGetItem(key) === dateKey);
+  }
+
+  claimDailyPuzzleBonus(dateKey, bonusCoins) {
+    const key = this.storageConfig?.keys?.dailyPuzzleClaimedDate;
+    if (!key || typeof dateKey !== 'string' || this.hasClaimedDailyPuzzle(dateKey)) {
+      return false;
+    }
+    this.safeSetItem(key, dateKey);
+    const amount = Math.max(0, Math.floor(Number(bonusCoins) || 0));
+    if (amount > 0) {
+      this.addCoins(amount);
+    }
     return true;
   }
 

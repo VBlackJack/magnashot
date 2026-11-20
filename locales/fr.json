@@ -1000,6 +1000,46 @@
           }
         }
       },
+      "arenaThemes": {
+        "items": {
+          "deepSpace": {
+            "name": "Arène Espace Profond",
+            "description": "Chambre magnétique nocturne par défaut avec lueur bleue."
+          },
+          "solarForge": {
+            "name": "Arène Forge Solaire",
+            "description": "Chambre ardente aux murs ambrés et horizon incandescent."
+          },
+          "cryoLab": {
+            "name": "Arène Labo Cryo",
+            "description": "Laboratoire glacial cyan avec grille givrée."
+          },
+          "synthwave": {
+            "name": "Arène Grille Synthwave",
+            "description": "Horizon arcade ultraviolet aux parois magenta."
+          }
+        }
+      },
+      "laserTrails": {
+        "items": {
+          "classic": {
+            "name": "Visée Classique",
+            "description": "Ligne laser par défaut assortie à la sphère."
+          },
+          "plasma": {
+            "name": "Faisceau Plasma",
+            "description": "Visée plasma magenta lumineuse."
+          },
+          "prism": {
+            "name": "Prisme Solaire",
+            "description": "Visée prisme dorée haute visibilité."
+          },
+          "pulse": {
+            "name": "Impulsion Émeraude",
+            "description": "Visée laser tactique émeraude."
+          }
+        }
+      },
       "balance": {
         "label": "Pièces disponibles : {{coins}} ⬡"
       },
@@ -1553,7 +1593,11 @@
         "upgradePurchased": "{{name}} amélioré au niveau {{level}} sur {{maxLevel}}.",
         "ammoPurchased": "{{name}} acheté. En stock : {{count}}.",
         "stylePurchased": "Style {{name}} débloqué et équipé.",
-        "styleEquipped": "Style {{name}} équipé."
+        "styleEquipped": "Style {{name}} équipé.",
+        "arenaThemePurchased": "Thème d'arène {{name}} débloqué et équipé.",
+        "arenaThemeEquipped": "Thème d'arène {{name}} équipé.",
+        "laserTrailPurchased": "Visée {{name}} débloquée et équipée.",
+        "laserTrailEquipped": "Visée {{name}} équipée."
       },
       "button": {
         "close": "Fermer"
@@ -1785,6 +1829,8 @@
         "accessibility": "Accessibilité"
       },
       "vibration": "Vibration (téléphone et manette)",
+      "leftHanded": "Tiroir mobile gaucher",
+      "pbGhost": "Affronter mon fantôme record (Défi du jour & Hebdo)",
       "musicPreviewOffHint": "Activez le son et la musique pour écouter l'aperçu Pulse."
     },
     "fluxPerk": {
@@ -1874,6 +1920,27 @@
       "arcadeSubhead": {
         "core": "Classiques & Chrono",
         "labs": "Labos Physiques"
+      },
+      "filters": {
+        "aria": "Filtrer les modes arcade",
+        "all": "Tous",
+        "quick": "Rapide",
+        "endless": "Infini",
+        "unmastered": "À maîtriser"
+      },
+      "smartPick": {
+        "nextUnmastered": "Prochain à maîtriser : {{mode}}"
+      },
+      "mastery": {
+        "summary": "{{mastered}}/{{total}} {{star}}",
+        "grandMaster": "Grand Maître {{mastered}}/{{total}} {{star}}"
+      },
+      "dailyPuzzle": {
+        "title": "Puzzle du jour",
+        "desc": "Un défi tactique partagé chaque jour.",
+        "stageChip": "Aujourd'hui : Puzzle #{{stage}}",
+        "stageBonus": "Puzzle #{{stage}} (+{{coins}} ⬡)",
+        "stageDone": "Puzzle #{{stage}} - Terminé ✓"
       },
       "campaign": {
         "summary": "{{chapter}} • {{stars}} / {{maxStars}} ★",
@@ -2198,7 +2265,8 @@
       "newer": "Ce duel nécessite une version plus récente de MagnaShot. Recharge pour mettre à jour.",
       "ok": "OK"
     },
-    "defaultName": "Fantôme"
+    "defaultName": "Fantôme",
+    "pbLabel": "Record"
   },
   "versus": {
     "tutorial": {

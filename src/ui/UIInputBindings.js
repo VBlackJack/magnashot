@@ -16,6 +16,8 @@
 
 import { GAME_MODES, GAME_STATES, INPUT_MODES, SPECIAL_TYPES_ORDER } from '../core/Constants.js';
 import { i18n, t } from '../core/I18n.js';
+import { SeededRandom } from '../core/SeededRandom.js';
+import { resolveDailyPuzzleStage } from './PlayHubView.js';
 import { SHOP_TABS } from './WorkshopView.js';
 import { fluxPerkIndexForKey } from './FluxPerkView.js';
 import {
@@ -334,12 +336,14 @@ function bindPreferenceToggles(ui) {
   els.btnAnimSpeed?.addEventListener('click', () => {
     ui.cycleAnimationSpeed();
   });
-  els.btnLang.addEventListener('click', () => {
+  els.btnLang.addEventListener('click', async () => {
     const supported = ui.gameConfig.defaults.supportedLanguages;
     const current = i18n.getLocale();
     const nextLang = supported[(supported.indexOf(current) + 1) % supported.length];
-    i18n.setLocale(nextLang);
-    ui.storageManager.setLanguage(nextLang);
+    await i18n.setLocale(nextLang);
+    if (i18n.getLocale() === nextLang) {
+      ui.storageManager.setLanguage(nextLang);
+    }
   });
 }
 
@@ -380,6 +384,37 @@ function bindHeaderAndShellControls(ui) {
   });
 }
 
+function bindPlayHubToolbar(ui) {
+  const filterBar = typeof document !== 'undefined' ? document.getElementById?.('play-hub-filters') : null;
+  filterBar?.addEventListener('click', (e) => {
+    const chip = e.target?.closest?.('[data-arcade-filter]');
+    if (!chip) {
+      return;
+    }
+    ui.playHubFilter = chip.dataset.arcadeFilter;
+    ui.refreshPlayHubRecords?.();
+  });
+  const smartPickBtn = typeof document !== 'undefined' ? document.getElementById?.('btn-play-next-unmastered') : null;
+  smartPickBtn?.addEventListener('click', () => {
+    const mode = smartPickBtn.dataset.targetMode;
+    const cardKey = mode ? ARCADE_CARD_SPECS[mode]?.card : null;
+    if (cardKey && ui.elements?.[cardKey]) {
+      ui.elements[cardKey].click();
+    }
+  });
+  const dailyPuzzleBtn = typeof document !== 'undefined' ? document.getElementById?.('btn-daily-puzzle') : null;
+  dailyPuzzleBtn?.addEventListener('click', () => {
+    const stage = resolveDailyPuzzleStage(SeededRandom.getTodayDateKey(), ui.gameConfig?.puzzles?.length || 1);
+    ui.requestDestructiveAction(
+      () => {
+        ui.hideAllModals();
+        ui.engine.startPuzzleMode(stage);
+      },
+      () => t('modals.play.dailyPuzzle.title')
+    );
+  });
+}
+
 function bindLauncherAndHintControls(ui) {
   const els = ui.elements;
   els.swapBtn.addEventListener('click', () => ui.engine.swapLauncherBalls());
@@ -413,6 +448,7 @@ function bindLauncherAndHintControls(ui) {
       ui.openPlayHub();
     }
   });
+  bindPlayHubToolbar(ui);
 }
 
 function bindShopTabs(ui) {

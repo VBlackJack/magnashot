@@ -29,6 +29,7 @@ import { SeededRandom } from '../core/SeededRandom.js';
 import { Ball } from '../entities/Ball.js';
 import { Obstacle } from '../entities/Obstacle.js';
 import { reportBountyEvent } from './Bounties.js';
+import { attachPersonalBestGhostIfEnabled } from './EngineGhostDuel.js';
 import { getOccupiedPlatformIndices } from './EngineTurnResolution.js';
 import { generateFluxStage } from './layouts/FluxStageGenerator.js';
 import { getUtcIsoWeekKey, getWeeklyFluxSeed } from './WeeklyFlux.js';
@@ -721,6 +722,7 @@ export const engineModeMethods = {
     }
     this.levelIntro =
       isRestart || this.isRestoringRun || this.activeDiscoveryId ? null : this.buildDailyIntro(seed);
+    attachPersonalBestGhostIfEnabled(this);
     this.notifyUI();
   },
 
@@ -771,6 +773,7 @@ export const engineModeMethods = {
       this.payWeeklyFluxBonus(this.weeklyWeekKey);
     }
     this.levelIntro = isRestart ? null : maybeBuildArcadeModeIntro(this, GAME_MODES.FLUX);
+    attachPersonalBestGhostIfEnabled(this);
     this.notifyUI();
   },
 

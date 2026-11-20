@@ -16,6 +16,240 @@
 
 import { MATH_CONSTANTS } from '../core/Constants.js';
 
+function drawShatterCoreGlow(renderer, ctx, sb, coreAlpha, pCfg) {
+  if (coreAlpha <= 0) {
+    return;
+  }
+  let grad = renderer.shatterCoreGradients.get(sb.burstColor);
+  if (!grad || renderer.shatterCoreGradientCtx !== ctx) {
+    if (renderer.shatterCoreGradientCtx !== ctx) {
+      renderer.shatterCoreGradients.clear();
+      renderer.shatterCoreGradientCtx = ctx;
+    }
+    grad = ctx.createRadialGradient(0, 0, 0, 0, 0, 1);
+    grad.addColorStop(0, pCfg.flashCoreColor);
+    grad.addColorStop(pCfg.flashMidStop, sb.burstColor);
+    grad.addColorStop(1, pCfg.flashEdgeColor);
+    renderer.shatterCoreGradients.set(sb.burstColor, grad);
+  }
+  // The shared gradient has unit radius: scale it to the ball inside its own save/restore.
+  ctx.save();
+  ctx.scale(sb.radius, sb.radius);
+  ctx.fillStyle = grad;
+  ctx.globalAlpha = coreAlpha;
+  ctx.beginPath();
+  ctx.arc(0, 0, 1, 0, MATH_CONSTANTS.TWO_PI);
+  ctx.fill();
+  ctx.restore();
+}
+
+function drawShatterCracks(ctx, sb, sbAlpha, pCfg) {
+  if (!sb.cracks) {
+    return;
+  }
+  ctx.strokeStyle = sb.burstColor;
+  ctx.lineWidth = pCfg.shatterCrackGlowWidth;
+  ctx.globalAlpha = sbAlpha;
+  ctx.beginPath();
+  for (const crack of sb.cracks) {
+    if (crack.length < 2) {
+      continue;
+    }
+    ctx.moveTo(crack[0].x, crack[0].y);
+    for (let i = 1; i < crack.length; i++) {
+      ctx.lineTo(crack[i].x, crack[i].y);
+    }
+  }
+  ctx.stroke();
+  ctx.strokeStyle = pCfg.flashCoreColor;
+  ctx.lineWidth = pCfg.shatterCrackCoreWidth;
+  ctx.stroke();
+}
+
+function drawExplosionPuffs(renderer, ctx, explosions, alpha, pCfg) {
+  if (!explosions) {
+    return;
+  }
+  for (const ex of explosions) {
+    if (ex.kind !== 'puff') {
+      continue;
+    }
+    const exRadius = renderer.interpolate(ex.prevRadius ?? ex.radius, ex.radius, alpha);
+    const exAlpha = Math.max(0, renderer.interpolate(ex.prevAlpha ?? ex.alpha, ex.alpha, alpha));
+    if (exRadius <= 0 || exAlpha <= 0) {
+      continue;
+    }
+    const exX = renderer.interpolate(ex.prevX ?? ex.x, ex.x, alpha);
+    const exY = renderer.interpolate(ex.prevY ?? ex.y, ex.y, alpha);
+    const interpAge = renderer.interpolate(ex.prevAge ?? ex.age, ex.age, alpha);
+    const progress = Math.min(1, Math.max(0, interpAge / Math.max(1, ex.maxAge)));
+    const phase = progress < pCfg.explosionHotPhaseEnd ? 0 : (progress < pCfg.explosionFirePhaseEnd ? 1 : 2);
+    renderer.fillUnitCircle(ctx, renderer.getUnitRadialGradient(ctx, 'puff', ex.color, phase), exX, exY, exRadius, exAlpha);
+  }
+}
+
+function drawExplosionCores(renderer, ctx, explosions, alpha, pCfg) {
+  if (!explosions) {
+    return;
+  }
+  for (const ex of explosions) {
+    if (ex.kind !== 'core') {
+      continue;
+    }
+    const exRadius = renderer.interpolate(ex.prevRadius ?? ex.radius, ex.radius, alpha);
+    const exAlpha = Math.max(0, renderer.interpolate(ex.prevAlpha ?? ex.alpha, ex.alpha, alpha));
+    if (exRadius <= 0 || exAlpha <= 0) {
+      continue;
+    }
+    renderer.fillUnitCircle(ctx, renderer.getUnitRadialGradient(ctx, 'core', ex.color), ex.x, ex.y, exRadius, exAlpha);
+    if (!ex.rays) {
+      continue;
+    }
+    ctx.strokeStyle = pCfg.flashCoreColor;
+    ctx.lineWidth = pCfg.explosionRayWidth;
+    ctx.globalAlpha = exAlpha;
+    ctx.beginPath();
+    for (const ray of ex.rays) {
+      const rayLen = exRadius * ray.lenFactor;
+      ctx.moveTo(ex.x, ex.y);
+      ctx.lineTo(ex.x + Math.cos(ray.angle) * rayLen, ex.y + Math.sin(ray.angle) * rayLen);
+    }
+    ctx.stroke();
+  }
+}
+
+function drawFlashesAndWaves(renderer, ctx, particleSystem, alpha, pCfg) {
+  for (const fl of particleSystem.flashes || []) {
+    const flRadius = renderer.interpolate(fl.prevRadius ?? fl.radius, fl.radius, alpha);
+    const flAlpha = Math.max(0, renderer.interpolate(fl.prevAlpha ?? fl.alpha, fl.alpha, alpha));
+    if (flRadius > 0 && flAlpha > 0) {
+      renderer.fillUnitCircle(ctx, renderer.getUnitRadialGradient(ctx, 'flash', fl.color), fl.x, fl.y, flRadius, flAlpha);
+    }
+  }
+  for (const sw of particleSystem.shockwaves) {
+    const swRadius = renderer.interpolate(sw.prevRadius ?? sw.radius, sw.radius, alpha);
+    const swAlpha = Math.max(0, renderer.interpolate(sw.prevAlpha ?? sw.alpha, sw.alpha, alpha));
+    ctx.strokeStyle = sw.color;
+    ctx.globalAlpha = swAlpha;
+    ctx.lineWidth = sw.lineWidth ?? pCfg.shockwaveLineWidth;
+    ctx.beginPath();
+    ctx.arc(sw.x, sw.y, swRadius, 0, MATH_CONSTANTS.TWO_PI);
+    ctx.stroke();
+  }
+}
+
+function drawStreaks(renderer, ctx, streaks, alpha, pCfg) {
+  for (const streak of streaks) {
+    const curveFactor = pCfg.streakCurveFactor * (streak.curveSign ?? 1);
+    const midX = (streak.x1 + streak.x2) * MATH_CONSTANTS.HALF - (streak.y2 - streak.y1) * curveFactor;
+    const midY = (streak.y1 + streak.y2) * MATH_CONSTANTS.HALF + (streak.x2 - streak.x1) * curveFactor;
+    const streakAlpha = Math.max(0, renderer.interpolate(streak.prevAlpha ?? streak.alpha, streak.alpha, alpha));
+    ctx.strokeStyle = streak.color;
+    ctx.globalAlpha = streakAlpha * pCfg.streakGlowAlphaFactor;
+    ctx.lineWidth = pCfg.streakGlowLineWidth;
+    ctx.beginPath();
+    ctx.moveTo(streak.x1, streak.y1);
+    ctx.quadraticCurveTo(midX, midY, streak.x2, streak.y2);
+    ctx.stroke();
+    ctx.globalAlpha = streakAlpha;
+    ctx.lineWidth = pCfg.streakLineWidth;
+    ctx.stroke();
+  }
+}
+
+function tracePolyline(ctx, points) {
+  ctx.beginPath();
+  ctx.moveTo(points[0].x, points[0].y);
+  for (let i = 1; i < points.length; i++) {
+    ctx.lineTo(points[i].x, points[i].y);
+  }
+  ctx.stroke();
+}
+
+function drawLightningBolts(renderer, ctx, bolts, alpha, pCfg) {
+  for (const bolt of bolts) {
+    if (bolt.segments.length < 2) {
+      continue;
+    }
+    const boltAlpha = Math.max(0, renderer.interpolate(bolt.prevAlpha ?? bolt.alpha, bolt.alpha, alpha));
+    ctx.strokeStyle = bolt.color;
+    ctx.globalAlpha = boltAlpha * pCfg.lightningGlowAlphaFactor;
+    ctx.lineWidth = pCfg.lightningGlowLineWidth;
+    tracePolyline(ctx, bolt.segments);
+    ctx.globalAlpha = boltAlpha;
+    ctx.lineWidth = pCfg.lightningLineWidth;
+    ctx.stroke();
+    ctx.strokeStyle = pCfg.flashCoreColor;
+    ctx.lineWidth = pCfg.lightningCoreLineWidth;
+    ctx.stroke();
+    ctx.strokeStyle = bolt.color;
+    ctx.lineWidth = pCfg.lightningBranchLineWidth;
+    for (const branch of bolt.branches || []) {
+      if (branch.length >= 2) {
+        tracePolyline(ctx, branch);
+      }
+    }
+  }
+}
+
+function drawSparkParticles(renderer, ctx, particles, alpha, pCfg) {
+  for (const p of particles) {
+    const px = renderer.interpolate(p.prevX, p.x, alpha);
+    const py = renderer.interpolate(p.prevY, p.y, alpha);
+    const pAlpha = Math.max(0, p.alpha);
+    if (Math.hypot(p.vx || 0, p.vy || 0) >= pCfg.sparkTailMinSpeed) {
+      ctx.strokeStyle = p.color;
+      ctx.globalAlpha = pAlpha;
+      ctx.lineWidth = p.radius * pCfg.sparkTailWidthFactor;
+      ctx.beginPath();
+      ctx.moveTo(px - p.vx * pCfg.sparkTailLengthFactor, py - p.vy * pCfg.sparkTailLengthFactor);
+      ctx.lineTo(px, py);
+      ctx.stroke();
+    }
+    ctx.fillStyle = p.color;
+    ctx.globalAlpha = pAlpha;
+    ctx.beginPath();
+    ctx.arc(px, py, p.radius, 0, MATH_CONSTANTS.TWO_PI);
+    ctx.fill();
+    ctx.fillStyle = pCfg.flashCoreColor;
+    ctx.beginPath();
+    ctx.arc(px, py, p.radius * pCfg.sparkCoreRadiusFactor, 0, MATH_CONSTANTS.TWO_PI);
+    ctx.fill();
+  }
+}
+
+function drawFloatingTexts(renderer, ctx, floatingTexts, alpha, pCfg, theme) {
+  const shadowColor = theme.floatingTextShadowColor;
+  const shadowOffset = pCfg.floatingTextShadowOffset;
+  const wallMargin = renderer.gameConfig.canvas.wallMargin;
+  const maxTextWidth = Math.max(0, renderer.logicalWidth - wallMargin * 2);
+  ctx.font = renderer.floatingTextFont;
+  ctx.textAlign = 'center';
+  for (const ft of floatingTexts) {
+    const fy = renderer.interpolate(ft.prevY, ft.y, alpha);
+    const halfWidth = Math.min(maxTextWidth, ctx.measureText?.(ft.text)?.width || 0) * MATH_CONSTANTS.HALF;
+    const minX = wallMargin + halfWidth;
+    const fx = Math.min(Math.max(minX, renderer.logicalWidth - wallMargin - halfWidth), Math.max(minX, ft.x));
+    ctx.globalAlpha = Math.max(0, ft.alpha);
+    const scale = ft.scale && ft.scale !== 1 ? ft.scale : 1;
+    if (scale !== 1) {
+      ctx.save();
+      ctx.translate(fx, fy);
+      ctx.scale(scale, scale);
+      ctx.fillStyle = shadowColor;
+      ctx.fillText(ft.text, shadowOffset, shadowOffset, maxTextWidth);
+      ctx.fillStyle = ft.color;
+      ctx.fillText(ft.text, 0, 0, maxTextWidth);
+      ctx.restore();
+    } else {
+      ctx.fillStyle = shadowColor;
+      ctx.fillText(ft.text, fx + shadowOffset, fy + shadowOffset, maxTextWidth);
+      ctx.fillStyle = ft.color;
+      ctx.fillText(ft.text, fx, fy, maxTextWidth);
+    }
+  }
+}
+
 /** Particle, liquid, wall-crack and shatter rendering methods installed on Renderer.prototype. */
 export const rendererParticlesMethods = {
   /** The liquid at the bottom of the board, rippling where falling spheres land. */
@@ -89,13 +323,13 @@ export const rendererParticlesMethods = {
     }
     const pCfg = this.gameConfig.juice.particles;
     for (const sb of particleSystem.shatteringBalls) {
-      const sbX = this.interpolate(sb.prevX ?? sb.x, sb.x, alpha);
-      const sbY = this.interpolate(sb.prevY ?? sb.y, sb.y, alpha);
       const sbScale = this.interpolate(sb.prevScale ?? sb.scale, sb.scale, alpha);
       const sbAlpha = Math.max(0, this.interpolate(sb.prevAlpha ?? sb.alpha, sb.alpha, alpha));
       if (sbAlpha <= 0 || sbScale <= 0) {
         continue;
       }
+      const sbX = this.interpolate(sb.prevX ?? sb.x, sb.x, alpha);
+      const sbY = this.interpolate(sb.prevY ?? sb.y, sb.y, alpha);
       const interpAge = this.interpolate(sb.prevAge ?? sb.age, sb.age, alpha);
       const progress = Math.min(1, Math.max(0, interpAge / Math.max(1, sb.maxAge)));
 
@@ -104,53 +338,9 @@ export const rendererParticlesMethods = {
       ctx.scale(sbScale, sbScale);
       ctx.globalAlpha = sbAlpha;
       this.drawBallAt(ctx, sb, 0, 0, now);
-
       ctx.globalCompositeOperation = 'lighter';
-      const coreAlpha = sbAlpha * progress * pCfg.shatterCoreFlashAlpha;
-      if (coreAlpha > 0) {
-        let grad = this.shatterCoreGradients.get(sb.burstColor);
-        if (!grad || this.shatterCoreGradientCtx !== ctx) {
-          if (this.shatterCoreGradientCtx !== ctx) {
-            this.shatterCoreGradients.clear();
-            this.shatterCoreGradientCtx = ctx;
-          }
-          grad = ctx.createRadialGradient(0, 0, 0, 0, 0, 1);
-          grad.addColorStop(0, pCfg.flashCoreColor);
-          grad.addColorStop(pCfg.flashMidStop, sb.burstColor);
-          grad.addColorStop(1, pCfg.flashEdgeColor);
-          this.shatterCoreGradients.set(sb.burstColor, grad);
-        }
-        // The shared gradient has unit radius: scale it to the ball inside its own save/restore.
-        ctx.save();
-        ctx.scale(sb.radius, sb.radius);
-        ctx.fillStyle = grad;
-        ctx.globalAlpha = coreAlpha;
-        ctx.beginPath();
-        ctx.arc(0, 0, 1, 0, MATH_CONSTANTS.TWO_PI);
-        ctx.fill();
-        ctx.restore();
-      }
-
-      if (sb.cracks) {
-        ctx.strokeStyle = sb.burstColor;
-        ctx.lineWidth = pCfg.shatterCrackGlowWidth;
-        ctx.globalAlpha = sbAlpha;
-        ctx.beginPath();
-        for (const crack of sb.cracks) {
-          if (crack.length < 2) {
-            continue;
-          }
-          ctx.moveTo(crack[0].x, crack[0].y);
-          for (let i = 1; i < crack.length; i++) {
-            ctx.lineTo(crack[i].x, crack[i].y);
-          }
-        }
-        ctx.stroke();
-
-        ctx.strokeStyle = pCfg.flashCoreColor;
-        ctx.lineWidth = pCfg.shatterCrackCoreWidth;
-        ctx.stroke();
-      }
+      drawShatterCoreGlow(this, ctx, sb, sbAlpha * progress * pCfg.shatterCoreFlashAlpha, pCfg);
+      drawShatterCracks(ctx, sb, sbAlpha, pCfg);
       ctx.restore();
     }
   },
@@ -208,201 +398,16 @@ export const rendererParticlesMethods = {
 
   drawParticles(ctx, particleSystem, alpha = 1.0) {
     const pCfg = this.gameConfig.juice.particles;
-    const theme = this.gameConfig.theme;
     ctx.save();
-
-    if (particleSystem.explosions) {
-      for (const ex of particleSystem.explosions) {
-        if (ex.kind !== 'puff') {
-          continue;
-        }
-        const exX = this.interpolate(ex.prevX ?? ex.x, ex.x, alpha);
-        const exY = this.interpolate(ex.prevY ?? ex.y, ex.y, alpha);
-        const exRadius = this.interpolate(ex.prevRadius ?? ex.radius, ex.radius, alpha);
-        const exAlpha = Math.max(0, this.interpolate(ex.prevAlpha ?? ex.alpha, ex.alpha, alpha));
-        if (exRadius <= 0 || exAlpha <= 0) {
-          continue;
-        }
-        const interpAge = this.interpolate(ex.prevAge ?? ex.age, ex.age, alpha);
-        const progress = Math.min(1, Math.max(0, interpAge / Math.max(1, ex.maxAge)));
-        const phase = progress < pCfg.explosionHotPhaseEnd ? 0 : (progress < pCfg.explosionFirePhaseEnd ? 1 : 2);
-        const grad = this.getUnitRadialGradient(ctx, 'puff', ex.color, phase);
-        this.fillUnitCircle(ctx, grad, exX, exY, exRadius, exAlpha);
-      }
-    }
-
+    drawExplosionPuffs(this, ctx, particleSystem.explosions, alpha, pCfg);
     ctx.globalCompositeOperation = 'lighter';
-
-    if (particleSystem.explosions) {
-      for (const ex of particleSystem.explosions) {
-        if (ex.kind !== 'core') {
-          continue;
-        }
-        const exRadius = this.interpolate(ex.prevRadius ?? ex.radius, ex.radius, alpha);
-        const exAlpha = Math.max(0, this.interpolate(ex.prevAlpha ?? ex.alpha, ex.alpha, alpha));
-        if (exRadius <= 0 || exAlpha <= 0) {
-          continue;
-        }
-        this.fillUnitCircle(ctx, this.getUnitRadialGradient(ctx, 'core', ex.color), ex.x, ex.y, exRadius, exAlpha);
-
-        if (ex.rays) {
-          ctx.strokeStyle = pCfg.flashCoreColor;
-          ctx.lineWidth = pCfg.explosionRayWidth;
-          ctx.globalAlpha = exAlpha;
-          ctx.beginPath();
-          for (const ray of ex.rays) {
-            const rayLen = exRadius * ray.lenFactor;
-            ctx.moveTo(ex.x, ex.y);
-            ctx.lineTo(ex.x + Math.cos(ray.angle) * rayLen, ex.y + Math.sin(ray.angle) * rayLen);
-          }
-          ctx.stroke();
-        }
-      }
-    }
-
-    if (particleSystem.flashes) {
-      for (const fl of particleSystem.flashes) {
-        const flRadius = this.interpolate(fl.prevRadius ?? fl.radius, fl.radius, alpha);
-        const flAlpha = Math.max(0, this.interpolate(fl.prevAlpha ?? fl.alpha, fl.alpha, alpha));
-        if (flRadius <= 0 || flAlpha <= 0) {
-          continue;
-        }
-        this.fillUnitCircle(ctx, this.getUnitRadialGradient(ctx, 'flash', fl.color), fl.x, fl.y, flRadius, flAlpha);
-      }
-    }
-
-    for (const sw of particleSystem.shockwaves) {
-      const swRadius = this.interpolate(sw.prevRadius ?? sw.radius, sw.radius, alpha);
-      const swAlpha = Math.max(0, this.interpolate(sw.prevAlpha ?? sw.alpha, sw.alpha, alpha));
-      ctx.strokeStyle = sw.color;
-      ctx.globalAlpha = swAlpha;
-      ctx.lineWidth = sw.lineWidth ?? pCfg.shockwaveLineWidth;
-      ctx.beginPath();
-      ctx.arc(sw.x, sw.y, swRadius, 0, MATH_CONSTANTS.TWO_PI);
-      ctx.stroke();
-    }
-
-    for (const streak of particleSystem.streaks) {
-      // The trail bows sideways, like a rocket that turned toward its target.
-      const curveSign = streak.curveSign ?? 1;
-      const curveFactor = pCfg.streakCurveFactor * curveSign;
-      const midX = (streak.x1 + streak.x2) * MATH_CONSTANTS.HALF - (streak.y2 - streak.y1) * curveFactor;
-      const midY = (streak.y1 + streak.y2) * MATH_CONSTANTS.HALF + (streak.x2 - streak.x1) * curveFactor;
-      const streakAlpha = Math.max(0, this.interpolate(streak.prevAlpha ?? streak.alpha, streak.alpha, alpha));
-      ctx.strokeStyle = streak.color;
-      ctx.globalAlpha = streakAlpha * pCfg.streakGlowAlphaFactor;
-      ctx.lineWidth = pCfg.streakGlowLineWidth;
-      ctx.beginPath();
-      ctx.moveTo(streak.x1, streak.y1);
-      ctx.quadraticCurveTo(midX, midY, streak.x2, streak.y2);
-      ctx.stroke();
-
-      ctx.globalAlpha = streakAlpha;
-      ctx.lineWidth = pCfg.streakLineWidth;
-      ctx.stroke();
-    }
-
-    for (const bolt of particleSystem.lightningBolts) {
-      if (bolt.segments.length < 2) {
-        continue;
-      }
-      const boltAlpha = Math.max(0, this.interpolate(bolt.prevAlpha ?? bolt.alpha, bolt.alpha, alpha));
-      ctx.strokeStyle = bolt.color;
-      ctx.globalAlpha = boltAlpha * pCfg.lightningGlowAlphaFactor;
-      ctx.lineWidth = pCfg.lightningGlowLineWidth;
-      ctx.beginPath();
-      ctx.moveTo(bolt.segments[0].x, bolt.segments[0].y);
-      for (let i = 1; i < bolt.segments.length; i++) {
-        ctx.lineTo(bolt.segments[i].x, bolt.segments[i].y);
-      }
-      ctx.stroke();
-
-      ctx.strokeStyle = bolt.color;
-      ctx.globalAlpha = boltAlpha;
-      ctx.lineWidth = pCfg.lightningLineWidth;
-      ctx.stroke();
-
-      ctx.strokeStyle = pCfg.flashCoreColor;
-      ctx.lineWidth = pCfg.lightningCoreLineWidth;
-      ctx.stroke();
-
-      if (bolt.branches) {
-        ctx.strokeStyle = bolt.color;
-        ctx.lineWidth = pCfg.lightningBranchLineWidth;
-        for (const branch of bolt.branches) {
-          if (branch.length < 2) {
-            continue;
-          }
-          ctx.beginPath();
-          ctx.moveTo(branch[0].x, branch[0].y);
-          for (let j = 1; j < branch.length; j++) {
-            ctx.lineTo(branch[j].x, branch[j].y);
-          }
-          ctx.stroke();
-        }
-      }
-    }
-
-    for (const p of particleSystem.particles) {
-      const px = this.interpolate(p.prevX, p.x, alpha);
-      const py = this.interpolate(p.prevY, p.y, alpha);
-      const pAlpha = Math.max(0, p.alpha);
-      const speed = Math.hypot(p.vx || 0, p.vy || 0);
-      if (speed >= pCfg.sparkTailMinSpeed) {
-        ctx.strokeStyle = p.color;
-        ctx.globalAlpha = pAlpha;
-        ctx.lineWidth = p.radius * pCfg.sparkTailWidthFactor;
-        ctx.beginPath();
-        ctx.moveTo(px - p.vx * pCfg.sparkTailLengthFactor, py - p.vy * pCfg.sparkTailLengthFactor);
-        ctx.lineTo(px, py);
-        ctx.stroke();
-      }
-      ctx.fillStyle = p.color;
-      ctx.globalAlpha = pAlpha;
-      ctx.beginPath();
-      ctx.arc(px, py, p.radius, 0, MATH_CONSTANTS.TWO_PI);
-      ctx.fill();
-
-      ctx.fillStyle = pCfg.flashCoreColor;
-      ctx.beginPath();
-      ctx.arc(px, py, p.radius * pCfg.sparkCoreRadiusFactor, 0, MATH_CONSTANTS.TWO_PI);
-      ctx.fill();
-    }
-
+    drawExplosionCores(this, ctx, particleSystem.explosions, alpha, pCfg);
+    drawFlashesAndWaves(this, ctx, particleSystem, alpha, pCfg);
+    drawStreaks(this, ctx, particleSystem.streaks, alpha, pCfg);
+    drawLightningBolts(this, ctx, particleSystem.lightningBolts, alpha, pCfg);
+    drawSparkParticles(this, ctx, particleSystem.particles, alpha, pCfg);
     ctx.globalCompositeOperation = 'source-over';
-
-    const shadowColor = theme.floatingTextShadowColor;
-    const shadowOffset = pCfg.floatingTextShadowOffset;
-    const wallMargin = this.gameConfig.canvas.wallMargin;
-    const maxTextWidth = Math.max(0, this.logicalWidth - wallMargin * 2);
-    ctx.font = this.floatingTextFont;
-    ctx.textAlign = 'center';
-    for (const ft of particleSystem.floatingTexts) {
-      const fy = this.interpolate(ft.prevY, ft.y, alpha);
-      const measuredWidth = Math.min(maxTextWidth, ctx.measureText?.(ft.text)?.width || 0);
-      const halfWidth = measuredWidth * MATH_CONSTANTS.HALF;
-      const minX = wallMargin + halfWidth;
-      const maxX = Math.max(minX, this.logicalWidth - wallMargin - halfWidth);
-      const fx = Math.min(maxX, Math.max(minX, ft.x));
-      ctx.globalAlpha = Math.max(0, ft.alpha);
-      const scale = ft.scale && ft.scale !== 1 ? ft.scale : 1;
-      if (scale !== 1) {
-        ctx.save();
-        ctx.translate(fx, fy);
-        ctx.scale(scale, scale);
-        ctx.fillStyle = shadowColor;
-        ctx.fillText(ft.text, shadowOffset, shadowOffset, maxTextWidth);
-        ctx.fillStyle = ft.color;
-        ctx.fillText(ft.text, 0, 0, maxTextWidth);
-        ctx.restore();
-      } else {
-        ctx.fillStyle = shadowColor;
-        ctx.fillText(ft.text, fx + shadowOffset, fy + shadowOffset, maxTextWidth);
-        ctx.fillStyle = ft.color;
-        ctx.fillText(ft.text, fx, fy, maxTextWidth);
-      }
-    }
-
+    drawFloatingTexts(this, ctx, particleSystem.floatingTexts, alpha, pCfg, this.gameConfig.theme);
     ctx.restore();
   }
 };

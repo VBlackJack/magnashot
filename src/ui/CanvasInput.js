@@ -203,7 +203,14 @@ export function bindCanvasInput(canvas, getEngine, gameConfig, options = {}) {
     }
     const aimPos = getAimAdjustedCoords(engine, e, rawPos);
     if (aimsAtPointer(engine, e, aimPos)) {
+      const prevBounces = engine.aimTrajectory?.filter((pt) => pt.isBounce).length || 0;
       engine.updateAim(aimPos.x, aimPos.y);
+      if (e.pointerType === 'touch') {
+        const nextBounces = engine.aimTrajectory?.filter((pt) => pt.isBounce).length || 0;
+        if (prevBounces === 0 && nextBounces > 0) {
+          engine.audioManager?.triggerHaptic?.(engine.audioManager?.config?.aimLockHapticMs);
+        }
+      }
     }
     onAimChanged(engine);
   });

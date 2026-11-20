@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-const APP_VERSION = '1.32.1';
+const APP_VERSION = '1.33.0';
 const CACHE_NAME = `magnashot-cache-v${APP_VERSION}`;
 
 // The service worker cannot read configs/*.json before it has a cache, so its
@@ -44,7 +44,6 @@ const PRECACHE_ASSETS = [
   './icons/icon-512.png',
   './icons/icon-maskable-192.png',
   './icons/icon-maskable-512.png',
-  './icons/og-card.png',
   './styles/main.css',
   './styles/modals.css',
   './styles/responsive.css',
@@ -73,6 +72,7 @@ const PRECACHE_ASSETS = [
   './src/entities/Obstacle.js',
   './src/entities/ParticleSystem.js',
   './src/game/DailyShare.js',
+  './src/game/PuzzleShareCodec.js',
   './src/game/WeeklyFlux.js',
   './src/game/Bounties.js',
   './src/game/GhostCodec.js',

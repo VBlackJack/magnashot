@@ -27,6 +27,8 @@ export const CODEX_MECHANICS_ORDER = Object.freeze(['polarity', 'collectors', 'o
 /** Merge Basin specials, events, contracts, and basin rules documented in the Workshop Codex. */
 export const CODEX_MERGE_GUIDE_ORDER = Object.freeze(['joker', 'ice', 'bomb', 'events', 'contracts', 'shapes']);
 
+const CODEX_BEHAVIORS_ORDER = Object.freeze(['hexGrid', 'pinball', 'orbital', 'convoy', 'merge', 'slingshot']);
+
 /**
  * Background of a special ball icon: lit from the top left, like the ball on the board.
  * @param {{highlight: string, fill: string}} spec - Special ball colors from balls.json.
@@ -34,6 +36,114 @@ export const CODEX_MERGE_GUIDE_ORDER = Object.freeze(['joker', 'ice', 'bomb', 'e
  */
 export function specialIconBackground(spec) {
   return `radial-gradient(circle at ${SPECIAL_ICON_HIGHLIGHT_POSITION}, ${spec.highlight}, ${spec.fill})`;
+}
+
+function buildCodexCard({ icon, title, desc, borderColor = null, background = null, dataset = null }) {
+  const card = document.createElement('div');
+  card.className = 'codex-card';
+  if (dataset) {
+    for (const [k, v] of Object.entries(dataset)) {
+      card.dataset[k] = v;
+    }
+  }
+  const badge = document.createElement('div');
+  badge.className = 'codex-badge';
+  if (borderColor) {
+    badge.style.borderColor = borderColor;
+  }
+  if (background) {
+    badge.style.background = background;
+  }
+  badge.textContent = icon;
+
+  const info = document.createElement('div');
+  info.className = 'codex-info';
+  const titleEl = document.createElement('div');
+  titleEl.className = 'codex-title';
+  titleEl.textContent = title;
+  const descEl = document.createElement('div');
+  descEl.className = 'codex-desc';
+  descEl.textContent = desc;
+  info.append(titleEl, descEl);
+
+  card.append(badge, info);
+  return card;
+}
+
+function appendCodexSection(pane, headingKey, cards, sectionName = null) {
+  const heading = document.createElement('h3');
+  heading.className = 'modal-subtitle';
+  heading.textContent = t(headingKey);
+  pane.appendChild(heading);
+
+  const grid = document.createElement('div');
+  grid.className = 'codex-grid';
+  if (sectionName) {
+    grid.dataset.codexSection = sectionName;
+  }
+  for (const card of cards) {
+    grid.appendChild(card);
+  }
+  pane.appendChild(grid);
+}
+
+function buildThemedBadge(highlight, fill) {
+  return highlight ? { borderColor: highlight, background: specialIconBackground({ highlight, fill }) } : {};
+}
+
+function buildModifierCards(ui) {
+  const fill = ui.ballsConfig.neutralPalette?.fill || ui.gameConfig.theme.launcherBaseColor;
+  return Object.entries(ui.ballsConfig.clusterModifiers || {}).map(([key, spec]) =>
+    buildCodexCard({
+      icon: spec.badge || '',
+      title: t(`modals.shop.codex.modifiers.${key}.name`),
+      desc: t(`modals.shop.codex.modifiers.${key}.description`),
+      ...buildThemedBadge(spec.ringColor, fill)
+    })
+  );
+}
+
+function buildObstacleCards(ui) {
+  const types = ui.obstaclesConfig?.types || ui.engine?.obstaclesConfig?.types || {};
+  const fallbackFill = ui.gameConfig.theme.launcherBaseColor;
+  return OBSTACLE_TYPES_ORDER.map((key) => {
+    const spec = types[key];
+    const color = spec?.ringColor || spec?.borderColor || spec?.coreColor || spec?.beamColor;
+    const fill = spec?.fillColor || spec?.outerColor || fallbackFill;
+    return buildCodexCard({
+      icon: t(`modals.shop.codex.obstacles.${key}.icon`),
+      title: t(`modals.shop.codex.obstacles.${key}.name`),
+      desc: t(`modals.shop.codex.obstacles.${key}.description`),
+      ...buildThemedBadge(color, fill)
+    });
+  });
+}
+
+function buildSpecialCards(ui) {
+  return SPECIAL_TYPES_ORDER
+    .filter((type) => Boolean(ui.ballsConfig.specialTypes?.[type]))
+    .map((type) => {
+      const spec = ui.ballsConfig.specialTypes[type];
+      return buildCodexCard({
+        icon: spec.icon,
+        title: t(`hud.powerups.${type}.name`),
+        desc: t(`hud.powerups.${type}.tooltip`),
+        background: specialIconBackground(spec)
+      });
+    });
+}
+
+function buildUniformCards(keys, keyPrefix, color, fill, datasetKey = null) {
+  const badgeStyle = buildThemedBadge(color, fill);
+  return keys.map((key) =>
+    buildCodexCard({
+      icon: t(`${keyPrefix}.${key}.icon`),
+      title: t(`${keyPrefix}.${key}.name`),
+      desc: t(`${keyPrefix}.${key}.description`),
+      ...badgeStyle,
+      dataset: datasetKey ? { [datasetKey]: key } : null
+    })
+  );
 }
 
 /**
@@ -47,303 +157,45 @@ export function buildCodexPane() {
     return;
   }
   pane.replaceChildren();
+  const theme = this.gameConfig.theme;
+  const fill = theme.launcherBaseColor;
+  const accent = theme.collectorLabelColor || theme.wavePopupColor;
 
-  const modHeading = document.createElement('h3');
-  modHeading.className = 'modal-subtitle';
-  modHeading.textContent = t('modals.shop.codex.modifiersTitle');
-  pane.appendChild(modHeading);
-
-  const modGrid = document.createElement('div');
-  modGrid.className = 'codex-grid';
-  for (const [modKey, modSpec] of Object.entries(this.ballsConfig.clusterModifiers || {})) {
-    const card = document.createElement('div');
-    card.className = 'codex-card';
-
-    const badge = document.createElement('div');
-    badge.className = 'codex-badge';
-    badge.style.borderColor = modSpec.ringColor;
-    badge.style.background = specialIconBackground({
-      highlight: modSpec.ringColor,
-      fill: this.ballsConfig.neutralPalette?.fill || this.gameConfig.theme.launcherBaseColor
-    });
-    badge.textContent = modSpec.badge || '';
-
-    const info = document.createElement('div');
-    info.className = 'codex-info';
-    const title = document.createElement('div');
-    title.className = 'codex-title';
-    title.textContent = t(`modals.shop.codex.modifiers.${modKey}.name`);
-    const desc = document.createElement('div');
-    desc.className = 'codex-desc';
-    desc.textContent = t(`modals.shop.codex.modifiers.${modKey}.description`);
-    info.append(title, desc);
-
-    card.append(badge, info);
-    modGrid.appendChild(card);
-  }
-  pane.appendChild(modGrid);
-
-  const obsHeading = document.createElement('h3');
-  obsHeading.className = 'modal-subtitle';
-  obsHeading.textContent = t('modals.shop.codex.obstaclesTitle');
-  pane.appendChild(obsHeading);
-
-  const obsGrid = document.createElement('div');
-  obsGrid.className = 'codex-grid';
-  const obstacleTypes = this.obstaclesConfig?.types || this.engine?.obstaclesConfig?.types || {};
-  for (const obsKey of OBSTACLE_TYPES_ORDER) {
-    const card = document.createElement('div');
-    card.className = 'codex-card';
-
-    const obsSpec = obstacleTypes[obsKey];
-    const badge = document.createElement('div');
-    badge.className = 'codex-badge';
-    const badgeColor = obsSpec?.ringColor || obsSpec?.borderColor || obsSpec?.coreColor || obsSpec?.beamColor;
-    if (badgeColor) {
-      badge.style.borderColor = badgeColor;
-      badge.style.background = specialIconBackground({
-        highlight: badgeColor,
-        fill: obsSpec?.fillColor || obsSpec?.outerColor || this.gameConfig.theme.launcherBaseColor
-      });
-    }
-    badge.textContent = t(`modals.shop.codex.obstacles.${obsKey}.icon`);
-
-    const info = document.createElement('div');
-    info.className = 'codex-info';
-    const title = document.createElement('div');
-    title.className = 'codex-title';
-    title.textContent = t(`modals.shop.codex.obstacles.${obsKey}.name`);
-    const desc = document.createElement('div');
-    desc.className = 'codex-desc';
-    desc.textContent = t(`modals.shop.codex.obstacles.${obsKey}.description`);
-    info.append(title, desc);
-
-    card.append(badge, info);
-    obsGrid.appendChild(card);
-  }
-  pane.appendChild(obsGrid);
-
-  const specialsHeading = document.createElement('h3');
-  specialsHeading.className = 'modal-subtitle';
-  specialsHeading.textContent = t('modals.shop.codex.specialsTitle');
-  pane.appendChild(specialsHeading);
-
-  const specialsGrid = document.createElement('div');
-  specialsGrid.className = 'codex-grid';
-  for (const type of SPECIAL_TYPES_ORDER) {
-    const spec = this.ballsConfig.specialTypes?.[type];
-    if (!spec) {
-      continue;
-    }
-    const card = document.createElement('div');
-    card.className = 'codex-card';
-
-    const badge = document.createElement('div');
-    badge.className = 'codex-badge';
-    badge.style.background = specialIconBackground(spec);
-    badge.textContent = spec.icon;
-
-    const info = document.createElement('div');
-    info.className = 'codex-info';
-    const title = document.createElement('div');
-    title.className = 'codex-title';
-    title.textContent = t(`hud.powerups.${type}.name`);
-    const desc = document.createElement('div');
-    desc.className = 'codex-desc';
-    desc.textContent = t(`hud.powerups.${type}.tooltip`);
-    info.append(title, desc);
-
-    card.append(badge, info);
-    specialsGrid.appendChild(card);
-  }
-  pane.appendChild(specialsGrid);
+  appendCodexSection(pane, 'modals.shop.codex.modifiersTitle', buildModifierCards(this));
+  appendCodexSection(pane, 'modals.shop.codex.obstaclesTitle', buildObstacleCards(this));
+  appendCodexSection(pane, 'modals.shop.codex.specialsTitle', buildSpecialCards(this));
 
   const mutatorKeys = Object.keys(this.gameConfig.daily?.mutators || {});
   if (mutatorKeys.length > 0) {
-    const mutHeading = document.createElement('h3');
-    mutHeading.className = 'modal-subtitle';
-    mutHeading.textContent = t('modals.shop.codex.mutatorsTitle');
-    pane.appendChild(mutHeading);
-
-    const mutGrid = document.createElement('div');
-    mutGrid.className = 'codex-grid';
-    for (const mutKey of mutatorKeys) {
-      const card = document.createElement('div');
-      card.className = 'codex-card';
-
-      const badge = document.createElement('div');
-      badge.className = 'codex-badge';
-      const mutColor = this.gameConfig.theme.wavePopupColor;
-      badge.style.borderColor = mutColor;
-      badge.style.background = specialIconBackground({
-        highlight: mutColor,
-        fill: this.gameConfig.theme.launcherBaseColor
-      });
-      badge.textContent = t(`modals.shop.codex.mutators.${mutKey}.icon`);
-
-      const info = document.createElement('div');
-      info.className = 'codex-info';
-      const title = document.createElement('div');
-      title.className = 'codex-title';
-      title.textContent = t(`gameplay.mutators.${mutKey}`);
-      const desc = document.createElement('div');
-      desc.className = 'codex-desc';
-      desc.textContent = t(`modals.shop.codex.mutators.${mutKey}.description`);
-      info.append(title, desc);
-
-      card.append(badge, info);
-      mutGrid.appendChild(card);
-    }
-    pane.appendChild(mutGrid);
+    const mutStyle = buildThemedBadge(theme.wavePopupColor, fill);
+    const mutCards = mutatorKeys.map((key) =>
+      buildCodexCard({
+        icon: t(`modals.shop.codex.mutators.${key}.icon`),
+        title: t(`gameplay.mutators.${key}`),
+        desc: t(`modals.shop.codex.mutators.${key}.description`),
+        ...mutStyle
+      })
+    );
+    appendCodexSection(pane, 'modals.shop.codex.mutatorsTitle', mutCards);
   }
 
-  const mechHeading = document.createElement('h3');
-  mechHeading.className = 'modal-subtitle';
-  mechHeading.textContent = t('modals.shop.codex.mechanicsTitle');
-  pane.appendChild(mechHeading);
-
-  const mechGrid = document.createElement('div');
-  mechGrid.className = 'codex-grid';
-  for (const mechKey of CODEX_MECHANICS_ORDER) {
-    const card = document.createElement('div');
-    card.className = 'codex-card';
-
-    const badge = document.createElement('div');
-    badge.className = 'codex-badge';
-    const mechColor = this.gameConfig.theme.collectorLabelColor || this.gameConfig.theme.wavePopupColor;
-    badge.style.borderColor = mechColor;
-    badge.style.background = specialIconBackground({
-      highlight: mechColor,
-      fill: this.gameConfig.theme.launcherBaseColor
-    });
-    badge.textContent = t(`modals.shop.codex.mechanics.${mechKey}.icon`);
-
-    const info = document.createElement('div');
-    info.className = 'codex-info';
-    const title = document.createElement('div');
-    title.className = 'codex-title';
-    title.textContent = t(`modals.shop.codex.mechanics.${mechKey}.name`);
-    const desc = document.createElement('div');
-    desc.className = 'codex-desc';
-    desc.textContent = t(`modals.shop.codex.mechanics.${mechKey}.description`);
-    info.append(title, desc);
-
-    card.append(badge, info);
-    mechGrid.appendChild(card);
-  }
-  pane.appendChild(mechGrid);
-  const patternsHeading = document.createElement('h3');
-  patternsHeading.className = 'modal-subtitle';
-  patternsHeading.textContent = t('modals.shop.codex.magnetarPatterns.title');
-  pane.appendChild(patternsHeading);
-
-  const patternsGrid = document.createElement('div');
-  patternsGrid.className = 'codex-grid';
-  patternsGrid.dataset.codexSection = 'magnetarPatterns';
-  for (const patternId of Object.values(MAGNETAR_BEHAVIOURS)) {
-    const card = document.createElement('div');
-    card.className = 'codex-card';
-    card.dataset.magnetarPattern = patternId;
-
-    const badge = document.createElement('div');
-    badge.className = 'codex-badge';
-    const patternColor = this.gameConfig.theme.collectorLabelColor || this.gameConfig.theme.wavePopupColor;
-    badge.style.borderColor = patternColor;
-    badge.style.background = specialIconBackground({
-      highlight: patternColor,
-      fill: this.gameConfig.theme.launcherBaseColor
-    });
-    badge.textContent = t(`modals.shop.codex.magnetarPatterns.patterns.${patternId}.icon`);
-
-    const info = document.createElement('div');
-    info.className = 'codex-info';
-    const title = document.createElement('div');
-    title.className = 'codex-title';
-    title.textContent = t(`modals.shop.codex.magnetarPatterns.patterns.${patternId}.name`);
-    const desc = document.createElement('div');
-    desc.className = 'codex-desc';
-    desc.textContent = t(`modals.shop.codex.magnetarPatterns.patterns.${patternId}.description`);
-    info.append(title, desc);
-
-    card.append(badge, info);
-    patternsGrid.appendChild(card);
-  }
-  pane.appendChild(patternsGrid);
-
-  const behaviorsOrder = ['hexGrid', 'pinball', 'orbital', 'convoy', 'merge', 'slingshot'];
-  const behaviorsHeading = document.createElement('h3');
-  behaviorsHeading.className = 'modal-subtitle';
-  behaviorsHeading.textContent = t('modals.shop.codex.behaviors.title');
-  pane.appendChild(behaviorsHeading);
-
-  const behaviorsGrid = document.createElement('div');
-  behaviorsGrid.className = 'codex-grid';
-  behaviorsGrid.dataset.codexSection = 'behaviors';
-  for (const behaviorId of behaviorsOrder) {
-    const card = document.createElement('div');
-    card.className = 'codex-card';
-    card.dataset.codexBehavior = behaviorId;
-
-    const badge = document.createElement('div');
-    badge.className = 'codex-badge';
-    const behaviorColor = this.gameConfig.theme.collectorLabelColor || this.gameConfig.theme.wavePopupColor;
-    badge.style.borderColor = behaviorColor;
-    badge.style.background = specialIconBackground({
-      highlight: behaviorColor,
-      fill: this.gameConfig.theme.launcherBaseColor
-    });
-    badge.textContent = t(`modals.shop.codex.behaviors.items.${behaviorId}.icon`);
-
-    const info = document.createElement('div');
-    info.className = 'codex-info';
-    const title = document.createElement('div');
-    title.className = 'codex-title';
-    title.textContent = t(`modals.shop.codex.behaviors.items.${behaviorId}.name`);
-    const desc = document.createElement('div');
-    desc.className = 'codex-desc';
-    desc.textContent = t(`modals.shop.codex.behaviors.items.${behaviorId}.description`);
-    info.append(title, desc);
-
-    card.append(badge, info);
-    behaviorsGrid.appendChild(card);
-  }
-  pane.appendChild(behaviorsGrid);
-
-  const mergeHeading = document.createElement('h3');
-  mergeHeading.className = 'modal-subtitle';
-  mergeHeading.textContent = t('modals.shop.codex.mergeGuide.title');
-  pane.appendChild(mergeHeading);
-
-  const mergeGrid = document.createElement('div');
-  mergeGrid.className = 'codex-grid';
-  mergeGrid.dataset.codexSection = 'mergeGuide';
-  for (const itemId of CODEX_MERGE_GUIDE_ORDER) {
-    const card = document.createElement('div');
-    card.className = 'codex-card';
-    card.dataset.codexMergeItem = itemId;
-
-    const badge = document.createElement('div');
-    badge.className = 'codex-badge';
-    const mergeColor = this.gameConfig.theme.wavePopupColor || this.gameConfig.theme.collectorLabelColor;
-    badge.style.borderColor = mergeColor;
-    badge.style.background = specialIconBackground({
-      highlight: mergeColor,
-      fill: this.gameConfig.theme.launcherBaseColor
-    });
-    badge.textContent = t(`modals.shop.codex.mergeGuide.items.${itemId}.icon`);
-
-    const info = document.createElement('div');
-    info.className = 'codex-info';
-    const title = document.createElement('div');
-    title.className = 'codex-title';
-    title.textContent = t(`modals.shop.codex.mergeGuide.items.${itemId}.name`);
-    const desc = document.createElement('div');
-    desc.className = 'codex-desc';
-    desc.textContent = t(`modals.shop.codex.mergeGuide.items.${itemId}.description`);
-    info.append(title, desc);
-
-    card.append(badge, info);
-    mergeGrid.appendChild(card);
-  }
-  pane.appendChild(mergeGrid);
+  appendCodexSection(pane, 'modals.shop.codex.mechanicsTitle', buildUniformCards(CODEX_MECHANICS_ORDER, 'modals.shop.codex.mechanics', accent, fill));
+  appendCodexSection(
+    pane,
+    'modals.shop.codex.magnetarPatterns.title',
+    buildUniformCards(Object.values(MAGNETAR_BEHAVIOURS), 'modals.shop.codex.magnetarPatterns.patterns', accent, fill, 'magnetarPattern'),
+    'magnetarPatterns'
+  );
+  appendCodexSection(
+    pane,
+    'modals.shop.codex.behaviors.title',
+    buildUniformCards(CODEX_BEHAVIORS_ORDER, 'modals.shop.codex.behaviors.items', accent, fill, 'codexBehavior'),
+    'behaviors'
+  );
+  appendCodexSection(
+    pane,
+    'modals.shop.codex.mergeGuide.title',
+    buildUniformCards(CODEX_MERGE_GUIDE_ORDER, 'modals.shop.codex.mergeGuide.items', theme.wavePopupColor || theme.collectorLabelColor, fill, 'codexMergeItem'),
+    'mergeGuide'
+  );
 }

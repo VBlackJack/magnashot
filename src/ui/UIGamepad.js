@@ -606,6 +606,27 @@ export const uiGamepadMethods = {
       this.updateGamepadSettings({ rumble: el.inputGamepadRumble.checked });
       this.audioManager?.setVibrationEnabled?.(el.inputGamepadRumble.checked);
     });
+    el.inputLeftHanded = document.getElementById?.('input-left-handed') ?? null;
+    const syncLeftHanded = (enabled) => {
+      if (typeof document !== 'undefined') {
+        document.documentElement?.classList?.toggle('left-handed-mobile', Boolean(enabled));
+      }
+      if (el.inputLeftHanded) {
+        el.inputLeftHanded.checked = Boolean(enabled);
+      }
+    };
+    el.inputLeftHanded?.addEventListener('change', () => {
+      this.storageManager.setLeftHanded?.(el.inputLeftHanded.checked);
+      syncLeftHanded(el.inputLeftHanded.checked);
+    });
+    syncLeftHanded(this.storageManager.getLeftHanded?.() ?? false);
+    el.inputPbGhost = document.getElementById?.('input-pb-ghost') ?? null;
+    if (el.inputPbGhost) {
+      el.inputPbGhost.checked = Boolean(this.storageManager.getPbGhostEnabled?.());
+      el.inputPbGhost.addEventListener('change', () => {
+        this.storageManager.setPbGhostEnabled?.(el.inputPbGhost.checked);
+      });
+    }
     this.audioManager?.setVibrationEnabled?.(this.storageManager.getGamepadRumble());
     this.updateGamepadControls();
     this.refreshControllerFields();

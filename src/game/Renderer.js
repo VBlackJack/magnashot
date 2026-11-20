@@ -1306,7 +1306,10 @@ export class Renderer {
     this.staticLayer.width = this.canvas.width;
     this.staticLayer.height = this.canvas.height;
     const layerCtx = this.staticLayer.getContext('2d');
-    const theme = this.gameConfig.theme;
+    const override = this.activeArenaTheme && this.activeArenaTheme !== 'deepSpace'
+      ? this.gameConfig.arenaThemes?.[this.activeArenaTheme]
+      : null;
+    const theme = override ? { ...this.gameConfig.theme, ...override } : this.gameConfig.theme;
     const width = this.logicalWidth;
     const height = this.logicalHeight;
 
@@ -1378,6 +1381,19 @@ export class Renderer {
       this.refreshBallSpriteKeySuffix();
       this.ballGradientCache.clear();
       this.ballSpriteCache?.clear();
+    }
+  }
+
+  setArenaTheme(themeId) {
+    if (themeId && typeof themeId === 'string' && this.activeArenaTheme !== themeId) {
+      this.activeArenaTheme = themeId;
+      this.staticLayerDirty = true;
+    }
+  }
+
+  setLaserTrail(trailId) {
+    if (trailId && typeof trailId === 'string') {
+      this.activeLaserTrail = trailId;
     }
   }
 
@@ -2214,8 +2230,12 @@ export class Renderer {
       return;
     }
     const palette = this.getBallPalette(currentBall);
+    const trailOverride = this.activeLaserTrail && this.activeLaserTrail !== 'classic'
+      ? this.gameConfig.laserTrails?.[this.activeLaserTrail]
+      : null;
+    const aimPalette = trailOverride?.color ? { ...palette, highlight: trailOverride.color } : palette;
     ctx.save();
-    strokeAimTrajectoryPath(this, ctx, points, palette, theme, now);
+    strokeAimTrajectoryPath(this, ctx, points, aimPalette, theme, now);
 
     const endX = points.landingX !== undefined ? points.landingX : points[points.length - 1].x;
     const endY = points.landingY !== undefined ? points.landingY : points[points.length - 1].y;

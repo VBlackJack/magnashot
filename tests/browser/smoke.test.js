@@ -4344,6 +4344,33 @@ describe('Lot E and audit smoke checks', () => {
       assert.equal(await page.locator('#stats-duels-list > li').count(), 1);
       await page.click('#btn-duels-filter-all');
       assert.equal(await page.locator('#stats-duels-list > li').count(), 2);
+
+      // Audit + Evolution E2E checks: Play Hub filters, Daily Puzzle, Workshop Themes/Trails, Settings toggles.
+      await page.click('#btn-close-stats');
+      await openPlayHub(page, viewport);
+      await waitShown(page, '#play-hub-filters');
+      assert.ok(await page.locator('#play-hub-mastery-summary').textContent());
+      assert.ok(await page.locator('#daily-puzzle-stage-label').textContent());
+      await page.click('#play-hub-filters [data-arcade-filter="quick"]');
+      assert.equal(await page.locator('#btn-endless').evaluate((el) => el.classList.contains('hidden')), true);
+      await page.click('#play-hub-filters [data-arcade-filter="all"]');
+      assert.equal(await page.locator('#btn-endless').evaluate((el) => el.classList.contains('hidden')), false);
+      await page.click('#btn-close-play');
+
+      await clickMenuButton(page, viewport, '#btn-shop');
+      await waitShown(page, '#modal-shop');
+      await page.click('#tab-shop-styles');
+      assert.equal(await page.locator('#shop-styles-grid .arena-theme-swatch').count(), 4);
+      assert.equal(await page.locator('#shop-styles-grid .laser-trail-swatch').count(), 4);
+      await page.click('#btn-close-shop');
+
+      await clickMenuButton(page, viewport, '#btn-settings');
+      await waitShown(page, '#modal-settings');
+      await page.check('#input-left-handed');
+      assert.equal(await page.evaluate(() => document.documentElement.classList.contains('left-handed-mobile')), true);
+      await page.check('#input-pb-ghost');
+      assert.equal(await page.locator('#input-pb-ghost').isChecked(), true);
+      await page.click('#btn-close-settings');
       assert.deepEqual(errors, []);
     } finally {
       await context.close();

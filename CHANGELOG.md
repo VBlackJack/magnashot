@@ -4,6 +4,22 @@ All notable changes to **MagnaShot** are documented in this file.
 
 ## [Unreleased]
 
+## [1.33.0] - 2026-11-20
+
+### Added
+- Play Hub session filter chips (`All`, `Quick`, `Endless`, `Unmastered`), a one-click `Next to master` smart picker (`#btn-play-next-unmastered`), a live Grand Mastery summary badge (`#play-hub-mastery-summary`), and a deterministic `Daily Puzzle` card (`#btn-daily-puzzle`) with a `+25` coin first-clear daily bonus (`index.html`, `src/game/DailyShare.js`, `src/game/EngineRoundFlow.js`, `src/ui/PlayHubView.js`, `src/ui/UIInputBindings.js`, `styles/modals.css`, `locales/*.json`).
+- Four unlockable Arena Visual Themes (`Deep Space`, `Solar Forge`, `Cryo Lab`, `Synthwave Grid`) and four unlockable Laser Sight Trails (`Classic`, `Plasma Beam`, `Solar Prism`, `Emerald Pulse`) purchasable with coins in the Workshop Styles tab, persisted in `StorageManager` and `ProgressBackup`, and applied in `Renderer.js` (`configs/game.json`, `src/core/Constants.js`, `src/ui/WorkshopView.js`).
+- Compact checksummed custom puzzle share codec (`src/game/PuzzleShareCodec.js`) with unit tests (`tests/coreHelpers.test.js`).
+- Solo Personal Best Ghost pace mode (`#input-pb-ghost` in Settings) allowing Daily Challenge and Weekly Flux runs to race the player's own stored best timeline live in the HUD without polluting friend Ghost Duel history (`src/game/EngineGhostDuel.js`, `src/game/EngineModes.js`).
+- Left-handed mobile portrait drawer toggle (`#input-left-handed` in Accessibility settings) mirroring `#btn-powerups-drawer` and `#powerups-panel` to the left edge on portrait phones, plus subtle touch ricochet-lock haptic feedback (`configs/audio.json`, `src/ui/CanvasInput.js`, `styles/responsive.css`).
+
+### Changed
+- Compressed 512px PWA PNG icons (`icons/icon-512.png`, `icons/icon-maskable-512.png`, -91% payload) and switched `I18n.js` to lazy-load secondary locales on language switch while preserving offline fallback.
+- Decomposed high-complexity functions in `PlayHubView.js`, `UIStats.js`, `RendererParticles.js`, `EngineRoundFlow.js`, `RunSnapshot.js`, `MergeBehavior.js`, `ImpactPreview.js`, and `CodexView.js`, removing stale paths and the legacy relaxed `MergeBehavior.js` ceiling in `eslint.config.js` so all eight modules enforce `complexity <= 15` and `max-lines-per-function <= 80`, and added unit + Playwright browser coverage (`tests/coreHelpers.test.js`, `tests/browser/smoke.test.js`).
+
+### Fixed
+- Converted `#hud-mode-banner` from `<div role="button">` to a native `<button type="button">` (`index.html`, `styles/main.css`), raised danger foreground text contrast to WCAG AA (`--accent-danger-text: #f87171` on raised surfaces in `styles/main.css` and `styles/modals.css`), and removed the 418.6 KB crawler-only `icons/og-card.png` from Service Worker precaching (`sw.js`, `tests/pwa.test.js`).
+
 ## [1.32.1] - 2026-11-16
 
 ### Fixed

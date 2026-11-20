@@ -313,6 +313,37 @@ export function captureRunSnapshot(engine, version) {
   };
 }
 
+function isValidModeSnapshotFields(snapshot, behavior) {
+  if (snapshot.mode === GAME_MODES.DAILY && typeof snapshot.dailySeedKey !== 'string') {
+    return false;
+  }
+  if (
+    snapshot.mode === GAME_MODES.FLUX &&
+    (typeof snapshot.engine?.fluxSeed !== 'string' || !Number.isInteger(snapshot.engine.fluxStage) || snapshot.engine.fluxStage < 1)
+  ) {
+    return false;
+  }
+  if (!behavior.validateModeState(snapshot.modeState ?? null)) {
+    return false;
+  }
+  return !(
+    snapshot.mode === GAME_MODES.SLINGSHOT &&
+    (!Array.isArray(snapshot.balls) || snapshot.modeState.coreFlags.length !== snapshot.balls.length)
+  );
+}
+
+function hasValidSnapshotStructure(snapshot, minBalls) {
+  return (
+    Array.isArray(snapshot.balls) &&
+    snapshot.balls.length >= minBalls &&
+    Array.isArray(snapshot.obstacles) &&
+    Array.isArray(snapshot.pendingChainCandidateIds) &&
+    Boolean(snapshot.engine && typeof snapshot.engine === 'object') &&
+    Boolean(snapshot.specialInventory && typeof snapshot.specialInventory === 'object') &&
+    Boolean(snapshot.currentBall && snapshot.nextBall)
+  );
+}
+
 /**
  * Structural check run before any engine state is touched, so a corrupted or
  * outdated snapshot is rejected instead of half-applied.
@@ -327,35 +358,12 @@ export function isValidRunSnapshot(snapshot, version) {
   if (!Object.values(GAME_MODES).includes(snapshot.mode)) {
     return false;
   }
-  if (snapshot.mode === GAME_MODES.DAILY && typeof snapshot.dailySeedKey !== 'string') {
-    return false;
-  }
-  if (
-    snapshot.mode === GAME_MODES.FLUX &&
-    (typeof snapshot.engine?.fluxSeed !== 'string' || !Number.isInteger(snapshot.engine.fluxStage) || snapshot.engine.fluxStage < 1)
-  ) {
-    return false;
-  }
   const behavior = getRegisteredModeBehavior(snapshot.mode);
+  if (!isValidModeSnapshotFields(snapshot, behavior)) {
+    return false;
+  }
   const minBalls = behavior.allowsEmptyBoardSnapshot() ? 0 : 1;
-  if (!behavior.validateModeState(snapshot.modeState ?? null)) {
-    return false;
-  }
-  if (
-    snapshot.mode === GAME_MODES.SLINGSHOT &&
-    (!Array.isArray(snapshot.balls) || snapshot.modeState.coreFlags.length !== snapshot.balls.length)
-  ) {
-    return false;
-  }
-  return (
-    Array.isArray(snapshot.balls) &&
-    snapshot.balls.length >= minBalls &&
-    Array.isArray(snapshot.obstacles) &&
-    Array.isArray(snapshot.pendingChainCandidateIds) &&
-    Boolean(snapshot.engine && typeof snapshot.engine === 'object') &&
-    Boolean(snapshot.specialInventory && typeof snapshot.specialInventory === 'object') &&
-    Boolean(snapshot.currentBall && snapshot.nextBall)
-  );
+  return hasValidSnapshotStructure(snapshot, minBalls);
 }
 
 /**
@@ -392,72 +400,43 @@ function restoreLegacySagLevel(engine, snapshot) {
   engine.sagLevel = Math.max(0, Math.min(spec.size - 1, spec.size - Math.floor(saved.shotsUntilWave)));
 }
 
-/**
- * Rebuilds the board of the snapshot's mode (obstacles, palette, mutators), then
- * replaces its balls and live state with the saved ones. The run resumes paused.
- * @param {import('./GameEngine.js').GameEngine} engine
- * @param {object} snapshot - A snapshot accepted by isValidRunSnapshot.
- * @returns {boolean} False when the rebuilt board does not match the snapshot; the
- *   freshly started run is then left in place.
- */
-export function applyRunSnapshot(engine, snapshot) {
-  if (snapshot.mode === GAME_MODES.CAMPAIGN) {
-    engine.startCampaignLevel(snapshot.engine.currentLevelId);
-  } else if (snapshot.mode === GAME_MODES.DAILY) {
-    engine.startDailyChallenge(snapshot.dailySeedKey, true);
-  } else if (snapshot.mode === GAME_MODES.FLUX) {
-    // A save without a version predates the settled shapes: it resumes on the shapes it was saved on.
-    const savedVersion = snapshot.fluxContentVersion;
-    const currentVersion = engine.gameConfig.ghostDuel.contentVersion.flux;
-    const contentVersion = Number.isInteger(savedVersion) && savedVersion >= MIN_CONTENT_VERSION && savedVersion <= currentVersion
-      ? savedVersion
-      : engine.fluxConfig.shapeSettle.sinceContentVersion - 1;
-    const isWeeklySnapshot = snapshot.isWeeklyFluxRun === true
-      && typeof snapshot.weeklyWeekKey === 'string'
-      && WEEK_KEY_PATTERN.test(snapshot.weeklyWeekKey);
-    engine.restoreFluxRun(
-      snapshot.engine.fluxSeed,
-      snapshot.engine.fluxStage,
-      snapshot.engine.fluxPreviousFamily,
-      contentVersion,
-      { markModeSeen: !isWeeklySnapshot }
-    );
-  } else if (snapshot.mode === GAME_MODES.PUZZLE) {
-    engine.startPuzzleMode(snapshot.engine.currentPuzzleStage || 1);
-  } else if (snapshot.mode === GAME_MODES.BLITZ) {
-    engine.startBlitzMode();
-  } else if (snapshot.mode === GAME_MODES.BOSS_RUSH) {
-    engine.startBossRushMode(snapshot.engine.bossRushWave || 1);
-  } else if (snapshot.mode === GAME_MODES.CASCADE) {
-    engine.startCascadeMode();
-  } else if (snapshot.mode === GAME_MODES.CLASSIC) {
-    engine.startClassicMode(snapshot.engine.classicStage || 1);
-  } else if (snapshot.mode === GAME_MODES.HEX_GRID) {
-    engine.startHexGridMode();
-  } else if (snapshot.mode === GAME_MODES.ORBITAL) {
-    engine.startOrbitalMode();
-  } else if (snapshot.mode === GAME_MODES.PINBALL) {
-    engine.startPinballMode(snapshot.engine.pinballStage || 1);
-  } else if (snapshot.mode === GAME_MODES.CONVOY) {
-    engine.startConvoyMode();
-  } else if (snapshot.mode === GAME_MODES.MERGE) {
-    engine.startMergeMode();
-  } else if (snapshot.mode === GAME_MODES.SLINGSHOT) {
-    engine.startSlingshotMode(snapshot.engine.slingshotStage || 1);
-  } else {
-    engine.startEndlessMode();
-  }
+function bootFluxFromSnapshot(engine, snapshot) {
+  // A save without a version predates the settled shapes: it resumes on the shapes it was saved on.
+  const savedVersion = snapshot.fluxContentVersion;
+  const currentVersion = engine.gameConfig.ghostDuel.contentVersion.flux;
+  const contentVersion = Number.isInteger(savedVersion) && savedVersion >= MIN_CONTENT_VERSION && savedVersion <= currentVersion
+    ? savedVersion
+    : engine.fluxConfig.shapeSettle.sinceContentVersion - 1;
+  const isWeeklySnapshot = snapshot.isWeeklyFluxRun === true
+    && typeof snapshot.weeklyWeekKey === 'string'
+    && WEEK_KEY_PATTERN.test(snapshot.weeklyWeekKey);
+  engine.restoreFluxRun(
+    snapshot.engine.fluxSeed,
+    snapshot.engine.fluxStage,
+    snapshot.engine.fluxPreviousFamily,
+    contentVersion,
+    { markModeSeen: !isWeeklySnapshot }
+  );
+}
 
-  const world = engine.physicsWorld;
-  const typesMatch = snapshot.obstacles.every((obs, idx) => world.obstacles[idx]?.type === obs.type);
-  if (world.obstacles.length !== snapshot.obstacles.length || !typesMatch) {
-    return false;
-  }
+const SNAPSHOT_MODE_STARTERS = Object.freeze({
+  [GAME_MODES.CAMPAIGN]: (engine, snap) => engine.startCampaignLevel(snap.engine.currentLevelId),
+  [GAME_MODES.DAILY]: (engine, snap) => engine.startDailyChallenge(snap.dailySeedKey, true),
+  [GAME_MODES.FLUX]: bootFluxFromSnapshot,
+  [GAME_MODES.PUZZLE]: (engine, snap) => engine.startPuzzleMode(snap.engine.currentPuzzleStage || 1),
+  [GAME_MODES.BLITZ]: (engine) => engine.startBlitzMode(),
+  [GAME_MODES.BOSS_RUSH]: (engine, snap) => engine.startBossRushMode(snap.engine.bossRushWave || 1),
+  [GAME_MODES.CASCADE]: (engine) => engine.startCascadeMode(),
+  [GAME_MODES.CLASSIC]: (engine, snap) => engine.startClassicMode(snap.engine.classicStage || 1),
+  [GAME_MODES.HEX_GRID]: (engine) => engine.startHexGridMode(),
+  [GAME_MODES.ORBITAL]: (engine) => engine.startOrbitalMode(),
+  [GAME_MODES.PINBALL]: (engine, snap) => engine.startPinballMode(snap.engine.pinballStage || 1),
+  [GAME_MODES.CONVOY]: (engine) => engine.startConvoyMode(),
+  [GAME_MODES.MERGE]: (engine) => engine.startMergeMode(),
+  [GAME_MODES.SLINGSHOT]: (engine, snap) => engine.startSlingshotMode(snap.engine.slingshotStage || 1)
+});
 
-  snapshot.obstacles.forEach((saved, idx) => {
-    restoreFields(world.obstacles[idx], saved, OBSTACLE_MOTION_FIELDS);
-  });
-
+function restoreSnapshotBalls(engine, world, snapshot) {
   for (const ball of [...world.balls]) {
     world.removeBall(ball);
   }
@@ -465,8 +444,6 @@ export function applyRunSnapshot(engine, snapshot) {
 
   const newIdBySavedId = new Map();
   const restored = snapshot.balls.map((saved) => {
-    // Built from neutral values, not the saved ones, so restoreFields checks every saved
-    // field (a text position included) against a value of the right type.
     const ball = new Ball({ x: 0, y: 0, radius: engine.physicsConfig.ball.radius, colorId: null });
     restoreFields(ball, saved, BALL_SCALAR_FIELDS);
     ball.pivotRef = saved.pivotIndex === NO_PIVOT_INDEX ? null : world.obstacles[saved.pivotIndex] || null;
@@ -482,7 +459,6 @@ export function applyRunSnapshot(engine, snapshot) {
         restored[idx].bonds.add(neighborId);
       }
     }
-    // Runs saved before tethers existed have none to restore.
     for (const savedNeighborId of saved.tethers || []) {
       const neighborId = newIdBySavedId.get(savedNeighborId);
       if (neighborId !== undefined && restored[idx].bonds.has(neighborId)) {
@@ -498,37 +474,14 @@ export function applyRunSnapshot(engine, snapshot) {
     }
   }
   world.allowTensionBreak = Boolean(snapshot.allowTensionBreak);
+  return restored;
+}
 
-  // The mode start built a fresh Magnetar; the restored board decides whether it stays. A
-  // Boss Core board (a run saved before Magnetars) has none, and a missing saved schedule
-  // leaves the fresh one at step 0.
-  const restoredMagnetar = restored.find((ball) => ball.clusterModifier === CLUSTER_MODIFIERS.MAGNETAR);
-  if (restoredMagnetar && engine.magnetar) {
-    engine.restoreMagnetar(snapshot.magnetar, restoredMagnetar.id);
-  } else {
-    engine.clearMagnetar();
-  }
-
-  // A run saved before the fairness counters existed restores them at their reset value.
-  for (const field of FAIRNESS_COUNTER_FIELDS) {
-    engine[field] = 0;
-  }
-  restoreFields(engine, snapshot.engine, ENGINE_SCALAR_FIELDS);
-  restoreLegacySagLevel(engine, snapshot);
-  engine.specialInventory = restoreSpecialInventory(engine.specialInventory, snapshot.specialInventory);
-  engine.waveLog = restoreWaveLog(engine, snapshot.waveLog);
-  // Optional: a run saved before hints could run out holds none, and a damaged list is dropped.
-  engine.discoveryShownIds = new Set(
-    Array.isArray(snapshot.discoveryShownIds)
-      ? snapshot.discoveryShownIds.filter((id) => typeof id === 'string')
-      : []
-  );
-  // Set after the mode restart above, which wipes both; runs saved before perks existed hold neither.
+function restoreFluxAndGhostMetadata(engine, snapshot) {
   if (snapshot.mode === GAME_MODES.FLUX) {
     engine.fluxPerks = restoreFluxPerks(engine, snapshot.fluxPerks);
     engine.fluxPerkOffer = restoreFluxPerkOffer(engine, snapshot.fluxPerkOffer);
   }
-  // Optional: the weekly flag and its week key are those captured when the run started.
   const isWeekly = snapshot.mode === GAME_MODES.FLUX
     && snapshot.isWeeklyFluxRun === true
     && typeof snapshot.weeklyWeekKey === 'string'
@@ -536,13 +489,31 @@ export function applyRunSnapshot(engine, snapshot) {
   engine.isWeeklyFluxRun = isWeekly;
   engine.weeklyWeekKey = isWeekly ? snapshot.weeklyWeekKey : null;
   engine.runBestBaseline = null;
-  // Optional: a run saved before timelines existed (or a damaged one) restarts with an empty one.
   const hasTimeline = snapshot.mode === GAME_MODES.DAILY || snapshot.mode === GAME_MODES.FLUX;
   engine.shotTimeline = hasTimeline ? normalizeShotTimeline(snapshot.shotTimeline, engine.gameConfig.shotTimeline) : null;
-  // Optional: a Daily rematch stays a rematch, and the ghost saved with the run is raced again.
   engine.isDailyRematch = snapshot.mode === GAME_MODES.DAILY && snapshot.isDailyRematch === true;
   engine.ghostDuel = null;
   engine.restoreGhostDuel?.(snapshot.ghostDuelCode);
+}
+
+function restoreEngineSnapshotState(engine, world, snapshot, restored) {
+  const restoredMagnetar = restored.find((ball) => ball.clusterModifier === CLUSTER_MODIFIERS.MAGNETAR);
+  if (restoredMagnetar && engine.magnetar) {
+    engine.restoreMagnetar(snapshot.magnetar, restoredMagnetar.id);
+  } else {
+    engine.clearMagnetar();
+  }
+  for (const field of FAIRNESS_COUNTER_FIELDS) {
+    engine[field] = 0;
+  }
+  restoreFields(engine, snapshot.engine, ENGINE_SCALAR_FIELDS);
+  restoreLegacySagLevel(engine, snapshot);
+  engine.specialInventory = restoreSpecialInventory(engine.specialInventory, snapshot.specialInventory);
+  engine.waveLog = restoreWaveLog(engine, snapshot.waveLog);
+  engine.discoveryShownIds = new Set(
+    Array.isArray(snapshot.discoveryShownIds) ? snapshot.discoveryShownIds.filter((id) => typeof id === 'string') : []
+  );
+  restoreFluxAndGhostMetadata(engine, snapshot);
   if (engine.seededRng && Number.isFinite(snapshot.rngState)) {
     engine.seededRng.state = snapshot.rngState;
   }
@@ -552,12 +523,37 @@ export function applyRunSnapshot(engine, snapshot) {
   if (snapshot.mode === GAME_MODES.CASCADE) {
     engine.cascadeOccupiedPlatforms = getOccupiedPlatformIndices(world);
   }
-  // The restored mode variant determines which record the run started against.
   engine.restoreRunBestBaseline(snapshot.runBestBaseline);
-  // Runs saved before the queue existed, or with a damaged one, get a fresh queue.
   const savedQueue = snapshot.upcomingColorIds;
   const isValidQueue = Array.isArray(savedQueue) && savedQueue.every((color) => engine.activePalette.includes(color));
   engine.upcomingColorIds = isValidQueue ? [...savedQueue] : [];
+}
+
+/**
+ * Rebuilds the board of the snapshot's mode (obstacles, palette, mutators), then
+ * replaces its balls and live state with the saved ones. The run resumes paused.
+ * @param {import('./GameEngine.js').GameEngine} engine
+ * @param {object} snapshot - A snapshot accepted by isValidRunSnapshot.
+ * @returns {boolean} False when the rebuilt board does not match the snapshot; the
+ *   freshly started run is then left in place.
+ */
+export function applyRunSnapshot(engine, snapshot) {
+  const starter = SNAPSHOT_MODE_STARTERS[snapshot.mode];
+  if (starter) {
+    starter(engine, snapshot);
+  } else {
+    engine.startEndlessMode();
+  }
+  const world = engine.physicsWorld;
+  const typesMatch = snapshot.obstacles.every((obs, idx) => world.obstacles[idx]?.type === obs.type);
+  if (world.obstacles.length !== snapshot.obstacles.length || !typesMatch) {
+    return false;
+  }
+  snapshot.obstacles.forEach((saved, idx) => {
+    restoreFields(world.obstacles[idx], saved, OBSTACLE_MOTION_FIELDS);
+  });
+  const restored = restoreSnapshotBalls(engine, world, snapshot);
+  restoreEngineSnapshotState(engine, world, snapshot, restored);
   if (snapshot.mode === GAME_MODES.PUZZLE) {
     // The mode start rebuilt the full scripted queue: its tail matching the saved colors
     // keeps the special types; otherwise the saved colors stand alone.

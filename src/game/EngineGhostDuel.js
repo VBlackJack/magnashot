@@ -37,6 +37,65 @@ const GHOST_MODE_FLUX = 'flux';
 const NO_SHOTS_EVALUATED = -1;
 const ORIGIN_SAMPLE_COUNT = 1;
 
+/**
+ * Builds a Personal Best ghost from the player's stored Daily or Weekly Flux timeline.
+ * Returns null when no completed timeline exists for that seed.
+ */
+export function buildPersonalBestGhost(storage, mode, key, gameConfig, aliasLabel, weekKey = null) {
+  if (!storage || !key || !gameConfig?.ghostDuel) {
+    return null;
+  }
+  let timeline = null;
+  if (mode === GHOST_MODE_DAILY) {
+    const entry = (storage.getDailyHistory?.() ?? []).find((item) => item?.d === key);
+    timeline = entry?.tl ?? null;
+  } else if (mode === GHOST_MODE_FLUX && weekKey) {
+    const weekly = storage.getWeeklyFluxBest?.(weekKey);
+    timeline = weekly?.seed === key ? (weekly.tl ?? null) : null;
+  }
+  if (!timeline || !Array.isArray(timeline.s) || timeline.s.length === 0) {
+    return null;
+  }
+  return {
+    mode,
+    key,
+    cv: contentVersionFor(gameConfig.ghostDuel, mode),
+    n: Number.isInteger(timeline.n) && timeline.n > 0 ? timeline.n : timeline.s.length,
+    step: Number.isInteger(timeline.step) && timeline.step > 0 ? timeline.step : 1,
+    s: [...timeline.s],
+    final: timeline.s[timeline.s.length - 1],
+    assists: { workshop: 0, ammo: 0, continues: 0, tiltFree: false },
+    alias: aliasLabel,
+    isPersonalBest: true
+  };
+}
+
+/** Attaches the player's own PB ghost on Daily/Weekly runs when enabled and no friend duel is active. */
+export function attachPersonalBestGhostIfEnabled(engine) {
+  if (!engine || engine.isVersusRole || engine.ghostDuel || engine.isDailyRematch) {
+    return false;
+  }
+  if (!engine.storageManager?.getPbGhostEnabled?.()) {
+    return false;
+  }
+  const isDaily = engine.mode === GAME_MODES.DAILY;
+  const isWeekly = engine.mode === GAME_MODES.FLUX && engine.isWeeklyFluxRun && engine.weeklyWeekKey;
+  if (!isDaily && !isWeekly) {
+    return false;
+  }
+  const ghostMode = isDaily ? GHOST_MODE_DAILY : GHOST_MODE_FLUX;
+  const key = isDaily ? engine.dailySeedKey : engine.fluxSeed;
+  const pbGhost = buildPersonalBestGhost(
+    engine.storageManager,
+    ghostMode,
+    key,
+    engine.gameConfig,
+    t('duel.pbLabel'),
+    isWeekly ? engine.weeklyWeekKey : null
+  );
+  return pbGhost ? engine.attachGhost(pbGhost) : false;
+}
+
 /** Ghost Duel methods installed on GameEngine: lifecycle of the rival run shown during a run. */
 export const engineGhostDuelMethods = {
   /**
@@ -101,7 +160,7 @@ export const engineGhostDuelMethods = {
     if (!isDailyMatch && !isFluxMatch) {
       return false;
     }
-    if (isFluxMatch) {
+    if (isFluxMatch && !ghost.isPersonalBest) {
       // Every duel on a seed shares one physics: the device tilt is locked.
       this.isSharedFluxRun = true;
     }
@@ -199,7 +258,7 @@ export const engineGhostDuelMethods = {
       this.gameOverSummary.duel = summary;
     }
     const storage = this.storageManager;
-    if (typeof storage.recordGhostDuel === 'function') {
+    if (!ghost.isPersonalBest && typeof storage.recordGhostDuel === 'function') {
       storage.recordGhostDuel({
         mode: ghost.mode,
         key: ghost.key,

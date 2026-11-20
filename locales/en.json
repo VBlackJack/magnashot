@@ -1000,6 +1000,46 @@
           }
         }
       },
+      "arenaThemes": {
+        "items": {
+          "deepSpace": {
+            "name": "Deep Space Arena",
+            "description": "Default midnight magnetic chamber with cool blue rim glow."
+          },
+          "solarForge": {
+            "name": "Solar Forge Arena",
+            "description": "Smoldering ember chamber with warm amber horizon and walls."
+          },
+          "cryoLab": {
+            "name": "Cryo Lab Arena",
+            "description": "Sub-zero cyan laboratory backdrop with frosted grid lines."
+          },
+          "synthwave": {
+            "name": "Synthwave Grid Arena",
+            "description": "Ultraviolet arcade horizon with magenta-violet containment walls."
+          }
+        }
+      },
+      "laserTrails": {
+        "items": {
+          "classic": {
+            "name": "Classic Sight",
+            "description": "Default sphere-matched laser sight line."
+          },
+          "plasma": {
+            "name": "Plasma Beam",
+            "description": "Luminous magenta plasma aim sight."
+          },
+          "prism": {
+            "name": "Solar Prism",
+            "description": "High-visibility golden prism aim sight."
+          },
+          "pulse": {
+            "name": "Emerald Pulse",
+            "description": "Crisp emerald-cyan tactical laser sight."
+          }
+        }
+      },
       "balance": {
         "label": "Available Coins: {{coins}} ⬡"
       },
@@ -1553,7 +1593,11 @@
         "upgradePurchased": "{{name}} upgraded to level {{level}} of {{maxLevel}}.",
         "ammoPurchased": "{{name}} purchased. In stock: {{count}}.",
         "stylePurchased": "{{name}} style unlocked and equipped.",
-        "styleEquipped": "{{name}} style equipped."
+        "styleEquipped": "{{name}} style equipped.",
+        "arenaThemePurchased": "{{name}} arena theme unlocked and equipped.",
+        "arenaThemeEquipped": "{{name}} arena theme equipped.",
+        "laserTrailPurchased": "{{name}} laser sight unlocked and equipped.",
+        "laserTrailEquipped": "{{name}} laser sight equipped."
       },
       "button": {
         "close": "Close"
@@ -1785,6 +1829,8 @@
         "accessibility": "Accessibility"
       },
       "vibration": "Vibration (phone and controller)",
+      "leftHanded": "Left-handed mobile drawer",
+      "pbGhost": "Race my Personal Best ghost (Daily & Weekly)",
       "musicPreviewOffHint": "Turn sound and music on to hear the Pulse preview."
     },
     "fluxPerk": {
@@ -1874,6 +1920,27 @@
       "arcadeSubhead": {
         "core": "Core & Timed",
         "labs": "Physics Labs"
+      },
+      "filters": {
+        "aria": "Filter arcade modes",
+        "all": "All",
+        "quick": "Quick",
+        "endless": "Endless",
+        "unmastered": "Unmastered"
+      },
+      "smartPick": {
+        "nextUnmastered": "Next to master: {{mode}}"
+      },
+      "mastery": {
+        "summary": "{{mastered}}/{{total}} {{star}}",
+        "grandMaster": "Grand Master {{mastered}}/{{total}} {{star}}"
+      },
+      "dailyPuzzle": {
+        "title": "Daily Puzzle",
+        "desc": "One shared tactical board each day.",
+        "stageChip": "Today: Puzzle #{{stage}}",
+        "stageBonus": "Puzzle #{{stage}} (+{{coins}} ⬡)",
+        "stageDone": "Puzzle #{{stage}} - Done ✓"
       },
       "campaign": {
         "summary": "{{chapter}} • {{stars}} / {{maxStars}} ★",
@@ -2198,7 +2265,8 @@
       "newer": "This duel needs a newer MagnaShot. Reload to update.",
       "ok": "OK"
     },
-    "defaultName": "Ghost"
+    "defaultName": "Ghost",
+    "pbLabel": "PB"
   },
   "versus": {
     "tutorial": {

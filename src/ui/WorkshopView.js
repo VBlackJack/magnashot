@@ -14,7 +14,16 @@
  * limitations under the License.
  */
 
-import { BALL_STYLES, BALL_STYLES_ORDER, GAME_MODES, SPECIAL_TYPES_ORDER } from '../core/Constants.js';
+import {
+  ARENA_THEMES,
+  ARENA_THEMES_ORDER,
+  BALL_STYLES,
+  BALL_STYLES_ORDER,
+  GAME_MODES,
+  LASER_TRAILS,
+  LASER_TRAILS_ORDER,
+  SPECIAL_TYPES_ORDER
+} from '../core/Constants.js';
 import { t, formatNumber } from '../core/I18n.js';
 import { specialIconBackground } from './CodexView.js';
 import { FULL_PERCENT, filterFocusTrapCandidates } from './UIHelpers.js';
@@ -501,6 +510,150 @@ function buildBallStyleCard(ui, styleId, spec, activeStyle, coins, slotIndex) {
   return card;
 }
 
+function buildArenaThemeCard(ui, themeId, spec, activeTheme, coins, slotIndex) {
+  const isUnlocked = ui.storageManager.isArenaThemeUnlocked?.(themeId) ?? (themeId === ARENA_THEMES.DEEP_SPACE);
+  const isActive = activeTheme === themeId;
+  const cost = spec.cost || 0;
+  const themeName = t(`modals.shop.arenaThemes.items.${themeId}.name`);
+
+  const card = document.createElement('div');
+  card.className = `upgrade-card style-card${isActive ? ' active-style' : ''}`;
+
+  const header = document.createElement('div');
+  header.className = 'upgrade-header';
+  const swatch = document.createElement('span');
+  swatch.className = 'arena-theme-swatch';
+  swatch.dataset.arenaTheme = themeId;
+  swatch.setAttribute('aria-hidden', 'true');
+  const status = document.createElement('span');
+  status.className = `upgrade-level${isActive ? ' style-status-active' : ''}`;
+  status.textContent = isActive
+    ? t('modals.shop.styles.equipped')
+    : isUnlocked
+      ? t('modals.shop.styles.unlocked')
+      : t('modals.shop.styles.cost', { cost: formatNumber(cost) });
+  header.append(swatch, status);
+
+  const title = document.createElement('div');
+  title.className = 'upgrade-title';
+  title.textContent = themeName;
+
+  const desc = document.createElement('div');
+  desc.className = 'upgrade-desc';
+  desc.textContent = t(`modals.shop.arenaThemes.items.${themeId}.description`);
+
+  const actionBtn = document.createElement('button');
+  actionBtn.type = 'button';
+  actionBtn.className = `modal-btn style-action-btn${isActive ? '' : ' primary'}`;
+  actionBtn.dataset.arenaThemeId = themeId;
+  if (isActive) {
+    actionBtn.textContent = t('modals.shop.styles.equipped');
+    actionBtn.disabled = true;
+  } else if (isUnlocked) {
+    actionBtn.textContent = t('modals.shop.styles.equip');
+    actionBtn.addEventListener('click', () => {
+      if (ui.storageManager.setActiveArenaTheme?.(themeId)) {
+        ui.renderer?.setArenaTheme?.(themeId);
+        ui.audioManager.playEffect('snap');
+        ui.announce(t('modals.shop.feedback.arenaThemeEquipped', { name: themeName }));
+        ui.rerenderShopKeepingFocus(`.style-action-btn[data-arena-theme-id="${themeId}"]`, slotIndex);
+      }
+    });
+  } else {
+    actionBtn.textContent = t('modals.shop.styles.cost', { cost: formatNumber(cost) });
+    actionBtn.disabled = coins < cost;
+    actionBtn.addEventListener('click', () => {
+      if (ui.storageManager.purchaseArenaTheme?.(themeId, cost)) {
+        ui.renderer?.setArenaTheme?.(themeId);
+        ui.audioManager.playEffect('match', 2);
+        ui.refresh(ui.engine, ui.lastExtra);
+        ui.announce(t('modals.shop.feedback.arenaThemePurchased', { name: themeName }));
+        ui.rerenderShopKeepingFocus(`.style-action-btn[data-arena-theme-id="${themeId}"]`, slotIndex);
+      }
+    });
+  }
+  card.append(header, title, desc, actionBtn);
+  return card;
+}
+
+function buildLaserTrailCard(ui, trailId, spec, activeTrail, coins, slotIndex) {
+  const isUnlocked = ui.storageManager.isLaserTrailUnlocked?.(trailId) ?? (trailId === LASER_TRAILS.CLASSIC);
+  const isActive = activeTrail === trailId;
+  const cost = spec.cost || 0;
+  const trailName = t(`modals.shop.laserTrails.items.${trailId}.name`);
+
+  const card = document.createElement('div');
+  card.className = `upgrade-card style-card${isActive ? ' active-style' : ''}`;
+
+  const header = document.createElement('div');
+  header.className = 'upgrade-header';
+  const swatch = document.createElement('span');
+  swatch.className = 'laser-trail-swatch';
+  swatch.dataset.laserTrail = trailId;
+  swatch.setAttribute('aria-hidden', 'true');
+  const status = document.createElement('span');
+  status.className = `upgrade-level${isActive ? ' style-status-active' : ''}`;
+  status.textContent = isActive
+    ? t('modals.shop.styles.equipped')
+    : isUnlocked
+      ? t('modals.shop.styles.unlocked')
+      : t('modals.shop.styles.cost', { cost: formatNumber(cost) });
+  header.append(swatch, status);
+
+  const title = document.createElement('div');
+  title.className = 'upgrade-title';
+  title.textContent = trailName;
+  const desc = document.createElement('div');
+  desc.className = 'upgrade-desc';
+  desc.textContent = t(`modals.shop.laserTrails.items.${trailId}.description`);
+
+  const actionBtn = document.createElement('button');
+  actionBtn.type = 'button';
+  actionBtn.className = `modal-btn style-action-btn${isActive ? '' : ' primary'}`;
+  actionBtn.dataset.laserTrailId = trailId;
+  if (isActive) {
+    actionBtn.textContent = t('modals.shop.styles.equipped');
+    actionBtn.disabled = true;
+  } else if (isUnlocked) {
+    actionBtn.textContent = t('modals.shop.styles.equip');
+    actionBtn.addEventListener('click', () => {
+      if (ui.storageManager.setActiveLaserTrail?.(trailId)) {
+        ui.renderer?.setLaserTrail?.(trailId);
+        ui.audioManager.playEffect('snap');
+        ui.announce(t('modals.shop.feedback.laserTrailEquipped', { name: trailName }));
+        ui.rerenderShopKeepingFocus(`.style-action-btn[data-laser-trail-id="${trailId}"]`, slotIndex);
+      }
+    });
+  } else {
+    actionBtn.textContent = t('modals.shop.styles.cost', { cost: formatNumber(cost) });
+    actionBtn.disabled = coins < cost;
+    actionBtn.addEventListener('click', () => {
+      if (ui.storageManager.purchaseLaserTrail?.(trailId, cost)) {
+        ui.renderer?.setLaserTrail?.(trailId);
+        ui.audioManager.playEffect('match', 2);
+        ui.refresh(ui.engine, ui.lastExtra);
+        ui.announce(t('modals.shop.feedback.laserTrailPurchased', { name: trailName }));
+        ui.rerenderShopKeepingFocus(`.style-action-btn[data-laser-trail-id="${trailId}"]`, slotIndex);
+      }
+    });
+  }
+  card.append(header, title, desc, actionBtn);
+  return card;
+}
+
+function appendStyleGroup(grid, order, catalog, buildCard, slotIndex) {
+  let nextSlot = slotIndex;
+  if (!catalog) {
+    return nextSlot;
+  }
+  for (const id of order) {
+    if (catalog[id]) {
+      grid.appendChild(buildCard(id, catalog[id], nextSlot++));
+    }
+  }
+  return nextSlot;
+}
+
 function renderWorkshopStylesPane(ui, coins) {
   if (!ui.elements.shopStylesGrid || !ui.ballsConfig?.styles) {
     return;
@@ -508,14 +661,12 @@ function renderWorkshopStylesPane(ui, coins) {
   const stylesGrid = ui.elements.shopStylesGrid;
   stylesGrid.replaceChildren();
   const activeStyle = ui.storageManager.getActiveBallStyle?.() || BALL_STYLES.CLASSIC;
-  for (let slotIndex = 0; slotIndex < BALL_STYLES_ORDER.length; slotIndex++) {
-    const styleId = BALL_STYLES_ORDER[slotIndex];
-    const spec = ui.ballsConfig.styles[styleId];
-    if (!spec) {
-      continue;
-    }
-    stylesGrid.appendChild(buildBallStyleCard(ui, styleId, spec, activeStyle, coins, slotIndex));
-  }
+  const activeTheme = ui.storageManager.getActiveArenaTheme?.() || ARENA_THEMES.DEEP_SPACE;
+  const activeTrail = ui.storageManager.getActiveLaserTrail?.() || LASER_TRAILS.CLASSIC;
+  let slot = 0;
+  slot = appendStyleGroup(stylesGrid, BALL_STYLES_ORDER, ui.ballsConfig.styles, (id, spec, idx) => buildBallStyleCard(ui, id, spec, activeStyle, coins, idx), slot);
+  slot = appendStyleGroup(stylesGrid, ARENA_THEMES_ORDER, ui.gameConfig?.arenaThemes, (id, spec, idx) => buildArenaThemeCard(ui, id, spec, activeTheme, coins, idx), slot);
+  appendStyleGroup(stylesGrid, LASER_TRAILS_ORDER, ui.gameConfig?.laserTrails, (id, spec, idx) => buildLaserTrailCard(ui, id, spec, activeTrail, coins, idx), slot);
 }
 
 const ACHIEVEMENT_LIVE_MODE_RECORDS = Object.freeze([

@@ -76,6 +76,8 @@ class Application {
       renderer.setHighContrast(storageManager.getHighContrast());
       renderer.setColorPatterns(storageManager.getColorPatterns());
       renderer.setBallStyle(storageManager.getActiveBallStyle());
+      renderer.setArenaTheme(storageManager.getActiveArenaTheme());
+      renderer.setLaserTrail(storageManager.getActiveLaserTrail());
 
       let uiManager = null;
       const engine = new GameEngine({

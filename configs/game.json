@@ -2456,6 +2456,8 @@
         "discoveries": "object",
         "discoveriesVersion": "integer",
         "unlockedBallStyles": "object",
+        "unlockedArenaThemes": "object",
+        "unlockedLaserTrails": "object",
         "modeUnlocks": "object",
         "weeklyFluxBest": "object",
         "playerStats": "object",
@@ -2466,8 +2468,11 @@
         "dailyLastPlayedDate": "date",
         "dailyStreakDate": "date",
         "dailyStreakGraceDate": "date",
+        "dailyPuzzleClaimedDate": "date",
         "weeklyFluxClaimedWeek": "week",
         "activeBallStyle": "string",
+        "activeArenaTheme": "string",
+        "activeLaserTrail": "string",
         "ghostAlias": "optionalString",
         "versusTutorialSeen": "boolean"
       }
@@ -2485,6 +2490,8 @@
       "gamepadAimSpeed": "gamepad_aim_speed",
       "gamepadInvertX": "gamepad_invert_x",
       "gamepadRumble": "gamepad_rumble",
+      "leftHanded": "left_handed",
+      "pbGhost": "pb_ghost",
       "animationSpeed": "anim_speed",
       "musicEnabled": "music_enabled",
       "musicVolume": "music_volume",
@@ -2536,6 +2543,11 @@
       "discoveriesVersion": "discoveries_version",
       "unlockedBallStyles": "ball_styles",
       "activeBallStyle": "ball_style",
+      "unlockedArenaThemes": "arena_themes",
+      "activeArenaTheme": "arena_theme",
+      "unlockedLaserTrails": "laser_trails",
+      "activeLaserTrail": "laser_trail",
+      "dailyPuzzleClaimedDate": "daily_puzzle_claimed",
       "schemaVersion": "schema_version",
       "modeUnlocks": "mode_unlocks",
       "dailyHistory": "daily_history",
@@ -2565,6 +2577,8 @@
     "matchMinCount": 3,
     "initialCoins": 50,
     "ballStyle": "classic",
+    "arenaTheme": "deepSpace",
+    "laserTrail": "classic",
     "musicEnabled": true,
     "musicVolume": 0.6,
     "musicVolumeSteps": [0.2, 0.4, 0.6, 0.8, 1],
@@ -2577,6 +2591,55 @@
     ],
     "coarsePointerMediaQuery": "(pointer: coarse)",
     "fullscreenDisplayModeMediaQuery": "(display-mode: fullscreen)"
+  },
+  "dailyPuzzle": {
+    "firstClearBonusCoins": 25
+  },
+  "laserTrails": {
+    "classic": {
+      "cost": 0
+    },
+    "plasma": {
+      "cost": 150,
+      "color": "#e879f9"
+    },
+    "prism": {
+      "cost": 200,
+      "color": "#fde047"
+    },
+    "pulse": {
+      "cost": 240,
+      "color": "#34d399"
+    }
+  },
+  "arenaThemes": {
+    "deepSpace": {
+      "cost": 0
+    },
+    "solarForge": {
+      "cost": 180,
+      "backgroundTop": "#140905",
+      "backgroundBottom": "#240f08",
+      "horizonGlowColor": "rgba(249, 115, 22, 0.22)",
+      "gridColor": "rgba(251, 146, 60, 0.08)",
+      "wallColor": "#fb923c"
+    },
+    "cryoLab": {
+      "cost": 220,
+      "backgroundTop": "#05131c",
+      "backgroundBottom": "#092130",
+      "horizonGlowColor": "rgba(56, 189, 248, 0.24)",
+      "gridColor": "rgba(125, 211, 252, 0.09)",
+      "wallColor": "#38bdf8"
+    },
+    "synthwave": {
+      "cost": 280,
+      "backgroundTop": "#12061f",
+      "backgroundBottom": "#220a38",
+      "horizonGlowColor": "rgba(236, 72, 153, 0.24)",
+      "gridColor": "rgba(192, 132, 252, 0.1)",
+      "wallColor": "#e879f9"
+    }
   },
   "theme": {
     "fontFamily": "system-ui, sans-serif",

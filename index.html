@@ -107,7 +107,7 @@
       </div>
       <div class="hud-center-info">
         <div class="hud-mode-row">
-          <div id="hud-mode-banner" class="hud-mode-banner" role="button" tabindex="0" aria-haspopup="dialog"></div>
+          <button id="hud-mode-banner" type="button" class="hud-mode-banner" aria-haspopup="dialog"></button>
           <button id="btn-hint-replay" type="button" class="hud-menu-btn hud-hint-btn hidden" data-i18n-aria-label="hud.hints.replayAria" data-i18n-title="hud.hints.replayAria"><span aria-hidden="true">?</span></button>
         </div>
         <div class="hud-badges-row">
@@ -195,7 +195,10 @@
   <div id="modal-play" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="modal-play-title">
     <div class="modal-card wide play-hub">
       <div class="play-hub-header">
-        <h2 id="modal-play-title" class="modal-title" data-i18n="modals.play.title"></h2>
+        <div class="play-hub-title-group">
+          <h2 id="modal-play-title" class="modal-title" data-i18n="modals.play.title"></h2>
+          <span id="play-hub-mastery-summary" class="play-hub-mastery-summary"></span>
+        </div>
         <button id="btn-close-play" type="button" class="modal-btn" data-i18n="modals.levelSelect.button.close"></button>
       </div>
       <p id="play-hub-hint" class="modal-subtext hidden" role="status" aria-live="polite"></p>
@@ -224,6 +227,12 @@
               <span class="arcade-card-desc" data-i18n="modals.play.weekly.desc"></span>
               <span id="weekly-reward" class="arcade-card-best gold-text hidden"></span>
             </button>
+            <button id="btn-daily-puzzle" type="button" class="arcade-mode-card">
+              <span class="arcade-card-icon" aria-hidden="true" data-i18n="modals.play.icon.puzzle"></span>
+              <span class="arcade-card-title" data-i18n="modals.play.dailyPuzzle.title"></span>
+              <span class="arcade-card-desc" data-i18n="modals.play.dailyPuzzle.desc"></span>
+              <span id="daily-puzzle-stage-label" class="arcade-card-best gold-text"></span>
+            </button>
           </div>
           <div id="play-bounties" class="play-bounties">
             <h4 class="play-bounties-title" data-i18n="modals.play.bounties.title"></h4>
@@ -231,7 +240,16 @@
           </div>
         </section>
         <section class="play-hub-section play-hub-arcade" aria-labelledby="play-section-arcade-title">
-          <h3 id="play-section-arcade-title" class="play-section-title" data-i18n="modals.play.section.arcade"></h3>
+          <div class="play-hub-arcade-head">
+            <h3 id="play-section-arcade-title" class="play-section-title" data-i18n="modals.play.section.arcade"></h3>
+            <button id="btn-play-next-unmastered" type="button" class="nav-btn badge-btn play-hub-smart-btn hidden"></button>
+          </div>
+          <div id="play-hub-filters" class="play-hub-filters" role="group" data-i18n-aria-label="modals.play.filters.aria">
+            <button type="button" class="play-hub-filter-chip" data-arcade-filter="all" aria-pressed="true" data-i18n="modals.play.filters.all"></button>
+            <button type="button" class="play-hub-filter-chip" data-arcade-filter="quick" aria-pressed="false" data-i18n="modals.play.filters.quick"></button>
+            <button type="button" class="play-hub-filter-chip" data-arcade-filter="endless" aria-pressed="false" data-i18n="modals.play.filters.endless"></button>
+            <button type="button" class="play-hub-filter-chip" data-arcade-filter="unmastered" aria-pressed="false" data-i18n="modals.play.filters.unmastered"></button>
+          </div>
           <div class="play-hub-grid">
             <h4 class="play-hub-subhead" data-i18n="modals.play.arcadeSubhead.core"></h4>
             <button id="btn-endless" type="button" class="arcade-mode-card">
@@ -622,6 +640,10 @@
           <input id="input-duel-name" type="text" class="flux-seed-input settings-duel-name-input" autocomplete="off" autocapitalize="off" spellcheck="false" aria-describedby="duel-name-hint">
           <p id="duel-name-hint" class="install-hint" data-i18n="modals.settings.duelName.hint"></p>
         </div>
+        <label class="settings-controller-field">
+          <input id="input-pb-ghost" type="checkbox">
+          <span data-i18n="modals.settings.pbGhost"></span>
+        </label>
       </section>
       <section class="settings-controller settings-group" aria-labelledby="settings-group-accessibility-title">
         <h3 id="settings-group-accessibility-title" class="stats-section-title" data-i18n="modals.settings.groups.accessibility"></h3>
@@ -646,6 +668,10 @@
         <label class="settings-controller-field">
           <input id="input-gamepad-rumble" type="checkbox">
           <span data-i18n="modals.settings.vibration"></span>
+        </label>
+        <label class="settings-controller-field">
+          <input id="input-left-handed" type="checkbox">
+          <span data-i18n="modals.settings.leftHanded"></span>
         </label>
       </section>
       <section class="settings-controller settings-group" aria-labelledby="settings-controller-title">

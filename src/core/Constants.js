@@ -160,6 +160,34 @@ export const BALL_STYLES_ORDER = Object.freeze([
   BALL_STYLES.METALLIC
 ]);
 
+export const ARENA_THEMES = Object.freeze({
+  DEEP_SPACE: 'deepSpace',
+  SOLAR_FORGE: 'solarForge',
+  CRYO_LAB: 'cryoLab',
+  SYNTHWAVE: 'synthwave'
+});
+
+export const ARENA_THEMES_ORDER = Object.freeze([
+  ARENA_THEMES.DEEP_SPACE,
+  ARENA_THEMES.SOLAR_FORGE,
+  ARENA_THEMES.CRYO_LAB,
+  ARENA_THEMES.SYNTHWAVE
+]);
+
+export const LASER_TRAILS = Object.freeze({
+  CLASSIC: 'classic',
+  PLASMA: 'plasma',
+  PRISM: 'prism',
+  PULSE: 'pulse'
+});
+
+export const LASER_TRAILS_ORDER = Object.freeze([
+  LASER_TRAILS.CLASSIC,
+  LASER_TRAILS.PLASMA,
+  LASER_TRAILS.PRISM,
+  LASER_TRAILS.PULSE
+]);
+
 export const CLUSTER_MODIFIERS = Object.freeze({
   ARMORED: 'armored',
   DORMANT_BOMB: 'dormantBomb',
