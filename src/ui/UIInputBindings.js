@@ -336,12 +336,14 @@ function bindPreferenceToggles(ui) {
   els.btnAnimSpeed?.addEventListener('click', () => {
     ui.cycleAnimationSpeed();
   });
-  els.btnLang.addEventListener('click', () => {
+  els.btnLang.addEventListener('click', async () => {
     const supported = ui.gameConfig.defaults.supportedLanguages;
     const current = i18n.getLocale();
     const nextLang = supported[(supported.indexOf(current) + 1) % supported.length];
-    i18n.setLocale(nextLang);
-    ui.storageManager.setLanguage(nextLang);
+    await i18n.setLocale(nextLang);
+    if (i18n.getLocale() === nextLang) {
+      ui.storageManager.setLanguage(nextLang);
+    }
   });
 }
 

@@ -69,30 +69,56 @@ export class I18nService {
     this.numberFormatters = new Map();
   }
 
+  async loadLocale(locale) {
+    if (typeof locale !== 'string' || !Object.hasOwn(LOCALE_PATHS, locale)) {
+      return false;
+    }
+    if (this.dictionaries.has(locale)) {
+      return true;
+    }
+    const path = LOCALE_PATHS[locale];
+    try {
+      const response = await fetch(path, DATA_FETCH_OPTIONS);
+      if (response.ok) {
+        const json = await response.json();
+        this.dictionaries.set(locale, json);
+        return true;
+      }
+    } catch {
+      // An unreachable or malformed locale leaves the others usable.
+    }
+    return false;
+  }
+
+  applyLocale(locale) {
+    this.currentLocale = locale;
+    if (typeof document !== 'undefined' && document.documentElement) {
+      document.documentElement.lang = locale;
+    }
+    this.translateDOM();
+    for (const callback of this.listeners) {
+      callback(locale);
+    }
+  }
+
   /**
-   * Loads every locale; one that fails to load does not prevent the others. When the
-   * requested locale is missing, the game starts in the fallback, else in any loaded one.
+   * Loads the active locale (and fallback if distinct) upfront; secondary locales lazy-load on
+   * switch. If neither initial locale loads, falls back to trying remaining locales.
    *
    * @param {string} initialLocale Locale to start with.
    * @param {string} [fallbackLocale] Configured default, looked up when a key is missing.
    */
   async init(initialLocale, fallbackLocale = initialLocale) {
-    const entries = Object.entries(LOCALE_PATHS);
-    await Promise.all(
-      entries.map(async ([locale, path]) => {
-        try {
-          const response = await fetch(path, DATA_FETCH_OPTIONS);
-          if (response.ok) {
-            const json = await response.json();
-            this.dictionaries.set(locale, json);
-          }
-        } catch {
-          // An unreachable or malformed locale leaves the others usable.
-        }
-      })
+    const initial = [initialLocale, fallbackLocale].filter(
+      (loc, idx, arr) => typeof loc === 'string' && Object.hasOwn(LOCALE_PATHS, loc) && arr.indexOf(loc) === idx
     );
-    this.fallbackLocale = fallbackLocale;
-    const startLocale = [initialLocale, fallbackLocale, ...this.dictionaries.keys()].find((locale) =>
+    await Promise.all(initial.map((locale) => this.loadLocale(locale)));
+    if (this.dictionaries.size === 0) {
+      const remaining = Object.keys(LOCALE_PATHS).filter((locale) => !initial.includes(locale));
+      await Promise.all(remaining.map((locale) => this.loadLocale(locale)));
+    }
+    this.fallbackLocale = typeof fallbackLocale === 'string' ? fallbackLocale : initialLocale;
+    const startLocale = [initialLocale, this.fallbackLocale, ...this.dictionaries.keys()].find((locale) =>
       this.dictionaries.has(locale)
     );
     if (startLocale) {
@@ -105,17 +131,16 @@ export class I18nService {
   }
 
   setLocale(locale) {
-    if (!this.dictionaries.has(locale)) {
-      return;
+    if (this.dictionaries.has(locale)) {
+      this.applyLocale(locale);
+      return true;
     }
-    this.currentLocale = locale;
-    if (typeof document !== 'undefined' && document.documentElement) {
-      document.documentElement.lang = locale;
-    }
-    this.translateDOM();
-    for (const callback of this.listeners) {
-      callback(locale);
-    }
+    return this.loadLocale(locale).then((loaded) => {
+      if (loaded) {
+        this.applyLocale(locale);
+      }
+      return loaded;
+    });
   }
 
   getLocale() {
