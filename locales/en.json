@@ -152,6 +152,7 @@
         "fluxBoss": "Flux • Shape {{stage}}: {{shape}} (Boss)",
         "fluxBossMagnetar": "Flux • Shape {{stage}}: {{shape}} (Boss, {{moorings}} moorings)",
         "puzzle": "Puzzle {{stage}} / {{total}}",
+        "customPuzzle": "Custom Puzzle",
         "blitz": "Blitz 90s • Wave {{wave}}",
         "bossRush": "Boss Rush • Wave {{wave}} (👑 {{shields}})",
         "bossRushMagnetar": "Boss Rush • Wave {{wave}} ({{moorings}} moorings)",
@@ -426,7 +427,17 @@
         "stage22": "Let the singularity bend your cobalt shot around the barrier to free the core.",
         "stage23": "Thread the rocket up the gap to pierce the armor and trigger the dormant bomb.",
         "stage24": "Equip Lightning and zap across the tethered anchors to drop both clusters at once.",
-        "stage25": "Bank past the antimagnet field to pop the violet anchors and release the core."
+        "stage25": "Bank past the antimagnet field to pop the violet anchors and release the core.",
+        "stage26": "Let the attractor bend your cobalt shot around the barrier into the anchors.",
+        "stage27": "Ride the repulsor deflection into the crimson anchors to detonate the barrel.",
+        "stage28": "Fire through the left portal to drop onto the shielded amber anchors.",
+        "stage29": "Ricochet off the central bumper to pop the emerald anchors and free the core.",
+        "stage30": "Use the Anvil to smash straight through the armored column into the barrel.",
+        "stage31": "Drop the Bomb between the tethered anchors to sever the entire cluster.",
+        "stage32": "Curve past the repulsor to snap the violet anchors and rescue the core.",
+        "stage33": "Send the Prism through the portal to pop the crimson anchors and rescue the core.",
+        "stage34": "Whip around the right singularity to clear the emerald anchors above the barrier.",
+        "stage35": "Thread the Rocket through the portal to pierce the shielded barrel."
       },
       "arcadeModes": {
         "classic": "Purist: fixed shots per stage, no upgrades or shop. Clear every sphere for bonus shots.",
@@ -919,7 +930,7 @@
       },
       "arcade": {
         "puzzle": "Puzzle",
-        "puzzleDesc": "25 trick-shot stages • 1 or 2 shots",
+        "puzzleDesc": "35 trick-shot stages • 1 or 2 shots",
         "puzzleRecord": "Puzzle {{stage}}/{{total}} • Stars: {{stars}}/{{maxStars}}",
         "puzzleStage": "Puzzle {{stage}}",
         "puzzleStageLocked": "Clear Puzzle {{previous}} to unlock.",
@@ -1546,6 +1557,54 @@
           "slingshotStagesGold": {
             "name": "Gravity Bender III",
             "description": "Reach Stage {{target}} in Magnetic Slingshot."
+          },
+          "puzzleStages": {
+            "name": "Trick-Shot Apprentice",
+            "description": "Clear {{target}} distinct Puzzle stages."
+          },
+          "puzzleStagesSilver": {
+            "name": "Trick-Shot Specialist",
+            "description": "Clear {{target}} distinct Puzzle stages."
+          },
+          "puzzleStagesGold": {
+            "name": "Trick-Shot Grandmaster",
+            "description": "Clear {{target}} distinct Puzzle stages."
+          },
+          "dailyPuzzles": {
+            "name": "Daily Tactician I",
+            "description": "Complete {{target}} Daily Tactical Puzzle."
+          },
+          "dailyPuzzlesSilver": {
+            "name": "Daily Tactician II",
+            "description": "Complete {{target}} Daily Tactical Puzzles."
+          },
+          "dailyPuzzlesGold": {
+            "name": "Daily Tactician III",
+            "description": "Complete {{target}} Daily Tactical Puzzles."
+          },
+          "cosmeticCollector": {
+            "name": "Workshop Curator I",
+            "description": "Unlock {{target}} Workshop styles, themes, or laser trails."
+          },
+          "cosmeticCollectorSilver": {
+            "name": "Workshop Curator II",
+            "description": "Unlock {{target}} Workshop styles, themes, or laser trails."
+          },
+          "cosmeticCollectorGold": {
+            "name": "Workshop Curator III",
+            "description": "Unlock {{target}} Workshop styles, themes, or laser trails."
+          },
+          "weeklyMasteryChest": {
+            "name": "Weekly Mastery Champion I",
+            "description": "Claim {{target}} full Weekly Mastery Trio bonus chest."
+          },
+          "weeklyMasteryChestSilver": {
+            "name": "Weekly Mastery Champion II",
+            "description": "Claim {{target}} full Weekly Mastery Trio bonus chests."
+          },
+          "weeklyMasteryChestGold": {
+            "name": "Weekly Mastery Champion III",
+            "description": "Claim {{target}} full Weekly Mastery Trio bonus chests."
           }
         },
         "tier": {
@@ -1965,6 +2024,7 @@
       },
       "bounties": {
         "title": "Daily Contracts",
+        "nextCta": "Next contract: {{title}}",
         "progress": "{{progress}}/{{target}}",
         "done": "Done ✓",
         "reward": "+{{coins}} ⬡",
@@ -1995,6 +2055,11 @@
         "fluxDesc": "Generated shapes, one bonus to pick after each.",
         "fluxRecord": "Shape {{stage}} • Best: {{score}}"
       },
+      "weeklyMastery": {
+        "title": "Weekly Mastery Trio",
+        "titleBonus": "Weekly Mastery Trio (+{{coins}} ⬡ chest)",
+        "titleClaimed": "Weekly Mastery Trio (chest claimed ✓)"
+      },
       "puzzle": {
         "stagesToggle": "Choose a puzzle"
       },
@@ -2024,15 +2089,42 @@
     },
     "puzzleBuilder": {
       "openButton": "Create puzzle",
+      "editButton": "Edit puzzle",
       "title": "Custom Puzzle Builder",
-      "subtitle": "Tap cells to place or remove spheres, set your shot queue, then play or copy a share link.",
+      "subtitle": "Tap cells to place spheres, anchors, or Rescue Cores, pick an obstacle, then play or share.",
       "paletteAria": "Sphere color palette",
+      "toolsAria": "Placement tool",
+      "gridAria": "Custom puzzle board",
       "queueAria": "Launcher shot queue",
       "shotsLabel": "Shots:",
+      "obstacleLabel": "Obstacle:",
+      "count": "{{count}} / {{max}} spheres",
       "playButton": "Play puzzle",
       "copyButton": "Copy share link",
+      "clearButton": "Clear",
+      "importLabel": "Import puzzle URL or code",
+      "importPlaceholder": "Paste ?puzzle=... link or code",
+      "importButton": "Import",
+      "imported": "Puzzle imported into the builder.",
       "copied": "Puzzle link copied to clipboard.",
       "emptyError": "Place at least one sphere on the board first.",
+      "tooLargeError": "Puzzle exceeds share-link size limit. Remove a few spheres.",
+      "invalidImportError": "Invalid or corrupted puzzle link.",
+      "invalidLink": "That custom puzzle link could not be loaded.",
+      "cellEmptyAria": "Row {{row}}, column {{col}}: empty",
+      "cellFilledAria": "Row {{row}}, column {{col}}: {{color}} {{kind}}",
+      "queuePillAria": "Shot {{index}}: {{color}}. Click to change color.",
+      "tools": {
+        "sphere": "Sphere",
+        "anchor": "Anchor ⚓",
+        "core": "Core 💎"
+      },
+      "obstacles": {
+        "none": "None",
+        "bumper": "Bumper",
+        "repulsor": "Repulsor",
+        "portal": "Portal pair"
+      },
       "colors": {
         "crimson": "Crimson",
         "cobalt": "Cobalt",
