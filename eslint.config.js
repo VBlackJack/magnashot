@@ -64,6 +64,7 @@ export default [
       'src/ui/CodexView.js',
       'src/ui/PlayHubView.js',
       'src/ui/ProgressBackupView.js',
+      'src/ui/PuzzleBuilderView.js',
       'src/ui/UICalibration.js',
       'src/ui/UIHudRefresh.js',
       'src/ui/UIInputBindings.js',

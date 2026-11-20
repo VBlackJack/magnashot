@@ -2016,6 +2016,26 @@
         "slingshot": "🏹",
         "versus": "⚔"
       }
+    },
+    "puzzleBuilder": {
+      "openButton": "Créer un puzzle",
+      "title": "Éditeur de puzzle",
+      "subtitle": "Touchez les cases pour placer ou retirer des sphères, réglez la file de tir, puis jouez ou copiez le lien.",
+      "paletteAria": "Palette de couleurs des sphères",
+      "queueAria": "File de tir du lanceur",
+      "shotsLabel": "Tirs :",
+      "playButton": "Jouer ce puzzle",
+      "copyButton": "Copier le lien",
+      "copied": "Lien du puzzle copié dans le presse-papiers.",
+      "emptyError": "Placez au moins une sphère sur le plateau.",
+      "colors": {
+        "red": "Rouge",
+        "blue": "Bleu",
+        "green": "Vert",
+        "yellow": "Jaune",
+        "purple": "Violet",
+        "cyan": "Cyan"
+      }
     }
   },
   "levels": {

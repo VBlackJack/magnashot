@@ -127,6 +127,7 @@ const PRECACHE_ASSETS = [
   './src/ui/FluxPerkView.js',
   './src/ui/UIGamepad.js',
   './src/ui/PlayHubView.js',
+  './src/ui/PuzzleBuilderView.js',
   './src/ui/PulseDriver.js',
   './src/ui/UICalibration.js',
   './src/ui/RhythmCalibration.js',

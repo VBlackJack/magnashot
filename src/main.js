@@ -25,6 +25,7 @@ import { GameEngine } from './game/GameEngine.js';
 import { UIManager, isSharedFluxOverSavedRun } from './ui/UIManager.js';
 import { createGameLoop } from './game/GameLoop.js';
 import { FLUX_SEED_QUERY_PARAM, readFluxSeedFromSearch, stripFluxSeedFromUrl } from './game/DailyShare.js';
+import { readCustomPuzzleFromSearch } from './game/PuzzleShareCodec.js';
 import { DUEL_STATUS, readDuelFromSearch } from './game/GhostCodec.js';
 import { GAME_MODES } from './core/Constants.js';
 import { bindCanvasInput } from './ui/CanvasInput.js';
@@ -164,7 +165,8 @@ class Application {
         fluxParam: FLUX_SEED_QUERY_PARAM
       });
       const hasValidDuel = duelRead.status === DUEL_STATUS.VALID;
-      const sharedFluxSeed = hasValidDuel ? null : readFluxSeedFromSearch(window.location?.search, fluxConfig.seed);
+      const sharedCustomPuzzle = hasValidDuel ? null : readCustomPuzzleFromSearch(window.location?.search);
+      const sharedFluxSeed = hasValidDuel || sharedCustomPuzzle ? null : readFluxSeedFromSearch(window.location?.search, fluxConfig.seed);
       const savedSnapshot = storageManager.loadRunSnapshot();
       const applyDeferredTuning = () => {
         const cTuning = configRegistry.get('campaign_tuning');
@@ -202,9 +204,11 @@ class Application {
           { always: true }
         );
       } else {
-        hasRestoredRun = canRestoreSaved && engine.restoreSavedRun();
+        hasRestoredRun = !sharedCustomPuzzle && canRestoreSaved && engine.restoreSavedRun();
         if (!hasRestoredRun) {
-          if (sharedFluxSeed) {
+          if (sharedCustomPuzzle) {
+            engine.startPuzzleMode(1, { customSpec: sharedCustomPuzzle });
+          } else if (sharedFluxSeed) {
             engine.startFluxRun(sharedFluxSeed, { isShared: true });
           } else {
             engine.startCampaignLevel(storageManager.getUnlockedLevel());

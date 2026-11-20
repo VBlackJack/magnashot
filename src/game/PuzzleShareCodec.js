@@ -111,6 +111,8 @@ export function encodeCustomPuzzle(spec) {
   return encoded.length <= MAX_PAYLOAD_CHARS ? encoded : null;
 }
 
+export const PUZZLE_QUERY_PARAM = 'puzzle';
+
 /**
  * Decodes and validates a custom puzzle payload. Returns null on any corruption or violation.
  * @param {unknown} payload
@@ -141,6 +143,33 @@ export function decodeCustomPuzzle(payload) {
       balls: parsed.b.map((entry) => (Array.isArray(entry) && entry.length === 3 ? { x: entry[0], y: entry[1], c: entry[2] } : null))
     };
     return isValidPuzzleSpec(spec) ? spec : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Reads and decodes `?puzzle=<payload>` from a URL search string, or null. */
+export function readCustomPuzzleFromSearch(search) {
+  if (typeof search !== 'string' || search.length === 0) {
+    return null;
+  }
+  const params = new URLSearchParams(search);
+  const raw = params.get(PUZZLE_QUERY_PARAM);
+  return raw ? decodeCustomPuzzle(raw) : null;
+}
+
+/** Builds a shareable URL carrying `?puzzle=<payload>`, or null if spec is invalid. */
+export function buildCustomPuzzleUrl(baseHref, spec) {
+  const encoded = encodeCustomPuzzle(spec);
+  if (!encoded || typeof baseHref !== 'string') {
+    return null;
+  }
+  try {
+    const url = new URL(baseHref);
+    url.search = '';
+    url.hash = '';
+    url.searchParams.set(PUZZLE_QUERY_PARAM, encoded);
+    return url.toString();
   } catch {
     return null;
   }

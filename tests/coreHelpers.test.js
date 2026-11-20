@@ -36,7 +36,12 @@ import {
 } from '../src/ui/PlayHubView.js';
 import { ARENA_THEMES, GAME_MODES, LASER_TRAILS } from '../src/core/Constants.js';
 import { buildPersonalBestGhost } from '../src/game/EngineGhostDuel.js';
-import { encodeCustomPuzzle, decodeCustomPuzzle } from '../src/game/PuzzleShareCodec.js';
+import {
+  encodeCustomPuzzle,
+  decodeCustomPuzzle,
+  readCustomPuzzleFromSearch,
+  buildCustomPuzzleUrl
+} from '../src/game/PuzzleShareCodec.js';
 
 test('sanitizeAlias strips punctuation, collapses whitespace, normalizes Unicode, and caps length', () => {
   const cfg = { aliasMaxLength: 12 };
@@ -152,4 +157,9 @@ test('PuzzleShareCodec round-trips valid puzzles and rejects corrupted or out-of
   assert.equal(decodeCustomPuzzle(''), null);
   assert.equal(encodeCustomPuzzle({ shots: 0, queue: ['red'], balls: [{ x: 10, y: 10, c: 'red' }] }), null);
   assert.equal(encodeCustomPuzzle({ shots: 1, queue: ['invalid'], balls: [{ x: 10, y: 10, c: 'red' }] }), null);
+
+  const shareUrl = buildCustomPuzzleUrl('https://vblackjack.github.io/magnashot/', sample);
+  assert.ok(shareUrl && shareUrl.includes('?puzzle='));
+  const parsedFromUrl = readCustomPuzzleFromSearch(new URL(shareUrl).search);
+  assert.deepEqual(parsedFromUrl, sample);
 });

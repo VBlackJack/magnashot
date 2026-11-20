@@ -2016,6 +2016,26 @@
         "slingshot": "🏹",
         "versus": "⚔"
       }
+    },
+    "puzzleBuilder": {
+      "openButton": "Create puzzle",
+      "title": "Custom Puzzle Builder",
+      "subtitle": "Tap cells to place or remove spheres, set your shot queue, then play or copy a share link.",
+      "paletteAria": "Sphere color palette",
+      "queueAria": "Launcher shot queue",
+      "shotsLabel": "Shots:",
+      "playButton": "Play puzzle",
+      "copyButton": "Copy share link",
+      "copied": "Puzzle link copied to clipboard.",
+      "emptyError": "Place at least one sphere on the board first.",
+      "colors": {
+        "red": "Red",
+        "blue": "Blue",
+        "green": "Green",
+        "yellow": "Yellow",
+        "purple": "Purple",
+        "cyan": "Cyan"
+      }
     }
   },
   "levels": {
