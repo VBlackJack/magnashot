@@ -31,6 +31,11 @@
     "cancelAimOffsetY": 28,
     "touchAimVerticalOffset": -90,
     "touchMinAimAnchorOffsetY": -135,
+    "touchFineAim": {
+      "slowdownFactor": 0.35,
+      "proximityRadiusPx": 150,
+      "maxStepPx": 8
+    },
     "survivalWaveWarningThreshold": 2,
     "dangerWarningMarginY": 72,
     "maxDevicePixelRatio": 3,
@@ -2996,6 +3001,7 @@
     "maxShots": 6,
     "maxBalls": 28,
     "maxObstacles": 2,
+    "maxFreeObstacles": 3,
     "obstaclePresets": {
       "bumper": [{ "type": "bumper", "x": 235, "y": 360, "radius": 24 }],
       "repulsor": [{ "type": "repulsor", "x": 235, "y": 350, "radius": 20, "strength": 1.2 }],
@@ -3004,6 +3010,11 @@
         { "type": "portal", "x": 355, "y": 210, "radius": 22, "linkId": "custom-p1" }
       ]
     }
+  },
+  "mutatorLab": {
+    "maxActive": 3,
+    "scoreMultiplierPerMutator": 0.25,
+    "allowedModes": ["endless", "flux", "classic"]
   },
   "laserTrails": {
     "classic": {

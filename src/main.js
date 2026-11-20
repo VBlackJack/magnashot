@@ -167,6 +167,11 @@ class Application {
         engine.saveRunSnapshot();
       };
       window.addEventListener('pagehide', persistOnLeave);
+      window.addEventListener('popstate', () => {
+        if (uiManager && (uiManager.isAnyModalOpen() || uiManager.isDrawerOpen || uiManager.isPowerupsDrawerOpen)) {
+          uiManager.handleBackAction();
+        }
+      });
       document.addEventListener('visibilitychange', () => {
         if (document.hidden) {
           persistOnLeave();

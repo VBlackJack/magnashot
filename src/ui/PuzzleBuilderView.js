@@ -43,7 +43,9 @@ const COLOR_SYMBOLS = Object.freeze({
   violet: '\u03a9',
   cyan: '\u03a6'
 });
-const BUILDER_TOOLS = Object.freeze({ SPHERE: 'sphere', ANCHOR: 'anchor', CORE: 'core' });
+const BUILDER_TOOLS = Object.freeze({ SPHERE: 'sphere', ANCHOR: 'anchor', CORE: 'core', BUMPER: 'bumper', REPULSOR: 'repulsor' });
+const OBSTACLE_TOOLS = new Set([BUILDER_TOOLS.BUMPER, BUILDER_TOOLS.REPULSOR]);
+const OBSTACLE_SYMBOLS = Object.freeze({ bumper: '\u25ce', repulsor: '\u2298', attractor: '\u2295' });
 const GRID_ARROW_DELTAS = Object.freeze({
   ArrowLeft: [-1, 0],
   ArrowRight: [1, 0],
@@ -70,8 +72,22 @@ function createInitialBuilderState(cfg) {
     shots: cfg.defaultShots,
     obstaclePreset: 'none',
     queue: [cfg.colors[0], cfg.colors[1] || cfg.colors[0]],
-    cells
+    cells,
+    obstacles: new Map(),
+    verifiedSignature: null
   };
+}
+
+function specSignature(spec) {
+  const plain = { ...spec };
+  delete plain.verified;
+  return JSON.stringify(plain);
+}
+
+function coordToGridKey(x, y, cfg) {
+  const col = Math.max(0, Math.min(cfg.gridCols - 1, Math.round((x - cfg.gridStartX) / cfg.gridStepX)));
+  const row = Math.max(0, Math.min(cfg.gridRows - 1, Math.round((y - cfg.gridStartY) / cfg.gridStepY)));
+  return `${col},${row}`;
 }
 
 /** Converts builder state into a PuzzleShareCodec spec. */
@@ -93,23 +109,60 @@ export function buildSpecFromBuilderState(state, cfg = DEFAULT_CFG) {
   if (state.obstaclePreset && state.obstaclePreset !== 'none') {
     spec.obstaclePreset = state.obstaclePreset;
   }
+  const obstacles = [];
+  for (const [key, obsType] of (state.obstacles?.entries?.() || [])) {
+    const [col, row] = key.split(',').map(Number);
+    obstacles.push({
+      t: obsType,
+      x: cfg.gridStartX + col * cfg.gridStepX,
+      y: cfg.gridStartY + row * cfg.gridStepY
+    });
+  }
+  if (obstacles.length > 0) {
+    spec.obstacles = obstacles;
+  }
+  if (state.verifiedSignature && state.verifiedSignature === specSignature(spec)) {
+    spec.verified = true;
+  }
   return spec;
+}
+
+function populateCellsAndObstacles(state, spec, cfg) {
+  state.cells.clear();
+  state.obstacles?.clear?.();
+  for (const ball of spec.balls || []) {
+    state.cells.set(coordToGridKey(ball.x, ball.y, cfg), { c: ball.c, a: Boolean(ball.a), k: Boolean(ball.k) });
+  }
+  for (const obs of spec.obstacles || []) {
+    state.obstacles?.set?.(coordToGridKey(obs.x, obs.y, cfg), obs.t);
+  }
 }
 
 /** Hydrates builder state from a decoded custom puzzle spec. */
 export function applySpecToBuilderState(state, spec, cfg = DEFAULT_CFG) {
-  state.cells.clear();
-  for (const ball of spec.balls || []) {
-    const col = Math.max(0, Math.min(cfg.gridCols - 1, Math.round((ball.x - cfg.gridStartX) / cfg.gridStepX)));
-    const row = Math.max(0, Math.min(cfg.gridRows - 1, Math.round((ball.y - cfg.gridStartY) / cfg.gridStepY)));
-    state.cells.set(`${col},${row}`, { c: ball.c, a: Boolean(ball.a), k: Boolean(ball.k) });
-  }
+  populateCellsAndObstacles(state, spec, cfg);
   state.shots = Math.max(1, Math.min(cfg.maxShots, Number(spec.shots) || cfg.defaultShots));
-  state.queue = Array.isArray(spec.queue) && spec.queue.length > 0 ? [...spec.queue] : [cfg.colors?.[0] || DEFAULT_COLORS[0]];
+  const fallbackColor = cfg.colors?.[0] || DEFAULT_COLORS[0];
+  state.queue = Array.isArray(spec.queue) && spec.queue.length > 0 ? [...spec.queue] : [fallbackColor];
   state.obstaclePreset = PUZZLE_OBSTACLE_KINDS.includes(spec.obstaclePreset) ? spec.obstaclePreset : 'none';
+  state.verifiedSignature = spec.verified ? specSignature(buildSpecFromBuilderState({ ...state, verifiedSignature: null }, cfg)) : null;
 }
 
-function toggleGridCell(state, key) {
+function toggleObstacleCell(state, key, cfg) {
+  state.cells.delete(key);
+  if (state.obstacles.get(key) === state.activeTool) {
+    state.obstacles.delete(key);
+  } else if (state.obstacles.size < (cfg.maxFreeObstacles || 3) || state.obstacles.has(key)) {
+    state.obstacles.set(key, state.activeTool);
+  }
+}
+
+function toggleGridCell(state, key, cfg = DEFAULT_CFG) {
+  if (OBSTACLE_TOOLS.has(state.activeTool)) {
+    toggleObstacleCell(state, key, cfg);
+    return;
+  }
+  state.obstacles?.delete?.(key);
   const existing = state.cells.get(key);
   if (state.activeTool === BUILDER_TOOLS.SPHERE) {
     if (existing && existing.c === state.activeColor && !existing.a && !existing.k) {
@@ -163,27 +216,34 @@ function handleGridKeydown(e, col, row, cfg, gridEl, state, onChange) {
   }
 }
 
+function createGridCellButton(c, r, state, cfg, gridEl, onChange) {
+  const key = `${c},${r}`;
+  const entry = state.cells.get(key) || null;
+  const obs = state.obstacles?.get?.(key) || null;
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = 'puzzle-builder-cell';
+  btn.dataset.cell = key;
+  if (entry) {
+    btn.dataset.ballColor = entry.c;
+  }
+  btn.setAttribute('aria-pressed', String(Boolean(entry || obs)));
+  btn.setAttribute('aria-label', obs ? t(`modals.puzzleBuilder.obstacles.${obs}`) : buildCellAriaLabel(c, r, entry));
+  btn.textContent = obs ? (OBSTACLE_SYMBOLS[obs] || '\u25ce') : formatCellVisual(entry);
+  btn.addEventListener('click', () => {
+    toggleGridCell(state, key, cfg);
+    onChange();
+  });
+  btn.addEventListener('keydown', (e) => handleGridKeydown(e, c, r, cfg, gridEl, state, onChange));
+  return btn;
+}
+
 function renderGridCells(gridEl, state, cfg, onChange) {
   const activeCellKey = document.activeElement?.dataset?.cell || null;
   gridEl.replaceChildren();
   for (let r = 0; r < cfg.gridRows; r++) {
     for (let c = 0; c < cfg.gridCols; c++) {
-      const key = `${c},${r}`;
-      const entry = state.cells.get(key) || null;
-      const btn = document.createElement('button');
-      btn.type = 'button';
-      btn.className = 'puzzle-builder-cell';
-      btn.dataset.cell = key;
-      if (entry) btn.dataset.ballColor = entry.c;
-      btn.setAttribute('aria-pressed', String(Boolean(entry)));
-      btn.setAttribute('aria-label', buildCellAriaLabel(c, r, entry));
-      btn.textContent = formatCellVisual(entry);
-      btn.addEventListener('click', () => {
-        toggleGridCell(state, key);
-        onChange();
-      });
-      btn.addEventListener('keydown', (e) => handleGridKeydown(e, c, r, cfg, gridEl, state, onChange));
-      gridEl.appendChild(btn);
+      gridEl.appendChild(createGridCellButton(c, r, state, cfg, gridEl, onChange));
     }
   }
   if (activeCellKey) {
@@ -238,7 +298,11 @@ function syncBuilderControls(els, state, cfg, render) {
   renderQueuePills(els.queueEl, state, cfg, render);
   if (els.shotsSelect) els.shotsSelect.value = String(state.shots);
   if (els.obstacleSelect) els.obstacleSelect.value = state.obstaclePreset;
-  if (els.countEl) els.countEl.textContent = t('modals.puzzleBuilder.count', { count: state.cells.size, max: cfg.maxBalls });
+  if (els.countEl) {
+    const spec = buildSpecFromBuilderState(state, cfg);
+    const verifiedTag = spec.verified ? ` • ${t('modals.puzzleBuilder.verifiedBadge')}` : '';
+    els.countEl.textContent = `${t('modals.puzzleBuilder.count', { count: state.cells.size, max: cfg.maxBalls })}${verifiedTag}`;
+  }
   for (const swatch of els.paletteEl?.querySelectorAll?.('[data-builder-color]') ?? []) {
     swatch.setAttribute('aria-pressed', String(swatch.dataset.builderColor === state.activeColor));
   }
@@ -269,6 +333,8 @@ async function handleCopyShareLink(els, state, cfg) {
 function bindBuilderActionListeners(ui, els, state, cfg, render) {
   els.clearBtn?.addEventListener('click', () => {
     state.cells.clear();
+    state.obstacles?.clear?.();
+    state.verifiedSignature = null;
     if (els.statusEl) els.statusEl.textContent = '';
     render();
   });
@@ -315,6 +381,11 @@ export function bindPuzzleBuilderModal(ui) {
     ui.openOverlayModal(els.modal, els.closeBtn);
   };
   ui.openPuzzleBuilder = openBuilder;
+  ui.markCustomPuzzleVerified = (spec) => {
+    if (spec) {
+      state.verifiedSignature = specSignature(spec);
+    }
+  };
 
   els.paletteEl?.addEventListener('click', (e) => {
     const btn = e.target?.closest?.('[data-builder-color]');

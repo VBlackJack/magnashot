@@ -408,6 +408,13 @@ export const uiModalMethods = {
       this.engine.state = GAME_STATES.PAUSED;
     }
     modal.classList.remove('hidden');
+    if (typeof window !== 'undefined' && window.history?.pushState && window.history.state?.magnashotModal !== true) {
+      try {
+        window.history.pushState({ magnashotModal: true }, '');
+      } catch {
+        // Ignore history restrictions in sandboxed iframes/file contexts.
+      }
+    }
     this.syncModalInertState();
     if (focusTarget) {
       focusTarget.focus();

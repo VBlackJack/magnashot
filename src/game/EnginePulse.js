@@ -235,7 +235,11 @@ export const enginePulseMethods = {
     }
     const dangerShare = lowest === -Infinity ? NO_AMOUNT : FULL_SHARE - (dangerY - lowest) / cfg.dangerSpan;
     const threats = this.versus ? (this.versus.threatIds?.length ?? NO_AMOUNT) / cfg.versusThreatFull : NO_AMOUNT;
-    return combineIntensity([sagShare, dangerShare, threats]);
+    const combo = this.combo || 0;
+    const comboShare = combo >= 10 ? 0.95 : combo >= 5 ? 0.55 : NO_AMOUNT;
+    const magnetarShare = this.magnetar ? (this.magnetar.armed ? 0.85 : 0.65) : NO_AMOUNT;
+    const labShare = this.activeLabMutators?.length > 0 ? Math.min(0.6, this.activeLabMutators.length * 0.15) : NO_AMOUNT;
+    return combineIntensity([sagShare, dangerShare, threats, comboShare, magnetarShare, labShare]);
   },
 
   /**

@@ -215,12 +215,13 @@ export const engineBoardMethods = {
   },
 
   rollEndlessModifier() {
-    if (this.activeMutatorKey === DAILY_MUTATORS.VOLATILE_CLUSTER) {
+    const hasMutator = (key) => this.activeMutatorKey === key || this.activeLabMutators?.includes(key);
+    if (hasMutator(DAILY_MUTATORS.VOLATILE_CLUSTER)) {
       const extra = this.gameConfig.daily.mutators.volatileCluster.extraBombWeight;
       if (this.random() < extra) {
         return CLUSTER_MODIFIERS.DORMANT_BOMB;
       }
-    } else if (this.activeMutatorKey === DAILY_MUTATORS.CRYO_SURGE) {
+    } else if (hasMutator(DAILY_MUTATORS.CRYO_SURGE)) {
       const extra = this.gameConfig.daily.mutators.cryoSurge.extraCoreWeight;
       if (this.random() < extra) {
         return this.random() < MATH_CONSTANTS.HALF

@@ -1055,6 +1055,9 @@ export class GameEngine {
    * Called when a run ends or is left, never on every score event.
    */
   persistRunHighScore() {
+    if (this.activeLabMutators?.length > 0) {
+      return;
+    }
     // The record in storage moves with the run: keep the one the run started against.
     this.getRunBestBaseline();
     const handler = PERSIST_HIGH_SCORE_HANDLERS.get(this.mode);
@@ -1164,6 +1167,7 @@ export class GameEngine {
     this.mode = mode;
     this.isCustomPuzzle = false;
     this.customPuzzleSpec = null;
+    this.activeLabMutators = [];
     // startVersusBoard sets the versus state again after this reset.
     this.versus = null;
     this.clearMagnetar();
@@ -1630,7 +1634,10 @@ export class GameEngine {
       return;
     }
     let mult = 1.0;
-    if (this.activeMutatorKey && this.gameConfig.daily?.mutators?.[this.activeMutatorKey]?.scoreMultiplier) {
+    if (this.activeLabMutators?.length > 0) {
+      const step = this.gameConfig.mutatorLab?.scoreMultiplierPerMutator ?? 0.25;
+      mult = 1.0 + this.activeLabMutators.length * step;
+    } else if (this.activeMutatorKey && this.gameConfig.daily?.mutators?.[this.activeMutatorKey]?.scoreMultiplier) {
       mult = this.gameConfig.daily.mutators[this.activeMutatorKey].scoreMultiplier;
     }
     this.score += Math.round(points * mult);
@@ -1649,20 +1656,13 @@ export class GameEngine {
   restartCurrent() {
     // A restart on the same board keeps the ghost; any other start clears it (resetRunState).
     const ghost = this.ghostDuel?.ghost ?? null;
+    const labMutators = this.activeLabMutators?.length > 0 ? [...this.activeLabMutators] : null;
     if (this.mode === GAME_MODES.FLUX) {
-      if (ghost) {
-        // Same board, same shapes: a duel replayed on older shapes restarts on them.
-        this.startFluxRun(this.fluxSeed, {
-          isShared: true,
-          isRestart: true,
-          weekKey: this.weeklyWeekKey ?? undefined,
-          contentVersion: this.fluxContentVersion
-        });
-      } else if (this.isWeeklyFluxRun) {
-        this.startWeeklyFlux({ isRestart: true });
-      } else {
-        this.startFluxRun();
-      }
+      restartFluxMode(this, ghost, labMutators);
+    } else if (labMutators && this.mode === GAME_MODES.ENDLESS) {
+      this.startEndlessMode({ mutators: labMutators });
+    } else if (labMutators && this.mode === GAME_MODES.CLASSIC) {
+      this.startClassicMode(1, { mutators: labMutators });
     } else {
       const handler = RESTART_MODE_HANDLERS.get(this.mode);
       if (handler) {
@@ -1680,6 +1680,22 @@ export class GameEngine {
     if (this.onStateChange) {
       this.onStateChange(this, extra);
     }
+  }
+}
+
+function restartFluxMode(engine, ghost, labMutators) {
+  if (ghost) {
+    // Same board, same shapes: a duel replayed on older shapes restarts on them.
+    engine.startFluxRun(engine.fluxSeed, {
+      isShared: true,
+      isRestart: true,
+      weekKey: engine.weeklyWeekKey ?? undefined,
+      contentVersion: engine.fluxContentVersion
+    });
+  } else if (engine.isWeeklyFluxRun) {
+    engine.startWeeklyFlux({ isRestart: true });
+  } else {
+    engine.startFluxRun(null, labMutators ? { mutators: labMutators } : undefined);
   }
 }
 
