@@ -26,6 +26,7 @@
   --accent-purple: #a855f7;
   --accent-amber: #f59e0b;
   --accent-danger: #ef4444;
+  --accent-danger-text: #f87171;
   --accent-emerald: #10b981;
   /* Solid button fills darkened so white labels reach at least 4.5:1. */
   --accent-danger-solid: #dc2626;
@@ -582,7 +583,7 @@ body {
 }
 
 .hud-value.warning {
-  color: var(--accent-danger);
+  color: var(--accent-danger-text);
 }
 
 .hud-center-info {
@@ -597,6 +598,7 @@ body {
   align-items: center;
   justify-content: center;
   gap: 6px;
+  font-family: inherit;
   font-size: 0.92rem;
   font-weight: 700;
   color: var(--text-soft);

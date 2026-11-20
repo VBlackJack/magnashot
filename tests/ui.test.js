@@ -1503,7 +1503,7 @@ test('Arcade modes live in the rich cards of the Play hub while the burger drawe
   }
   assert.match(
     indexHtml,
-    /id="hud-mode-banner"[^>]*role="button"[^>]*tabindex="0"[^>]*aria-haspopup="dialog"/
+    /<button[^>]*id="hud-mode-banner"[^>]*type="button"[^>]*aria-haspopup="dialog"/
   );
 
   const ui = Object.create(UIManager.prototype);

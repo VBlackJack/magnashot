@@ -79,7 +79,7 @@
 }
 
 .danger-title {
-  color: var(--accent-danger);
+  color: var(--accent-danger-text);
 }
 
 .victory-stars-banner {

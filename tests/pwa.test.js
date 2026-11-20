@@ -26,6 +26,9 @@ const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 // Directories whose every file must be available offline
 const OFFLINE_DIRECTORIES = ['src', 'configs', 'locales', 'icons', 'styles'];
 
+// Social-crawler preview images live under icons/ for OpenGraph metadata, never rendered in-app.
+const NON_RUNTIME_ASSETS = new Set(['icons/og-card.png']);
+
 function listFiles(directory) {
   return readdirSync(directory, { withFileTypes: true }).flatMap((entry) =>
     entry.isDirectory() ? listFiles(join(directory, entry.name)) : [join(directory, entry.name)]
@@ -39,10 +42,11 @@ function readPrecacheList() {
 
 test('Service worker precaches every runtime asset and nothing missing', () => {
   const precached = readPrecacheList();
-  const runtimeFiles = OFFLINE_DIRECTORIES.flatMap((dir) => listFiles(join(REPO_ROOT, dir))).map((file) =>
-    relative(REPO_ROOT, file).split('\\').join('/')
-  );
+  const runtimeFiles = OFFLINE_DIRECTORIES.flatMap((dir) => listFiles(join(REPO_ROOT, dir)))
+    .map((file) => relative(REPO_ROOT, file).split('\\').join('/'))
+    .filter((file) => !NON_RUNTIME_ASSETS.has(file));
   assert.deepEqual(runtimeFiles.filter((file) => !precached.includes(file)), []);
+  assert.deepEqual(precached.filter((file) => NON_RUNTIME_ASSETS.has(file)), []);
   assert.deepEqual(precached.filter((file) => !existsSync(join(REPO_ROOT, file))), []);
 });
 
