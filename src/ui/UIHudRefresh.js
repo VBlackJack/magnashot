@@ -351,6 +351,16 @@ function formatCoreRescueSuffix(engine) {
   })}`;
 }
 
+function formatLabMutatorSuffix(ui, engine) {
+  const count = engine.activeLabMutators?.length || 0;
+  if (count <= 0) {
+    return '';
+  }
+  const perMutator = ui.gameConfig?.mutatorLab?.scoreMultiplierPerMutator ?? 0.25;
+  const mult = (1 + count * perMutator).toFixed(2).replace(/\.00$/, '').replace(/0$/, '');
+  return ` • ${t('hud.stats.mode.labSuffix', { mult })}`;
+}
+
 const STAGE_MODE_BANNER_BUILDERS = Object.freeze({
   [GAME_MODES.CAMPAIGN]: (ui, engine) => {
     const lvl = engine.levelCatalog.summarize(engine.currentLevelId);
@@ -360,7 +370,7 @@ const STAGE_MODE_BANNER_BUILDERS = Object.freeze({
     })}${formatCoreRescueSuffix(engine)}`;
   },
   [GAME_MODES.PUZZLE]: (ui, engine) => `${engine.isCustomPuzzle
-    ? t('hud.stats.mode.customPuzzle')
+    ? t(engine.customPuzzleSpec?.verified ? 'hud.stats.mode.customPuzzleVerified' : 'hud.stats.mode.customPuzzle')
     : t('hud.stats.mode.puzzle', {
         stage: engine.currentPuzzleStage,
         total: ui.gameConfig.puzzles?.length || 1
@@ -400,7 +410,7 @@ function refreshStageModeHud(ui, engine, magnetarView, warningShotsThreshold) {
   if (!buildBanner) {
     return false;
   }
-  setTextIfChanged(ui.elements.modeBanner, buildBanner(ui, engine, magnetarView));
+  setTextIfChanged(ui.elements.modeBanner, `${buildBanner(ui, engine, magnetarView)}${formatLabMutatorSuffix(ui, engine)}`);
   if (engine.mode === GAME_MODES.BLITZ) {
     refreshBlitzTimeCounter(ui, engine);
   } else {
@@ -431,17 +441,18 @@ function formatBossRushBanner(engine, magnetarView) {
 }
 
 function refreshWaveModeBanner(ui, engine, magnetarView) {
+  const labSuffix = formatLabMutatorSuffix(ui, engine);
   if (engine.mode === GAME_MODES.BOSS_RUSH) {
-    setTextIfChanged(ui.elements.modeBanner, formatBossRushBanner(engine, magnetarView));
+    setTextIfChanged(ui.elements.modeBanner, `${formatBossRushBanner(engine, magnetarView)}${labSuffix}`);
     return;
   }
   const specBuilder = WAVE_BANNER_SPECS[engine.mode];
   if (specBuilder) {
     const { key, params } = specBuilder(engine);
-    setTextIfChanged(ui.elements.modeBanner, t(key, params));
+    setTextIfChanged(ui.elements.modeBanner, `${t(key, params)}${labSuffix}`);
     return;
   }
-  setTextIfChanged(ui.elements.modeBanner, t('hud.stats.mode.endless', { wave: engine.waveCount }));
+  setTextIfChanged(ui.elements.modeBanner, `${t('hud.stats.mode.endless', { wave: engine.waveCount })}${labSuffix}`);
 }
 
 function resolveWaveShotsLabelKey(mode, shakeLeft) {
@@ -829,6 +840,9 @@ function revealVictoryContent(ui, engine, summary, isVictoryJustRevealed) {
   }
   ui.elements.modalVictory.classList.remove('hidden');
   if (isVictoryJustRevealed) {
+    if (engine.isCustomPuzzle && engine.customPuzzleSpec) {
+      ui.markCustomPuzzleVerified?.(engine.customPuzzleSpec);
+    }
     ui.elements.btnEditPuzzleVictory?.classList.toggle('hidden', !engine.isCustomPuzzle);
     syncNextContractCta(ui, ui.elements.btnNextContractVictory, engine);
     const nextButton = ui.elements.btnNextLevel;

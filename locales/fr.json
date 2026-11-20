@@ -153,6 +153,8 @@
         "fluxBossMagnetar": "Flux • Forme {{stage}} : {{shape}} (Boss, {{moorings}} amarres)",
         "puzzle": "Puzzle {{stage}} / {{total}}",
         "customPuzzle": "Puzzle personnalisé",
+        "customPuzzleVerified": "Puzzle personnalisé ✓",
+        "labSuffix": "Labo x{{mult}}",
         "blitz": "Blitz 90s • Vague {{wave}}",
         "bossRush": "Boss Rush • Vague {{wave}} (👑 {{shields}})",
         "bossRushMagnetar": "Boss Rush • Vague {{wave}} ({{moorings}} amarres)",
@@ -2060,6 +2062,21 @@
         "titleBonus": "Trio de maîtrise hebdo (coffre +{{coins}} ⬡)",
         "titleClaimed": "Trio de maîtrise hebdo (coffre remporté ✓)"
       },
+      "spotlight": {
+        "dailyPuzzle": "Objectif du moment : Puzzle du jour #{{stage}} (+{{coins}} ⬡) ->",
+        "weeklyMastery": "Objectif hebdo : {{name}} ({{progress}}/{{target}}) ->",
+        "campaignUnlock": "Bientôt débloqué : terminez le Niveau {{level}} pour ouvrir un mode ->",
+        "nextMastery": "Prochaine maîtrise : {{mode}} ->"
+      },
+      "mutatorLab": {
+        "toggle": "Labo de mutateurs",
+        "subtitle": "Combinez 1 à 3 modificateurs pour un multiplicateur de score (records standards séparés).",
+        "chipsAria": "Modificateurs du Labo de mutateurs",
+        "mult": "Score x{{mult}}",
+        "launchEndless": "Labo Survie",
+        "launchFlux": "Labo Flux",
+        "launchClassic": "Labo Puriste"
+      },
       "puzzle": {
         "stagesToggle": "Choisir un puzzle"
       },
@@ -2099,6 +2116,7 @@
       "shotsLabel": "Tirs :",
       "obstacleLabel": "Obstacle :",
       "count": "{{count}} / {{max}} sphères",
+      "verifiedBadge": "Vérifié ✓",
       "playButton": "Jouer ce puzzle",
       "copyButton": "Copier le lien",
       "clearButton": "Effacer",
@@ -2117,7 +2135,9 @@
       "tools": {
         "sphere": "Sphère",
         "anchor": "Ancre ⚓",
-        "core": "Noyau 💎"
+        "core": "Noyau 💎",
+        "bumper": "Bumper ◉",
+        "repulsor": "Répulseur ◎"
       },
       "obstacles": {
         "none": "Aucun",

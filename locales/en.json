@@ -153,6 +153,8 @@
         "fluxBossMagnetar": "Flux • Shape {{stage}}: {{shape}} (Boss, {{moorings}} moorings)",
         "puzzle": "Puzzle {{stage}} / {{total}}",
         "customPuzzle": "Custom Puzzle",
+        "customPuzzleVerified": "Custom Puzzle ✓",
+        "labSuffix": "Lab x{{mult}}",
         "blitz": "Blitz 90s • Wave {{wave}}",
         "bossRush": "Boss Rush • Wave {{wave}} (👑 {{shields}})",
         "bossRushMagnetar": "Boss Rush • Wave {{wave}} ({{moorings}} moorings)",
@@ -2060,6 +2062,21 @@
         "titleBonus": "Weekly Mastery Trio (+{{coins}} ⬡ chest)",
         "titleClaimed": "Weekly Mastery Trio (chest claimed ✓)"
       },
+      "spotlight": {
+        "dailyPuzzle": "Next goal: Daily Puzzle #{{stage}} (+{{coins}} ⬡) ->",
+        "weeklyMastery": "Weekly goal: {{name}} ({{progress}}/{{target}}) ->",
+        "campaignUnlock": "Almost there: clear Campaign Level {{level}} to unlock a new mode ->",
+        "nextMastery": "Next mastery target: {{mode}} ->"
+      },
+      "mutatorLab": {
+        "toggle": "Mutator Lab",
+        "subtitle": "Combine 1 to 3 modifiers for a score multiplier (standard records stay separate).",
+        "chipsAria": "Mutator Lab modifiers",
+        "mult": "Score x{{mult}}",
+        "launchEndless": "Lab Survival",
+        "launchFlux": "Lab Flux",
+        "launchClassic": "Lab Purist"
+      },
       "puzzle": {
         "stagesToggle": "Choose a puzzle"
       },
@@ -2099,6 +2116,7 @@
       "shotsLabel": "Shots:",
       "obstacleLabel": "Obstacle:",
       "count": "{{count}} / {{max}} spheres",
+      "verifiedBadge": "Verified ✓",
       "playButton": "Play puzzle",
       "copyButton": "Copy share link",
       "clearButton": "Clear",
@@ -2117,7 +2135,9 @@
       "tools": {
         "sphere": "Sphere",
         "anchor": "Anchor ⚓",
-        "core": "Core 💎"
+        "core": "Core 💎",
+        "bumper": "Bumper ◉",
+        "repulsor": "Repulsor ◎"
       },
       "obstacles": {
         "none": "None",

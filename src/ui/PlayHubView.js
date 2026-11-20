@@ -660,6 +660,107 @@ function refreshDailyPuzzleChip(storage, gameConfig) {
   setTextIfChanged(dailyPuzzleEl, t(key, { stage: formatNumber(stage), coins: formatNumber(bonus) }));
 }
 
+function findNextLockedModeHint(storage, gameConfig) {
+  const unlocks = gameConfig?.modeUnlocks?.campaignLevelCleared;
+  if (!unlocks || !storage) {
+    return null;
+  }
+  const cleared = Math.max(0, (storage.getUnlockedLevel?.() || 1) - 1);
+  let closest = null;
+  for (const [mode, reqLevel] of Object.entries(unlocks)) {
+    if (Number.isFinite(reqLevel) && cleared < reqLevel && (!closest || reqLevel < closest.reqLevel)) {
+      closest = { mode, reqLevel, remaining: reqLevel - cleared };
+    }
+  }
+  return closest;
+}
+
+function resolveWeeklySpotlight(storage) {
+  const pending = storage.getWeeklyMasteryState?.()?.bounties?.find?.((b) => !b.completed);
+  if (!pending) {
+    return null;
+  }
+  return {
+    kind: 'weeklyMastery',
+    key: 'modals.play.spotlight.weeklyMastery',
+    params: {
+      name: t(`bounties.items.${pending.id}`, { target: formatNumber(pending.target) }),
+      progress: formatNumber(pending.progress || 0),
+      target: formatNumber(pending.target)
+    }
+  };
+}
+
+function resolveCampaignOrModeSpotlight(storage, gameConfig) {
+  const nextLock = findNextLockedModeHint(storage, gameConfig);
+  if (nextLock && nextLock.remaining <= 2) {
+    return {
+      kind: 'campaign',
+      key: 'modals.play.spotlight.campaignUnlock',
+      params: { level: formatNumber(nextLock.reqLevel) }
+    };
+  }
+  const nextMode = resolveNextUnmasteredArcadeMode(storage, gameConfig);
+  if (nextMode && ARCADE_CARD_SPECS[nextMode]) {
+    return {
+      kind: 'mode',
+      targetMode: nextMode,
+      key: 'modals.play.spotlight.nextMastery',
+      params: { mode: t(ARCADE_CARD_SPECS[nextMode].titleKey) }
+    };
+  }
+  return null;
+}
+
+/**
+ * Picks the single highest-value next objective to highlight at the top of the Play Hub:
+ * 1. Unclaimed Daily Puzzle
+ * 2. First unfinished Weekly Mastery Trio objective
+ * 3. Campaign unlock proximity (<= 2 levels away)
+ * 4. Next unmastered arcade mode
+ * @param {object} storage - StorageManager.
+ * @param {object} gameConfig - Game config.
+ * @returns {{kind: string, key: string, params: object, targetMode?: string}|null}
+ */
+export function resolvePlayHubSpotlight(storage, gameConfig) {
+  if (!storage || !gameConfig) {
+    return null;
+  }
+  const todayKey = SeededRandom.getTodayDateKey();
+  if (storage.hasClaimedDailyPuzzle?.(todayKey) !== true) {
+    const stage = resolveDailyPuzzleStage(todayKey, gameConfig.puzzles?.length || 1);
+    return {
+      kind: 'dailyPuzzle',
+      key: 'modals.play.spotlight.dailyPuzzle',
+      params: { stage: formatNumber(stage), coins: formatNumber(gameConfig.dailyPuzzle?.firstClearBonusCoins || 0) }
+    };
+  }
+  return resolveWeeklySpotlight(storage) || resolveCampaignOrModeSpotlight(storage, gameConfig);
+}
+
+function refreshPlayHubSpotlight(els, storage, gameConfig) {
+  const banner = els?.playHubSpotlight
+    || (typeof document !== 'undefined' ? document.getElementById?.('play-hub-spotlight') : null);
+  if (!banner) {
+    return;
+  }
+  const spotlight = resolvePlayHubSpotlight(storage, gameConfig);
+  if (!spotlight) {
+    banner.classList.add(HIDDEN_CLASS);
+    delete banner.dataset.spotlightKind;
+    delete banner.dataset.spotlightMode;
+    return;
+  }
+  banner.dataset.spotlightKind = spotlight.kind;
+  if (spotlight.targetMode) {
+    banner.dataset.spotlightMode = spotlight.targetMode;
+  } else {
+    delete banner.dataset.spotlightMode;
+  }
+  setTextIfChanged(banner, t(spotlight.key, spotlight.params));
+  banner.classList.remove(HIDDEN_CLASS);
+}
+
 function refreshPlayHubMastery(els, storage, gameConfig, filter = PLAY_HUB_FILTERS.ALL) {
   const mastery = resolveModeMasteryProgress(storage, gameConfig);
   const starSymbol = gameConfig?.theme?.starFilledSymbol || '';
@@ -682,6 +783,7 @@ function refreshPlayHubMastery(els, storage, gameConfig, filter = PLAY_HUB_FILTE
   refreshSmartPickButton(storage, gameConfig);
   refreshGrandMasteryBadge(mastery, starSymbol);
   refreshDailyPuzzleChip(storage, gameConfig);
+  refreshPlayHubSpotlight(els, storage, gameConfig);
 }
 
 /** Methods installed on UIManager (see installMethods). `this` is the UIManager. */

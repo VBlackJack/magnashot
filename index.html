@@ -202,6 +202,7 @@
         <button id="btn-close-play" type="button" class="modal-btn" data-i18n="modals.levelSelect.button.close"></button>
       </div>
       <p id="play-hub-hint" class="modal-subtext hidden" role="status" aria-live="polite"></p>
+      <button id="play-hub-spotlight" type="button" class="play-hub-spotlight hidden"></button>
       <div class="play-hub-layout">
         <section class="play-hub-section play-hub-campaign" aria-labelledby="play-section-campaign-title">
           <h3 id="play-section-campaign-title" class="play-section-title"><span class="play-section-icon" aria-hidden="true" data-i18n="modals.play.icon.campaign"></span> <span data-i18n="modals.play.section.campaign"></span></h3>
@@ -350,6 +351,29 @@
             <input id="input-flux-seed" type="text" class="flux-seed-input" autocomplete="off" spellcheck="false" data-i18n-placeholder="modals.levelSelect.fluxSeed.placeholder" data-i18n-aria-label="modals.levelSelect.fluxSeed.ariaLabel">
             <button id="btn-flux-seed-go" type="button" class="nav-btn badge-btn" data-i18n="modals.levelSelect.fluxSeed.launch"></button>
             <p id="flux-seed-error" class="flux-seed-error hidden"></p>
+          </div>
+          <div id="play-mutator-lab" class="play-mutator-lab">
+            <div class="play-mutator-lab-head">
+              <button id="btn-mutator-lab-toggle" type="button" class="nav-btn badge-btn" aria-expanded="false" aria-controls="mutator-lab-panel" data-i18n="modals.play.mutatorLab.toggle"></button>
+              <span id="mutator-lab-mult" class="play-mutator-lab-mult"></span>
+            </div>
+            <div id="mutator-lab-panel" class="mutator-lab-panel play-disclosure hidden">
+              <p class="modal-subtext" data-i18n="modals.play.mutatorLab.subtitle"></p>
+              <div id="mutator-lab-chips" class="mutator-lab-chips" role="group" data-i18n-aria-label="modals.play.mutatorLab.chipsAria">
+                <button type="button" class="mutator-lab-chip" data-lab-mutator="hyperGravity" aria-pressed="false" data-i18n="gameplay.mutators.hyperGravity"></button>
+                <button type="button" class="mutator-lab-chip" data-lab-mutator="turboRotors" aria-pressed="false" data-i18n="gameplay.mutators.turboRotors"></button>
+                <button type="button" class="mutator-lab-chip" data-lab-mutator="superMagnetism" aria-pressed="false" data-i18n="gameplay.mutators.superMagnetism"></button>
+                <button type="button" class="mutator-lab-chip" data-lab-mutator="volatileCluster" aria-pressed="false" data-i18n="gameplay.mutators.volatileCluster"></button>
+                <button type="button" class="mutator-lab-chip" data-lab-mutator="portalMatrix" aria-pressed="false" data-i18n="gameplay.mutators.portalMatrix"></button>
+                <button type="button" class="mutator-lab-chip" data-lab-mutator="bumperPinball" aria-pressed="false" data-i18n="gameplay.mutators.bumperPinball"></button>
+                <button type="button" class="mutator-lab-chip" data-lab-mutator="cryoSurge" aria-pressed="false" data-i18n="gameplay.mutators.cryoSurge"></button>
+              </div>
+              <div class="mutator-lab-actions">
+                <button id="btn-lab-endless" type="button" class="modal-btn primary" data-i18n="modals.play.mutatorLab.launchEndless"></button>
+                <button id="btn-lab-flux" type="button" class="modal-btn" data-i18n="modals.play.mutatorLab.launchFlux"></button>
+                <button id="btn-lab-classic" type="button" class="modal-btn" data-i18n="modals.play.mutatorLab.launchClassic"></button>
+              </div>
+            </div>
           </div>
         </section>
         <section class="play-hub-section play-hub-duel" aria-labelledby="play-section-duel-title">
@@ -938,6 +962,8 @@
         <button type="button" class="puzzle-builder-swatch" data-builder-tool="sphere" aria-pressed="true" data-i18n="modals.puzzleBuilder.tools.sphere"></button>
         <button type="button" class="puzzle-builder-swatch" data-builder-tool="anchor" aria-pressed="false" data-i18n="modals.puzzleBuilder.tools.anchor"></button>
         <button type="button" class="puzzle-builder-swatch" data-builder-tool="core" aria-pressed="false" data-i18n="modals.puzzleBuilder.tools.core"></button>
+        <button type="button" class="puzzle-builder-swatch" data-builder-tool="bumper" aria-pressed="false" data-i18n="modals.puzzleBuilder.tools.bumper"></button>
+        <button type="button" class="puzzle-builder-swatch" data-builder-tool="repulsor" aria-pressed="false" data-i18n="modals.puzzleBuilder.tools.repulsor"></button>
         <span id="puzzle-builder-count" class="puzzle-builder-count" aria-live="polite"></span>
       </div>
       <div id="puzzle-builder-grid" class="puzzle-builder-grid" role="grid" data-i18n-aria-label="modals.puzzleBuilder.gridAria"></div>
