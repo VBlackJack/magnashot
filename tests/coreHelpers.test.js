@@ -31,7 +31,8 @@ import {
   PLAY_HUB_FILTERS,
   matchesArcadeFilter,
   resolveNextUnmasteredArcadeMode,
-  summarizeGrandMastery
+  summarizeGrandMastery,
+  resolveDailyPuzzleStage
 } from '../src/ui/PlayHubView.js';
 import { ARENA_THEMES, GAME_MODES } from '../src/core/Constants.js';
 import { buildPersonalBestGhost } from '../src/game/EngineGhostDuel.js';
@@ -123,4 +124,9 @@ test('Play Hub arcade filters and next-unmastered smart picker classify modes ac
   const weeklyPb = buildPersonalBestGhost(weeklyStorage, 'flux', 'abc123', ghostCfg, 'PB', '2026-W47');
   assert.equal(weeklyPb?.isPersonalBest, true);
   assert.equal(weeklyPb?.key, 'abc123');
+
+  const stageA = resolveDailyPuzzleStage('2026-11-20', 20);
+  const stageB = resolveDailyPuzzleStage('2026-11-20', 20);
+  assert.equal(stageA, stageB);
+  assert.ok(stageA >= 1 && stageA <= 20);
 });

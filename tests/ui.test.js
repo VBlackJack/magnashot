@@ -3246,7 +3246,7 @@ test('the Play hub lists the Arcade cards in campaign unlock order, then the Due
   assert.deepEqual(Object.keys(ARCADE_CARD_SPECS).slice(0, unlockModes.length), unlockModes, 'ARCADE_CARD_SPECS keeps the same order');
   assert.deepEqual(cardIds(duel), ['btn-mode-versus']);
   const challenges = hub.slice(hub.indexOf('play-hub-challenges'), hub.indexOf('play-hub-arcade'));
-  assert.deepEqual(cardIds(challenges), ['btn-daily', 'btn-weekly']);
+  assert.deepEqual(cardIds(challenges), ['btn-daily', 'btn-weekly', 'btn-daily-puzzle']);
 });
 
 test('every data-i18n key of the Play hub and the campaign map exists in both locales', () => {

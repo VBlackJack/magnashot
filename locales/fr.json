@@ -1913,6 +1913,11 @@
         "summary": "{{mastered}}/{{total}} {{star}}",
         "grandMaster": "Grand Maître {{mastered}}/{{total}} {{star}}"
       },
+      "dailyPuzzle": {
+        "title": "Puzzle du jour",
+        "desc": "Un défi tactique partagé chaque jour.",
+        "stageChip": "Aujourd'hui : Puzzle #{{stage}}"
+      },
       "campaign": {
         "summary": "{{chapter}} • {{stars}} / {{maxStars}} ★",
         "progressAria": "Étoiles du chapitre : {{stars}} sur {{maxStars}}",

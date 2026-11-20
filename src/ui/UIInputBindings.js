@@ -16,6 +16,8 @@
 
 import { GAME_MODES, GAME_STATES, INPUT_MODES, SPECIAL_TYPES_ORDER } from '../core/Constants.js';
 import { i18n, t } from '../core/I18n.js';
+import { SeededRandom } from '../core/SeededRandom.js';
+import { resolveDailyPuzzleStage } from './PlayHubView.js';
 import { SHOP_TABS } from './WorkshopView.js';
 import { fluxPerkIndexForKey } from './FluxPerkView.js';
 import {
@@ -397,6 +399,17 @@ function bindPlayHubToolbar(ui) {
     if (cardKey && ui.elements?.[cardKey]) {
       ui.elements[cardKey].click();
     }
+  });
+  const dailyPuzzleBtn = typeof document !== 'undefined' ? document.getElementById?.('btn-daily-puzzle') : null;
+  dailyPuzzleBtn?.addEventListener('click', () => {
+    const stage = resolveDailyPuzzleStage(SeededRandom.getTodayDateKey(), ui.gameConfig?.puzzles?.length || 1);
+    ui.requestDestructiveAction(
+      () => {
+        ui.hideAllModals();
+        ui.engine.startPuzzleMode(stage);
+      },
+      () => t('modals.play.dailyPuzzle.title')
+    );
   });
 }
 

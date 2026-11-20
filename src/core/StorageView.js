@@ -95,6 +95,8 @@ export const VERSUS_STORAGE_POLICY = Object.freeze({
   getGamepadAimSpeed: P.FORWARD,
   getGamepadInvertX: P.FORWARD,
   getGamepadRumble: P.FORWARD,
+  getLeftHanded: P.FORWARD,
+  getPbGhostEnabled: P.FORWARD,
   getAnimationSpeed: P.FORWARD,
   getMusicEnabled: P.FORWARD,
   getMusicVolume: P.FORWARD,
@@ -103,6 +105,9 @@ export const VERSUS_STORAGE_POLICY = Object.freeze({
   getUnlockedBallStyles: P.FORWARD,
   isBallStyleUnlocked: P.FORWARD,
   getActiveBallStyle: P.FORWARD,
+  getUnlockedArenaThemes: P.FORWARD,
+  isArenaThemeUnlocked: P.FORWARD,
+  getActiveArenaTheme: P.FORWARD,
   getRunSnapshotVersion: P.FORWARD,
   computeDailyStreakBonus: P.FORWARD,
 
@@ -125,6 +130,10 @@ export const VERSUS_STORAGE_POLICY = Object.freeze({
   setRhythmOffsetMs: P.NOOP,
   setActiveBallStyle: P.NOOP,
   purchaseBallStyle: P.FALSE,
+  setLeftHanded: P.NOOP,
+  setPbGhostEnabled: P.NOOP,
+  setActiveArenaTheme: P.NOOP,
+  purchaseArenaTheme: P.FALSE,
 
   // Daily.
   hasPlayedDailyToday: P.FALSE,

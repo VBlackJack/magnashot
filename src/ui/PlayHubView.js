@@ -626,6 +626,12 @@ function refreshSmartPickButton(storage, gameConfig) {
   btn.classList.remove(HIDDEN_CLASS);
 }
 
+export function resolveDailyPuzzleStage(dateKey, totalPuzzles) {
+  const count = Math.max(1, Math.floor(Number(totalPuzzles) || 1));
+  const rng = new SeededRandom(`daily-puzzle:${dateKey || SeededRandom.getTodayDateKey()}`);
+  return 1 + Math.floor(rng.next() * count);
+}
+
 export function summarizeGrandMastery(mastery) {
   const entries = Object.values(mastery || {});
   const total = entries.length;
@@ -642,6 +648,15 @@ function refreshGrandMasteryBadge(mastery, starSymbol) {
   badge.classList.toggle('is-grand-master', isGrandMaster);
   const key = isGrandMaster ? 'modals.play.mastery.grandMaster' : 'modals.play.mastery.summary';
   setTextIfChanged(badge, t(key, { mastered: formatNumber(mastered), total: formatNumber(total), star: starSymbol }));
+}
+
+function refreshDailyPuzzleChip(gameConfig) {
+  const dailyPuzzleEl = typeof document !== 'undefined' ? document.getElementById?.('daily-puzzle-stage-label') : null;
+  if (!dailyPuzzleEl) {
+    return;
+  }
+  const stage = resolveDailyPuzzleStage(SeededRandom.getTodayDateKey(), gameConfig?.puzzles?.length || 1);
+  setTextIfChanged(dailyPuzzleEl, t('modals.play.dailyPuzzle.stageChip', { stage: formatNumber(stage) }));
 }
 
 function refreshPlayHubMastery(els, storage, gameConfig, filter = PLAY_HUB_FILTERS.ALL) {
@@ -665,6 +680,7 @@ function refreshPlayHubMastery(els, storage, gameConfig, filter = PLAY_HUB_FILTE
   applyPlayHubArcadeFilter(els, filter, mastery);
   refreshSmartPickButton(storage, gameConfig);
   refreshGrandMasteryBadge(mastery, starSymbol);
+  refreshDailyPuzzleChip(gameConfig);
 }
 
 /** Methods installed on UIManager (see installMethods). `this` is the UIManager. */

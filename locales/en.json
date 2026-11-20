@@ -1913,6 +1913,11 @@
         "summary": "{{mastered}}/{{total}} {{star}}",
         "grandMaster": "Grand Master {{mastered}}/{{total}} {{star}}"
       },
+      "dailyPuzzle": {
+        "title": "Daily Puzzle",
+        "desc": "One shared tactical board each day.",
+        "stageChip": "Today: Puzzle #{{stage}}"
+      },
       "campaign": {
         "summary": "{{chapter}} • {{stars}} / {{maxStars}} ★",
         "progressAria": "Chapter stars: {{stars}} of {{maxStars}}",
