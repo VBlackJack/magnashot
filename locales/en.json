@@ -1000,6 +1000,26 @@
           }
         }
       },
+      "arenaThemes": {
+        "items": {
+          "deepSpace": {
+            "name": "Deep Space Arena",
+            "description": "Default midnight magnetic chamber with cool blue rim glow."
+          },
+          "solarForge": {
+            "name": "Solar Forge Arena",
+            "description": "Smoldering ember chamber with warm amber horizon and walls."
+          },
+          "cryoLab": {
+            "name": "Cryo Lab Arena",
+            "description": "Sub-zero cyan laboratory backdrop with frosted grid lines."
+          },
+          "synthwave": {
+            "name": "Synthwave Grid Arena",
+            "description": "Ultraviolet arcade horizon with magenta-violet containment walls."
+          }
+        }
+      },
       "balance": {
         "label": "Available Coins: {{coins}} ⬡"
       },
@@ -1553,7 +1573,9 @@
         "upgradePurchased": "{{name}} upgraded to level {{level}} of {{maxLevel}}.",
         "ammoPurchased": "{{name}} purchased. In stock: {{count}}.",
         "stylePurchased": "{{name}} style unlocked and equipped.",
-        "styleEquipped": "{{name}} style equipped."
+        "styleEquipped": "{{name}} style equipped.",
+        "arenaThemePurchased": "{{name}} arena theme unlocked and equipped.",
+        "arenaThemeEquipped": "{{name}} arena theme equipped."
       },
       "button": {
         "close": "Close"
@@ -1885,6 +1907,10 @@
       },
       "smartPick": {
         "nextUnmastered": "Next to master: {{mode}}"
+      },
+      "mastery": {
+        "summary": "{{mastered}}/{{total}} {{star}}",
+        "grandMaster": "Grand Master {{mastered}}/{{total}} {{star}}"
       },
       "campaign": {
         "summary": "{{chapter}} • {{stars}} / {{maxStars}} ★",

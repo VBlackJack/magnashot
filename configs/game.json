@@ -2456,6 +2456,7 @@
         "discoveries": "object",
         "discoveriesVersion": "integer",
         "unlockedBallStyles": "object",
+        "unlockedArenaThemes": "object",
         "modeUnlocks": "object",
         "weeklyFluxBest": "object",
         "playerStats": "object",
@@ -2468,6 +2469,7 @@
         "dailyStreakGraceDate": "date",
         "weeklyFluxClaimedWeek": "week",
         "activeBallStyle": "string",
+        "activeArenaTheme": "string",
         "ghostAlias": "optionalString",
         "versusTutorialSeen": "boolean"
       }
@@ -2537,6 +2539,8 @@
       "discoveriesVersion": "discoveries_version",
       "unlockedBallStyles": "ball_styles",
       "activeBallStyle": "ball_style",
+      "unlockedArenaThemes": "arena_themes",
+      "activeArenaTheme": "arena_theme",
       "schemaVersion": "schema_version",
       "modeUnlocks": "mode_unlocks",
       "dailyHistory": "daily_history",
@@ -2566,6 +2570,7 @@
     "matchMinCount": 3,
     "initialCoins": 50,
     "ballStyle": "classic",
+    "arenaTheme": "deepSpace",
     "musicEnabled": true,
     "musicVolume": 0.6,
     "musicVolumeSteps": [0.2, 0.4, 0.6, 0.8, 1],
@@ -2578,6 +2583,35 @@
     ],
     "coarsePointerMediaQuery": "(pointer: coarse)",
     "fullscreenDisplayModeMediaQuery": "(display-mode: fullscreen)"
+  },
+  "arenaThemes": {
+    "deepSpace": {
+      "cost": 0
+    },
+    "solarForge": {
+      "cost": 180,
+      "backgroundTop": "#140905",
+      "backgroundBottom": "#240f08",
+      "horizonGlowColor": "rgba(249, 115, 22, 0.22)",
+      "gridColor": "rgba(251, 146, 60, 0.08)",
+      "wallColor": "#fb923c"
+    },
+    "cryoLab": {
+      "cost": 220,
+      "backgroundTop": "#05131c",
+      "backgroundBottom": "#092130",
+      "horizonGlowColor": "rgba(56, 189, 248, 0.24)",
+      "gridColor": "rgba(125, 211, 252, 0.09)",
+      "wallColor": "#38bdf8"
+    },
+    "synthwave": {
+      "cost": 280,
+      "backgroundTop": "#12061f",
+      "backgroundBottom": "#220a38",
+      "horizonGlowColor": "rgba(236, 72, 153, 0.24)",
+      "gridColor": "rgba(192, 132, 252, 0.1)",
+      "wallColor": "#e879f9"
+    }
   },
   "theme": {
     "fontFamily": "system-ui, sans-serif",

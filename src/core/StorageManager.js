@@ -1392,6 +1392,70 @@ export class StorageManager {
     return true;
   }
 
+  getUnlockedArenaThemes() {
+    const defaultTheme = this.defaultsConfig?.arenaTheme || 'deepSpace';
+    const key = this.storageConfig?.keys?.unlockedArenaThemes;
+    const parsed = key ? this.readJsonObject(key) : {};
+    const unlocked = { [defaultTheme]: true };
+    for (const [themeId, value] of Object.entries(parsed)) {
+      if (value === true) {
+        unlocked[themeId] = true;
+      }
+    }
+    return unlocked;
+  }
+
+  isArenaThemeUnlocked(themeId) {
+    if (!themeId || typeof themeId !== 'string') {
+      return false;
+    }
+    return this.getUnlockedArenaThemes()[themeId] === true;
+  }
+
+  getActiveArenaTheme() {
+    const defaultTheme = this.defaultsConfig?.arenaTheme || 'deepSpace';
+    const key = this.storageConfig?.keys?.activeArenaTheme;
+    const stored = key ? this.safeGetItem(key) : null;
+    return stored && this.isArenaThemeUnlocked(stored) ? stored : defaultTheme;
+  }
+
+  setActiveArenaTheme(themeId) {
+    if (!this.isArenaThemeUnlocked(themeId)) {
+      return false;
+    }
+    const key = this.storageConfig?.keys?.activeArenaTheme;
+    if (key) {
+      this.safeSetItem(key, themeId);
+    }
+    return true;
+  }
+
+  purchaseArenaTheme(themeId, cost) {
+    const catalog = configRegistry.get('game')?.arenaThemes || {};
+    const spec = catalog[themeId];
+    if (!spec) {
+      return false;
+    }
+    if (this.isArenaThemeUnlocked(themeId)) {
+      this.setActiveArenaTheme(themeId);
+      return false;
+    }
+    const cleanCost = Math.max(0, Math.floor(Number(cost ?? spec.cost) || 0));
+    const coins = this.getCoins();
+    if (coins < cleanCost) {
+      return false;
+    }
+    this.setCoins(coins - cleanCost);
+    const unlocked = this.getUnlockedArenaThemes();
+    unlocked[themeId] = true;
+    const key = this.storageConfig?.keys?.unlockedArenaThemes;
+    if (key) {
+      this.safeSetItem(key, JSON.stringify(unlocked));
+    }
+    this.setActiveArenaTheme(themeId);
+    return true;
+  }
+
   /**
    * Whether the stored profile holds any progress, read straight from localStorage so a
    * restricted storage throws to the caller. Uses the configured grandfather progress keys.

@@ -664,6 +664,50 @@
   color: var(--text-bright);
 }
 
+.play-hub-title-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.play-hub-mastery-summary {
+  font-size: 0.74rem;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--border-subtle);
+  background: var(--surface-sunken);
+  color: var(--text-gold-soft);
+}
+
+.play-hub-mastery-summary.is-grand-master {
+  border-color: var(--accent-amber);
+  background: var(--accent-amber-alpha-20);
+  color: var(--text-gold);
+}
+
+.arena-theme-swatch {
+  display: inline-block;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  border: 1px solid var(--border-strong);
+  background: var(--bg-dark);
+}
+
+.arena-theme-swatch[data-arena-theme='solarForge'] {
+  background: linear-gradient(180deg, var(--surface-sunken), var(--accent-amber));
+}
+
+.arena-theme-swatch[data-arena-theme='cryoLab'] {
+  background: linear-gradient(180deg, var(--surface-sunken), var(--accent-blue));
+}
+
+.arena-theme-swatch[data-arena-theme='synthwave'] {
+  background: linear-gradient(180deg, var(--surface-sunken), var(--accent-purple));
+}
+
 .play-hub-subhead {
   grid-column: 1 / -1;
   margin: 4px 0 0;

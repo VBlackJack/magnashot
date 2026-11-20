@@ -1306,7 +1306,10 @@ export class Renderer {
     this.staticLayer.width = this.canvas.width;
     this.staticLayer.height = this.canvas.height;
     const layerCtx = this.staticLayer.getContext('2d');
-    const theme = this.gameConfig.theme;
+    const override = this.activeArenaTheme && this.activeArenaTheme !== 'deepSpace'
+      ? this.gameConfig.arenaThemes?.[this.activeArenaTheme]
+      : null;
+    const theme = override ? { ...this.gameConfig.theme, ...override } : this.gameConfig.theme;
     const width = this.logicalWidth;
     const height = this.logicalHeight;
 
@@ -1378,6 +1381,13 @@ export class Renderer {
       this.refreshBallSpriteKeySuffix();
       this.ballGradientCache.clear();
       this.ballSpriteCache?.clear();
+    }
+  }
+
+  setArenaTheme(themeId) {
+    if (themeId && typeof themeId === 'string' && this.activeArenaTheme !== themeId) {
+      this.activeArenaTheme = themeId;
+      this.staticLayerDirty = true;
     }
   }
 

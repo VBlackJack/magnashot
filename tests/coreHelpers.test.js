@@ -30,9 +30,10 @@ import {
 import {
   PLAY_HUB_FILTERS,
   matchesArcadeFilter,
-  resolveNextUnmasteredArcadeMode
+  resolveNextUnmasteredArcadeMode,
+  summarizeGrandMastery
 } from '../src/ui/PlayHubView.js';
-import { GAME_MODES } from '../src/core/Constants.js';
+import { ARENA_THEMES, GAME_MODES } from '../src/core/Constants.js';
 
 test('sanitizeAlias strips punctuation, collapses whitespace, normalizes Unicode, and caps length', () => {
   const cfg = { aliasMaxLength: 12 };
@@ -98,4 +99,14 @@ test('Play Hub arcade filters and next-unmastered smart picker classify modes ac
     getUnlockedModes: () => ['endless', 'classic']
   };
   assert.equal(resolveNextUnmasteredArcadeMode(mockStorage, mockConfig), GAME_MODES.CLASSIC);
+
+  assert.deepEqual(
+    summarizeGrandMastery({ a: { mastered: true }, b: { mastered: false } }),
+    { mastered: 1, total: 2, isGrandMaster: false }
+  );
+  assert.deepEqual(
+    summarizeGrandMastery({ a: { mastered: true }, b: { mastered: true } }),
+    { mastered: 2, total: 2, isGrandMaster: true }
+  );
+  assert.equal(ARENA_THEMES.DEEP_SPACE, 'deepSpace');
 });

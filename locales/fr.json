@@ -1000,6 +1000,26 @@
           }
         }
       },
+      "arenaThemes": {
+        "items": {
+          "deepSpace": {
+            "name": "Arène Espace Profond",
+            "description": "Chambre magnétique nocturne par défaut avec lueur bleue."
+          },
+          "solarForge": {
+            "name": "Arène Forge Solaire",
+            "description": "Chambre ardente aux murs ambrés et horizon incandescent."
+          },
+          "cryoLab": {
+            "name": "Arène Labo Cryo",
+            "description": "Laboratoire glacial cyan avec grille givrée."
+          },
+          "synthwave": {
+            "name": "Arène Grille Synthwave",
+            "description": "Horizon arcade ultraviolet aux parois magenta."
+          }
+        }
+      },
       "balance": {
         "label": "Pièces disponibles : {{coins}} ⬡"
       },
@@ -1553,7 +1573,9 @@
         "upgradePurchased": "{{name}} amélioré au niveau {{level}} sur {{maxLevel}}.",
         "ammoPurchased": "{{name}} acheté. En stock : {{count}}.",
         "stylePurchased": "Style {{name}} débloqué et équipé.",
-        "styleEquipped": "Style {{name}} équipé."
+        "styleEquipped": "Style {{name}} équipé.",
+        "arenaThemePurchased": "Thème d'arène {{name}} débloqué et équipé.",
+        "arenaThemeEquipped": "Thème d'arène {{name}} équipé."
       },
       "button": {
         "close": "Fermer"
@@ -1885,6 +1907,10 @@
       },
       "smartPick": {
         "nextUnmastered": "Prochain à maîtriser : {{mode}}"
+      },
+      "mastery": {
+        "summary": "{{mastered}}/{{total}} {{star}}",
+        "grandMaster": "Grand Maître {{mastered}}/{{total}} {{star}}"
       },
       "campaign": {
         "summary": "{{chapter}} • {{stars}} / {{maxStars}} ★",

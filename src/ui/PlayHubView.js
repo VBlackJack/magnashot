@@ -626,6 +626,24 @@ function refreshSmartPickButton(storage, gameConfig) {
   btn.classList.remove(HIDDEN_CLASS);
 }
 
+export function summarizeGrandMastery(mastery) {
+  const entries = Object.values(mastery || {});
+  const total = entries.length;
+  const mastered = entries.filter((entry) => entry?.mastered).length;
+  return { mastered, total, isGrandMaster: total > 0 && mastered === total };
+}
+
+function refreshGrandMasteryBadge(mastery, starSymbol) {
+  const badge = typeof document !== 'undefined' ? document.getElementById?.('play-hub-mastery-summary') : null;
+  if (!badge) {
+    return;
+  }
+  const { mastered, total, isGrandMaster } = summarizeGrandMastery(mastery);
+  badge.classList.toggle('is-grand-master', isGrandMaster);
+  const key = isGrandMaster ? 'modals.play.mastery.grandMaster' : 'modals.play.mastery.summary';
+  setTextIfChanged(badge, t(key, { mastered: formatNumber(mastered), total: formatNumber(total), star: starSymbol }));
+}
+
 function refreshPlayHubMastery(els, storage, gameConfig, filter = PLAY_HUB_FILTERS.ALL) {
   const mastery = resolveModeMasteryProgress(storage, gameConfig);
   const starSymbol = gameConfig?.theme?.starFilledSymbol || '';
@@ -646,6 +664,7 @@ function refreshPlayHubMastery(els, storage, gameConfig, filter = PLAY_HUB_FILTE
   );
   applyPlayHubArcadeFilter(els, filter, mastery);
   refreshSmartPickButton(storage, gameConfig);
+  refreshGrandMasteryBadge(mastery, starSymbol);
 }
 
 /** Methods installed on UIManager (see installMethods). `this` is the UIManager. */

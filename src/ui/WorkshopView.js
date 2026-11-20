@@ -14,7 +14,14 @@
  * limitations under the License.
  */
 
-import { BALL_STYLES, BALL_STYLES_ORDER, GAME_MODES, SPECIAL_TYPES_ORDER } from '../core/Constants.js';
+import {
+  ARENA_THEMES,
+  ARENA_THEMES_ORDER,
+  BALL_STYLES,
+  BALL_STYLES_ORDER,
+  GAME_MODES,
+  SPECIAL_TYPES_ORDER
+} from '../core/Constants.js';
 import { t, formatNumber } from '../core/I18n.js';
 import { specialIconBackground } from './CodexView.js';
 import { FULL_PERCENT, filterFocusTrapCandidates } from './UIHelpers.js';
@@ -501,6 +508,72 @@ function buildBallStyleCard(ui, styleId, spec, activeStyle, coins, slotIndex) {
   return card;
 }
 
+function buildArenaThemeCard(ui, themeId, spec, activeTheme, coins, slotIndex) {
+  const isUnlocked = ui.storageManager.isArenaThemeUnlocked?.(themeId) ?? (themeId === ARENA_THEMES.DEEP_SPACE);
+  const isActive = activeTheme === themeId;
+  const cost = spec.cost || 0;
+  const themeName = t(`modals.shop.arenaThemes.items.${themeId}.name`);
+
+  const card = document.createElement('div');
+  card.className = `upgrade-card style-card${isActive ? ' active-style' : ''}`;
+
+  const header = document.createElement('div');
+  header.className = 'upgrade-header';
+  const swatch = document.createElement('span');
+  swatch.className = 'arena-theme-swatch';
+  swatch.dataset.arenaTheme = themeId;
+  swatch.setAttribute('aria-hidden', 'true');
+  const status = document.createElement('span');
+  status.className = `upgrade-level${isActive ? ' style-status-active' : ''}`;
+  status.textContent = isActive
+    ? t('modals.shop.styles.equipped')
+    : isUnlocked
+      ? t('modals.shop.styles.unlocked')
+      : t('modals.shop.styles.cost', { cost: formatNumber(cost) });
+  header.append(swatch, status);
+
+  const title = document.createElement('div');
+  title.className = 'upgrade-title';
+  title.textContent = themeName;
+
+  const desc = document.createElement('div');
+  desc.className = 'upgrade-desc';
+  desc.textContent = t(`modals.shop.arenaThemes.items.${themeId}.description`);
+
+  const actionBtn = document.createElement('button');
+  actionBtn.type = 'button';
+  actionBtn.className = `modal-btn style-action-btn${isActive ? '' : ' primary'}`;
+  actionBtn.dataset.arenaThemeId = themeId;
+  if (isActive) {
+    actionBtn.textContent = t('modals.shop.styles.equipped');
+    actionBtn.disabled = true;
+  } else if (isUnlocked) {
+    actionBtn.textContent = t('modals.shop.styles.equip');
+    actionBtn.addEventListener('click', () => {
+      if (ui.storageManager.setActiveArenaTheme?.(themeId)) {
+        ui.renderer?.setArenaTheme?.(themeId);
+        ui.audioManager.playEffect('snap');
+        ui.announce(t('modals.shop.feedback.arenaThemeEquipped', { name: themeName }));
+        ui.rerenderShopKeepingFocus(`.style-action-btn[data-arena-theme-id="${themeId}"]`, slotIndex);
+      }
+    });
+  } else {
+    actionBtn.textContent = t('modals.shop.styles.cost', { cost: formatNumber(cost) });
+    actionBtn.disabled = coins < cost;
+    actionBtn.addEventListener('click', () => {
+      if (ui.storageManager.purchaseArenaTheme?.(themeId, cost)) {
+        ui.renderer?.setArenaTheme?.(themeId);
+        ui.audioManager.playEffect('match', 2);
+        ui.refresh(ui.engine, ui.lastExtra);
+        ui.announce(t('modals.shop.feedback.arenaThemePurchased', { name: themeName }));
+        ui.rerenderShopKeepingFocus(`.style-action-btn[data-arena-theme-id="${themeId}"]`, slotIndex);
+      }
+    });
+  }
+  card.append(header, title, desc, actionBtn);
+  return card;
+}
+
 function renderWorkshopStylesPane(ui, coins) {
   if (!ui.elements.shopStylesGrid || !ui.ballsConfig?.styles) {
     return;
@@ -508,13 +581,23 @@ function renderWorkshopStylesPane(ui, coins) {
   const stylesGrid = ui.elements.shopStylesGrid;
   stylesGrid.replaceChildren();
   const activeStyle = ui.storageManager.getActiveBallStyle?.() || BALL_STYLES.CLASSIC;
-  for (let slotIndex = 0; slotIndex < BALL_STYLES_ORDER.length; slotIndex++) {
-    const styleId = BALL_STYLES_ORDER[slotIndex];
+  let slotIndex = 0;
+  for (const styleId of BALL_STYLES_ORDER) {
     const spec = ui.ballsConfig.styles[styleId];
-    if (!spec) {
-      continue;
+    if (spec) {
+      stylesGrid.appendChild(buildBallStyleCard(ui, styleId, spec, activeStyle, coins, slotIndex++));
     }
-    stylesGrid.appendChild(buildBallStyleCard(ui, styleId, spec, activeStyle, coins, slotIndex));
+  }
+  const arenaThemes = ui.gameConfig?.arenaThemes;
+  if (!arenaThemes) {
+    return;
+  }
+  const activeTheme = ui.storageManager.getActiveArenaTheme?.() || ARENA_THEMES.DEEP_SPACE;
+  for (const themeId of ARENA_THEMES_ORDER) {
+    const spec = arenaThemes[themeId];
+    if (spec) {
+      stylesGrid.appendChild(buildArenaThemeCard(ui, themeId, spec, activeTheme, coins, slotIndex++));
+    }
   }
 }
 
