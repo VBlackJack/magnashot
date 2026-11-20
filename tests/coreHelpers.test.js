@@ -147,10 +147,10 @@ test('Play Hub arcade filters and next-unmastered smart picker classify modes ac
 test('PuzzleShareCodec round-trips valid puzzles and rejects corrupted or out-of-range payloads', () => {
   const sample = {
     shots: 3,
-    queue: ['red', 'blue', 'green'],
+    queue: ['crimson', 'cobalt', 'emerald'],
     balls: [
-      { x: 200, y: 120, c: 'red' },
-      { x: 240, y: 120, c: 'red' }
+      { x: 200, y: 120, c: 'crimson' },
+      { x: 240, y: 120, c: 'crimson' }
     ]
   };
   const encoded = encodeCustomPuzzle(sample);
@@ -161,8 +161,8 @@ test('PuzzleShareCodec round-trips valid puzzles and rejects corrupted or out-of
   const tampered = (encoded[0] === 'A' ? 'B' : 'A') + encoded.slice(1);
   assert.equal(decodeCustomPuzzle(tampered), null);
   assert.equal(decodeCustomPuzzle(''), null);
-  assert.equal(encodeCustomPuzzle({ shots: 0, queue: ['red'], balls: [{ x: 10, y: 10, c: 'red' }] }), null);
-  assert.equal(encodeCustomPuzzle({ shots: 1, queue: ['invalid'], balls: [{ x: 10, y: 10, c: 'red' }] }), null);
+  assert.equal(encodeCustomPuzzle({ shots: 0, queue: ['crimson'], balls: [{ x: 10, y: 10, c: 'crimson' }] }), null);
+  assert.equal(encodeCustomPuzzle({ shots: 1, queue: ['invalid'], balls: [{ x: 10, y: 10, c: 'crimson' }] }), null);
 
   const shareUrl = buildCustomPuzzleUrl('https://vblackjack.github.io/magnashot/', sample);
   assert.ok(shareUrl && shareUrl.includes('?puzzle='));

@@ -17,7 +17,7 @@
 import { t } from '../core/I18n.js';
 import { buildCustomPuzzleUrl } from '../game/PuzzleShareCodec.js';
 
-const BUILDER_COLORS = Object.freeze(['red', 'blue', 'green', 'yellow', 'purple', 'cyan']);
+const BUILDER_COLORS = Object.freeze(['crimson', 'cobalt', 'emerald', 'amber', 'violet', 'cyan']);
 const GRID_COLS = 7;
 const GRID_ROWS = 4;
 const GRID_START_X = 115;
@@ -29,14 +29,14 @@ const MAX_BUILDER_SHOTS = 6;
 
 function createInitialBuilderState() {
   const cells = new Map();
-  cells.set('2,0', 'red');
-  cells.set('3,0', 'red');
-  cells.set('4,0', 'blue');
-  cells.set('3,1', 'blue');
+  cells.set('2,0', 'crimson');
+  cells.set('3,0', 'crimson');
+  cells.set('4,0', 'cobalt');
+  cells.set('3,1', 'cobalt');
   return {
-    activeColor: 'red',
+    activeColor: 'crimson',
     shots: DEFAULT_SHOTS,
-    queue: ['red', 'blue'],
+    queue: ['crimson', 'cobalt'],
     cells
   };
 }

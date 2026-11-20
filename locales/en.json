@@ -2029,11 +2029,11 @@
       "copied": "Puzzle link copied to clipboard.",
       "emptyError": "Place at least one sphere on the board first.",
       "colors": {
-        "red": "Red",
-        "blue": "Blue",
-        "green": "Green",
-        "yellow": "Yellow",
-        "purple": "Purple",
+        "crimson": "Crimson",
+        "cobalt": "Cobalt",
+        "emerald": "Emerald",
+        "amber": "Amber",
+        "violet": "Violet",
         "cyan": "Cyan"
       }
     }

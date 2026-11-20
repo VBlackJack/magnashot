@@ -31,7 +31,7 @@ const FNV_OFFSET_BASIS = 0x811c9dc5;
 const FNV_PRIME = 0x01000193;
 const CHECKSUM_MASK = 0xffff;
 const PAYLOAD_PATTERN = /^[A-Za-z0-9_-]+$/;
-const ALLOWED_COLORS = new Set(['red', 'blue', 'green', 'yellow', 'purple', 'cyan']);
+const ALLOWED_COLORS = new Set(['crimson', 'cobalt', 'emerald', 'amber', 'violet', 'cyan']);
 
 function fnv1a16(text) {
   let hash = FNV_OFFSET_BASIS;

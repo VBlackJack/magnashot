@@ -776,32 +776,32 @@
   padding: 0;
 }
 
-.puzzle-builder-cell[data-ball-color='red'],
-.puzzle-builder-queue-pill[data-ball-color='red'] {
+.puzzle-builder-cell[data-ball-color='crimson'],
+.puzzle-builder-queue-pill[data-ball-color='crimson'] {
   border-color: var(--accent-danger);
   color: var(--accent-danger-text);
 }
 
-.puzzle-builder-cell[data-ball-color='blue'],
-.puzzle-builder-queue-pill[data-ball-color='blue'] {
+.puzzle-builder-cell[data-ball-color='cobalt'],
+.puzzle-builder-queue-pill[data-ball-color='cobalt'] {
   border-color: var(--accent-blue);
   color: var(--accent-blue);
 }
 
-.puzzle-builder-cell[data-ball-color='green'],
-.puzzle-builder-queue-pill[data-ball-color='green'] {
+.puzzle-builder-cell[data-ball-color='emerald'],
+.puzzle-builder-queue-pill[data-ball-color='emerald'] {
   border-color: var(--accent-emerald);
   color: var(--accent-emerald);
 }
 
-.puzzle-builder-cell[data-ball-color='yellow'],
-.puzzle-builder-queue-pill[data-ball-color='yellow'] {
+.puzzle-builder-cell[data-ball-color='amber'],
+.puzzle-builder-queue-pill[data-ball-color='amber'] {
   border-color: var(--accent-amber);
   color: var(--text-gold);
 }
 
-.puzzle-builder-cell[data-ball-color='purple'],
-.puzzle-builder-queue-pill[data-ball-color='purple'] {
+.puzzle-builder-cell[data-ball-color='violet'],
+.puzzle-builder-queue-pill[data-ball-color='violet'] {
   border-color: var(--accent-purple);
   color: var(--text-purple-soft);
 }

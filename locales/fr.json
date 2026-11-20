@@ -2029,11 +2029,11 @@
       "copied": "Lien du puzzle copié dans le presse-papiers.",
       "emptyError": "Placez au moins une sphère sur le plateau.",
       "colors": {
-        "red": "Rouge",
-        "blue": "Bleu",
-        "green": "Vert",
-        "yellow": "Jaune",
-        "purple": "Violet",
+        "crimson": "Carmin",
+        "cobalt": "Cobalt",
+        "emerald": "Émeraude",
+        "amber": "Ambre",
+        "violet": "Violet",
         "cyan": "Cyan"
       }
     }
