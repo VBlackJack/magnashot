@@ -4,6 +4,8 @@ All notable changes to **MagnaShot** are documented in this file.
 
 ## [Unreleased]
 
+## [1.33.0] - 2026-11-20
+
 ### Added
 - Play Hub session filter chips (`All`, `Quick`, `Endless`, `Unmastered`), a one-click `Next to master` smart picker (`#btn-play-next-unmastered`), a live Grand Mastery summary badge (`#play-hub-mastery-summary`), and a deterministic `Daily Puzzle` card (`#btn-daily-puzzle`) with a `+25` coin first-clear daily bonus (`index.html`, `src/game/DailyShare.js`, `src/game/EngineRoundFlow.js`, `src/ui/PlayHubView.js`, `src/ui/UIInputBindings.js`, `styles/modals.css`, `locales/*.json`).
 - Four unlockable Arena Visual Themes (`Deep Space`, `Solar Forge`, `Cryo Lab`, `Synthwave Grid`) and four unlockable Laser Sight Trails (`Classic`, `Plasma Beam`, `Solar Prism`, `Emerald Pulse`) purchasable with coins in the Workshop Styles tab, persisted in `StorageManager` and `ProgressBackup`, and applied in `Renderer.js` (`configs/game.json`, `src/core/Constants.js`, `src/ui/WorkshopView.js`).
