@@ -1167,6 +1167,7 @@ export class GameEngine {
     this.mode = mode;
     this.isCustomPuzzle = false;
     this.customPuzzleSpec = null;
+    this.puzzleGhostAngle = null;
     this.activeLabMutators = [];
     // startVersusBoard sets the versus state again after this reset.
     this.versus = null;
@@ -1553,6 +1554,7 @@ export class GameEngine {
     if (this.mode === GAME_MODES.CASCADE) {
       this.cascadeOccupiedPlatforms = getOccupiedPlatformIndices(this.physicsWorld);
     }
+    recordPuzzleOpeningShot(this);
     // The previous shot has settled: this is the state it left behind.
     this.sampleShotTimeline();
     this.evaluateGhostShot();
@@ -1681,6 +1683,16 @@ export class GameEngine {
       this.onStateChange(this, extra);
     }
   }
+}
+
+function recordPuzzleOpeningShot(engine) {
+  if (engine.mode !== GAME_MODES.PUZZLE || engine.runShotsFired !== 0 || !Number.isFinite(engine.aimAngle)) {
+    return;
+  }
+  const ghostKey = engine.isCustomPuzzle
+    ? `custom:${engine.customPuzzleSpec?.balls?.length || 0}:${engine.customPuzzleSpec?.shots || 0}`
+    : `stage:${engine.currentPuzzleStage}`;
+  engine.lastPuzzleShot = { key: ghostKey, angle: engine.aimAngle };
 }
 
 function restartFluxMode(engine, ghost, labMutators) {

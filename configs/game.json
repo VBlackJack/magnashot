@@ -36,6 +36,12 @@
       "proximityRadiusPx": 150,
       "maxStepPx": 8
     },
+    "puzzleGhostLine": {
+      "lengthPx": 175,
+      "alpha": 0.34,
+      "dash": [5, 7],
+      "lineWidth": 1.8
+    },
     "survivalWaveWarningThreshold": 2,
     "dangerWarningMarginY": 72,
     "maxDevicePixelRatio": 3,
@@ -2854,6 +2860,7 @@
         "bounties": "object",
         "weeklyMastery": "object",
         "dailyPuzzlesCleared": "integer",
+        "savedPuzzles": "array",
         "dailyHistory": "array",
         "ghostDuels": "array",
         "dailyBestDate": "date",
@@ -2951,7 +2958,8 @@
       "ghostAlias": "ghost_alias",
       "bounties": "bounties",
       "weeklyMastery": "weekly_mastery",
-      "dailyPuzzlesCleared": "daily_puzzles_cleared"
+      "dailyPuzzlesCleared": "daily_puzzles_cleared",
+      "savedPuzzles": "saved_puzzles"
     },
     "runSnapshotVersion": 1,
     "legacyMigration": {
@@ -3002,6 +3010,7 @@
     "maxBalls": 28,
     "maxObstacles": 2,
     "maxFreeObstacles": 3,
+    "maxSavedPuzzles": 10,
     "obstaclePresets": {
       "bumper": [{ "type": "bumper", "x": 235, "y": 360, "radius": 24 }],
       "repulsor": [{ "type": "repulsor", "x": 235, "y": 350, "radius": 20, "strength": 1.2 }],

@@ -61,6 +61,7 @@ function createTestEngine(storageManager = createTestStorage()) {
     playVictory: () => {},
     playGameOver: () => {},
     playClick: () => {},
+    playEffect: () => {},
     stopAll: () => {},
     setMusicIntensity: () => {},
     notifyPulseEvent: () => {}
@@ -204,6 +205,43 @@ describe('v1.36 Signature Evolutions', () => {
       storage.getUnlockedLevel = () => 2;
       const third = resolvePlayHubSpotlight(storage, gameConfig);
       assert.equal(third?.kind, 'campaign');
+    });
+  });
+
+  describe('Puzzle Previous-Shot Ghost Angle & My Puzzles Library', () => {
+    it('remembers the opening shot angle when retrying the same puzzle stage and clears it on stage change', () => {
+      const engine = createTestEngine();
+      engine.startPuzzleMode(1);
+      assert.equal(engine.puzzleGhostAngle, null, 'First attempt has no previous-shot ghost angle');
+
+      engine.aimAngle = -1.25;
+      engine.shoot();
+      engine.startPuzzleMode(1);
+      assert.equal(engine.puzzleGhostAngle, -1.25, 'Retrying the same puzzle stage exposes the previous opening angle');
+
+      engine.startPuzzleMode(2);
+      assert.equal(engine.puzzleGhostAngle, null, 'Switching to a different puzzle stage clears the ghost angle');
+    });
+
+    it('persists, deduplicates, caps at 10, and deletes entries in the Saved Puzzles library', () => {
+      const storage = createTestStorage();
+      assert.deepEqual(storage.getSavedPuzzles(), []);
+
+      for (let i = 1; i <= 12; i++) {
+        assert.equal(storage.saveCustomPuzzle({ code: `code-${i}`, balls: i, shots: 2, verified: i % 2 === 0 }), true);
+      }
+      const list = storage.getSavedPuzzles();
+      assert.equal(list.length, 10, 'Library must cap saved puzzles at maxSavedPuzzles (10)');
+      assert.equal(list[0].code, 'code-12', 'Most recently saved puzzle should appear first');
+
+      storage.saveCustomPuzzle({ code: 'code-10', balls: 10, shots: 3, verified: true });
+      const deduped = storage.getSavedPuzzles();
+      assert.equal(deduped.length, 10);
+      assert.equal(deduped[0].code, 'code-10');
+      assert.equal(deduped[0].verified, true);
+
+      assert.equal(storage.deleteSavedPuzzle('code-10'), true);
+      assert.equal(storage.getSavedPuzzles().length, 9);
     });
   });
 });
