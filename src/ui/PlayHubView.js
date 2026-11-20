@@ -17,6 +17,7 @@
 import { GAME_MODES, GAME_STATES } from '../core/Constants.js';
 import { t, formatNumber } from '../core/I18n.js';
 import { SeededRandom } from '../core/SeededRandom.js';
+import { resolveDailyPuzzleStage } from '../game/DailyShare.js';
 import { getUtcIsoWeekKey } from '../game/WeeklyFlux.js';
 import {
   ARCADE_CARD_SPECS,
@@ -626,11 +627,7 @@ function refreshSmartPickButton(storage, gameConfig) {
   btn.classList.remove(HIDDEN_CLASS);
 }
 
-export function resolveDailyPuzzleStage(dateKey, totalPuzzles) {
-  const count = Math.max(1, Math.floor(Number(totalPuzzles) || 1));
-  const rng = new SeededRandom(`daily-puzzle:${dateKey || SeededRandom.getTodayDateKey()}`);
-  return 1 + Math.floor(rng.next() * count);
-}
+export { resolveDailyPuzzleStage };
 
 export function summarizeGrandMastery(mastery) {
   const entries = Object.values(mastery || {});
@@ -650,13 +647,17 @@ function refreshGrandMasteryBadge(mastery, starSymbol) {
   setTextIfChanged(badge, t(key, { mastered: formatNumber(mastered), total: formatNumber(total), star: starSymbol }));
 }
 
-function refreshDailyPuzzleChip(gameConfig) {
+function refreshDailyPuzzleChip(storage, gameConfig) {
   const dailyPuzzleEl = typeof document !== 'undefined' ? document.getElementById?.('daily-puzzle-stage-label') : null;
   if (!dailyPuzzleEl) {
     return;
   }
-  const stage = resolveDailyPuzzleStage(SeededRandom.getTodayDateKey(), gameConfig?.puzzles?.length || 1);
-  setTextIfChanged(dailyPuzzleEl, t('modals.play.dailyPuzzle.stageChip', { stage: formatNumber(stage) }));
+  const todayKey = SeededRandom.getTodayDateKey();
+  const stage = resolveDailyPuzzleStage(todayKey, gameConfig?.puzzles?.length || 1);
+  const claimed = storage?.hasClaimedDailyPuzzle?.(todayKey) === true;
+  const bonus = gameConfig?.dailyPuzzle?.firstClearBonusCoins || 0;
+  const key = claimed ? 'modals.play.dailyPuzzle.stageDone' : 'modals.play.dailyPuzzle.stageBonus';
+  setTextIfChanged(dailyPuzzleEl, t(key, { stage: formatNumber(stage), coins: formatNumber(bonus) }));
 }
 
 function refreshPlayHubMastery(els, storage, gameConfig, filter = PLAY_HUB_FILTERS.ALL) {
@@ -680,7 +681,7 @@ function refreshPlayHubMastery(els, storage, gameConfig, filter = PLAY_HUB_FILTE
   applyPlayHubArcadeFilter(els, filter, mastery);
   refreshSmartPickButton(storage, gameConfig);
   refreshGrandMasteryBadge(mastery, starSymbol);
-  refreshDailyPuzzleChip(gameConfig);
+  refreshDailyPuzzleChip(storage, gameConfig);
 }
 
 /** Methods installed on UIManager (see installMethods). `this` is the UIManager. */

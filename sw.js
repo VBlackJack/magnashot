@@ -72,6 +72,7 @@ const PRECACHE_ASSETS = [
   './src/entities/Obstacle.js',
   './src/entities/ParticleSystem.js',
   './src/game/DailyShare.js',
+  './src/game/PuzzleShareCodec.js',
   './src/game/WeeklyFlux.js',
   './src/game/Bounties.js',
   './src/game/GhostCodec.js',

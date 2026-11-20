@@ -52,6 +52,7 @@ export default [
       'src/game/EngineTurnResolution.js',
       'src/game/GameEngine.js',
       'src/game/ImpactPreview.js',
+      'src/game/PuzzleShareCodec.js',
       'src/game/Renderer.js',
       'src/game/RendererMagnetarCharges.js',
       'src/game/RendererParticles.js',

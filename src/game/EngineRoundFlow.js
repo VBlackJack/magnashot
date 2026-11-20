@@ -27,6 +27,7 @@ import { t } from '../core/I18n.js';
 import { SeededRandom } from '../core/SeededRandom.js';
 import { getSagSpec, getSagPhase, SAG_PHASES } from './SagMeter.js';
 import { reportBountyEvent } from './Bounties.js';
+import { resolveDailyPuzzleStage } from './DailyShare.js';
 import { getOccupiedPlatformIndices } from './EngineTurnResolution.js';
 
 /**
@@ -191,8 +192,13 @@ function evaluatePuzzleRoundEnd(engine) {
     scoring
   });
   const { newlyEarnedStars } = engine.storageManager.savePuzzleStageResult(stage, engine.score, stars);
-  const earnedCoins = newlyEarnedStars * (scoring.coinsPerVictoryStar + scoring.firstTimeStarCoinBonus);
-  engine.storageManager.addCoins(earnedCoins);
+  const starCoins = newlyEarnedStars * (scoring.coinsPerVictoryStar + scoring.firstTimeStarCoinBonus);
+  engine.storageManager.addCoins(starCoins);
+  const todayKey = SeededRandom.getTodayDateKey();
+  const dailyBonus = engine.gameConfig.dailyPuzzle?.firstClearBonusCoins || 0;
+  const isDailyPuzzle = stage === resolveDailyPuzzleStage(todayKey, engine.gameConfig.puzzles?.length || 1);
+  const dailyPuzzleCoins = isDailyPuzzle && engine.storageManager.claimDailyPuzzleBonus?.(todayKey, dailyBonus) ? dailyBonus : 0;
+  const earnedCoins = starCoins + dailyPuzzleCoins;
   engine.flushPendingRunCoins();
   reportBountyEvent(engine, 'puzzle_stage_cleared', 1);
   finishVictoryState(engine, {

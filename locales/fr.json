@@ -1020,6 +1020,26 @@
           }
         }
       },
+      "laserTrails": {
+        "items": {
+          "classic": {
+            "name": "Visée Classique",
+            "description": "Ligne laser par défaut assortie à la sphère."
+          },
+          "plasma": {
+            "name": "Faisceau Plasma",
+            "description": "Visée plasma magenta lumineuse."
+          },
+          "prism": {
+            "name": "Prisme Solaire",
+            "description": "Visée prisme dorée haute visibilité."
+          },
+          "pulse": {
+            "name": "Impulsion Émeraude",
+            "description": "Visée laser tactique émeraude."
+          }
+        }
+      },
       "balance": {
         "label": "Pièces disponibles : {{coins}} ⬡"
       },
@@ -1575,7 +1595,9 @@
         "stylePurchased": "Style {{name}} débloqué et équipé.",
         "styleEquipped": "Style {{name}} équipé.",
         "arenaThemePurchased": "Thème d'arène {{name}} débloqué et équipé.",
-        "arenaThemeEquipped": "Thème d'arène {{name}} équipé."
+        "arenaThemeEquipped": "Thème d'arène {{name}} équipé.",
+        "laserTrailPurchased": "Visée {{name}} débloquée et équipée.",
+        "laserTrailEquipped": "Visée {{name}} équipée."
       },
       "button": {
         "close": "Fermer"
@@ -1916,7 +1938,9 @@
       "dailyPuzzle": {
         "title": "Puzzle du jour",
         "desc": "Un défi tactique partagé chaque jour.",
-        "stageChip": "Aujourd'hui : Puzzle #{{stage}}"
+        "stageChip": "Aujourd'hui : Puzzle #{{stage}}",
+        "stageBonus": "Puzzle #{{stage}} (+{{coins}} ⬡)",
+        "stageDone": "Puzzle #{{stage}} - Terminé ✓"
       },
       "campaign": {
         "summary": "{{chapter}} • {{stars}} / {{maxStars}} ★",

@@ -1391,6 +1391,12 @@ export class Renderer {
     }
   }
 
+  setLaserTrail(trailId) {
+    if (trailId && typeof trailId === 'string') {
+      this.activeLaserTrail = trailId;
+    }
+  }
+
   /**
    * Polarity glyphs are the color-independent cue for a ball, so on a small canvas
    * they grow toward the ball edge to stay at a readable on-screen size.
@@ -2224,8 +2230,12 @@ export class Renderer {
       return;
     }
     const palette = this.getBallPalette(currentBall);
+    const trailOverride = this.activeLaserTrail && this.activeLaserTrail !== 'classic'
+      ? this.gameConfig.laserTrails?.[this.activeLaserTrail]
+      : null;
+    const aimPalette = trailOverride?.color ? { ...palette, highlight: trailOverride.color } : palette;
     ctx.save();
-    strokeAimTrajectoryPath(this, ctx, points, palette, theme, now);
+    strokeAimTrajectoryPath(this, ctx, points, aimPalette, theme, now);
 
     const endX = points.landingX !== undefined ? points.landingX : points[points.length - 1].x;
     const endY = points.landingY !== undefined ? points.landingY : points[points.length - 1].y;

@@ -174,6 +174,20 @@ export const ARENA_THEMES_ORDER = Object.freeze([
   ARENA_THEMES.SYNTHWAVE
 ]);
 
+export const LASER_TRAILS = Object.freeze({
+  CLASSIC: 'classic',
+  PLASMA: 'plasma',
+  PRISM: 'prism',
+  PULSE: 'pulse'
+});
+
+export const LASER_TRAILS_ORDER = Object.freeze([
+  LASER_TRAILS.CLASSIC,
+  LASER_TRAILS.PLASMA,
+  LASER_TRAILS.PRISM,
+  LASER_TRAILS.PULSE
+]);
+
 export const CLUSTER_MODIFIERS = Object.freeze({
   ARMORED: 'armored',
   DORMANT_BOMB: 'dormantBomb',

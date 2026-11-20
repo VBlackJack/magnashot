@@ -34,8 +34,9 @@ import {
   summarizeGrandMastery,
   resolveDailyPuzzleStage
 } from '../src/ui/PlayHubView.js';
-import { ARENA_THEMES, GAME_MODES } from '../src/core/Constants.js';
+import { ARENA_THEMES, GAME_MODES, LASER_TRAILS } from '../src/core/Constants.js';
 import { buildPersonalBestGhost } from '../src/game/EngineGhostDuel.js';
+import { encodeCustomPuzzle, decodeCustomPuzzle } from '../src/game/PuzzleShareCodec.js';
 
 test('sanitizeAlias strips punctuation, collapses whitespace, normalizes Unicode, and caps length', () => {
   const cfg = { aliasMaxLength: 12 };
@@ -129,4 +130,26 @@ test('Play Hub arcade filters and next-unmastered smart picker classify modes ac
   const stageB = resolveDailyPuzzleStage('2026-11-20', 20);
   assert.equal(stageA, stageB);
   assert.ok(stageA >= 1 && stageA <= 20);
+  assert.equal(LASER_TRAILS.CLASSIC, 'classic');
+});
+
+test('PuzzleShareCodec round-trips valid puzzles and rejects corrupted or out-of-range payloads', () => {
+  const sample = {
+    shots: 3,
+    queue: ['red', 'blue', 'green'],
+    balls: [
+      { x: 200, y: 120, c: 'red' },
+      { x: 240, y: 120, c: 'red' }
+    ]
+  };
+  const encoded = encodeCustomPuzzle(sample);
+  assert.ok(encoded && encoded.length > 0);
+  assert.deepEqual(decodeCustomPuzzle(encoded), sample);
+
+  // Tampering with checksum/body fails decoding
+  const tampered = (encoded[0] === 'A' ? 'B' : 'A') + encoded.slice(1);
+  assert.equal(decodeCustomPuzzle(tampered), null);
+  assert.equal(decodeCustomPuzzle(''), null);
+  assert.equal(encodeCustomPuzzle({ shots: 0, queue: ['red'], balls: [{ x: 10, y: 10, c: 'red' }] }), null);
+  assert.equal(encodeCustomPuzzle({ shots: 1, queue: ['invalid'], balls: [{ x: 10, y: 10, c: 'red' }] }), null);
 });

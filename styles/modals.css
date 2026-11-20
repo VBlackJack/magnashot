@@ -708,6 +708,27 @@
   background: linear-gradient(180deg, var(--surface-sunken), var(--accent-purple));
 }
 
+.laser-trail-swatch {
+  display: inline-block;
+  width: 28px;
+  height: 8px;
+  border-radius: 999px;
+  border: 1px solid var(--border-strong);
+  background: var(--accent-blue);
+}
+
+.laser-trail-swatch[data-laser-trail='plasma'] {
+  background: var(--accent-purple);
+}
+
+.laser-trail-swatch[data-laser-trail='prism'] {
+  background: var(--text-gold);
+}
+
+.laser-trail-swatch[data-laser-trail='pulse'] {
+  background: var(--accent-emerald);
+}
+
 .play-hub-subhead {
   grid-column: 1 / -1;
   margin: 4px 0 0;

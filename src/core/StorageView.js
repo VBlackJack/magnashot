@@ -108,6 +108,9 @@ export const VERSUS_STORAGE_POLICY = Object.freeze({
   getUnlockedArenaThemes: P.FORWARD,
   isArenaThemeUnlocked: P.FORWARD,
   getActiveArenaTheme: P.FORWARD,
+  getUnlockedLaserTrails: P.FORWARD,
+  isLaserTrailUnlocked: P.FORWARD,
+  getActiveLaserTrail: P.FORWARD,
   getRunSnapshotVersion: P.FORWARD,
   computeDailyStreakBonus: P.FORWARD,
 
@@ -134,6 +137,10 @@ export const VERSUS_STORAGE_POLICY = Object.freeze({
   setPbGhostEnabled: P.NOOP,
   setActiveArenaTheme: P.NOOP,
   purchaseArenaTheme: P.FALSE,
+  setActiveLaserTrail: P.NOOP,
+  purchaseLaserTrail: P.FALSE,
+  hasClaimedDailyPuzzle: P.FALSE,
+  claimDailyPuzzleBonus: P.FALSE,
 
   // Daily.
   hasPlayedDailyToday: P.FALSE,

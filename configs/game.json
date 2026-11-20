@@ -2457,6 +2457,7 @@
         "discoveriesVersion": "integer",
         "unlockedBallStyles": "object",
         "unlockedArenaThemes": "object",
+        "unlockedLaserTrails": "object",
         "modeUnlocks": "object",
         "weeklyFluxBest": "object",
         "playerStats": "object",
@@ -2467,9 +2468,11 @@
         "dailyLastPlayedDate": "date",
         "dailyStreakDate": "date",
         "dailyStreakGraceDate": "date",
+        "dailyPuzzleClaimedDate": "date",
         "weeklyFluxClaimedWeek": "week",
         "activeBallStyle": "string",
         "activeArenaTheme": "string",
+        "activeLaserTrail": "string",
         "ghostAlias": "optionalString",
         "versusTutorialSeen": "boolean"
       }
@@ -2542,6 +2545,9 @@
       "activeBallStyle": "ball_style",
       "unlockedArenaThemes": "arena_themes",
       "activeArenaTheme": "arena_theme",
+      "unlockedLaserTrails": "laser_trails",
+      "activeLaserTrail": "laser_trail",
+      "dailyPuzzleClaimedDate": "daily_puzzle_claimed",
       "schemaVersion": "schema_version",
       "modeUnlocks": "mode_unlocks",
       "dailyHistory": "daily_history",
@@ -2572,6 +2578,7 @@
     "initialCoins": 50,
     "ballStyle": "classic",
     "arenaTheme": "deepSpace",
+    "laserTrail": "classic",
     "musicEnabled": true,
     "musicVolume": 0.6,
     "musicVolumeSteps": [0.2, 0.4, 0.6, 0.8, 1],
@@ -2584,6 +2591,26 @@
     ],
     "coarsePointerMediaQuery": "(pointer: coarse)",
     "fullscreenDisplayModeMediaQuery": "(display-mode: fullscreen)"
+  },
+  "dailyPuzzle": {
+    "firstClearBonusCoins": 25
+  },
+  "laserTrails": {
+    "classic": {
+      "cost": 0
+    },
+    "plasma": {
+      "cost": 150,
+      "color": "#e879f9"
+    },
+    "prism": {
+      "cost": 200,
+      "color": "#fde047"
+    },
+    "pulse": {
+      "cost": 240,
+      "color": "#34d399"
+    }
   },
   "arenaThemes": {
     "deepSpace": {

@@ -16,6 +16,7 @@
 
 import { GAME_MODES } from '../core/Constants.js';
 import { t, formatNumber } from '../core/I18n.js';
+import { SeededRandom } from '../core/SeededRandom.js';
 
 /**
  * Shareable result text of every non-campaign mode (Daily Challenge, Survival, Flux, Puzzle, Blitz,
@@ -519,4 +520,11 @@ export function formatDailyCountdown(ms) {
     hours: Math.floor(totalMinutes / MINUTES_PER_HOUR),
     minutes: totalMinutes % MINUTES_PER_HOUR
   };
+}
+
+/** Deterministic daily puzzle stage index (1..totalPuzzles) shared by all players for dateKey. */
+export function resolveDailyPuzzleStage(dateKey, totalPuzzles) {
+  const count = Math.max(1, Math.floor(Number(totalPuzzles) || 1));
+  const rng = new SeededRandom(`daily-puzzle:${dateKey || SeededRandom.getTodayDateKey()}`);
+  return 1 + Math.floor(rng.next() * count);
 }

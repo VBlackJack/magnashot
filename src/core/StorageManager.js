@@ -1466,6 +1466,88 @@ export class StorageManager {
     return true;
   }
 
+  getUnlockedLaserTrails() {
+    const defaultTrail = this.defaultsConfig?.laserTrail || 'classic';
+    const key = this.storageConfig?.keys?.unlockedLaserTrails;
+    const parsed = key ? this.readJsonObject(key) : {};
+    const unlocked = { [defaultTrail]: true };
+    for (const [trailId, value] of Object.entries(parsed)) {
+      if (value === true) {
+        unlocked[trailId] = true;
+      }
+    }
+    return unlocked;
+  }
+
+  isLaserTrailUnlocked(trailId) {
+    if (!trailId || typeof trailId !== 'string') {
+      return false;
+    }
+    return this.getUnlockedLaserTrails()[trailId] === true;
+  }
+
+  getActiveLaserTrail() {
+    const defaultTrail = this.defaultsConfig?.laserTrail || 'classic';
+    const key = this.storageConfig?.keys?.activeLaserTrail;
+    const stored = key ? this.safeGetItem(key) : null;
+    return stored && this.isLaserTrailUnlocked(stored) ? stored : defaultTrail;
+  }
+
+  setActiveLaserTrail(trailId) {
+    if (!this.isLaserTrailUnlocked(trailId)) {
+      return false;
+    }
+    const key = this.storageConfig?.keys?.activeLaserTrail;
+    if (key) {
+      this.safeSetItem(key, trailId);
+    }
+    return true;
+  }
+
+  purchaseLaserTrail(trailId, cost) {
+    const catalog = configRegistry.get('game')?.laserTrails || {};
+    const spec = catalog[trailId];
+    if (!spec) {
+      return false;
+    }
+    if (this.isLaserTrailUnlocked(trailId)) {
+      this.setActiveLaserTrail(trailId);
+      return false;
+    }
+    const cleanCost = Math.max(0, Math.floor(Number(cost ?? spec.cost) || 0));
+    const coins = this.getCoins();
+    if (coins < cleanCost) {
+      return false;
+    }
+    this.setCoins(coins - cleanCost);
+    const unlocked = this.getUnlockedLaserTrails();
+    unlocked[trailId] = true;
+    const key = this.storageConfig?.keys?.unlockedLaserTrails;
+    if (key) {
+      this.safeSetItem(key, JSON.stringify(unlocked));
+    }
+    this.setActiveLaserTrail(trailId);
+    return true;
+  }
+
+  hasClaimedDailyPuzzle(dateKey) {
+    const key = this.storageConfig?.keys?.dailyPuzzleClaimedDate;
+    return Boolean(key && typeof dateKey === 'string' && this.safeGetItem(key) === dateKey);
+  }
+
+  claimDailyPuzzleBonus(dateKey, bonusCoins) {
+    const key = this.storageConfig?.keys?.dailyPuzzleClaimedDate;
+    if (!key || typeof dateKey !== 'string' || this.hasClaimedDailyPuzzle(dateKey)) {
+      return false;
+    }
+    this.safeSetItem(key, dateKey);
+    const amount = Math.max(0, Math.floor(Number(bonusCoins) || 0));
+    if (amount > 0) {
+      this.addCoins(amount);
+    }
+    return true;
+  }
+
   /**
    * Whether the stored profile holds any progress, read straight from localStorage so a
    * restricted storage throws to the caller. Uses the configured grandfather progress keys.
