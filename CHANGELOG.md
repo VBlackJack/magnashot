@@ -4,6 +4,9 @@ All notable changes to **MagnaShot** are documented in this file.
 
 ## [Unreleased]
 
+### Fixed
+- Rebalanced the desktop Play Hub grid (`index.html`, `styles/modals.css`, `styles/responsive.css`): placed Campaign and Duel side by side, spanned Challenges full-width in 3 equal columns (removing the legacy `#btn-weekly` full-row override), arranged Daily Contracts and Weekly Mastery Trio in a 2-column row, and tightened card spacing to eliminate the empty left-column gap and bring Arcade into immediate view.
+
 ## [1.35.0] - 2026-11-20
 
 ### Added
