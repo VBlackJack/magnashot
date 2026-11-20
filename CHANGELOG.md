@@ -4,6 +4,8 @@ All notable changes to **MagnaShot** are documented in this file.
 
 ## [Unreleased]
 
+## [1.35.0] - 2026-11-20
+
 ### Added
 - **Puzzle Previous-Shot Ghost Angle & Local "My Puzzles" Library** (`src/game/GameEngine.js`, `src/game/EngineModes.js`, `src/game/Renderer.js`, `src/core/StorageCosmetics.js`, `src/ui/PuzzleBuilderView.js`, `configs/game.json`): shows a faint dashed ghost ray of the previous opening shot angle when retrying the same Puzzle stage, and lets creators save, reload, and manage up to 10 custom puzzles locally inside the builder (backed up in `ProgressBackup`), verified with dedicated Playwright E2E coverage (`tests/browser/v136Evolutions.test.js`).
 - **Mutator Lab** (`configs/game.json`, `src/game/GameEngine.js`, `src/game/EngineBoard.js`, `src/game/EngineModes.js`, `src/ui/UIInputBindings.js`, `src/ui/UIHudRefresh.js`, `index.html`): combine 1 to 3 Daily Challenge physics mutators on Survival (`endless`), Flux (`flux`), or Purist (`classic`) for a live `+0.25x` per-mutator score multiplier (up to `1.75x`) while keeping standard high scores and PB Ghost isolated.
