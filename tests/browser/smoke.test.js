@@ -4327,7 +4327,7 @@ describe('Lot E and audit smoke checks', () => {
       await page.click('#btn-puzzle-stages-toggle');
       await waitShown(page, '#puzzle-stages-strip');
       const stageCount = await page.locator('#puzzle-stages-strip .puzzle-stage-btn').count();
-      assert.equal(stageCount, 20);
+      assert.equal(stageCount, 25);
       await page.click('#puzzle-stages-strip .puzzle-stage-btn[data-puzzle-stage="20"]');
       await page.waitForFunction(
         (puzzleMode) => window.__fluxEngine.mode === puzzleMode && window.__fluxEngine.currentPuzzleStage === 20,

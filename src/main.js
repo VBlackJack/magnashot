@@ -78,6 +78,8 @@ class Application {
       renderer.setArenaTheme(storageManager.getActiveArenaTheme());
       renderer.setLaserTrail(storageManager.getActiveLaserTrail());
 
+      const campaignTuning = configRegistry.get('campaign_tuning') ?? null;
+      const fluxShapeTuning = configRegistry.get('flux_shape_tuning') ?? null;
       let uiManager = null;
       const engine = new GameEngine({
         gameConfig,
@@ -86,8 +88,8 @@ class Application {
         obstaclesConfig,
         levelsConfig,
         campaignConfig,
-        campaignTuning: configRegistry.get('campaign_tuning') ?? null,
-        fluxShapeTuning: configRegistry.get('flux_shape_tuning') ?? null,
+        campaignTuning,
+        fluxShapeTuning,
         fluxConfig,
         modesConfig,
         audioManager,
@@ -117,8 +119,8 @@ class Application {
           obstaclesConfig,
           levelsConfig,
           campaignConfig,
-          campaignTuning: configRegistry.get('campaign_tuning') ?? null,
-          fluxShapeTuning: configRegistry.get('flux_shape_tuning') ?? null,
+          campaignTuning,
+          fluxShapeTuning,
           fluxConfig,
           modesConfig
         }

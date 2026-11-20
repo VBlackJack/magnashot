@@ -421,7 +421,12 @@
         "stage17": "Peignez l'ancre liée en cramoisi avec le Pinceau pour déclencher la réaction.",
         "stage18": "Contournez la Singularité avec la Bombe en polarité inversée.",
         "stage19": "Passez par le relais portail à droite, puis éliminez la grappe à gauche.",
-        "stage20": "Déverrouillez le bouclier du rotor à droite, puis décrochez le noyau central."
+        "stage20": "Déverrouillez le bouclier du rotor à droite, puis décrochez le noyau central.",
+        "stage21": "Passez par le portail droit pour faire éclater les ancres émeraude derrière la barrière.",
+        "stage22": "Laissez la singularité courber votre tir cobalt autour de la barrière pour libérer le noyau.",
+        "stage23": "Glissez la fusée dans l'ouverture pour percer l'armure et déclencher la bombe dormante.",
+        "stage24": "Équipez l'Éclair et frappez les ancres liées pour faire chuter les deux grappes d'un coup.",
+        "stage25": "Rebondissez hors du champ anti-aimant pour briser les ancres violettes et libérer le noyau."
       },
       "arcadeModes": {
         "classic": "Puriste : tirs limités par étape, sans boutique ni Atelier. Videz le plateau pour recharger.",
@@ -914,7 +919,7 @@
       },
       "arcade": {
         "puzzle": "Puzzle",
-        "puzzleDesc": "20 défis d'adresse • 1 ou 2 tirs",
+        "puzzleDesc": "25 défis d'adresse • 1 ou 2 tirs",
         "puzzleRecord": "Puzzle {{stage}}/{{total}} • Étoiles : {{stars}}/{{maxStars}}",
         "puzzleStage": "Puzzle {{stage}}",
         "puzzleStageLocked": "Terminez le Puzzle {{previous}} pour débloquer.",

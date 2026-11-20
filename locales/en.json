@@ -421,7 +421,12 @@
         "stage17": "Paint the Tethered anchor crimson with the Brush to trigger the chain reaction.",
         "stage18": "Curve an explosive Bomb around the Singularity with inverted polarity.",
         "stage19": "Thread the portal relay first to blow open the top-right cluster, then clear the left.",
-        "stage20": "Unlock the rotor shield on the right first, then drop the hanging core."
+        "stage20": "Unlock the rotor shield on the right first, then drop the hanging core.",
+        "stage21": "Warp through the right portal to pop the emerald anchors behind the barrier.",
+        "stage22": "Let the singularity bend your cobalt shot around the barrier to free the core.",
+        "stage23": "Thread the rocket up the gap to pierce the armor and trigger the dormant bomb.",
+        "stage24": "Equip Lightning and zap across the tethered anchors to drop both clusters at once.",
+        "stage25": "Bank past the antimagnet field to pop the violet anchors and release the core."
       },
       "arcadeModes": {
         "classic": "Purist: fixed shots per stage, no upgrades or shop. Clear every sphere for bonus shots.",
@@ -914,7 +919,7 @@
       },
       "arcade": {
         "puzzle": "Puzzle",
-        "puzzleDesc": "20 trick-shot stages • 1 or 2 shots",
+        "puzzleDesc": "25 trick-shot stages • 1 or 2 shots",
         "puzzleRecord": "Puzzle {{stage}}/{{total}} • Stars: {{stars}}/{{maxStars}}",
         "puzzleStage": "Puzzle {{stage}}",
         "puzzleStageLocked": "Clear Puzzle {{previous}} to unlock.",

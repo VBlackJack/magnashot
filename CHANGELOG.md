@@ -4,6 +4,15 @@ All notable changes to **MagnaShot** are documented in this file.
 
 ## [Unreleased]
 
+### Added
+- Custom Puzzle Builder modal (`#modal-puzzle-builder`, `src/ui/PuzzleBuilderView.js`, `#btn-puzzle-builder`) and `?puzzle=...` share link boot support (`src/game/PuzzleShareCodec.js`, `src/game/EngineModes.js`, `src/main.js`) allowing players to place spheres and anchors on a grid using `configs/balls.json` `standardColors`, configure 1-3 shots and objectives, test live, and copy compact checksummed share URLs.
+- Puzzle Pack 2 (`P21` to `P25` in `configs/game.json`), adding 5 solver-verified 1-shot trick-shot stages (portal avalanche, singularity curve, rocket piercer, lightning tether, antimagnet bank rescue) with localized hints (`locales/*.json`) and pinned winning windows (`tests/fixtures/puzzleSolutions.json`), bringing Puzzle Mode to 25 stages.
+- Extended Personal Best Ghost pace (`#input-pb-ghost`) and `ShotTimeline` persistence (`pbTimelines` in `StorageCosmetics.js` and `ProgressBackup`) to Purist (`classic`) and Blitz 90s (`blitz`) runs alongside Daily Challenge and Weekly Flux (`src/core/ShotTimeline.js`, `src/game/EngineGhostDuel.js`, `src/game/EngineProgress.js`, `src/game/EngineModes.js`).
+
+### Changed
+- Deferred fetching of the 301 KB `configs/campaignTuning.json` and `configs/fluxShapeTuning.json` manifests off the critical startup path via `ConfigRegistry.loadCore()` and background `loadDeferred()` (`src/core/ConfigRegistry.js`, `src/main.js`).
+- Extracted cosmetic unlock/purchase, arena theme, laser trail, and PB timeline storage helpers into `src/core/StorageCosmetics.js`, removing 214 duplicated lines from `src/core/StorageManager.js` (`sw.js`, `eslint.config.js`, `src/core/StorageView.js`).
+
 ## [1.33.0] - 2026-11-20
 
 ### Added
