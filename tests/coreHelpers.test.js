@@ -27,6 +27,12 @@ import {
   haveSameMergeCalibre,
   getMergeFusionCalibre
 } from '../src/game/modes/MergeSpecials.js';
+import {
+  PLAY_HUB_FILTERS,
+  matchesArcadeFilter,
+  resolveNextUnmasteredArcadeMode
+} from '../src/ui/PlayHubView.js';
+import { GAME_MODES } from '../src/core/Constants.js';
 
 test('sanitizeAlias strips punctuation, collapses whitespace, normalizes Unicode, and caps length', () => {
   const cfg = { aliasMaxLength: 12 };
@@ -72,4 +78,24 @@ test('MergeSpecials validates kinds, weighted draws, and fusion calibre rules', 
   assert.equal(getMergeFusionCalibre(joker, joker, 11), null);
   assert.equal(getMergeFusionCalibre(ice, plain2, 11), null);
   assert.equal(getMergeFusionCalibre(bomb, plain2, 11), null);
+});
+
+test('Play Hub arcade filters and next-unmastered smart picker classify modes accurately', () => {
+  assert.equal(matchesArcadeFilter(GAME_MODES.PUZZLE, PLAY_HUB_FILTERS.QUICK, { mastered: false }), true);
+  assert.equal(matchesArcadeFilter(GAME_MODES.ENDLESS, PLAY_HUB_FILTERS.QUICK, { mastered: false }), false);
+  assert.equal(matchesArcadeFilter(GAME_MODES.ENDLESS, PLAY_HUB_FILTERS.ENDLESS, { mastered: false }), true);
+  assert.equal(matchesArcadeFilter(GAME_MODES.ENDLESS, PLAY_HUB_FILTERS.UNMASTERED, { mastered: true }), false);
+  assert.equal(matchesArcadeFilter(GAME_MODES.ENDLESS, PLAY_HUB_FILTERS.UNMASTERED, { mastered: false }), true);
+
+  const mockConfig = {
+    modeUnlocks: { unlockLevels: { endless: 3, classic: 4 } },
+    playHub: { mastery: { endlessScore: 5000, classicStage: 5 } }
+  };
+  const mockStorage = {
+    getUnlockedLevel: () => 5,
+    getEndlessHighScore: () => 6000,
+    getClassicBestStage: () => 2,
+    getUnlockedModes: () => ['endless', 'classic']
+  };
+  assert.equal(resolveNextUnmasteredArcadeMode(mockStorage, mockConfig), GAME_MODES.CLASSIC);
 });

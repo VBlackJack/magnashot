@@ -554,7 +554,79 @@ function refreshArcadeRecordLines(els, storage, gameConfig) {
   );
 }
 
-function refreshPlayHubMastery(els, storage, gameConfig) {
+export const PLAY_HUB_FILTERS = Object.freeze({
+  ALL: 'all',
+  QUICK: 'quick',
+  ENDLESS: 'endless',
+  UNMASTERED: 'unmastered'
+});
+
+const QUICK_ARCADE_MODES = new Set([
+  GAME_MODES.PUZZLE,
+  GAME_MODES.BLITZ,
+  GAME_MODES.PINBALL,
+  GAME_MODES.SLINGSHOT
+]);
+
+export function matchesArcadeFilter(mode, filter, masteryEntry) {
+  if (filter === PLAY_HUB_FILTERS.QUICK) {
+    return QUICK_ARCADE_MODES.has(mode);
+  }
+  if (filter === PLAY_HUB_FILTERS.ENDLESS) {
+    return !QUICK_ARCADE_MODES.has(mode);
+  }
+  if (filter === PLAY_HUB_FILTERS.UNMASTERED) {
+    return !masteryEntry?.mastered;
+  }
+  return true;
+}
+
+export function resolveNextUnmasteredArcadeMode(storage, gameConfig) {
+  if (!storage) {
+    return null;
+  }
+  const mastery = resolveModeMasteryProgress(storage, gameConfig);
+  for (const mode of Object.keys(ARCADE_CARD_SPECS)) {
+    if (isModeUnlocked(mode, storage, gameConfig) && !mastery[mode]?.mastered) {
+      return mode;
+    }
+  }
+  return null;
+}
+
+function getArcadeCardWrapper(card) {
+  return card?.closest?.('.play-hub-cell') || card;
+}
+
+function applyPlayHubArcadeFilter(els, filter, mastery) {
+  const activeFilter = Object.values(PLAY_HUB_FILTERS).includes(filter) ? filter : PLAY_HUB_FILTERS.ALL;
+  for (const [mode, spec] of Object.entries(ARCADE_CARD_SPECS)) {
+    const wrapper = getArcadeCardWrapper(els?.[spec.card]);
+    wrapper?.classList?.toggle(HIDDEN_CLASS, !matchesArcadeFilter(mode, activeFilter, mastery[mode]));
+  }
+  const filterBar = typeof document !== 'undefined' ? document.getElementById?.('play-hub-filters') : null;
+  for (const chip of filterBar?.querySelectorAll?.('[data-arcade-filter]') ?? []) {
+    setAttributeIfChanged(chip, 'aria-pressed', String(chip.dataset.arcadeFilter === activeFilter));
+  }
+}
+
+function refreshSmartPickButton(storage, gameConfig) {
+  const btn = typeof document !== 'undefined' ? document.getElementById?.('btn-play-next-unmastered') : null;
+  if (!btn) {
+    return;
+  }
+  const nextMode = resolveNextUnmasteredArcadeMode(storage, gameConfig);
+  if (!nextMode || !ARCADE_CARD_SPECS[nextMode]) {
+    btn.classList.add(HIDDEN_CLASS);
+    delete btn.dataset.targetMode;
+    return;
+  }
+  btn.dataset.targetMode = nextMode;
+  setTextIfChanged(btn, t('modals.play.smartPick.nextUnmastered', { mode: t(ARCADE_CARD_SPECS[nextMode].titleKey) }));
+  btn.classList.remove(HIDDEN_CLASS);
+}
+
+function refreshPlayHubMastery(els, storage, gameConfig, filter = PLAY_HUB_FILTERS.ALL) {
   const mastery = resolveModeMasteryProgress(storage, gameConfig);
   const starSymbol = gameConfig?.theme?.starFilledSymbol || '';
   const masteredLabel = t('modals.levelSelect.arcade.masteredBadge');
@@ -572,6 +644,8 @@ function refreshPlayHubMastery(els, storage, gameConfig) {
     masteredLabel,
     campaignMastery ? { ...campaignMastery, showMeter: false } : null
   );
+  applyPlayHubArcadeFilter(els, filter, mastery);
+  refreshSmartPickButton(storage, gameConfig);
 }
 
 /** Methods installed on UIManager (see installMethods). `this` is the UIManager. */
@@ -626,7 +700,7 @@ export const uiPlayHubMethods = {
     writeRewardChip(els.dailyReward, this.describeDailyRewardChip());
     writeRewardChip(els.weeklyReward, this.describeWeeklyRewardChip());
     renderDailyBounties(els.playBountiesList, storage.getDailyBountiesState?.());
-    refreshPlayHubMastery(els, storage, this.gameConfig);
+    refreshPlayHubMastery(els, storage, this.gameConfig, this.playHubFilter);
   },
 
   /** What the primary Campaign button does right now (see resolveContinueTarget). */

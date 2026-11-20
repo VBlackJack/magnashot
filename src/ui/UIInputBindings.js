@@ -380,6 +380,26 @@ function bindHeaderAndShellControls(ui) {
   });
 }
 
+function bindPlayHubToolbar(ui) {
+  const filterBar = typeof document !== 'undefined' ? document.getElementById?.('play-hub-filters') : null;
+  filterBar?.addEventListener('click', (e) => {
+    const chip = e.target?.closest?.('[data-arcade-filter]');
+    if (!chip) {
+      return;
+    }
+    ui.playHubFilter = chip.dataset.arcadeFilter;
+    ui.refreshPlayHubRecords?.();
+  });
+  const smartPickBtn = typeof document !== 'undefined' ? document.getElementById?.('btn-play-next-unmastered') : null;
+  smartPickBtn?.addEventListener('click', () => {
+    const mode = smartPickBtn.dataset.targetMode;
+    const cardKey = mode ? ARCADE_CARD_SPECS[mode]?.card : null;
+    if (cardKey && ui.elements?.[cardKey]) {
+      ui.elements[cardKey].click();
+    }
+  });
+}
+
 function bindLauncherAndHintControls(ui) {
   const els = ui.elements;
   els.swapBtn.addEventListener('click', () => ui.engine.swapLauncherBalls());
@@ -413,6 +433,7 @@ function bindLauncherAndHintControls(ui) {
       ui.openPlayHub();
     }
   });
+  bindPlayHubToolbar(ui);
 }
 
 function bindShopTabs(ui) {

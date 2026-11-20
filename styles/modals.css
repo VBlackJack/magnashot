@@ -624,6 +624,46 @@
   align-items: start;
 }
 
+.play-hub-arcade-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.play-hub-smart-btn {
+  font-size: 0.72rem;
+  padding: 4px 10px;
+  border-color: var(--accent-blue);
+  color: var(--text-info-soft);
+}
+
+.play-hub-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+
+.play-hub-filter-chip {
+  font-family: inherit;
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--border-subtle);
+  background: var(--surface-sunken);
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.play-hub-filter-chip[aria-pressed='true'] {
+  background: var(--accent-blue-alpha-22);
+  border-color: var(--accent-blue);
+  color: var(--text-bright);
+}
+
 .play-hub-subhead {
   grid-column: 1 / -1;
   margin: 4px 0 0;

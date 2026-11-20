@@ -335,6 +335,39 @@
     backdrop-filter: blur(8px);
     overflow-y: auto;
   }
+  :root.left-handed-mobile .powerups-drawer-btn {
+    right: auto;
+    left: 0;
+    padding: 6px 8px 6px 6px;
+    border-radius: 0 14px 14px 0;
+    border-right: 1px solid var(--border-strong);
+    border-left: 0;
+    box-shadow: 4px 4px 16px var(--shadow-alpha-60);
+  }
+  :root.left-handed-mobile .stage-container.powerups-drawer-open .powerups-drawer-btn {
+    right: auto;
+    left: var(--side-drawer-width);
+  }
+  :root.left-handed-mobile .powerups-drawer-chevron {
+    transform: rotate(180deg);
+  }
+  :root.left-handed-mobile .stage-container.powerups-drawer-open .powerups-drawer-chevron {
+    transform: rotate(0deg);
+  }
+  :root.left-handed-mobile .stage-container.powerups-drawer-open .powerups-panel {
+    right: auto;
+    left: 0;
+    border-right: 1px solid var(--border-strong);
+    border-left: 0;
+    border-radius: 0 14px 14px 0;
+    box-shadow: 8px 0 28px var(--shadow-alpha-75);
+  }
+  :root.left-handed-mobile:not([data-input='gamepad'])
+    .stage-container.powerups-drawer-open:not([data-launcher-posture='dropRail'])
+    .launcher-controls-dock {
+    right: auto;
+    left: 10px;
+  }
   .stage-container.powerups-drawer-open .powerups-bar {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));

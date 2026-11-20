@@ -1785,6 +1785,7 @@
         "accessibility": "Accessibilité"
       },
       "vibration": "Vibration (téléphone et manette)",
+      "leftHanded": "Tiroir mobile gaucher",
       "musicPreviewOffHint": "Activez le son et la musique pour écouter l'aperçu Pulse."
     },
     "fluxPerk": {
@@ -1874,6 +1875,16 @@
       "arcadeSubhead": {
         "core": "Classiques & Chrono",
         "labs": "Labos Physiques"
+      },
+      "filters": {
+        "aria": "Filtrer les modes arcade",
+        "all": "Tous",
+        "quick": "Rapide",
+        "endless": "Infini",
+        "unmastered": "À maîtriser"
+      },
+      "smartPick": {
+        "nextUnmastered": "Prochain à maîtriser : {{mode}}"
       },
       "campaign": {
         "summary": "{{chapter}} • {{stars}} / {{maxStars}} ★",

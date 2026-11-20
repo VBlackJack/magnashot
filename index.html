@@ -231,7 +231,16 @@
           </div>
         </section>
         <section class="play-hub-section play-hub-arcade" aria-labelledby="play-section-arcade-title">
-          <h3 id="play-section-arcade-title" class="play-section-title" data-i18n="modals.play.section.arcade"></h3>
+          <div class="play-hub-arcade-head">
+            <h3 id="play-section-arcade-title" class="play-section-title" data-i18n="modals.play.section.arcade"></h3>
+            <button id="btn-play-next-unmastered" type="button" class="nav-btn badge-btn play-hub-smart-btn hidden"></button>
+          </div>
+          <div id="play-hub-filters" class="play-hub-filters" role="group" data-i18n-aria-label="modals.play.filters.aria">
+            <button type="button" class="play-hub-filter-chip" data-arcade-filter="all" aria-pressed="true" data-i18n="modals.play.filters.all"></button>
+            <button type="button" class="play-hub-filter-chip" data-arcade-filter="quick" aria-pressed="false" data-i18n="modals.play.filters.quick"></button>
+            <button type="button" class="play-hub-filter-chip" data-arcade-filter="endless" aria-pressed="false" data-i18n="modals.play.filters.endless"></button>
+            <button type="button" class="play-hub-filter-chip" data-arcade-filter="unmastered" aria-pressed="false" data-i18n="modals.play.filters.unmastered"></button>
+          </div>
           <div class="play-hub-grid">
             <h4 class="play-hub-subhead" data-i18n="modals.play.arcadeSubhead.core"></h4>
             <button id="btn-endless" type="button" class="arcade-mode-card">
@@ -646,6 +655,10 @@
         <label class="settings-controller-field">
           <input id="input-gamepad-rumble" type="checkbox">
           <span data-i18n="modals.settings.vibration"></span>
+        </label>
+        <label class="settings-controller-field">
+          <input id="input-left-handed" type="checkbox">
+          <span data-i18n="modals.settings.leftHanded"></span>
         </label>
       </section>
       <section class="settings-controller settings-group" aria-labelledby="settings-controller-title">

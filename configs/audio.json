@@ -10,6 +10,7 @@
   "maxVoices": 12,
   "effectMinIntervalMs": 40,
   "hapticMinIntervalMs": 60,
+  "aimLockHapticMs": 6,
   "limiter": {
     "thresholdDb": -10,
     "kneeDb": 6,

@@ -345,6 +345,16 @@ export class StorageManager {
     this.safeSetItem(this.storageConfig.keys.gamepadRumble, Boolean(enabled));
   }
 
+  /** @returns {boolean} Whether portrait mobile controls mirror to the left edge (default off). */
+  getLeftHanded() {
+    const raw = this.safeGetItem(this.storageConfig.keys.leftHanded);
+    return raw === 'true';
+  }
+
+  setLeftHanded(enabled) {
+    this.safeSetItem(this.storageConfig.keys.leftHanded, Boolean(enabled));
+  }
+
   /**
    * @returns {number} Stored animation speed multiplier, or the configured default (1x).
    */

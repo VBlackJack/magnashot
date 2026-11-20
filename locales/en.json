@@ -1785,6 +1785,7 @@
         "accessibility": "Accessibility"
       },
       "vibration": "Vibration (phone and controller)",
+      "leftHanded": "Left-handed mobile drawer",
       "musicPreviewOffHint": "Turn sound and music on to hear the Pulse preview."
     },
     "fluxPerk": {
@@ -1874,6 +1875,16 @@
       "arcadeSubhead": {
         "core": "Core & Timed",
         "labs": "Physics Labs"
+      },
+      "filters": {
+        "aria": "Filter arcade modes",
+        "all": "All",
+        "quick": "Quick",
+        "endless": "Endless",
+        "unmastered": "Unmastered"
+      },
+      "smartPick": {
+        "nextUnmastered": "Next to master: {{mode}}"
       },
       "campaign": {
         "summary": "{{chapter}} • {{stars}} / {{maxStars}} ★",

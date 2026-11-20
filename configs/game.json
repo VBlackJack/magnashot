@@ -2485,6 +2485,7 @@
       "gamepadAimSpeed": "gamepad_aim_speed",
       "gamepadInvertX": "gamepad_invert_x",
       "gamepadRumble": "gamepad_rumble",
+      "leftHanded": "left_handed",
       "animationSpeed": "anim_speed",
       "musicEnabled": "music_enabled",
       "musicVolume": "music_volume",
