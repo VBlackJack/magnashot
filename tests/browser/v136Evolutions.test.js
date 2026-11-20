@@ -49,9 +49,11 @@ describe('v1.36 / v1.37 browser E2E flows', () => {
     await page.click('#hud-mode-banner');
     await page.waitForSelector('#modal-play:not(.hidden)');
 
-    // 1. Spotlight banner and Weekly Mastery Trio are visible
+    // 1. Spotlight banner and collapsible Weekly Mastery Trio
     const spotlightVisible = await page.isVisible('#play-hub-spotlight');
     assert.equal(spotlightVisible, true, 'Play Hub Spotlight banner should be visible');
+    await page.click('#btn-contracts-toggle');
+    await page.waitForSelector('#play-contracts-panel:not(.hidden)');
     const weeklyItems = await page.locator('#play-weekly-mastery-list li').count();
     assert.equal(weeklyItems, 3, 'Weekly Mastery Trio should display 3 objectives');
 

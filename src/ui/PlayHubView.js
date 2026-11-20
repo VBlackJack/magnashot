@@ -761,6 +761,45 @@ function refreshPlayHubSpotlight(els, storage, gameConfig) {
   banner.classList.remove(HIDDEN_CLASS);
 }
 
+function refreshContractsToggleSummary(dailyState, weeklyState) {
+  const btn = typeof document !== 'undefined' ? document.getElementById?.('btn-contracts-toggle') : null;
+  if (!btn) return;
+  const dailyItems = dailyState?.items || [];
+  const weeklyItems = weeklyState?.items || [];
+  const dailyDone = dailyItems.filter((item) => item?.completed).length;
+  const weeklyDone = weeklyItems.filter((item) => item?.completed).length;
+  setTextIfChanged(btn, t('modals.play.contractsToggle', {
+    dailyDone: formatNumber(dailyDone),
+    dailyTotal: formatNumber(dailyItems.length),
+    weeklyDone: formatNumber(weeklyDone),
+    weeklyTotal: formatNumber(weeklyItems.length)
+  }));
+}
+
+function refreshRecentModesBar(els, storage, gameConfig) {
+  const bar = typeof document !== 'undefined' ? document.getElementById?.('play-hub-recent') : null;
+  if (!bar) return;
+  const recent = (storage?.getRecentModes?.() || [])
+    .filter((mode) => ARCADE_CARD_SPECS[mode] && isModeUnlocked(mode, storage, gameConfig));
+  bar.replaceChildren();
+  bar.classList.toggle(HIDDEN_CLASS, recent.length === 0);
+  if (recent.length === 0) return;
+  const label = document.createElement('span');
+  label.className = 'play-hub-recent-label';
+  label.textContent = t('modals.play.recent.label');
+  bar.appendChild(label);
+  for (const mode of recent) {
+    const spec = ARCADE_CARD_SPECS[mode];
+    const chip = document.createElement('button');
+    chip.type = 'button';
+    chip.className = 'play-hub-recent-chip';
+    chip.dataset.recentMode = mode;
+    chip.textContent = t(spec.titleKey);
+    chip.addEventListener('click', () => els?.[spec.card]?.click());
+    bar.appendChild(chip);
+  }
+}
+
 function refreshPlayHubMastery(els, storage, gameConfig, filter = PLAY_HUB_FILTERS.ALL) {
   const mastery = resolveModeMasteryProgress(storage, gameConfig);
   const starSymbol = gameConfig?.theme?.starFilledSymbol || '';
@@ -784,6 +823,7 @@ function refreshPlayHubMastery(els, storage, gameConfig, filter = PLAY_HUB_FILTE
   refreshGrandMasteryBadge(mastery, starSymbol);
   refreshDailyPuzzleChip(storage, gameConfig);
   refreshPlayHubSpotlight(els, storage, gameConfig);
+  refreshRecentModesBar(els, storage, gameConfig);
 }
 
 /** Methods installed on UIManager (see installMethods). `this` is the UIManager. */
@@ -837,9 +877,11 @@ export const uiPlayHubMethods = {
     refreshArcadeRecordLines(els, storage, this.gameConfig);
     writeRewardChip(els.dailyReward, this.describeDailyRewardChip());
     writeRewardChip(els.weeklyReward, this.describeWeeklyRewardChip());
-    renderDailyBounties(els.playBountiesList, storage.getDailyBountiesState?.());
+    const dailyBounties = storage.getDailyBountiesState?.();
+    renderDailyBounties(els.playBountiesList, dailyBounties);
     const weeklyMastery = storage.getWeeklyMasteryState?.();
     renderDailyBounties(els.playWeeklyMasteryList, weeklyMastery);
+    refreshContractsToggleSummary(dailyBounties, weeklyMastery);
     if (els.playWeeklyMasteryTitle) {
       const bonus = this.gameConfig?.bounties?.weeklyChestBonusCoins || 60;
       const titleKey = weeklyMastery?.chestClaimed

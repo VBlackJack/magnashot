@@ -117,6 +117,8 @@ export const VERSUS_STORAGE_POLICY = Object.freeze({
   getSavedPuzzles: P.EMPTY_ARRAY,
   saveCustomPuzzle: P.FALSE,
   deleteSavedPuzzle: P.FALSE,
+  getRecentModes: P.EMPTY_ARRAY,
+  recordRecentMode: P.NOOP,
   getRunSnapshotVersion: P.FORWARD,
   computeDailyStreakBonus: P.FORWARD,
 

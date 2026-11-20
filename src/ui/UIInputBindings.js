@@ -497,6 +497,12 @@ function bindPlayHubToolbar(ui) {
       () => t('modals.play.dailyPuzzle.title')
     );
   });
+  const contractsToggle = typeof document !== 'undefined' ? document.getElementById?.('btn-contracts-toggle') : null;
+  const contractsPanel = typeof document !== 'undefined' ? document.getElementById?.('play-contracts-panel') : null;
+  contractsToggle?.addEventListener('click', () => {
+    const isOpen = contractsPanel?.classList.toggle(HIDDEN_CLASS) === false;
+    contractsToggle.setAttribute('aria-expanded', String(isOpen));
+  });
   bindPlayHubSpotlight(ui);
   bindPlayHubMutatorLab(ui);
   bindPuzzleBuilderModal(ui);

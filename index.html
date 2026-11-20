@@ -203,6 +203,7 @@
       </div>
       <p id="play-hub-hint" class="modal-subtext hidden" role="status" aria-live="polite"></p>
       <button id="play-hub-spotlight" type="button" class="play-hub-spotlight hidden"></button>
+      <div id="play-hub-recent" class="play-hub-recent hidden" role="group" data-i18n-aria-label="modals.play.recent.aria"></div>
       <div class="play-hub-layout">
         <section class="play-hub-section play-hub-campaign" aria-labelledby="play-section-campaign-title">
           <h3 id="play-section-campaign-title" class="play-section-title"><span class="play-section-icon" aria-hidden="true" data-i18n="modals.play.icon.campaign"></span> <span data-i18n="modals.play.section.campaign"></span></h3>
@@ -235,7 +236,8 @@
               <span id="daily-puzzle-stage-label" class="arcade-card-best gold-text"></span>
             </button>
           </div>
-          <div class="play-bounties-row">
+          <button id="btn-contracts-toggle" type="button" class="play-contracts-toggle" aria-expanded="false" aria-controls="play-contracts-panel"></button>
+          <div id="play-contracts-panel" class="play-bounties-row hidden">
             <div id="play-bounties" class="play-bounties">
               <h4 class="play-bounties-title" data-i18n="modals.play.bounties.title"></h4>
               <ul id="play-bounties-list" class="play-bounties-list"></ul>
