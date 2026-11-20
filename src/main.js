@@ -35,7 +35,7 @@ const HIDDEN_CLASS = 'hidden';
 class Application {
   async bootstrap() {
     try {
-      await configRegistry.loadAll();
+      await configRegistry.loadCore();
 
       const gameConfig = configRegistry.get('game');
       const physicsConfig = configRegistry.get('physics');
@@ -43,8 +43,6 @@ class Application {
       const obstaclesConfig = configRegistry.get('obstacles');
       const levelsConfig = configRegistry.get('levels');
       const campaignConfig = configRegistry.get('campaign');
-      const campaignTuning = configRegistry.get('campaign_tuning');
-      const fluxShapeTuning = configRegistry.get('flux_shape_tuning');
       const fluxConfig = configRegistry.get('flux');
       const modesConfig = configRegistry.get('modes');
 
@@ -87,8 +85,8 @@ class Application {
         obstaclesConfig,
         levelsConfig,
         campaignConfig,
-        campaignTuning,
-        fluxShapeTuning,
+        campaignTuning: configRegistry.get('campaign_tuning') ?? null,
+        fluxShapeTuning: configRegistry.get('flux_shape_tuning') ?? null,
         fluxConfig,
         modesConfig,
         audioManager,
@@ -118,8 +116,8 @@ class Application {
           obstaclesConfig,
           levelsConfig,
           campaignConfig,
-          campaignTuning,
-          fluxShapeTuning,
+          campaignTuning: configRegistry.get('campaign_tuning') ?? null,
+          fluxShapeTuning: configRegistry.get('flux_shape_tuning') ?? null,
           fluxConfig,
           modesConfig
         }
@@ -168,6 +166,28 @@ class Application {
       const hasValidDuel = duelRead.status === DUEL_STATUS.VALID;
       const sharedFluxSeed = hasValidDuel ? null : readFluxSeedFromSearch(window.location?.search, fluxConfig.seed);
       const savedSnapshot = storageManager.loadRunSnapshot();
+      const applyDeferredTuning = () => {
+        const cTuning = configRegistry.get('campaign_tuning');
+        const fTuning = configRegistry.get('flux_shape_tuning');
+        if (cTuning?.levels) {
+          engine.levelCatalog.tuning = cTuning.levels;
+        }
+        if (fTuning) {
+          engine.fluxShapeTuning = fTuning;
+        }
+      };
+      const needsTuningNow =
+        hasValidDuel ||
+        Boolean(sharedFluxSeed) ||
+        savedSnapshot?.mode === GAME_MODES.FLUX ||
+        (savedSnapshot?.mode === GAME_MODES.CAMPAIGN && (savedSnapshot?.engine?.currentLevelId || 1) > levelsConfig.levels.length) ||
+        storageManager.getUnlockedLevel() > levelsConfig.levels.length;
+      if (needsTuningNow) {
+        await configRegistry.loadDeferred();
+        applyDeferredTuning();
+      } else {
+        configRegistry.loadDeferred().then(applyDeferredTuning).catch(() => {});
+      }
       let hasRestoredRun = false;
       const canRestoreSaved = !sharedFluxSeed || savedSnapshot?.engine?.fluxSeed === sharedFluxSeed;
       if (isSharedFluxOverSavedRun(sharedFluxSeed, savedSnapshot) && engine.restoreSavedRun()) {

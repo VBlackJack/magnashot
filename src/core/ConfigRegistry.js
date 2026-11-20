@@ -73,28 +73,49 @@ export function validateConfigs(configs) {
   }
 }
 
+const DEFERRED_CONFIG_KEYS = new Set(['CAMPAIGN_TUNING', 'FLUX_SHAPE_TUNING']);
+
 class ConfigRegistry {
   constructor() {
     this.configs = new Map();
     this.loaded = false;
   }
 
-  async loadAll() {
-    const entries = Object.entries(CONFIG_PATHS);
+  async loadEntries(entries) {
     const results = await Promise.all(
       entries.map(async ([key, path]) => {
+        const ns = key.toLowerCase();
+        if (this.configs.has(ns)) {
+          return [ns, this.configs.get(ns)];
+        }
         const response = await fetch(path, DATA_FETCH_OPTIONS);
         if (!response.ok) {
           throw new Error(`HTTP ${response.status}: ${path}`);
         }
         const data = await response.json();
-        return [key.toLowerCase(), data];
+        return [ns, data];
       })
     );
-
-    for (const [key, data] of results) {
-      this.configs.set(key, data);
+    for (const [ns, data] of results) {
+      this.configs.set(ns, data);
     }
+  }
+
+  async loadCore() {
+    const coreEntries = Object.entries(CONFIG_PATHS).filter(([key]) => !DEFERRED_CONFIG_KEYS.has(key));
+    await this.loadEntries(coreEntries);
+    validateConfigs(this.configs);
+    applyWorldGeometry(this.configs.get('game'));
+    this.loaded = true;
+  }
+
+  async loadDeferred() {
+    const deferredEntries = Object.entries(CONFIG_PATHS).filter(([key]) => DEFERRED_CONFIG_KEYS.has(key));
+    await this.loadEntries(deferredEntries);
+  }
+
+  async loadAll() {
+    await this.loadEntries(Object.entries(CONFIG_PATHS));
     validateConfigs(this.configs);
     applyWorldGeometry(this.configs.get('game'));
     this.loaded = true;
