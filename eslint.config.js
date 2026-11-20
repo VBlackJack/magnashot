@@ -48,31 +48,29 @@ export default [
       'src/core/WorldGeometry.js',
       'src/entities/Ball.js',
       'src/entities/Obstacle.js',
+      'src/game/EngineRoundFlow.js',
       'src/game/EngineTurnResolution.js',
       'src/game/GameEngine.js',
       'src/game/Renderer.js',
       'src/game/RendererMagnetarCharges.js',
+      'src/game/RendererParticles.js',
+      'src/game/RunSnapshot.js',
+      'src/game/modes/MergeBehavior.js',
       'src/physics/PhysicsWorld.js',
       'src/physics/SpatialHashGrid.js',
+      'src/ui/PlayHubView.js',
       'src/ui/ProgressBackupView.js',
       'src/ui/UICalibration.js',
       'src/ui/UIHudRefresh.js',
       'src/ui/UIInputBindings.js',
       'src/ui/UIManager.js',
+      'src/ui/UIStats.js',
       'src/ui/UIVersus.js',
       'src/ui/WorkshopView.js'
     ],
     rules: {
       complexity: ['error', 15],
       'max-lines-per-function': ['error', { max: 80, skipBlankLines: true, skipComments: true }]
-    }
-  },
-  {
-    // Legacy ceiling on MergeBehavior prevents regression of the decomposed physics step.
-    files: ['src/game/modes/MergeBehavior.js'],
-    rules: {
-      complexity: ['error', 28],
-      'max-lines-per-function': ['error', { max: 130, skipBlankLines: true, skipComments: true }]
     }
   },
   {

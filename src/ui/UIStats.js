@@ -117,58 +117,38 @@ export function formatVersusLocalLines(count, translate, format) {
   return matches > 0 ? [translate('versus.local.stats.matches', { count: format(matches) })] : [];
 }
 
-/**
- * Display model of the Overview tab.
- * @param {object} stats - Local statistics (storage getPlayerStats()).
- * @param {object} records - Bests from storage: {campaign: {level, stars}, modes: {[mode]: record}}.
- * @param {{translate: Function, format: Function, modeOrder: string[], locale: string}} context - Display context.
- * @returns {{isEmpty: boolean, since: string, general: Array<{label: string, value: string}>,
- *   modes: Array<{mode: string, name: string, runs: string, best: string}>, notes: string[]}}
- */
-export function buildStatsOverview(stats, records, context) {
-  const { translate, format, modeOrder, locale } = context;
-  const modeStats = stats?.modes ?? {};
-  const modes = [];
-  for (const mode of modeOrder) {
-    const entry = modeStats[mode];
-    const runs = Number(entry?.runs) || 0;
-    const best = formatModeBest(records?.modes?.[mode], translate, format);
-    const details =
-      mode === GAME_MODES.VERSUS
-        ? [
-            ...formatVersusTierLines(records?.versus, translate, format),
-            ...formatVersusLocalLines(records?.versusLocalMatches, translate, format)
-          ]
-        : [];
-    if (runs <= 0 && !best && details.length === 0) {
-      continue;
-    }
-    const nameKey = STATS_EXTRA_MODE_NAME_KEYS[mode] ?? MODE_NAME_KEYS[mode];
-    modes.push({
-      mode,
-      name: nameKey ? plainModeName(translate(nameKey)) : mode,
-      runs:
-        runs > 0
-          ? translate('modals.stats.overview.modeRuns', {
-              runs: format(runs),
-              wins: format(entry.wins),
-              quits: format(entry.quits)
-            })
-          : '',
-      best,
-      ...(details.length > 0 ? { details } : {})
-    });
+function buildModeOverviewEntry(mode, modeStats, records, translate, format) {
+  const entry = modeStats[mode];
+  const runs = Number(entry?.runs) || 0;
+  const best = formatModeBest(records?.modes?.[mode], translate, format);
+  const details =
+    mode === GAME_MODES.VERSUS
+      ? [
+          ...formatVersusTierLines(records?.versus, translate, format),
+          ...formatVersusLocalLines(records?.versusLocalMatches, translate, format)
+        ]
+      : [];
+  if (runs <= 0 && !best && details.length === 0) {
+    return null;
   }
-  const { hours, minutes } = splitPlayTime(stats?.playMs);
-  const shots = Number(stats?.shots) || 0;
-  const general = [];
-  if (shots > 0 || (Number(stats?.playMs) || 0) > 0) {
-    general.push({
-      label: translate('modals.stats.overview.playTime'),
-      value: translate('modals.stats.overview.playTimeValue', { hours: format(hours), minutes: format(minutes) })
-    });
-    general.push({ label: translate('modals.stats.overview.shots'), value: format(shots) });
-  }
+  const nameKey = STATS_EXTRA_MODE_NAME_KEYS[mode] ?? MODE_NAME_KEYS[mode];
+  return {
+    mode,
+    name: nameKey ? plainModeName(translate(nameKey)) : mode,
+    runs:
+      runs > 0
+        ? translate('modals.stats.overview.modeRuns', {
+            runs: format(runs),
+            wins: format(entry.wins),
+            quits: format(entry.quits)
+          })
+        : '',
+    best,
+    ...(details.length > 0 ? { details } : {})
+  };
+}
+
+function buildOverviewNotes(stats, records, translate, format) {
   const notes = [];
   const campaign = records?.campaign;
   if (campaign?.level > 0) {
@@ -188,6 +168,36 @@ export function buildStatsOverview(stats, records, context) {
       translate('modals.stats.overview.mostLeftLevel', { level: mostLeft.levelId, quits: format(mostLeft.quits) })
     );
   }
+  return notes;
+}
+
+/**
+ * Display model of the Overview tab.
+ * @param {object} stats - Local statistics (storage getPlayerStats()).
+ * @param {object} records - Bests from storage: {campaign: {level, stars}, modes: {[mode]: record}}.
+ * @param {{translate: Function, format: Function, modeOrder: string[], locale: string}} context - Display context.
+ * @returns {{isEmpty: boolean, since: string, general: Array<{label: string, value: string}>,
+ *   modes: Array<{mode: string, name: string, runs: string, best: string}>, notes: string[]}}
+ */
+export function buildStatsOverview(stats, records, context) {
+  const { translate, format, modeOrder, locale } = context;
+  const modeStats = stats?.modes ?? {};
+  const modes = modeOrder
+    .map((mode) => buildModeOverviewEntry(mode, modeStats, records, translate, format))
+    .filter(Boolean);
+  const { hours, minutes } = splitPlayTime(stats?.playMs);
+  const shots = Number(stats?.shots) || 0;
+  const general = [];
+  if (shots > 0 || (Number(stats?.playMs) || 0) > 0) {
+    general.push(
+      {
+        label: translate('modals.stats.overview.playTime'),
+        value: translate('modals.stats.overview.playTimeValue', { hours: format(hours), minutes: format(minutes) })
+      },
+      { label: translate('modals.stats.overview.shots'), value: format(shots) }
+    );
+  }
+  const notes = buildOverviewNotes(stats, records, translate, format);
   const since = Number(stats?.since) > 0
     ? translate('modals.stats.overview.since', { date: formatStatsDate(stats.since, locale) })
     : '';
@@ -239,6 +249,40 @@ export function buildDailyHistorySummary(history, todayKey, days) {
   });
   const best = history.reduce((top, entry) => (entry.s > top.s ? entry : top), history[0]);
   return { played: inWindow.length, days, bestScore: best.s, bestDate: best.d };
+}
+
+const MODE_RECORD_SPECS = Object.freeze([
+  [GAME_MODES.ENDLESS, 'getEndlessHighScore', null, null, null],
+  [GAME_MODES.CLASSIC, 'getClassicHighScore', RECORD_KIND_CLASSIC_STAGE, 'stage', 'getClassicBestStage'],
+  [GAME_MODES.PUZZLE, 'getPuzzleHighScore', RECORD_KIND_STAGE, 'stage', 'getPuzzleBestStage'],
+  [GAME_MODES.BLITZ, 'getBlitzHighScore', null, null, null],
+  [GAME_MODES.FLUX, 'getFluxHighScore', RECORD_KIND_STAGE, 'stage', 'getFluxBestStage'],
+  [GAME_MODES.CASCADE, 'getCascadeHighScore', null, null, null],
+  [GAME_MODES.BOSS_RUSH, 'getBossRushHighScore', RECORD_KIND_WAVE, 'wave', 'getBossRushBestWave'],
+  [GAME_MODES.HEX_GRID, 'getHexGridHighScore', RECORD_KIND_WAVE, 'wave', 'getHexGridBestWave'],
+  [GAME_MODES.PINBALL, 'getPinballHighScore', RECORD_KIND_CLASSIC_STAGE, 'stage', 'getPinballBestStage'],
+  [GAME_MODES.ORBITAL, 'getOrbitalHighScore', RECORD_KIND_WAVE, 'wave', 'getOrbitalBestWave'],
+  [GAME_MODES.CONVOY, 'getConvoyHighScore', RECORD_KIND_WAVE, 'wave', 'getConvoyBestWave'],
+  [GAME_MODES.MERGE, 'getMergeHighScore', RECORD_KIND_TIER, 'tier', 'getMergeBestTier'],
+  [GAME_MODES.SLINGSHOT, 'getSlingshotHighScore', RECORD_KIND_CLASSIC_STAGE, 'stage', 'getSlingshotBestStage']
+]);
+
+function readStatNum(storage, getter) {
+  const fn = storage?.[getter];
+  return typeof fn === 'function' ? (fn.call(storage) ?? 0) : 0;
+}
+
+function buildModeRecordMap(storage, dailyBest) {
+  const modes = { [GAME_MODES.DAILY]: { score: dailyBest } };
+  for (const [mode, scoreGetter, kind, progressField, progressGetter] of MODE_RECORD_SPECS) {
+    const entry = { score: readStatNum(storage, scoreGetter) };
+    if (kind && progressField && progressGetter) {
+      entry.kind = kind;
+      entry[progressField] = readStatNum(storage, progressGetter);
+    }
+    modes[mode] = entry;
+  }
+  return modes;
 }
 
 /** Methods installed on UIManager.prototype by UIManager.js. */
@@ -346,71 +390,16 @@ export const uiStatsMethods = {
   /** Best results of every mode, read through the storage manager. */
   buildStatsRecords() {
     const storage = this.storageManager;
-    const unlockedLevel = storage.getUnlockedLevel?.() ?? 0;
-    const totalStars = storage.getTotalStars?.() ?? 0;
+    const unlockedLevel = readStatNum(storage, 'getUnlockedLevel');
+    const totalStars = readStatNum(storage, 'getTotalStars');
     const hasCampaignProgress = unlockedLevel > 1 || totalStars > 0;
     const dailyHistoryBest = (storage.getDailyHistory?.() ?? []).reduce((top, entry) => Math.max(top, entry.s), 0);
-    const dailyBest = Math.max(dailyHistoryBest, storage.getDailyHighScore?.() ?? 0);
+    const dailyBest = Math.max(dailyHistoryBest, readStatNum(storage, 'getDailyHighScore'));
     return {
       campaign: { level: hasCampaignProgress ? unlockedLevel : 0, stars: totalStars },
       versus: storage.getVersusRecords?.() ?? {},
-      versusLocalMatches: storage.getVersusLocalMatches?.() ?? 0,
-      modes: {
-        [GAME_MODES.ENDLESS]: { score: storage.getEndlessHighScore?.() ?? 0 },
-        [GAME_MODES.DAILY]: { score: dailyBest },
-        [GAME_MODES.CLASSIC]: {
-          score: storage.getClassicHighScore?.() ?? 0,
-          kind: RECORD_KIND_CLASSIC_STAGE,
-          stage: storage.getClassicBestStage?.() ?? 0
-        },
-        [GAME_MODES.PUZZLE]: {
-          score: storage.getPuzzleHighScore?.() ?? 0,
-          kind: RECORD_KIND_STAGE,
-          stage: storage.getPuzzleBestStage?.() ?? 0
-        },
-        [GAME_MODES.BLITZ]: { score: storage.getBlitzHighScore?.() ?? 0 },
-        [GAME_MODES.FLUX]: {
-          score: storage.getFluxHighScore?.() ?? 0,
-          kind: RECORD_KIND_STAGE,
-          stage: storage.getFluxBestStage?.() ?? 0
-        },
-        [GAME_MODES.CASCADE]: { score: storage.getCascadeHighScore?.() ?? 0 },
-        [GAME_MODES.BOSS_RUSH]: {
-          score: storage.getBossRushHighScore?.() ?? 0,
-          kind: RECORD_KIND_WAVE,
-          wave: storage.getBossRushBestWave?.() ?? 0
-        },
-        [GAME_MODES.HEX_GRID]: {
-          score: storage.getHexGridHighScore?.() ?? 0,
-          kind: RECORD_KIND_WAVE,
-          wave: storage.getHexGridBestWave?.() ?? 0
-        },
-        [GAME_MODES.PINBALL]: {
-          score: storage.getPinballHighScore?.() ?? 0,
-          kind: RECORD_KIND_CLASSIC_STAGE,
-          stage: storage.getPinballBestStage?.() ?? 0
-        },
-        [GAME_MODES.ORBITAL]: {
-          score: storage.getOrbitalHighScore?.() ?? 0,
-          kind: RECORD_KIND_WAVE,
-          wave: storage.getOrbitalBestWave?.() ?? 0
-        },
-        [GAME_MODES.CONVOY]: {
-          score: storage.getConvoyHighScore?.() ?? 0,
-          kind: RECORD_KIND_WAVE,
-          wave: storage.getConvoyBestWave?.() ?? 0
-        },
-        [GAME_MODES.MERGE]: {
-          score: storage.getMergeHighScore?.() ?? 0,
-          kind: RECORD_KIND_TIER,
-          tier: storage.getMergeBestTier?.() ?? 0
-        },
-        [GAME_MODES.SLINGSHOT]: {
-          score: storage.getSlingshotHighScore?.() ?? 0,
-          kind: RECORD_KIND_CLASSIC_STAGE,
-          stage: storage.getSlingshotBestStage?.() ?? 0
-        }
-      }
+      versusLocalMatches: readStatNum(storage, 'getVersusLocalMatches'),
+      modes: buildModeRecordMap(storage, dailyBest)
     };
   },
 

@@ -74,6 +74,274 @@ export function getPuzzleNextStarHint({ attempts, score, thresholds, puzzleStars
 }
 
 /** Methods of GameEngine that belong to this domain, installed on its prototype. */
+function relinkEndlessAnchors(engine, previousAnchors, newRowBalls) {
+  if (newRowBalls.length === 0) {
+    return;
+  }
+  const newRowIds = new Set(newRowBalls.map((b) => b.id));
+  for (const oldAnchor of previousAnchors) {
+    const linked = [...oldAnchor.bonds].some((neighborId) => newRowIds.has(neighborId));
+    if (!linked) {
+      const closest = engine.findClosestBall(oldAnchor, newRowBalls);
+      if (closest) {
+        engine.physicsWorld.createBond(oldAnchor, closest, false);
+      }
+    }
+  }
+  let anchoredSet = engine.physicsWorld.getAnchoredBallIds();
+  for (const ball of engine.physicsWorld.balls) {
+    if (!anchoredSet.has(ball.id)) {
+      const closest = engine.findClosestBall(ball, newRowBalls);
+      if (closest) {
+        engine.physicsWorld.createBond(ball, closest, false);
+        anchoredSet = engine.physicsWorld.getAnchoredBallIds();
+      }
+    }
+  }
+}
+
+function getWaveBanner(theme, waveType) {
+  if (waveType === WAVE_TYPES.BOSS) {
+    return { key: 'gameplay.feedback.wave.bossWave', color: theme.bossPopupColor };
+  }
+  if (waveType === WAVE_TYPES.GOLD_RUSH) {
+    return { key: 'gameplay.feedback.wave.goldRush', color: theme.coinPopupColor };
+  }
+  return { key: 'gameplay.feedback.wave.incoming', color: theme.wavePopupColor };
+}
+
+function finishVictoryState(engine, summary) {
+  engine.state = GAME_STATES.VICTORY;
+  engine.persistRunHighScore();
+  engine.recordRunOutcome('win');
+  engine.storageManager.clearRunSnapshot();
+  engine.audioManager.playEffect('victory');
+  engine.victorySummary = summary;
+  engine.victoryCelebrationFrames = engine.gameConfig.victory.celebrationFrames;
+  engine.particleSystem.spawnFloatingText(
+    engine.gameConfig.canvas.logicalWidth * MATH_CONSTANTS.HALF,
+    engine.gameConfig.canvas.logicalHeight * MATH_CONSTANTS.HALF,
+    t('gameplay.feedback.victory.cleared'),
+    engine.gameConfig.theme.victoryPopupColor
+  );
+  engine.notifyUI(engine.victorySummary);
+}
+
+function evaluateCampaignRoundEnd(engine) {
+  if (!engine.isObjectiveCleared()) {
+    engine.startOutOfShotsGraceIfNeeded();
+    return;
+  }
+  engine.outOfShotsGraceFrames = 0;
+  engine.releaseRemainingBoardAsAvalanche();
+  engine.storageManager?.recordAchievementProgress?.({ shotsRemainingOnClear: engine.shotsRemaining });
+  engine.unlockAchievementTiers('sharpshooter', engine.shotsRemaining);
+  const bonus = engine.shotsRemaining * engine.gameConfig.scoring.remainingShotBonus;
+  engine.addScore(bonus);
+  const stars = engine.computeStars(engine.score);
+  const previousStats = engine.storageManager.getLevelStats()[engine.currentLevelId] || { bestScore: 0, stars: 0 };
+  const isNewRecord = previousStats.bestScore > 0 && engine.score > previousStats.bestScore;
+  const nextStarTarget = engine.getStarThresholds().find((th) => th > engine.score) ?? null;
+  const { newlyEarnedStars } = engine.storageManager.saveLevelResult(engine.currentLevelId, engine.score, stars);
+  const earnedCoins = stars * engine.gameConfig.scoring.coinsPerVictoryStar
+    + newlyEarnedStars * engine.gameConfig.scoring.firstTimeStarCoinBonus;
+  engine.storageManager.addCoins(earnedCoins);
+  engine.flushPendingRunCoins();
+  reportBountyEvent(engine, 'campaign_level_cleared', 1);
+  engine.storageManager.unlockLevel(Math.min(engine.currentLevelId + 1, engine.levelCatalog.lastId));
+  engine.unlockAchievementTiers('starCollector', engine.storageManager.getTotalStars());
+  finishVictoryState(engine, {
+    victoryBonus: bonus,
+    stars,
+    earnedCoins,
+    isNewRecord,
+    nextStarTarget,
+    nextStarNumber: nextStarTarget !== null ? stars + 1 : null,
+    pointsToNextStar: nextStarTarget !== null ? Math.max(1, nextStarTarget - engine.score) : 0,
+    unlockedModes: engine.storageManager.syncEarnedModeUnlocks?.() ?? []
+  });
+}
+
+function evaluatePuzzleRoundEnd(engine) {
+  if (!engine.isObjectiveCleared()) {
+    engine.startOutOfShotsGraceIfNeeded();
+    return;
+  }
+  engine.outOfShotsGraceFrames = 0;
+  engine.releaseRemainingBoardAsAvalanche();
+  const bonus = engine.shotsRemaining * engine.gameConfig.scoring.remainingShotBonus;
+  engine.addScore(bonus);
+  const stage = engine.currentPuzzleStage;
+  const previous = engine.storageManager.getPuzzleStageStats()[stage] || { bestScore: 0, stars: 0, attempts: 0 };
+  const scoring = engine.gameConfig.scoring;
+  // A snapshot saved before attempts were counted on the first shot holds 0: never better than a first try.
+  const attemptsForStars = Math.max(1, previous.attempts);
+  const stars = computePuzzleStars({
+    attempts: attemptsForStars,
+    scoreStars: engine.computeStars(engine.score),
+    puzzleStars: engine.gameConfig.puzzleStars,
+    scoring
+  });
+  const isNewRecord = previous.bestScore > 0 && engine.score > previous.bestScore;
+  const { nextStarTarget, nextStarNumber } = getPuzzleNextStarHint({
+    attempts: attemptsForStars,
+    score: engine.score,
+    thresholds: engine.getStarThresholds(),
+    puzzleStars: engine.gameConfig.puzzleStars,
+    scoring
+  });
+  const { newlyEarnedStars } = engine.storageManager.savePuzzleStageResult(stage, engine.score, stars);
+  const earnedCoins = newlyEarnedStars * (scoring.coinsPerVictoryStar + scoring.firstTimeStarCoinBonus);
+  engine.storageManager.addCoins(earnedCoins);
+  engine.flushPendingRunCoins();
+  reportBountyEvent(engine, 'puzzle_stage_cleared', 1);
+  finishVictoryState(engine, {
+    victoryBonus: bonus,
+    stars,
+    earnedCoins,
+    isNewRecord,
+    nextStarTarget,
+    nextStarNumber,
+    pointsToNextStar: nextStarTarget !== null ? Math.max(1, nextStarTarget - engine.score) : 0
+  });
+}
+
+function evaluateFluxRoundEnd(engine) {
+  if (engine.magnetar && !engine.getMagnetarBall() && engine.physicsWorld.balls.length > 0) {
+    // The Magnetar fell: whatever else is left of the shape goes with it and the stage is won.
+    engine.releaseRemainingBoardAsAvalanche();
+  }
+  if (engine.physicsWorld.balls.length === 0) {
+    engine.outOfShotsGraceFrames = 0;
+    engine.completeFluxStage();
+    return;
+  }
+  engine.startOutOfShotsGraceIfNeeded();
+}
+
+function advanceBossRushWave(engine) {
+  if (engine.physicsWorld.projectile) {
+    // The next wave would wipe the shot in flight: wait for it to land.
+    engine.pendingBossRushWave = true;
+    return;
+  }
+  engine.pendingBossRushWave = false;
+  const bossRushCfg = engine.gameConfig.bossRush;
+  const canvasCfg = engine.gameConfig.canvas;
+  engine.releaseRemainingBoardAsAvalanche();
+  const waveBonus = bossRushCfg.waveClearBonusBase * engine.bossRushWave;
+  engine.addScore(waveBonus);
+  engine.awardRunCoins(bossRushCfg.waveClearCoinBonus);
+  reportBountyEvent(engine, 'boss_rush_wave_cleared', 1);
+  engine.particleSystem.spawnFloatingText(
+    canvasCfg.logicalWidth * MATH_CONSTANTS.HALF,
+    canvasCfg.logicalHeight * MATH_CONSTANTS.HALF,
+    t('gameplay.feedback.bossRush.waveCleared', { points: waveBonus }),
+    engine.gameConfig.theme.victoryPopupColor
+  );
+  engine.bossRushWave++;
+  engine.waveCount = engine.bossRushWave;
+  engine.unlockAchievementTiers('bossRushWaves', engine.bossRushWave);
+  engine.persistRunHighScore();
+  engine.spawnBossRushWave();
+  engine.refreshStaleLauncherColors();
+  engine.refreshDiscovery();
+  engine.saveRunSnapshot({ force: true });
+  engine.notifyUI();
+}
+
+function evaluateBossRushRoundEnd(engine) {
+  const bossBall = engine.getBossBall();
+  if (!bossBall) {
+    advanceBossRushWave(engine);
+    return;
+  }
+  if (engine.physicsWorld.balls.length === 1 && !engine.magnetar) {
+    const bossRushCfg = engine.gameConfig.bossRush;
+    const r = engine.physicsConfig.ball.radius;
+    const centralPivot = engine.physicsWorld.obstacles.find((o) => o.type === OBSTACLE_TYPES.PIVOT) || null;
+    engine.spawnConcentricRings(
+      bossBall.x,
+      bossBall.y,
+      [{ radius: r * bossRushCfg.innerRingRadiusFactor, count: bossRushCfg.innerRingCount }],
+      centralPivot,
+      engine.gameConfig.endless.modifierWeights
+    );
+    for (const ball of engine.physicsWorld.balls) {
+      if (ball.id !== bossBall.id) {
+        engine.physicsWorld.createBond(bossBall, ball, false);
+      }
+    }
+    engine.physicsWorld.rebuildInitialBonds();
+    engine.refreshStaleLauncherColors();
+  }
+}
+
+function evaluateCascadeRoundEnd(engine) {
+  if (engine.physicsWorld.balls.length > 0) {
+    return;
+  }
+  const cascadeCfg = engine.gameConfig.cascade;
+  engine.cascadeWave++;
+  engine.waveCount = engine.cascadeWave;
+  engine.cascadeTurnsUntilDrop = cascadeCfg.shotsBeforeDrop;
+  for (let row = 0; row < cascadeCfg.initialDropRows; row++) {
+    engine.spawnCascadeDropWave(0);
+  }
+  engine.cascadeOccupiedPlatforms = getOccupiedPlatformIndices(engine.physicsWorld);
+  engine.refreshStaleLauncherColors();
+  engine.particleSystem.spawnFloatingText(
+    engine.gameConfig.canvas.logicalWidth * MATH_CONSTANTS.HALF,
+    cascadeCfg.startY + engine.gameConfig.canvas.wavePopupOffsetY,
+    t('gameplay.feedback.wave.incoming'),
+    engine.gameConfig.theme.wavePopupColor
+  );
+  engine.saveRunSnapshot();
+  engine.notifyUI();
+}
+
+const HIGH_SCORE_GETTERS = Object.freeze({
+  [GAME_MODES.ENDLESS]: 'getEndlessHighScore',
+  [GAME_MODES.BLITZ]: 'getBlitzHighScore',
+  [GAME_MODES.BOSS_RUSH]: 'getBossRushHighScore',
+  [GAME_MODES.CASCADE]: 'getCascadeHighScore',
+  [GAME_MODES.PUZZLE]: 'getPuzzleHighScore',
+  [GAME_MODES.CLASSIC]: 'getClassicHighScore',
+  [GAME_MODES.HEX_GRID]: 'getHexGridHighScore',
+  [GAME_MODES.ORBITAL]: 'getOrbitalHighScore',
+  [GAME_MODES.PINBALL]: 'getPinballHighScore',
+  [GAME_MODES.CONVOY]: 'getConvoyHighScore',
+  [GAME_MODES.MERGE]: 'getMergeHighScore',
+  [GAME_MODES.SLINGSHOT]: 'getSlingshotHighScore'
+});
+
+function readPreviousBestScore(engine) {
+  const storage = engine.storageManager;
+  if (engine.mode === GAME_MODES.DAILY) {
+    return storage.getDailyHighScore(engine.dailySeedKey || SeededRandom.getTodayDateKey());
+  }
+  if (engine.mode === GAME_MODES.FLUX) {
+    return engine.isWeeklyFluxRun
+      ? (storage.getWeeklyFluxBest?.(engine.weeklyWeekKey)?.score || 0)
+      : storage.getFluxHighScore();
+  }
+  const getter = HIGH_SCORE_GETTERS[engine.mode];
+  return getter && typeof storage[getter] === 'function' ? (storage[getter]() || 0) : 0;
+}
+
+const ROUND_END_HANDLERS = Object.freeze({
+  [GAME_MODES.CAMPAIGN]: evaluateCampaignRoundEnd,
+  [GAME_MODES.PUZZLE]: evaluatePuzzleRoundEnd,
+  [GAME_MODES.FLUX]: evaluateFluxRoundEnd,
+  [GAME_MODES.CLASSIC]: (engine) => {
+    if (engine.physicsWorld.balls.length === 0 && !engine.physicsWorld.projectile) {
+      engine.completeClassicStage();
+    }
+  },
+  [GAME_MODES.BOSS_RUSH]: evaluateBossRushRoundEnd,
+  [GAME_MODES.CASCADE]: evaluateCascadeRoundEnd
+});
+
 export const engineRoundFlowMethods = {
   findClosestBall(sourceBall, candidates) {
     if (!candidates || candidates.length === 0) {
@@ -199,19 +467,16 @@ export const engineRoundFlowMethods = {
     this.endlessRowParity = (this.endlessRowParity + 1) % 2;
 
     const previousAnchors = this.shiftClusterDown(descentStepY);
-
     const cols = waveCfg.columns ?? endlessCfg.columns;
     const waveType = this.getWaveType(this.waveCount);
     this.waveLog.push(waveType);
-    const isBossWave = waveType === WAVE_TYPES.BOSS;
-    const isGoldRushWave = waveType === WAVE_TYPES.GOLD_RUSH;
-    let remainingGoldCores = isGoldRushWave ? endlessCfg.goldRushCoinCoreCount : 0;
+    let remainingGoldCores = waveType === WAVE_TYPES.GOLD_RUSH ? endlessCfg.goldRushCoinCoreCount : 0;
     let bossCorePlaced = false;
 
     const waveStream = this.mode === GAME_MODES.DAILY ? `${this.dailySeedKey}:wave:${this.waveCount}` : null;
     const newRowBalls = this.withScopedRandom(waveStream, () =>
       this.spawnEndlessRow(startY, this.endlessRowParity, true, (col) => {
-        if (isBossWave && !bossCorePlaced && col >= Math.floor(cols * MATH_CONSTANTS.HALF)) {
+        if (waveType === WAVE_TYPES.BOSS && !bossCorePlaced && col >= Math.floor(cols * MATH_CONSTANTS.HALF)) {
           bossCorePlaced = true;
           return CLUSTER_MODIFIERS.BOSS_CORE;
         }
@@ -222,38 +487,9 @@ export const engineRoundFlowMethods = {
         return this.rollEndlessModifier();
       })
     );
-    const newRowIds = new Set(newRowBalls.map((b) => b.id));
 
     this.physicsWorld.rebuildInitialBonds();
-
-    if (newRowBalls.length > 0) {
-      for (const oldAnchor of previousAnchors) {
-        let linkedToNewRow = false;
-        for (const neighborId of oldAnchor.bonds) {
-          if (newRowIds.has(neighborId)) {
-            linkedToNewRow = true;
-            break;
-          }
-        }
-        if (!linkedToNewRow) {
-          const closest = this.findClosestBall(oldAnchor, newRowBalls);
-          if (closest) {
-            this.physicsWorld.createBond(oldAnchor, closest, false);
-          }
-        }
-      }
-
-      let anchoredSet = this.physicsWorld.getAnchoredBallIds();
-      for (const ball of this.physicsWorld.balls) {
-        if (!anchoredSet.has(ball.id)) {
-          const closest = this.findClosestBall(ball, newRowBalls);
-          if (closest) {
-            this.physicsWorld.createBond(ball, closest, false);
-            anchoredSet = this.physicsWorld.getAnchoredBallIds();
-          }
-        }
-      }
-    }
+    relinkEndlessAnchors(this, previousAnchors, newRowBalls);
 
     if (this.mode === GAME_MODES.ENDLESS) {
       this.storageManager?.recordAchievementProgress?.({ endlessWave: this.waveCount });
@@ -262,21 +498,12 @@ export const engineRoundFlowMethods = {
       this.unlockAchievementTiers('survivorWave10', this.waveCount);
     }
 
-    let waveBannerKey = 'gameplay.feedback.wave.incoming';
-    let waveBannerColor = this.gameConfig.theme.wavePopupColor;
-    if (isBossWave) {
-      waveBannerKey = 'gameplay.feedback.wave.bossWave';
-      waveBannerColor = this.gameConfig.theme.bossPopupColor;
-    } else if (isGoldRushWave) {
-      waveBannerKey = 'gameplay.feedback.wave.goldRush';
-      waveBannerColor = this.gameConfig.theme.coinPopupColor;
-    }
-
+    const banner = getWaveBanner(this.gameConfig.theme, waveType);
     this.particleSystem.spawnFloatingText(
       this.gameConfig.canvas.logicalWidth * MATH_CONSTANTS.HALF,
       startY + this.gameConfig.canvas.wavePopupOffsetY,
-      t(waveBannerKey),
-      waveBannerColor
+      t(banner.key),
+      banner.color
     );
   },
 
@@ -314,199 +541,9 @@ export const engineRoundFlowMethods = {
     if (this.getModeBehavior().evaluateBoardState(this)) {
       return;
     }
-    if (this.mode === GAME_MODES.CAMPAIGN) {
-      if (this.isObjectiveCleared()) {
-        this.outOfShotsGraceFrames = 0;
-        this.releaseRemainingBoardAsAvalanche();
-        this.storageManager?.recordAchievementProgress?.({ shotsRemainingOnClear: this.shotsRemaining });
-        this.unlockAchievementTiers('sharpshooter', this.shotsRemaining);
-        const bonus = this.shotsRemaining * this.gameConfig.scoring.remainingShotBonus;
-        this.addScore(bonus);
-        const stars = this.computeStars(this.score);
-        const previousStats = this.storageManager.getLevelStats()[this.currentLevelId] || { bestScore: 0, stars: 0 };
-        const isNewRecord = previousStats.bestScore > 0 && this.score > previousStats.bestScore;
-        const thresholds = this.getStarThresholds();
-        const nextStarTarget = thresholds.find((th) => th > this.score) ?? null;
-        const nextStarNumber = nextStarTarget !== null ? stars + 1 : null;
-        const pointsToNextStar = nextStarTarget !== null ? Math.max(1, nextStarTarget - this.score) : 0;
-        const { newlyEarnedStars } = this.storageManager.saveLevelResult(this.currentLevelId, this.score, stars);
-        const firstStarBonus = newlyEarnedStars * this.gameConfig.scoring.firstTimeStarCoinBonus;
-        const earnedCoins = stars * this.gameConfig.scoring.coinsPerVictoryStar + firstStarBonus;
-        this.storageManager.addCoins(earnedCoins);
-        this.flushPendingRunCoins();
-        reportBountyEvent(this, 'campaign_level_cleared', 1);
-        this.storageManager.unlockLevel(Math.min(this.currentLevelId + 1, this.levelCatalog.lastId));
-        this.unlockAchievementTiers('starCollector', this.storageManager.getTotalStars());
-        this.state = GAME_STATES.VICTORY;
-        this.persistRunHighScore();
-        this.recordRunOutcome('win');
-        this.storageManager.clearRunSnapshot();
-        this.audioManager.playEffect('victory');
-        this.victorySummary = {
-          victoryBonus: bonus,
-          stars,
-          earnedCoins,
-          isNewRecord,
-          nextStarTarget,
-          nextStarNumber,
-          pointsToNextStar,
-          unlockedModes: this.storageManager.syncEarnedModeUnlocks?.() ?? []
-        };
-        this.victoryCelebrationFrames = this.gameConfig.victory.celebrationFrames;
-        this.particleSystem.spawnFloatingText(
-          this.gameConfig.canvas.logicalWidth * MATH_CONSTANTS.HALF,
-          this.gameConfig.canvas.logicalHeight * MATH_CONSTANTS.HALF,
-          t('gameplay.feedback.victory.cleared'),
-          this.gameConfig.theme.victoryPopupColor
-        );
-        this.notifyUI(this.victorySummary);
-        return;
-      }
-
-      this.startOutOfShotsGraceIfNeeded();
-    } else if (this.mode === GAME_MODES.PUZZLE) {
-      if (this.isObjectiveCleared()) {
-        this.outOfShotsGraceFrames = 0;
-        this.releaseRemainingBoardAsAvalanche();
-        const bonus = this.shotsRemaining * this.gameConfig.scoring.remainingShotBonus;
-        this.addScore(bonus);
-        const stage = this.currentPuzzleStage;
-        const previous = this.storageManager.getPuzzleStageStats()[stage] || { bestScore: 0, stars: 0, attempts: 0 };
-        const scoring = this.gameConfig.scoring;
-        // A snapshot saved before attempts were counted on the first shot holds 0: never better than a first try.
-        const attemptsForStars = Math.max(1, previous.attempts);
-        const stars = computePuzzleStars({
-          attempts: attemptsForStars,
-          scoreStars: this.computeStars(this.score),
-          puzzleStars: this.gameConfig.puzzleStars,
-          scoring
-        });
-        const isNewRecord = previous.bestScore > 0 && this.score > previous.bestScore;
-        const { nextStarTarget, nextStarNumber } = getPuzzleNextStarHint({
-          attempts: attemptsForStars,
-          score: this.score,
-          thresholds: this.getStarThresholds(),
-          puzzleStars: this.gameConfig.puzzleStars,
-          scoring
-        });
-        const pointsToNextStar = nextStarTarget !== null ? Math.max(1, nextStarTarget - this.score) : 0;
-        const { newlyEarnedStars } = this.storageManager.savePuzzleStageResult(stage, this.score, stars);
-        const earnedCoins = newlyEarnedStars * (scoring.coinsPerVictoryStar + scoring.firstTimeStarCoinBonus);
-        this.storageManager.addCoins(earnedCoins);
-        this.flushPendingRunCoins();
-        reportBountyEvent(this, 'puzzle_stage_cleared', 1);
-        this.state = GAME_STATES.VICTORY;
-        this.persistRunHighScore();
-        this.recordRunOutcome('win');
-        this.storageManager.clearRunSnapshot();
-        this.audioManager.playEffect('victory');
-        this.victorySummary = {
-          victoryBonus: bonus,
-          stars,
-          earnedCoins,
-          isNewRecord,
-          nextStarTarget,
-          nextStarNumber,
-          pointsToNextStar
-        };
-        this.victoryCelebrationFrames = this.gameConfig.victory.celebrationFrames;
-        this.particleSystem.spawnFloatingText(
-          this.gameConfig.canvas.logicalWidth * MATH_CONSTANTS.HALF,
-          this.gameConfig.canvas.logicalHeight * MATH_CONSTANTS.HALF,
-          t('gameplay.feedback.victory.cleared'),
-          this.gameConfig.theme.victoryPopupColor
-        );
-        this.notifyUI(this.victorySummary);
-        return;
-      }
-      this.startOutOfShotsGraceIfNeeded();
-    } else if (this.mode === GAME_MODES.FLUX) {
-      if (this.magnetar && !this.getMagnetarBall() && this.physicsWorld.balls.length > 0) {
-        // The Magnetar fell: whatever else is left of the shape goes with it and the stage is won.
-        this.releaseRemainingBoardAsAvalanche();
-      }
-      if (this.physicsWorld.balls.length === 0) {
-        this.outOfShotsGraceFrames = 0;
-        this.completeFluxStage();
-        return;
-      }
-      this.startOutOfShotsGraceIfNeeded();
-    } else if (this.mode === GAME_MODES.CLASSIC) {
-      if (this.physicsWorld.balls.length === 0 && !this.physicsWorld.projectile) {
-        this.completeClassicStage();
-      }
-    } else if (this.mode === GAME_MODES.BOSS_RUSH) {
-      const bossBall = this.getBossBall();
-      if (!bossBall) {
-        if (this.physicsWorld.projectile) {
-          // The next wave would wipe the shot in flight: wait for it to land (update() and
-          // the post-turn cleanup both come back here). The run is not capturable meanwhile
-          // (see isRunSnapshotable), so this flag is never saved.
-          this.pendingBossRushWave = true;
-          return;
-        }
-        this.pendingBossRushWave = false;
-        const bossRushCfg = this.gameConfig.bossRush;
-        const canvasCfg = this.gameConfig.canvas;
-        this.releaseRemainingBoardAsAvalanche();
-        const waveBonus = bossRushCfg.waveClearBonusBase * this.bossRushWave;
-        this.addScore(waveBonus);
-        this.awardRunCoins(bossRushCfg.waveClearCoinBonus);
-        reportBountyEvent(this, 'boss_rush_wave_cleared', 1);
-        this.particleSystem.spawnFloatingText(
-          canvasCfg.logicalWidth * MATH_CONSTANTS.HALF,
-          canvasCfg.logicalHeight * MATH_CONSTANTS.HALF,
-          t('gameplay.feedback.bossRush.waveCleared', { points: waveBonus }),
-          this.gameConfig.theme.victoryPopupColor
-        );
-        this.bossRushWave++;
-        this.waveCount = this.bossRushWave;
-        this.unlockAchievementTiers('bossRushWaves', this.bossRushWave);
-        this.persistRunHighScore();
-        this.spawnBossRushWave();
-        this.refreshStaleLauncherColors();
-        this.refreshDiscovery();
-        this.saveRunSnapshot({ force: true });
-        this.notifyUI();
-      } else if (this.physicsWorld.balls.length === 1 && !this.magnetar) {
-        const bossRushCfg = this.gameConfig.bossRush;
-        const r = this.physicsConfig.ball.radius;
-        const centralPivot = this.physicsWorld.obstacles.find((o) => o.type === OBSTACLE_TYPES.PIVOT) || null;
-        this.spawnConcentricRings(
-          bossBall.x,
-          bossBall.y,
-          [{ radius: r * bossRushCfg.innerRingRadiusFactor, count: bossRushCfg.innerRingCount }],
-          centralPivot,
-          this.gameConfig.endless.modifierWeights
-        );
-        for (const ball of this.physicsWorld.balls) {
-          if (ball.id !== bossBall.id) {
-            this.physicsWorld.createBond(bossBall, ball, false);
-          }
-        }
-        this.physicsWorld.rebuildInitialBonds();
-        this.refreshStaleLauncherColors();
-      }
-    } else if (this.mode === GAME_MODES.CASCADE) {
-      if (this.physicsWorld.balls.length === 0) {
-        const cascadeCfg = this.gameConfig.cascade;
-        this.cascadeWave++;
-        this.waveCount = this.cascadeWave;
-        this.cascadeTurnsUntilDrop = cascadeCfg.shotsBeforeDrop;
-        for (let row = 0; row < cascadeCfg.initialDropRows; row++) {
-          this.spawnCascadeDropWave(0);
-        }
-        this.cascadeOccupiedPlatforms = getOccupiedPlatformIndices(this.physicsWorld);
-        this.refreshStaleLauncherColors();
-        this.particleSystem.spawnFloatingText(
-          this.gameConfig.canvas.logicalWidth * MATH_CONSTANTS.HALF,
-          cascadeCfg.startY + this.gameConfig.canvas.wavePopupOffsetY,
-          t('gameplay.feedback.wave.incoming'),
-          this.gameConfig.theme.wavePopupColor
-        );
-        this.saveRunSnapshot();
-        this.notifyUI();
-      }
+    const handler = ROUND_END_HANDLERS[this.mode];
+    if (handler) {
+      handler(this);
     } else if ((this.isSurvivalMode() || this.mode === GAME_MODES.BLITZ) && this.physicsWorld.balls.length === 0) {
       if (this.mode === GAME_MODES.ENDLESS) {
         reportBountyEvent(this, 'endless_wave_cleared', 1);
@@ -531,45 +568,14 @@ export const engineRoundFlowMethods = {
     }
     // The final board is shown where it really is: no lowering ease on the end screen.
     this.railLowerFrames = 0;
-    let previousBestScore = 0;
-    if (this.mode === GAME_MODES.ENDLESS) {
-      previousBestScore = this.storageManager.getEndlessHighScore();
-    } else if (this.mode === GAME_MODES.DAILY) {
-      previousBestScore = this.storageManager.getDailyHighScore(this.dailySeedKey || SeededRandom.getTodayDateKey());
-    } else if (this.mode === GAME_MODES.FLUX && this.isWeeklyFluxRun) {
-      previousBestScore = this.storageManager.getWeeklyFluxBest?.(this.weeklyWeekKey)?.score || 0;
-    } else if (this.mode === GAME_MODES.FLUX) {
-      previousBestScore = this.storageManager.getFluxHighScore();
-    } else if (this.mode === GAME_MODES.BLITZ) {
-      previousBestScore = this.storageManager.getBlitzHighScore?.() || 0;
-    } else if (this.mode === GAME_MODES.BOSS_RUSH) {
-      previousBestScore = this.storageManager.getBossRushHighScore?.() || 0;
-    } else if (this.mode === GAME_MODES.CASCADE) {
-      previousBestScore = this.storageManager.getCascadeHighScore?.() || 0;
-    } else if (this.mode === GAME_MODES.PUZZLE) {
-      previousBestScore = this.storageManager.getPuzzleHighScore?.() || 0;
-    } else if (this.mode === GAME_MODES.CLASSIC) {
-      previousBestScore = this.storageManager.getClassicHighScore?.() || 0;
-    } else if (this.mode === GAME_MODES.HEX_GRID) {
-      previousBestScore = this.storageManager.getHexGridHighScore?.() || 0;
-    } else if (this.mode === GAME_MODES.ORBITAL) {
-      previousBestScore = this.storageManager.getOrbitalHighScore?.() || 0;
-    } else if (this.mode === GAME_MODES.PINBALL) {
-      previousBestScore = this.storageManager.getPinballHighScore?.() || 0;
-    } else if (this.mode === GAME_MODES.CONVOY) {
-      previousBestScore = this.storageManager.getConvoyHighScore?.() || 0;
-    } else if (this.mode === GAME_MODES.MERGE) {
-      previousBestScore = this.storageManager.getMergeHighScore?.() || 0;
-    } else if (this.mode === GAME_MODES.SLINGSHOT) {
-      previousBestScore = this.storageManager.getSlingshotHighScore?.() || 0;
-    }
+    const previousBestScore = readPreviousBestScore(this);
     // A Daily rematch persists nothing, so it never sets a record.
-    const isNewRecord = this.mode !== GAME_MODES.CAMPAIGN && this.mode !== GAME_MODES.PUZZLE && !this.isDailyRematch && previousBestScore > 0 && this.score > previousBestScore;
-    const remainingSpheres = this.physicsWorld.balls.length;
+    const isRecordMode = this.mode !== GAME_MODES.CAMPAIGN && this.mode !== GAME_MODES.PUZZLE && !this.isDailyRematch;
+    const isNewRecord = isRecordMode && previousBestScore > 0 && this.score > previousBestScore;
     this.gameOverSummary = {
       reasonKey,
       isNewRecord,
-      remainingSpheres,
+      remainingSpheres: this.physicsWorld.balls.length,
       maxCombo: this.maxComboInRound,
       earnedCoins: this.runCoinsEarned,
       nearMiss: this.computeNearMiss()

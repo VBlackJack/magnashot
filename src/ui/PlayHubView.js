@@ -402,6 +402,30 @@ function syncMasteryMeter(card, showMeter, ratio) {
  * @param {string} srLabel - Localized screen-reader label for mastery.
  * @param {{current: number, target: number, ratio: number, showMeter?: boolean}|null} [progress] - Progress details.
  */
+function shouldShowMasteryBar(mastered, progress) {
+  if (mastered || progress?.showMeter === false) {
+    return false;
+  }
+  return Boolean(progress && progress.current > 0 && progress.ratio > 0 && progress.ratio < 1);
+}
+
+function ensureMasteredBadge(card) {
+  let badge = card.querySelector(`.${MASTERED_BADGE_CLASS}`);
+  if (badge) {
+    return badge;
+  }
+  badge = document.createElement('span');
+  badge.className = MASTERED_BADGE_CLASS;
+  const starSpan = document.createElement('span');
+  starSpan.className = MASTERED_STAR_CLASS;
+  starSpan.setAttribute('aria-hidden', 'true');
+  const srSpan = document.createElement('span');
+  srSpan.className = VISUALLY_HIDDEN_CLASS;
+  badge.append(starSpan, srSpan);
+  card.append(badge);
+  return badge;
+}
+
 function syncMasteredBadge(card, mastered, starSymbol, srLabel, progress = null) {
   if (!card) {
     return;
@@ -410,30 +434,20 @@ function syncMasteredBadge(card, mastered, starSymbol, srLabel, progress = null)
   if (typeof document === 'undefined' || typeof card.querySelector !== 'function' || typeof card.append !== 'function') {
     return;
   }
-  const hasProgressBar = Boolean(!mastered && progress?.showMeter !== false && progress?.current > 0 && progress?.ratio > 0 && progress?.ratio < 1);
-  syncMasteryMeter(card, hasProgressBar, progress?.ratio || 0);
-
-  let badge = card.querySelector(`.${MASTERED_BADGE_CLASS}`);
+  syncMasteryMeter(card, shouldShowMasteryBar(mastered, progress), progress?.ratio || 0);
   if (!mastered) {
-    badge?.classList?.add(HIDDEN_CLASS);
+    card.querySelector(`.${MASTERED_BADGE_CLASS}`)?.classList?.add(HIDDEN_CLASS);
     return;
   }
-  if (!badge) {
-    badge = document.createElement('span');
-    badge.className = MASTERED_BADGE_CLASS;
-    const starSpan = document.createElement('span');
-    starSpan.className = MASTERED_STAR_CLASS;
-    starSpan.setAttribute('aria-hidden', 'true');
-    const srSpan = document.createElement('span');
-    srSpan.className = VISUALLY_HIDDEN_CLASS;
-    badge.append(starSpan, srSpan);
-    card.append(badge);
-  }
+  const badge = ensureMasteredBadge(card);
   badge.classList.remove(HIDDEN_CLASS);
-  const starSpan = badge.querySelector(`.${MASTERED_STAR_CLASS}`);
-  const srSpan = badge.querySelector(`.${VISUALLY_HIDDEN_CLASS}`);
-  setTextIfChanged(starSpan, starSymbol);
-  setTextIfChanged(srSpan, srLabel);
+  setTextIfChanged(badge.querySelector(`.${MASTERED_STAR_CLASS}`), starSymbol);
+  setTextIfChanged(badge.querySelector(`.${VISUALLY_HIDDEN_CLASS}`), srLabel);
+}
+
+function readVersusHardWins(storage) {
+  const records = storage.getVersusRecords?.() || storage.getVersusStats?.() || {};
+  return records.hard?.w ?? records.hard?.won ?? 0;
 }
 
 /**
@@ -449,18 +463,13 @@ export function resolveModeMasteryProgress(storage, gameConfig) {
   const m = { ...DEFAULT_MASTERY, ...(gameConfig?.playHub?.mastery || {}) };
   const totalPuzzles = Math.max(1, gameConfig?.puzzles?.length || 1);
   const maxPuzzleStars = gameConfig?.scoring?.maxStars || 0;
-  const versusRecords = storage.getVersusRecords?.() || storage.getVersusStats?.() || {};
   const result = {};
   for (const [mode, readValue, targetKey] of MODE_MASTERY_SPECS) {
     result[mode] = buildMasteryEntry(readValue(storage), m[targetKey]);
   }
-  result[GAME_MODES.PUZZLE] = maxPuzzleStars > 0
-    ? buildMasteryEntry(storage.getPuzzleTotalStars?.() || 0, totalPuzzles * maxPuzzleStars)
-    : buildMasteryEntry(0, 0);
-  result[GAME_MODES.VERSUS] = buildMasteryEntry(
-    versusRecords.hard?.w ?? versusRecords.hard?.won ?? 0,
-    m.versusHardWins
-  );
+  const puzzleCurrent = maxPuzzleStars > 0 ? (storage.getPuzzleTotalStars?.() || 0) : 0;
+  result[GAME_MODES.PUZZLE] = buildMasteryEntry(puzzleCurrent, totalPuzzles * maxPuzzleStars);
+  result[GAME_MODES.VERSUS] = buildMasteryEntry(readVersusHardWins(storage), m.versusHardWins);
   return result;
 }
 
@@ -478,6 +487,91 @@ export function resolveModeMastery(storage, gameConfig) {
     mastered[mode] = entry.mastered;
   }
   return mastered;
+}
+
+function readStorageNumber(storage, getter, fallback = 0) {
+  const fn = storage?.[getter];
+  return typeof fn === 'function' ? (fn.call(storage) || fallback) : fallback;
+}
+
+const SCORE_RECORD_CARDS = Object.freeze([
+  ['arcadeBestEndless', 'getEndlessHighScore'],
+  ['arcadeBestBlitz', 'getBlitzHighScore'],
+  ['arcadeBestCascade', 'getCascadeHighScore']
+]);
+
+const WAVE_RECORD_CARDS = Object.freeze([
+  ['arcadeBestBossRush', 'getBossRushBestWave', 'getBossRushHighScore'],
+  ['arcadeBestHexGrid', 'getHexGridBestWave', 'getHexGridHighScore'],
+  ['arcadeBestOrbital', 'getOrbitalBestWave', 'getOrbitalHighScore'],
+  ['arcadeBestConvoy', 'getConvoyBestWave', 'getConvoyHighScore']
+]);
+
+const STAGE_RECORD_CARDS = Object.freeze([
+  ['arcadeBestFlux', 'modals.play.arcade.fluxRecord', 'getFluxBestStage', 'getFluxHighScore'],
+  ['arcadeBestPinball', 'modals.levelSelect.arcade.pinballRecord', 'getPinballBestStage', 'getPinballHighScore'],
+  ['arcadeBestSlingshot', 'modals.levelSelect.arcade.pinballRecord', 'getSlingshotBestStage', 'getSlingshotHighScore']
+]);
+
+function refreshArcadeRecordLines(els, storage, gameConfig) {
+  const totalPuzzles = Math.max(1, gameConfig?.puzzles?.length || 1);
+  const bestPuzzleStage = Math.min(totalPuzzles, Math.max(DEFAULT_STAGE, readStorageNumber(storage, 'getPuzzleBestStage', 1)));
+  const maxPuzzleStars = gameConfig?.scoring?.maxStars || 0;
+  for (const [elKey, scoreGetter] of SCORE_RECORD_CARDS) {
+    setTextIfChanged(els[elKey], t('modals.levelSelect.card.bestScore', { score: formatNumber(readStorageNumber(storage, scoreGetter)) }));
+  }
+  setTextIfChanged(
+    els.arcadeBestClassic,
+    t('modals.levelSelect.arcade.classicBest', { stage: formatNumber(Math.max(DEFAULT_STAGE, readStorageNumber(storage, 'getClassicBestStage', 1))) })
+  );
+  setTextIfChanged(
+    els.arcadeBestPuzzle,
+    t('modals.levelSelect.arcade.puzzleRecord', {
+      stage: formatNumber(bestPuzzleStage),
+      total: formatNumber(totalPuzzles),
+      stars: formatNumber(readStorageNumber(storage, 'getPuzzleTotalStars')),
+      maxStars: formatNumber(totalPuzzles * maxPuzzleStars)
+    })
+  );
+  for (const [elKey, key, stageGetter, scoreGetter] of STAGE_RECORD_CARDS) {
+    setTextIfChanged(els[elKey], t(key, {
+      stage: formatNumber(Math.max(DEFAULT_STAGE, readStorageNumber(storage, stageGetter, 1))),
+      score: formatNumber(readStorageNumber(storage, scoreGetter))
+    }));
+  }
+  for (const [elKey, waveGetter, scoreGetter] of WAVE_RECORD_CARDS) {
+    setTextIfChanged(els[elKey], t('modals.levelSelect.arcade.bossRushRecord', {
+      wave: formatNumber(Math.max(DEFAULT_STAGE, readStorageNumber(storage, waveGetter, 1))),
+      score: formatNumber(readStorageNumber(storage, scoreGetter))
+    }));
+  }
+  setTextIfChanged(
+    els.arcadeBestMerge,
+    t('modals.levelSelect.arcade.mergeRecord', {
+      tier: formatNumber(Math.max(DEFAULT_STAGE, readStorageNumber(storage, 'getMergeBestTier', 1))),
+      score: formatNumber(readStorageNumber(storage, 'getMergeHighScore'))
+    })
+  );
+}
+
+function refreshPlayHubMastery(els, storage, gameConfig) {
+  const mastery = resolveModeMasteryProgress(storage, gameConfig);
+  const starSymbol = gameConfig?.theme?.starFilledSymbol || '';
+  const masteredLabel = t('modals.levelSelect.arcade.masteredBadge');
+  for (const [mode, spec] of Object.entries(ARCADE_CARD_SPECS)) {
+    if (Object.hasOwn(mastery, mode)) {
+      syncMasteredBadge(els[spec.card], mastery[mode].mastered, starSymbol, masteredLabel, mastery[mode]);
+    }
+  }
+  syncMasteredBadge(els.btnDaily, Boolean(mastery[GAME_MODES.DAILY]?.mastered), starSymbol, masteredLabel, mastery[GAME_MODES.DAILY]);
+  const campaignMastery = mastery[GAME_MODES.CAMPAIGN];
+  syncMasteredBadge(
+    els.playCampaignSection,
+    Boolean(campaignMastery?.mastered),
+    starSymbol,
+    masteredLabel,
+    campaignMastery ? { ...campaignMastery, showMeter: false } : null
+  );
 }
 
 /** Methods installed on UIManager (see installMethods). `this` is the UIManager. */
@@ -528,113 +622,11 @@ export const uiPlayHubMethods = {
   refreshPlayHubRecords() {
     const els = this.elements;
     const storage = this.storageManager;
-    const totalPuzzles = Math.max(1, this.gameConfig?.puzzles?.length || 1);
-    const bestPuzzleStage = Math.min(totalPuzzles, Math.max(DEFAULT_STAGE, storage.getPuzzleBestStage?.() || 1));
-    const maxPuzzleStars = this.gameConfig?.scoring?.maxStars || 0;
-    setTextIfChanged(
-      els.arcadeBestEndless,
-      t('modals.levelSelect.card.bestScore', { score: formatNumber(storage.getEndlessHighScore?.() || 0) })
-    );
-    setTextIfChanged(
-      els.arcadeBestClassic,
-      t('modals.levelSelect.arcade.classicBest', {
-        stage: formatNumber(Math.max(DEFAULT_STAGE, storage.getClassicBestStage?.() || 1))
-      })
-    );
-    setTextIfChanged(
-      els.arcadeBestPuzzle,
-      t('modals.levelSelect.arcade.puzzleRecord', {
-        stage: formatNumber(bestPuzzleStage),
-        total: formatNumber(totalPuzzles),
-        stars: formatNumber(storage.getPuzzleTotalStars?.() || 0),
-        maxStars: formatNumber(totalPuzzles * maxPuzzleStars)
-      })
-    );
-    setTextIfChanged(
-      els.arcadeBestBlitz,
-      t('modals.levelSelect.card.bestScore', { score: formatNumber(storage.getBlitzHighScore?.() || 0) })
-    );
-    setTextIfChanged(
-      els.arcadeBestFlux,
-      t('modals.play.arcade.fluxRecord', {
-        stage: formatNumber(Math.max(DEFAULT_STAGE, storage.getFluxBestStage?.() || 1)),
-        score: formatNumber(storage.getFluxHighScore?.() || 0)
-      })
-    );
-    setTextIfChanged(
-      els.arcadeBestCascade,
-      t('modals.levelSelect.card.bestScore', { score: formatNumber(storage.getCascadeHighScore?.() || 0) })
-    );
-    setTextIfChanged(
-      els.arcadeBestBossRush,
-      t('modals.levelSelect.arcade.bossRushRecord', {
-        wave: formatNumber(Math.max(DEFAULT_STAGE, storage.getBossRushBestWave?.() || 1)),
-        score: formatNumber(storage.getBossRushHighScore?.() || 0)
-      })
-    );
-    setTextIfChanged(
-      els.arcadeBestHexGrid,
-      t('modals.levelSelect.arcade.bossRushRecord', {
-        wave: formatNumber(Math.max(DEFAULT_STAGE, storage.getHexGridBestWave?.() || 1)),
-        score: formatNumber(storage.getHexGridHighScore?.() || 0)
-      })
-    );
-    setTextIfChanged(
-      els.arcadeBestPinball,
-      t('modals.levelSelect.arcade.pinballRecord', {
-        stage: formatNumber(Math.max(DEFAULT_STAGE, storage.getPinballBestStage?.() || 1)),
-        score: formatNumber(storage.getPinballHighScore?.() || 0)
-      })
-    );
-    setTextIfChanged(
-      els.arcadeBestOrbital,
-      t('modals.levelSelect.arcade.bossRushRecord', {
-        wave: formatNumber(Math.max(DEFAULT_STAGE, storage.getOrbitalBestWave?.() || 1)),
-        score: formatNumber(storage.getOrbitalHighScore?.() || 0)
-      })
-    );
-    setTextIfChanged(
-      els.arcadeBestConvoy,
-      t('modals.levelSelect.arcade.bossRushRecord', {
-        wave: formatNumber(Math.max(DEFAULT_STAGE, storage.getConvoyBestWave?.() || 1)),
-        score: formatNumber(storage.getConvoyHighScore?.() || 0)
-      })
-    );
-    const bestMergeTier = storage.getMergeBestTier?.() || 0;
-    const bestMergeScore = storage.getMergeHighScore?.() || 0;
-    setTextIfChanged(
-      els.arcadeBestMerge,
-      t('modals.levelSelect.arcade.mergeRecord', {
-        tier: formatNumber(Math.max(DEFAULT_STAGE, bestMergeTier || 1)),
-        score: formatNumber(bestMergeScore)
-      })
-    );
-    setTextIfChanged(
-      els.arcadeBestSlingshot,
-      t('modals.levelSelect.arcade.pinballRecord', {
-        stage: formatNumber(Math.max(DEFAULT_STAGE, storage.getSlingshotBestStage?.() || 1)),
-        score: formatNumber(storage.getSlingshotHighScore?.() || 0)
-      })
-    );
+    refreshArcadeRecordLines(els, storage, this.gameConfig);
     writeRewardChip(els.dailyReward, this.describeDailyRewardChip());
     writeRewardChip(els.weeklyReward, this.describeWeeklyRewardChip());
     renderDailyBounties(els.playBountiesList, storage.getDailyBountiesState?.());
-    const mastery = resolveModeMasteryProgress(storage, this.gameConfig);
-    const starSymbol = this.gameConfig?.theme?.starFilledSymbol || '';
-    const masteredLabel = t('modals.levelSelect.arcade.masteredBadge');
-    for (const [mode, spec] of Object.entries(ARCADE_CARD_SPECS)) {
-      if (Object.hasOwn(mastery, mode)) {
-        syncMasteredBadge(els[spec.card], mastery[mode].mastered, starSymbol, masteredLabel, mastery[mode]);
-      }
-    }
-    syncMasteredBadge(els.btnDaily, Boolean(mastery[GAME_MODES.DAILY]?.mastered), starSymbol, masteredLabel, mastery[GAME_MODES.DAILY]);
-    syncMasteredBadge(
-      els.playCampaignSection,
-      Boolean(mastery[GAME_MODES.CAMPAIGN]?.mastered),
-      starSymbol,
-      masteredLabel,
-      mastery[GAME_MODES.CAMPAIGN] ? { ...mastery[GAME_MODES.CAMPAIGN], showMeter: false } : null
-    );
+    refreshPlayHubMastery(els, storage, this.gameConfig);
   },
 
   /** What the primary Campaign button does right now (see resolveContinueTarget). */

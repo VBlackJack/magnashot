@@ -1556,6 +1556,91 @@ export class MergeBehavior extends ModeBehavior {
     engine.notifyUI();
   }
 
+  resolveMergePoint(a, b) {
+    let mx = (a.x + b.x) * MATH_CONSTANTS.HALF;
+    let my = (a.y + b.y) * MATH_CONSTANTS.HALF;
+    const joker = [a, b].find((ball) => ball.mergeKind === MERGE_SPECIAL_KINDS.JOKER);
+    if (joker) {
+      const other = joker === a ? b : a;
+      const gap = Math.hypot(other.x - joker.x, other.y - joker.y);
+      if (gap > MATH_CONSTANTS.EPSILON) {
+        mx = joker.x + ((other.x - joker.x) / gap) * joker.radius;
+        my = joker.y + ((other.y - joker.y) / gap) * joker.radius;
+      }
+    }
+    return { mx, my };
+  }
+
+  triggerSupernovaMerge(engine, radius, mx, my, cfg) {
+    const pts = cfg.supernovaBonus * Math.max(1, engine.combo);
+    engine.addScore(pts);
+    engine.modeState.supernovas = (engine.modeState.supernovas || 0) + 1;
+    engine.awardRunCoins(cfg.supernovaCoins || 0);
+    this.recordFusedCalibre(engine, cfg.tiers.length);
+    this.recordContractFusion(engine, cfg.tiers.length, mx, my);
+    engine.waveCount = engine.mergeBestTier;
+    reportBountyEvent(engine, 'merge_fusion', 1);
+    engine.audioManager.playEffect('victory');
+    const color = engine.gameConfig.theme.victoryPopupColor;
+    engine.particleSystem.spawnShockwave(mx, my, color, radius * cfg.shockwaveRadiusFactor);
+    engine.particleSystem.spawnBurst(
+      mx, my, color, engine.gameConfig.juice.matchBurstCount * 2, engine.gameConfig.juice.matchBurstSpeed
+    );
+    engine.particleSystem.spawnFloatingText(
+      mx, my + engine.gameConfig.canvas.floatingTextOffsetY, t('gameplay.feedback.merge.supernova', { points: pts }), color
+    );
+    this.emitMergeShockwave(engine, mx, my, radius, cfg.supernovaShockwaveImpulse, -1);
+    engine.unlockAchievementTiers('mergeTiers', cfg.tiers.length);
+    engine.storageManager?.recordAchievementProgress?.({ maxCombo: engine.combo });
+    engine.unlockAchievementTiers('comboMaster', engine.combo);
+  }
+
+  spawnMergedTierBall(engine, tierIndex, mx, my, avgVx, avgVy, cfg) {
+    const nextSpec = this.getTierSpecByIndex(engine, tierIndex + 1);
+    const geometry = this.getBasinGeometry(engine);
+    const spawn = { x: mx, y: my };
+    const clampToWalls = () => {
+      spawn.x = Math.max(geometry.left + nextSpec.radius, Math.min(geometry.right - nextSpec.radius, spawn.x));
+      spawn.y = Math.min(geometry.floor - nextSpec.radius, spawn.y);
+    };
+    clampToWalls();
+    for (const peg of geometry.pegs) {
+      this.collideWithPeg({ ...spawn, radius: nextSpec.radius, vx: 0, vy: 0 }, peg, 0, spawn);
+    }
+    clampToWalls();
+
+    const merged = new Ball({
+      x: spawn.x, y: spawn.y, vx: avgVx, vy: avgVy, radius: nextSpec.radius, colorId: nextSpec.id, isAnchor: false
+    });
+    merged.mergeTier = nextSpec.tier;
+    merged.mergeGraceSec = 0.25;
+    merged.mergeOverflowSec = 0;
+    merged.mergePolaritySec = 0.35;
+    merged.impactScale = MERGE_POP_SCALE;
+    engine.physicsWorld.addBall(merged);
+
+    const golden = this.getActiveEventParams(engine, MERGE_EVENT_IDS.GOLDEN);
+    const pts = Math.round(nextSpec.points * Math.max(1, engine.combo) * (golden?.pointsFactor ?? 1));
+    engine.addScore(pts);
+    this.recordFusedCalibre(engine, nextSpec.tier + 1);
+    this.recordContractFusion(engine, nextSpec.tier + 1, spawn.x, spawn.y);
+    engine.waveCount = engine.mergeBestTier;
+    engine.audioManager.playEffect('mergeFusion', nextSpec.tier);
+    reportBountyEvent(engine, 'merge_fusion', 1);
+    engine.particleSystem.spawnShockwave(spawn.x, spawn.y, nextSpec.highlight, nextSpec.radius * cfg.shockwaveRadiusFactor * 0.75);
+    engine.particleSystem.spawnBurst(
+      spawn.x, spawn.y, nextSpec.highlight, engine.gameConfig.juice.matchBurstCount, engine.gameConfig.juice.matchBurstSpeed
+    );
+    const label = engine.combo >= CHAIN_TEXT_MIN_COMBO
+      ? t('gameplay.feedback.merge.chain', { chain: engine.combo, points: pts })
+      : t('gameplay.feedback.merge.fused', { tier: nextSpec.tier + 1, points: pts });
+    engine.particleSystem.spawnFloatingText(spawn.x, spawn.y + engine.gameConfig.canvas.floatingTextOffsetY, label, nextSpec.highlight);
+    this.emitMergeShockwave(engine, spawn.x, spawn.y, nextSpec.radius, cfg.shockwaveImpulse, nextSpec.tier);
+    engine.unlockAchievementTiers('mergeTiers', engine.mergeBestTier);
+    engine.storageManager?.recordAchievementProgress?.({ maxCombo: engine.combo });
+    engine.unlockAchievementTiers('comboMaster', engine.combo);
+  }
+
   resolveMergePairs(engine, mergePairs) {
     const cfg = engine.modesConfig.merge;
     const scoring = engine.gameConfig.scoring;
@@ -1565,133 +1650,23 @@ export class MergeBehavior extends ModeBehavior {
       if (!world.ballMap.has(a.id) || !world.ballMap.has(b.id)) {
         continue;
       }
-      let mx = (a.x + b.x) * MATH_CONSTANTS.HALF;
-      let my = (a.y + b.y) * MATH_CONSTANTS.HALF;
+      const { mx, my } = this.resolveMergePoint(a, b);
       const avgVx = (a.vx + b.vx) * MATH_CONSTANTS.HALF * 0.5;
       const avgVy = (a.vy + b.vy) * MATH_CONSTANTS.HALF * 0.5;
       const tierIndex = getMergeFusionCalibre(a, b, cfg.tiers.length - 1) ?? getMergeCalibre(a) ?? 0;
-      const joker = [a, b].find((ball) => ball.mergeKind === MERGE_SPECIAL_KINDS.JOKER);
-      if (joker) {
-        // A Joker fuses at the point where it touches the other sphere.
-        const other = joker === a ? b : a;
-        const gap = Math.hypot(other.x - joker.x, other.y - joker.y);
-        if (gap > MATH_CONSTANTS.EPSILON) {
-          mx = joker.x + ((other.x - joker.x) / gap) * joker.radius;
-          my = joker.y + ((other.y - joker.y) / gap) * joker.radius;
-        }
-      }
 
       world.removeBall(a);
       world.removeBall(b);
-
       engine.combo = Math.min(engine.combo + scoring.comboIncrement, scoring.maxComboMultiplier);
       engine.maxComboInRound = Math.max(engine.maxComboInRound, engine.combo);
       engine.modeState.mergesCount = (engine.modeState.mergesCount || 0) + 1;
       this.grantChainReward(engine, mx, my);
 
       if (tierIndex >= cfg.tiers.length - 1) {
-        // Two max-calibre spheres trigger a Supernova!
-        const pts = cfg.supernovaBonus * Math.max(1, engine.combo);
-        engine.addScore(pts);
-        engine.modeState.supernovas = (engine.modeState.supernovas || 0) + 1;
-        engine.awardRunCoins(cfg.supernovaCoins || 0);
-        this.recordFusedCalibre(engine, cfg.tiers.length);
-        this.recordContractFusion(engine, cfg.tiers.length, mx, my);
-        engine.waveCount = engine.mergeBestTier;
-        reportBountyEvent(engine, 'merge_fusion', 1);
-        engine.audioManager.playEffect('victory');
-        engine.particleSystem.spawnShockwave(
-          mx,
-          my,
-          engine.gameConfig.theme.victoryPopupColor,
-          a.radius * cfg.shockwaveRadiusFactor
-        );
-        engine.particleSystem.spawnBurst(
-          mx,
-          my,
-          engine.gameConfig.theme.victoryPopupColor,
-          engine.gameConfig.juice.matchBurstCount * 2,
-          engine.gameConfig.juice.matchBurstSpeed
-        );
-        engine.particleSystem.spawnFloatingText(
-          mx,
-          my + engine.gameConfig.canvas.floatingTextOffsetY,
-          t('gameplay.feedback.merge.supernova', { points: pts }),
-          engine.gameConfig.theme.victoryPopupColor
-        );
-        this.emitMergeShockwave(engine, mx, my, a.radius, cfg.supernovaShockwaveImpulse, -1);
-        engine.unlockAchievementTiers('mergeTiers', cfg.tiers.length);
-        engine.storageManager?.recordAchievementProgress?.({ maxCombo: engine.combo });
-        engine.unlockAchievementTiers('comboMaster', engine.combo);
-        continue;
+        this.triggerSupernovaMerge(engine, a.radius, mx, my, cfg);
+      } else {
+        this.spawnMergedTierBall(engine, tierIndex, mx, my, avgVx, avgVy, cfg);
       }
-
-      const nextSpec = this.getTierSpecByIndex(engine, tierIndex + 1);
-      const geometry = this.getBasinGeometry(engine);
-      const spawn = { x: mx, y: my };
-      const clampToWalls = () => {
-        spawn.x = Math.max(geometry.left + nextSpec.radius, Math.min(geometry.right - nextSpec.radius, spawn.x));
-        spawn.y = Math.min(geometry.floor - nextSpec.radius, spawn.y);
-      };
-      clampToWalls();
-      for (const peg of geometry.pegs) {
-        this.collideWithPeg({ ...spawn, radius: nextSpec.radius, vx: 0, vy: 0 }, peg, 0, spawn);
-      }
-      clampToWalls();
-      const clampedX = spawn.x;
-      const clampedY = spawn.y;
-
-      const merged = new Ball({
-        x: clampedX,
-        y: clampedY,
-        vx: avgVx,
-        vy: avgVy,
-        radius: nextSpec.radius,
-        colorId: nextSpec.id,
-        isAnchor: false
-      });
-      merged.mergeTier = nextSpec.tier;
-      merged.mergeGraceSec = 0.25;
-      merged.mergeOverflowSec = 0;
-      merged.mergePolaritySec = 0.35;
-      merged.impactScale = MERGE_POP_SCALE;
-      world.addBall(merged);
-
-      const golden = this.getActiveEventParams(engine, MERGE_EVENT_IDS.GOLDEN);
-      const pts = Math.round(nextSpec.points * Math.max(1, engine.combo) * (golden?.pointsFactor ?? 1));
-      engine.addScore(pts);
-      this.recordFusedCalibre(engine, nextSpec.tier + 1);
-      this.recordContractFusion(engine, nextSpec.tier + 1, clampedX, clampedY);
-      engine.waveCount = engine.mergeBestTier;
-
-      engine.audioManager.playEffect('mergeFusion', nextSpec.tier);
-      reportBountyEvent(engine, 'merge_fusion', 1);
-      engine.particleSystem.spawnShockwave(
-        clampedX,
-        clampedY,
-        nextSpec.highlight,
-        nextSpec.radius * cfg.shockwaveRadiusFactor * 0.75
-      );
-      engine.particleSystem.spawnBurst(
-        clampedX,
-        clampedY,
-        nextSpec.highlight,
-        engine.gameConfig.juice.matchBurstCount,
-        engine.gameConfig.juice.matchBurstSpeed
-      );
-      engine.particleSystem.spawnFloatingText(
-        clampedX,
-        clampedY + engine.gameConfig.canvas.floatingTextOffsetY,
-        engine.combo >= CHAIN_TEXT_MIN_COMBO
-          ? t('gameplay.feedback.merge.chain', { chain: engine.combo, points: pts })
-          : t('gameplay.feedback.merge.fused', { tier: nextSpec.tier + 1, points: pts }),
-        nextSpec.highlight
-      );
-
-      this.emitMergeShockwave(engine, clampedX, clampedY, nextSpec.radius, cfg.shockwaveImpulse, nextSpec.tier);
-      engine.unlockAchievementTiers('mergeTiers', engine.mergeBestTier);
-      engine.storageManager?.recordAchievementProgress?.({ maxCombo: engine.combo });
-      engine.unlockAchievementTiers('comboMaster', engine.combo);
     }
 
     engine.persistRunHighScore();
@@ -1703,14 +1678,8 @@ export class MergeBehavior extends ModeBehavior {
     return true;
   }
 
-  serializeModeState(engine) {
-    const state = engine.modeState || {};
+  serializeEventAndPressureFields(state) {
     return {
-      dropX: engine.mergeDropX ?? engine.gameConfig.canvas.logicalWidth * MATH_CONSTANTS.HALF,
-      bestTier: engine.mergeBestTier ?? 1,
-      mergesCount: state.mergesCount ?? 0,
-      supernovas: state.supernovas ?? 0,
-      ...(Number.isInteger(state.shakeRemaining) ? { shakeRemaining: state.shakeRemaining } : {}),
       event: state.event ?? null,
       upcomingEvent: state.upcomingEvent ?? null,
       lastEventId: state.lastEventId ?? null,
@@ -1724,7 +1693,28 @@ export class MergeBehavior extends ModeBehavior {
       pendingOffsetPx: state.pendingOffsetPx ?? null,
       pendingDropsLeft: state.pendingDropsLeft ?? 0,
       holdDrops: state.holdDrops ?? 0,
-      topTierDrops: state.topTierDrops ?? null,
+      topTierDrops: state.topTierDrops ?? null
+    };
+  }
+
+  serializeBasinBalls(balls) {
+    return {
+      ballTiers: balls.map((b) => (Number.isInteger(b.mergeTier) ? b.mergeTier : 0)),
+      ballGraceSecs: balls.map((b) => Math.max(0, b.mergeGraceSec || 0)),
+      ballKinds: balls.map((b) => b.mergeKind ?? null),
+      ballSpecial: balls.map((b) => (Number.isFinite(b.mergeSpecialSec) ? b.mergeSpecialSec : null))
+    };
+  }
+
+  serializeModeState(engine) {
+    const state = engine.modeState || {};
+    return {
+      dropX: engine.mergeDropX ?? engine.gameConfig.canvas.logicalWidth * MATH_CONSTANTS.HALF,
+      bestTier: engine.mergeBestTier ?? 1,
+      mergesCount: state.mergesCount ?? 0,
+      supernovas: state.supernovas ?? 0,
+      ...(Number.isInteger(state.shakeRemaining) ? { shakeRemaining: state.shakeRemaining } : {}),
+      ...this.serializeEventAndPressureFields(state),
       shapeId: this.getShapeId(engine),
       dropCount: state.dropCount ?? 0,
       specialsSeen: [...(state.specialsSeen ?? [])],
@@ -1733,10 +1723,7 @@ export class MergeBehavior extends ModeBehavior {
         next: engine.nextBall?.mergeKind ?? null,
         queue: [...(state.upcomingKinds ?? [])]
       },
-      ballTiers: engine.physicsWorld.balls.map((b) => (Number.isInteger(b.mergeTier) ? b.mergeTier : 0)),
-      ballGraceSecs: engine.physicsWorld.balls.map((b) => Math.max(0, b.mergeGraceSec || 0)),
-      ballKinds: engine.physicsWorld.balls.map((b) => b.mergeKind ?? null),
-      ballSpecial: engine.physicsWorld.balls.map((b) => (Number.isFinite(b.mergeSpecialSec) ? b.mergeSpecialSec : null))
+      ...this.serializeBasinBalls(engine.physicsWorld.balls)
     };
   }
 
@@ -1762,6 +1749,27 @@ export class MergeBehavior extends ModeBehavior {
       return false;
     }
     return true;
+  }
+
+  restoreBasinBalls(engine, rawState, cfg) {
+    const balls = engine.physicsWorld.balls;
+    const restoredLineY = this.getOverflowLineY(engine);
+    for (let i = 0; i < balls.length; i++) {
+      const savedTier = Number.isInteger(rawState.ballTiers[i]) ? rawState.ballTiers[i] : 0;
+      const kind = sanitizeMergeSpecialKind(rawState.ballKinds?.[i], cfg.specials?.kinds);
+      const spec = this.resolveKindSpec(engine, kind, this.getTierSpecByIndex(engine, savedTier));
+      balls[i].mergeTier = this.hasOwnCalibre(kind) ? spec.tier : null;
+      balls[i].mergeKind = kind;
+      balls[i].mergeSpecialSec = this.sanitizeSpecialTimer(engine, kind, rawState.ballSpecial?.[i]);
+      balls[i].colorId = spec.id;
+      balls[i].radius = spec.radius;
+      const savedGrace = Number.isFinite(rawState.ballGraceSecs?.[i]) ? Math.max(0, rawState.ballGraceSecs[i]) : 0;
+      balls[i].mergeGraceSec = Math.max(this.getStepGraceSec(engine, balls[i], restoredLineY, 0), savedGrace);
+      balls[i].mergeEntering = false;
+      balls[i].mergeOverflowSec = 0;
+      balls[i].mergePolaritySec = 0;
+      balls[i].mergePulseSec = 0;
+    }
   }
 
   restoreModeState(engine, rawState) {
@@ -1804,26 +1812,7 @@ export class MergeBehavior extends ModeBehavior {
       this.restoreContractCycle(engine, rawState);
     }
     this.restorePressure(engine, rawState);
-
-    const balls = engine.physicsWorld.balls;
-    const restoredLineY = this.getOverflowLineY(engine);
-    for (let i = 0; i < balls.length; i++) {
-      const savedTier = Number.isInteger(rawState.ballTiers[i]) ? rawState.ballTiers[i] : 0;
-      // A legacy snapshot holds no kinds: every sphere is a plain one.
-      const kind = sanitizeMergeSpecialKind(rawState.ballKinds?.[i], cfg.specials?.kinds);
-      const spec = this.resolveKindSpec(engine, kind, this.getTierSpecByIndex(engine, savedTier));
-      balls[i].mergeTier = this.hasOwnCalibre(kind) ? spec.tier : null;
-      balls[i].mergeKind = kind;
-      balls[i].mergeSpecialSec = this.sanitizeSpecialTimer(engine, kind, rawState.ballSpecial?.[i]);
-      balls[i].colorId = spec.id;
-      balls[i].radius = spec.radius;
-      const savedGrace = Number.isFinite(rawState.ballGraceSecs?.[i]) ? Math.max(0, rawState.ballGraceSecs[i]) : 0;
-      balls[i].mergeGraceSec = Math.max(this.getStepGraceSec(engine, balls[i], restoredLineY, 0), savedGrace);
-      balls[i].mergeEntering = false;
-      balls[i].mergeOverflowSec = 0;
-      balls[i].mergePolaritySec = 0;
-      balls[i].mergePulseSec = 0;
-    }
+    this.restoreBasinBalls(engine, rawState, cfg);
     this.syncLauncherBallTier(engine, engine.currentBall);
     this.syncLauncherBallTier(engine, engine.nextBall);
   }
@@ -1875,6 +1864,48 @@ export class MergeBehavior extends ModeBehavior {
       : this.drawEventGap(engine, state.eventCount);
   }
 
+  drawDropGuide(ctx, engine, cfg, geometry, theme, basinStrokeColor) {
+    if (!engine.isRunPlaying() || !engine.currentBall || engine.isAimCancelled) {
+      return;
+    }
+    const r = engine.currentBall.radius;
+    const dropX = this.clampDropX(engine, engine.mergeDropX, r);
+    const currentTier = this.getTierSpecById(engine, engine.currentBall.colorId)?.tier ?? 0;
+    const restingY = this.predictDropLandingY(engine, cfg, dropX, r, geometry);
+    const touchesSameTier = this.hasEqualTierContactAt(engine, dropX, restingY, r, currentTier);
+    const guideColor = engine.isPolarityFlipped ? theme.overchargePopupColor : basinStrokeColor;
+    const ghostColor = touchesSameTier ? (theme.targetHighlightColor || theme.overchargePopupColor) : guideColor;
+    const guideBottomY = Math.max(cfg.launcherY + r, restingY - r);
+
+    ctx.strokeStyle = guideColor;
+    ctx.globalAlpha = DROP_GUIDE_ALPHA;
+    ctx.lineWidth = 1.5;
+    ctx.setLineDash(DROP_GUIDE_DASH);
+    ctx.beginPath();
+    ctx.moveTo(dropX, cfg.launcherY + r);
+    ctx.lineTo(dropX, guideBottomY);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    if (typeof ctx.arc !== 'function' || typeof ctx.fill !== 'function') {
+      return;
+    }
+    ctx.fillStyle = ghostColor;
+    ctx.globalAlpha = theme.aimGhostFillAlpha ?? 0.28;
+    ctx.beginPath();
+    ctx.arc(dropX, restingY, r, 0, MATH_CONSTANTS.TWO_PI);
+    ctx.fill();
+    ctx.strokeStyle = ghostColor;
+    ctx.globalAlpha = theme.aimGhostStrokeAlpha ?? 0.85;
+    ctx.lineWidth = theme.aimGhostLineWidth ?? GHOST_PREVIEW_LINE_WIDTH;
+    ctx.stroke();
+    if (touchesSameTier) {
+      ctx.beginPath();
+      ctx.arc(dropX, restingY, r + GHOST_MERGE_RING_OFFSET, 0, MATH_CONSTANTS.TWO_PI);
+      ctx.stroke();
+    }
+  }
+
   drawUnderlay(ctx, engine, renderer, theme) {
     const cfg = engine.modesConfig.merge;
     const geometry = this.getBasinGeometry(engine);
@@ -1884,19 +1915,16 @@ export class MergeBehavior extends ModeBehavior {
     const basinStrokeColor = theme.launcherAccentColor || theme.aimLineColor;
 
     ctx.save();
-    // Subtle magnetic containment chamber fill
     ctx.fillStyle = basinStrokeColor;
     ctx.globalAlpha = BASIN_GLOW_ALPHA * 0.35;
     ctx.fillRect(geometry.left, lineY, basinW, basinH);
 
-    // Danger band that pressure took from the basin
     if (lineY > cfg.overflowLineY) {
       ctx.fillStyle = theme.dangerLineColor;
       ctx.globalAlpha = PRESSURE_ZONE_ALPHA;
       ctx.fillRect(geometry.left, cfg.overflowLineY, basinW, lineY - cfg.overflowLineY);
     }
 
-    // Basin walls & floor
     ctx.strokeStyle = basinStrokeColor;
     ctx.globalAlpha = 0.72;
     ctx.lineWidth = WALL_LINE_WIDTH;
@@ -1910,7 +1938,6 @@ export class MergeBehavior extends ModeBehavior {
     ctx.stroke();
     this.drawPegs(ctx, geometry, theme);
 
-    // Top overflow danger line
     const overflowRatio = engine.modeState?.maxOverflowRatio ?? 0;
     ctx.strokeStyle = theme.dangerLineColor;
     ctx.globalAlpha = OVERFLOW_LINE_ALPHA + overflowRatio * 0.25;
@@ -1923,48 +1950,20 @@ export class MergeBehavior extends ModeBehavior {
     ctx.setLineDash([]);
 
     this.drawPressureTelegraph(ctx, engine, theme, geometry);
+    this.drawDropGuide(ctx, engine, cfg, geometry, theme, basinStrokeColor);
+    ctx.restore();
+  }
 
-    // Vertical drop guide & resting ghost target from top rail cursor
-    if (engine.isRunPlaying() && engine.currentBall && !engine.isAimCancelled) {
-      const r = engine.currentBall.radius;
-      const dropX = this.clampDropX(engine, engine.mergeDropX, r);
-      const currentTier = this.getTierSpecById(engine, engine.currentBall.colorId)?.tier ?? 0;
-      const restingY = this.predictDropLandingY(engine, cfg, dropX, r, geometry);
-      const touchesSameTier = this.hasEqualTierContactAt(engine, dropX, restingY, r, currentTier);
-      const guideColor = engine.isPolarityFlipped ? theme.overchargePopupColor : basinStrokeColor;
-      const ghostColor = touchesSameTier ? (theme.targetHighlightColor || theme.overchargePopupColor) : guideColor;
-      const guideBottomY = Math.max(cfg.launcherY + r, restingY - r);
-
-      ctx.strokeStyle = guideColor;
-      ctx.globalAlpha = DROP_GUIDE_ALPHA;
-      ctx.lineWidth = 1.5;
-      ctx.setLineDash(DROP_GUIDE_DASH);
-      ctx.beginPath();
-      ctx.moveTo(dropX, cfg.launcherY + r);
-      ctx.lineTo(dropX, guideBottomY);
-      ctx.stroke();
-      ctx.setLineDash([]);
-
-      if (typeof ctx.arc === 'function' && typeof ctx.fill === 'function') {
-        ctx.fillStyle = ghostColor;
-        ctx.globalAlpha = theme.aimGhostFillAlpha ?? 0.28;
-        ctx.beginPath();
-        ctx.arc(dropX, restingY, r, 0, MATH_CONSTANTS.TWO_PI);
-        ctx.fill();
-
-        ctx.strokeStyle = ghostColor;
-        ctx.globalAlpha = theme.aimGhostStrokeAlpha ?? 0.85;
-        ctx.lineWidth = theme.aimGhostLineWidth ?? GHOST_PREVIEW_LINE_WIDTH;
-        ctx.stroke();
-
-        if (touchesSameTier) {
-          ctx.beginPath();
-          ctx.arc(dropX, restingY, r + GHOST_MERGE_RING_OFFSET, 0, MATH_CONSTANTS.TWO_PI);
-          ctx.stroke();
-        }
+  findLowestCircleHitY(dropX, radius, items, initialY) {
+    let dropY = initialY;
+    for (const item of items) {
+      const dx = Math.abs(item.x - dropX);
+      const sumR = radius + item.radius;
+      if (dx < sumR) {
+        dropY = Math.min(dropY, item.y - Math.sqrt(sumR * sumR - dx * dx));
       }
     }
-    ctx.restore();
+    return dropY;
   }
 
   /** Resolves where a dropped sphere comes to vertical rest above resting basin spheres, pegs, or the floor. */
@@ -1972,30 +1971,9 @@ export class MergeBehavior extends ModeBehavior {
     const left = geometry?.left ?? cfg.basinLeftX;
     const right = geometry?.right ?? cfg.basinRightX;
     const floor = geometry?.floor ?? cfg.basinFloorY;
-    let dropY = floor - radius;
-    for (const ball of engine.physicsWorld.balls) {
-      if (ball.y <= cfg.launcherY || ball.x < left || ball.x > right) {
-        continue;
-      }
-      const dx = Math.abs(ball.x - dropX);
-      const sumR = radius + ball.radius;
-      if (dx < sumR) {
-        const hitY = ball.y - Math.sqrt(sumR * sumR - dx * dx);
-        if (hitY < dropY) {
-          dropY = hitY;
-        }
-      }
-    }
-    for (const peg of geometry?.pegs ?? []) {
-      const dx = Math.abs(peg.x - dropX);
-      const sumR = radius + peg.radius;
-      if (dx < sumR) {
-        const hitY = peg.y - Math.sqrt(sumR * sumR - dx * dx);
-        if (hitY < dropY) {
-          dropY = hitY;
-        }
-      }
-    }
+    const balls = engine.physicsWorld.balls.filter((b) => b.y > cfg.launcherY && b.x >= left && b.x <= right);
+    let dropY = this.findLowestCircleHitY(dropX, radius, balls, floor - radius);
+    dropY = this.findLowestCircleHitY(dropX, radius, geometry?.pegs ?? [], dropY);
     return Math.max(cfg.launcherY, dropY);
   }
 
