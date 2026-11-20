@@ -34,6 +34,7 @@ import {
   summarizeGrandMastery
 } from '../src/ui/PlayHubView.js';
 import { ARENA_THEMES, GAME_MODES } from '../src/core/Constants.js';
+import { buildPersonalBestGhost } from '../src/game/EngineGhostDuel.js';
 
 test('sanitizeAlias strips punctuation, collapses whitespace, normalizes Unicode, and caps length', () => {
   const cfg = { aliasMaxLength: 12 };
@@ -109,4 +110,17 @@ test('Play Hub arcade filters and next-unmastered smart picker classify modes ac
     { mastered: 2, total: 2, isGrandMaster: true }
   );
   assert.equal(ARENA_THEMES.DEEP_SPACE, 'deepSpace');
+
+  const ghostCfg = { ghostDuel: { contentVersion: { daily: 1, flux: 2 } } };
+  const timeline = { n: 5, step: 1, s: [100, 250, 400, 600, 800], f: true };
+  const dailyStorage = { getDailyHistory: () => [{ d: '2026-11-20', s: 800, tl: timeline }] };
+  const dailyPb = buildPersonalBestGhost(dailyStorage, 'daily', '2026-11-20', ghostCfg, 'PB');
+  assert.equal(dailyPb?.isPersonalBest, true);
+  assert.equal(dailyPb?.alias, 'PB');
+  assert.equal(dailyPb?.final, 800);
+
+  const weeklyStorage = { getWeeklyFluxBest: () => ({ week: '2026-W47', seed: 'abc123', score: 800, tl: timeline }) };
+  const weeklyPb = buildPersonalBestGhost(weeklyStorage, 'flux', 'abc123', ghostCfg, 'PB', '2026-W47');
+  assert.equal(weeklyPb?.isPersonalBest, true);
+  assert.equal(weeklyPb?.key, 'abc123');
 });

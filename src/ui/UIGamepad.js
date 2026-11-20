@@ -620,6 +620,13 @@ export const uiGamepadMethods = {
       syncLeftHanded(el.inputLeftHanded.checked);
     });
     syncLeftHanded(this.storageManager.getLeftHanded?.() ?? false);
+    el.inputPbGhost = document.getElementById?.('input-pb-ghost') ?? null;
+    if (el.inputPbGhost) {
+      el.inputPbGhost.checked = Boolean(this.storageManager.getPbGhostEnabled?.());
+      el.inputPbGhost.addEventListener('change', () => {
+        this.storageManager.setPbGhostEnabled?.(el.inputPbGhost.checked);
+      });
+    }
     this.audioManager?.setVibrationEnabled?.(this.storageManager.getGamepadRumble());
     this.updateGamepadControls();
     this.refreshControllerFields();

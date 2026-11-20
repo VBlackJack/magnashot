@@ -355,6 +355,16 @@ export class StorageManager {
     this.safeSetItem(this.storageConfig.keys.leftHanded, Boolean(enabled));
   }
 
+  /** @returns {boolean} Whether Daily/Weekly runs race the player's own PB timeline (default off). */
+  getPbGhostEnabled() {
+    const raw = this.safeGetItem(this.storageConfig.keys.pbGhost);
+    return raw === 'true';
+  }
+
+  setPbGhostEnabled(enabled) {
+    this.safeSetItem(this.storageConfig.keys.pbGhost, Boolean(enabled));
+  }
+
   /**
    * @returns {number} Stored animation speed multiplier, or the configured default (1x).
    */

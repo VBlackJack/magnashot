@@ -1808,6 +1808,7 @@
       },
       "vibration": "Vibration (téléphone et manette)",
       "leftHanded": "Tiroir mobile gaucher",
+      "pbGhost": "Affronter mon fantôme record (Défi du jour & Hebdo)",
       "musicPreviewOffHint": "Activez le son et la musique pour écouter l'aperçu Pulse."
     },
     "fluxPerk": {
@@ -2235,7 +2236,8 @@
       "newer": "Ce duel nécessite une version plus récente de MagnaShot. Recharge pour mettre à jour.",
       "ok": "OK"
     },
-    "defaultName": "Fantôme"
+    "defaultName": "Fantôme",
+    "pbLabel": "Record"
   },
   "versus": {
     "tutorial": {

@@ -1808,6 +1808,7 @@
       },
       "vibration": "Vibration (phone and controller)",
       "leftHanded": "Left-handed mobile drawer",
+      "pbGhost": "Race my Personal Best ghost (Daily & Weekly)",
       "musicPreviewOffHint": "Turn sound and music on to hear the Pulse preview."
     },
     "fluxPerk": {
@@ -2235,7 +2236,8 @@
       "newer": "This duel needs a newer MagnaShot. Reload to update.",
       "ok": "OK"
     },
-    "defaultName": "Ghost"
+    "defaultName": "Ghost",
+    "pbLabel": "PB"
   },
   "versus": {
     "tutorial": {
