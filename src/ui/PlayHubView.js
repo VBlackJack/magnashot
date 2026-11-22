@@ -738,6 +738,8 @@ export function resolvePlayHubSpotlight(storage, gameConfig) {
   return resolveWeeklySpotlight(storage) || resolveCampaignOrModeSpotlight(storage, gameConfig);
 }
 
+const SPOTLIGHT_ARROW_SUFFIX = ' ->';
+
 function refreshPlayHubSpotlight(els, storage, gameConfig) {
   const banner = els?.playHubSpotlight
     || (typeof document !== 'undefined' ? document.getElementById?.('play-hub-spotlight') : null);
@@ -757,7 +759,24 @@ function refreshPlayHubSpotlight(els, storage, gameConfig) {
   } else {
     delete banner.dataset.spotlightMode;
   }
-  setTextIfChanged(banner, t(spotlight.key, spotlight.params));
+  const rawText = t(spotlight.key, spotlight.params);
+  if (rawText.endsWith(SPOTLIGHT_ARROW_SUFFIX) && typeof document !== 'undefined' && typeof banner.replaceChildren === 'function') {
+    const labelText = rawText.slice(0, -SPOTLIGHT_ARROW_SUFFIX.length);
+    const prevLabel = banner.dataset.spotlightLabel || '';
+    if (prevLabel !== labelText) {
+      banner.dataset.spotlightLabel = labelText;
+      const labelEl = document.createElement('span');
+      labelEl.className = 'play-hub-spotlight-label';
+      labelEl.textContent = labelText;
+      const arrowEl = document.createElement('span');
+      arrowEl.className = 'play-hub-spotlight-arrow';
+      arrowEl.textContent = SPOTLIGHT_ARROW_SUFFIX;
+      banner.replaceChildren(labelEl, arrowEl);
+    }
+  } else {
+    delete banner.dataset.spotlightLabel;
+    setTextIfChanged(banner, rawText);
+  }
   banner.classList.remove(HIDDEN_CLASS);
 }
 

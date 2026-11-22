@@ -501,7 +501,10 @@
   <!-- Shop Modal -->
   <div id="modal-shop" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="modal-shop-title">
     <div class="modal-card wide">
-      <h2 id="modal-shop-title" class="modal-title gold-text" data-i18n="modals.shop.title.main"></h2>
+      <div class="modal-header">
+        <h2 id="modal-shop-title" class="modal-title gold-text" data-i18n="modals.shop.title.main"></h2>
+        <button id="btn-close-shop" type="button" class="modal-btn" data-i18n="modals.shop.button.close"></button>
+      </div>
       <p id="shop-balance" class="modal-stat-line gold-text"></p>
       <div class="modal-tabs" role="tablist">
         <button id="tab-shop-upgrades" type="button" class="modal-tab active" role="tab" aria-selected="true" aria-controls="shop-upgrades-pane" tabindex="0" data-i18n="modals.shop.tabs.upgrades"></button>
@@ -522,9 +525,6 @@
       </div>
       <div id="achievements-grid" class="levels-grid hidden" role="tabpanel" aria-labelledby="tab-shop-achievements"></div>
       <div id="codex-pane" class="codex-pane hidden" role="tabpanel" aria-labelledby="tab-shop-codex"></div>
-      <div class="modal-actions">
-        <button id="btn-close-shop" type="button" class="modal-btn" data-i18n="modals.shop.button.close"></button>
-      </div>
     </div>
   </div>
 
@@ -613,8 +613,12 @@
 
   <!-- Settings Modal -->
   <div id="modal-settings" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="modal-settings-title">
-    <div class="modal-card">
-      <h2 id="modal-settings-title" class="modal-title" data-i18n="modals.settings.title.main"></h2>
+    <div class="modal-card settings-modal">
+      <div class="modal-header">
+        <h2 id="modal-settings-title" class="modal-title" data-i18n="modals.settings.title.main"></h2>
+        <button id="btn-close-settings" type="button" class="modal-btn" data-i18n="modals.settings.button.close"></button>
+      </div>
+      <div class="settings-groups-grid">
       <section class="settings-controller settings-group" aria-labelledby="settings-group-audio-title">
         <h3 id="settings-group-audio-title" class="stats-section-title" data-i18n="modals.settings.groups.audio"></h3>
         <div class="pause-settings-row">
@@ -738,12 +742,10 @@
           </label>
         </div>
       </section>
+      </div>
       <div class="settings-install-row">
         <button id="btn-install" type="button" class="modal-btn hidden" data-i18n="modals.settings.install.button"></button>
         <p id="install-ios-hint" class="install-hint hidden" data-i18n="modals.settings.install.iosHint"></p>
-      </div>
-      <div class="modal-actions">
-        <button id="btn-close-settings" type="button" class="modal-btn primary" data-i18n="modals.settings.button.close"></button>
       </div>
     </div>
   </div>
@@ -782,7 +784,10 @@
   <!-- Stats Modal -->
   <div id="modal-stats" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="modal-stats-title">
     <div class="modal-card wide">
-      <h2 id="modal-stats-title" class="modal-title" data-i18n="modals.stats.title.main"></h2>
+      <div class="modal-header">
+        <h2 id="modal-stats-title" class="modal-title" data-i18n="modals.stats.title.main"></h2>
+        <button id="btn-close-stats" type="button" class="modal-btn" data-i18n="modals.stats.button.close"></button>
+      </div>
       <div class="modal-tabs" role="tablist">
         <button id="tab-stats-overview" type="button" class="modal-tab active" role="tab" aria-selected="true" aria-controls="stats-overview-pane" tabindex="0" data-i18n="modals.stats.tabs.overview"></button>
         <button id="tab-stats-daily" type="button" class="modal-tab" role="tab" aria-selected="false" aria-controls="stats-daily-pane" tabindex="-1" data-i18n="modals.stats.tabs.daily"></button>
@@ -832,7 +837,6 @@
       </label>
       <div class="modal-actions">
         <button id="btn-copy-stats" type="button" class="modal-btn primary" data-i18n="modals.stats.button.copy"></button>
-        <button id="btn-close-stats" type="button" class="modal-btn" data-i18n="modals.stats.button.close"></button>
       </div>
     </div>
   </div>

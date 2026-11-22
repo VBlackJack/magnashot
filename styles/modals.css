@@ -43,6 +43,8 @@
 }
 
 .modal-card > .levels-grid,
+.modal-card > .levels-body,
+.modal-card > .levels-map-body,
 .modal-card > .shop-pane,
 .modal-card > .codex-pane {
   flex-shrink: 1;
@@ -569,6 +571,8 @@
   text-align: left;
 }
 
+.modal-header,
+.levels-map-header,
 .play-hub-header {
   display: flex;
   align-items: center;
@@ -576,8 +580,11 @@
   gap: 12px;
 }
 
+.modal-header .modal-title,
+.levels-map-header .modal-title,
 .play-hub-header .modal-title {
   margin: 0;
+  text-align: left;
 }
 
 .play-hub-layout {
@@ -603,7 +610,8 @@
   box-shadow: 0 0 10px var(--accent-purple-alpha-45);
 }
 
-.play-hub-section > h3 {
+.play-hub-section > h3,
+.play-hub-section .play-section-title {
   margin: 0;
   font-size: 0.72rem;
   font-weight: 700;
@@ -632,8 +640,9 @@
 }
 
 .play-hub-smart-btn {
-  font-size: 0.72rem;
-  padding: 4px 10px;
+  font-size: 0.74rem;
+  min-height: 32px;
+  padding: 6px 12px;
   border-color: var(--accent-blue);
   color: var(--text-info-soft);
 }
@@ -647,9 +656,10 @@
 
 .play-hub-filter-chip {
   font-family: inherit;
-  font-size: 0.72rem;
+  font-size: 0.74rem;
   font-weight: 600;
-  padding: 4px 10px;
+  min-height: 32px;
+  padding: 6px 12px;
   border-radius: 999px;
   border: 1px solid var(--border-subtle);
   background: var(--surface-sunken);
@@ -780,16 +790,65 @@
   cursor: pointer;
 }
 
+.puzzle-builder-modal {
+  max-width: 560px;
+  gap: 8px;
+  padding: 18px 20px;
+}
+
+.puzzle-builder-swatch[data-builder-color]::before {
+  content: '';
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  margin-right: 6px;
+  vertical-align: middle;
+  background: var(--swatch-color, currentColor);
+}
+
+.puzzle-builder-swatch[data-builder-color='crimson'] {
+  --swatch-color: var(--accent-danger-text);
+  border-color: var(--accent-danger);
+}
+
+.puzzle-builder-swatch[data-builder-color='cobalt'] {
+  --swatch-color: var(--accent-blue);
+  border-color: var(--accent-blue);
+}
+
+.puzzle-builder-swatch[data-builder-color='emerald'] {
+  --swatch-color: var(--accent-emerald);
+  border-color: var(--accent-emerald);
+}
+
+.puzzle-builder-swatch[data-builder-color='amber'] {
+  --swatch-color: var(--text-gold);
+  border-color: var(--accent-amber);
+}
+
+.puzzle-builder-swatch[data-builder-color='violet'] {
+  --swatch-color: var(--text-purple-soft);
+  border-color: var(--accent-purple);
+}
+
+.puzzle-builder-swatch[data-builder-color='cyan'] {
+  --swatch-color: var(--text-info-bright);
+  border-color: var(--text-info-soft);
+}
+
 .puzzle-builder-swatch[aria-pressed='true'] {
   border-color: var(--accent-blue);
   background: var(--accent-blue-alpha-22);
+  box-shadow: 0 0 0 1px var(--accent-blue);
 }
 
 .puzzle-builder-grid {
   display: grid;
-  grid-template-columns: repeat(7, minmax(0, 1fr));
+  grid-template-columns: repeat(7, minmax(var(--touch-target), 1fr));
   gap: 6px;
-  margin: 8px 0;
+  margin: 6px 0;
+  overflow-x: auto;
 }
 
 .puzzle-builder-cell {
@@ -849,6 +908,19 @@
   color: var(--text-secondary);
 }
 
+#puzzle-builder-shots,
+#puzzle-builder-obstacle {
+  min-height: var(--touch-target);
+  padding: 6px 10px;
+  background: var(--surface-sunken);
+  color: var(--text-main);
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  font: inherit;
+  font-size: var(--caption-font-size);
+  font-weight: 700;
+}
+
 .play-hub-subhead {
   grid-column: 1 / -1;
   margin: 4px 0 0;
@@ -895,9 +967,9 @@
 
 .play-hub-cell > .arcade-card-toggle {
   align-self: flex-end;
-  padding: 2px 8px;
-  font-size: 0.68rem;
-  min-height: 24px;
+  padding: 4px 10px;
+  font-size: 0.7rem;
+  min-height: 28px;
   margin-top: -2px;
 }
 
@@ -915,7 +987,8 @@
 
 .play-contracts-toggle {
   width: 100%;
-  padding: 5px 10px;
+  min-height: 36px;
+  padding: 8px 12px;
   border-radius: 8px;
   border: 1px solid var(--border-subtle);
   background: var(--surface-raised);
@@ -1319,7 +1392,8 @@
 }
 
 /* Grid and detail panel side by side; the grid is the one scroller. */
-.levels-body {
+.levels-body,
+.levels-map-body {
   --levels-detail-width: 260px;
   display: flex;
   flex: 1 1 auto;
@@ -1375,7 +1449,7 @@
 
 .level-tile-stars {
   color: var(--accent-amber);
-  font-size: 0.6rem;
+  font-size: 0.6875rem;
   line-height: 1;
   letter-spacing: 0;
 }
@@ -2047,8 +2121,9 @@
   justify-content: space-between;
   gap: 8px;
   width: 100%;
+  min-height: 36px;
   margin: 0 0 6px;
-  padding: 5px 10px;
+  padding: 8px 12px;
   border-radius: 8px;
   border: 1px solid var(--accent-amber);
   background: var(--accent-amber-alpha-16);
@@ -2057,6 +2132,15 @@
   font-weight: 700;
   text-align: left;
   cursor: pointer;
+}
+
+.play-hub-spotlight-label {
+  min-width: 0;
+}
+
+.play-hub-spotlight-arrow {
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 
 .play-hub-spotlight:hover,

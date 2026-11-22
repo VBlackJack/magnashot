@@ -362,10 +362,10 @@
       },
       "modeUnlocked": "Nouveau mode débloqué : {{modes}}",
       "ghost": {
-        "ahead": "Tu passes devant {{name}}",
+        "ahead": "Vous passez devant {{name}}",
         "behind": "{{name}} prend la tête",
         "ended": "La partie de {{name}} s'est arrêtée à {{score}}",
-        "passed": "Tu as dépassé le score final de {{name}}"
+        "passed": "Vous avez dépassé le score final de {{name}}"
       },
       "magnetar": {
         "armed": "Magnetar : {{behaviour}} au prochain tour. {{counter}}",
@@ -460,8 +460,8 @@
       "behind": "-{{gap}} vs {{name}}",
       "tied": "= {{name}}",
       "final": "{{text}} (final)",
-      "aria": "Tu es {{side}} {{name}} de {{gap}} points au tir {{shot}}",
-      "ariaTied": "Tu es à égalité avec {{name}} au tir {{shot}}",
+      "aria": "Vous êtes {{side}} {{name}} de {{gap}} points au tir {{shot}}",
+      "ariaTied": "Vous êtes à égalité avec {{name}} au tir {{shot}}",
       "side": {
         "ahead": "devant",
         "behind": "derrière"
@@ -1755,7 +1755,7 @@
         }
       },
       "duel": {
-        "won": "Tu bats {{name}} de {{gap}}",
+        "won": "Vous battez {{name}} de {{gap}}",
         "lost": "{{name}} gagne de {{gap}}",
         "tie": "Égalité parfaite avec {{name}}"
       }
@@ -1839,12 +1839,12 @@
         },
         "status": {
           "download": "Fichier de progression préparé.",
-          "exportError": "Impossible d'exporter ta progression.",
+          "exportError": "Impossible d'exporter votre progression.",
           "tooLarge": "Ce fichier de progression est trop volumineux.",
           "empty": "Ce fichier ne contient aucune progression à importer.",
           "invalid": "Ce fichier de progression MagnaShot est invalide pour cette version.",
-          "importError": "L'import n'a pas pu se terminer. Garde ton fichier de progression et réessaie.",
-          "quotaExceeded": "Le stockage du navigateur est plein. Exporte ta progression pour ne pas perdre les changements récents."
+          "importError": "L'import n'a pas pu se terminer. Gardez votre fichier de progression et réessayez.",
+          "quotaExceeded": "Le stockage du navigateur est plein. Exportez votre progression pour ne pas perdre les changements récents."
         }
       },
       "shakeGesture": {
@@ -1867,7 +1867,7 @@
       },
       "duelName": {
         "label": "Nom de duel (facultatif)",
-        "hint": "Lettres et chiffres, 12 max. Visible des amis que tu défies."
+        "hint": "Lettres et chiffres, 12 max. Visible des amis que vous défiez."
       },
       "controller": {
         "title": "Manette",

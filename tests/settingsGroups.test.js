@@ -30,7 +30,7 @@ const en = loadJson('./locales/en.json');
 
 const HAPTIC_MS = 20;
 const SETTINGS_START = html.indexOf('id="modal-settings"');
-const SETTINGS_END = html.indexOf('id="btn-close-settings"');
+const SETTINGS_END = html.indexOf('id="modal-progress-import"');
 const settingsHtml = html.slice(SETTINGS_START, SETTINGS_END);
 
 const makeClassList = (initial = []) => {

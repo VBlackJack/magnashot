@@ -408,6 +408,10 @@ export const uiModalMethods = {
       this.engine.state = GAME_STATES.PAUSED;
     }
     modal.classList.remove('hidden');
+    const modalCard = modal.querySelector?.('.modal-card');
+    if (modalCard) {
+      modalCard.scrollTop = 0;
+    }
     if (typeof window !== 'undefined' && window.history?.pushState && window.history.state?.magnashotModal !== true) {
       try {
         window.history.pushState({ magnashotModal: true }, '');

@@ -89,14 +89,14 @@
     font-size: 0.75rem;
   }
   .hud-label {
-    font-size: 0.65rem;
+    font-size: 0.6875rem;
     letter-spacing: 0.02em;
   }
   .hud-value {
     font-size: 0.92rem;
   }
   .hud-subvalue {
-    font-size: 0.62rem;
+    font-size: 0.6875rem;
   }
   .polarity-floating-btn,
   .swap-floating-btn {
@@ -113,7 +113,7 @@
     padding: 4px 6px;
   }
   .overcharge-header {
-    font-size: 0.65rem;
+    font-size: 0.6875rem;
   }
   .overcharge-track {
     height: 6px;
@@ -214,8 +214,16 @@
   .hud-stat-coins,
   .hud-stat-best,
   .hud-mode-banner,
-  .hud-stat-score .hud-subvalue {
+  #hud-star-next,
+  #hud-star-meter {
     display: none;
+  }
+  .hud-stat-score .hud-subvalue {
+    display: inline-flex;
+    align-items: center;
+    margin-top: 0;
+    font-size: 0.72rem;
+    line-height: 1;
   }
   /* Keep round/coins/best inside the slide-in drawer so the top bar stays single-line. */
   .hud-bar {
@@ -240,7 +248,7 @@
    */
   .stage-container {
     --stage-reserve-y: var(--canvas-border);
-    --side-drawer-width: min(224px, 70vw);
+    --side-drawer-width: min(210px, 60vw);
     --side-drawer-inset: 6px;
     --side-drawer-offset: 14px;
     --side-drawer-tab-height: calc(var(--touch-target) + 4px);
@@ -310,10 +318,53 @@
   .stage-container:not(.powerups-drawer-open) .powerups-panel {
     display: none;
   }
+  /* Keep Polarity reachable in 1 tap above the drawer tab on portrait phones. */
   :root:not([data-input='gamepad'])
     .stage-container:not(.powerups-drawer-open):not([data-launcher-posture='dropRail'])
     .launcher-controls-dock {
+    position: absolute;
+    right: 0;
+    bottom: calc(var(--side-drawer-offset) + var(--side-drawer-tab-height) + 8px);
+    z-index: 26;
+    display: flex;
+    width: auto;
+    height: auto;
+  }
+  :root:not([data-input='gamepad'])
+    .stage-container:not(.powerups-drawer-open):not([data-launcher-posture='dropRail'])
+    .polarity-floating-btn {
+    flex: 0 0 auto;
+    min-width: var(--touch-target);
+    min-height: var(--touch-target);
+    padding: 6px 8px;
+    border-radius: 14px 0 0 14px;
+    border-right: 0;
+    box-shadow: -4px 4px 16px var(--shadow-alpha-60);
+  }
+  :root:not([data-input='gamepad'])
+    .stage-container:not(.powerups-drawer-open):not([data-launcher-posture='dropRail'])
+    .polarity-floating-btn .launcher-caption {
     display: none;
+  }
+  :root.left-handed-mobile:not([data-input='gamepad'])
+    .stage-container:not(.powerups-drawer-open):not([data-launcher-posture='dropRail'])
+    .launcher-controls-dock {
+    right: auto;
+    left: 0;
+  }
+  :root.left-handed-mobile:not([data-input='gamepad'])
+    .stage-container:not(.powerups-drawer-open):not([data-launcher-posture='dropRail'])
+    .polarity-floating-btn {
+    border-radius: 0 14px 14px 0;
+    border-right: 1px solid var(--border-strong);
+    border-left: 0;
+    box-shadow: 4px 4px 16px var(--shadow-alpha-60);
+  }
+  /* Step tutorial banners aside while the powerups drawer overlays the board. */
+  .stage-container.powerups-drawer-open .tutorial-banner,
+  .stage-container.powerups-drawer-open .level-intro-banner {
+    opacity: 0;
+    pointer-events: none;
   }
   .stage-container.powerups-drawer-open .powerups-panel {
     position: absolute;
@@ -562,6 +613,7 @@
  */
 @media (orientation: landscape) and (max-height: 500px) {
   :root {
+    --dock-width: 108px;
     --drawer-width: min(460px, 92vw);
     /* Gap between the equipped banner and the tutorial hint stacked above it. */
     --landscape-overlay-stack: 52px;
@@ -598,6 +650,26 @@
   }
   .nav-modes {
     grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+  .hud-bar {
+    align-items: start;
+  }
+  .polarity-floating-btn .launcher-text,
+  .swap-floating-btn .launcher-text {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+  }
+  .polarity-floating-btn .launcher-caption,
+  .swap-floating-btn .launcher-caption {
+    display: inline;
+    font-size: 0.74rem;
+    font-weight: 600;
+    white-space: nowrap;
   }
   .powerups-empty {
     display: none;
@@ -754,7 +826,15 @@
   .play-bounty-btn,
   .hud-mode-banner,
   .polarity-floating-btn,
-  .swap-floating-btn {
+  .swap-floating-btn,
+  .play-hub-filter-chip,
+  .play-hub-spotlight,
+  .play-contracts-toggle,
+  .arcade-card-toggle,
+  .play-hub-smart-btn,
+  .mutator-lab-chip,
+  .puzzle-builder-slot-load,
+  .puzzle-builder-slot-del {
     min-height: var(--touch-target);
   }
   .powerup-key {
@@ -789,7 +869,13 @@
     padding-right: 0;
   }
   .powerup-name {
-    font-size: 0.56rem;
+    font-size: 0.6875rem;
+  }
+  .puzzle-builder-modal {
+    padding: 12px;
+  }
+  .puzzle-builder-grid {
+    gap: 3px;
   }
 }
 
@@ -918,18 +1004,25 @@
     align-self: stretch;
     --play-hub-columns: 2;
   }
+  .play-hub-duel:has(#btn-versus-local-hub.hidden) {
+    --play-hub-columns: 1;
+  }
 }
 
-/* Phones: descriptions step aside; a locked card keeps its lock line, clamped to two lines. */
+/* Phones: unlocked cards keep a single-line hint; locked cards keep up to three lines so the unlock rule never clips. */
 @media (max-width: 680px), (orientation: landscape) and (max-height: 500px) {
   .arcade-mode-card .arcade-card-desc {
-    display: none;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 1;
+    line-clamp: 1;
+    overflow: hidden;
   }
   .arcade-mode-card.is-locked .arcade-card-desc {
     display: -webkit-box;
     -webkit-box-orient: vertical;
-    -webkit-line-clamp: 2;
-    line-clamp: 2;
+    -webkit-line-clamp: 3;
+    line-clamp: 3;
     overflow: hidden;
   }
   #levels-detail-desc {
@@ -975,7 +1068,8 @@
 
 /* Phone portrait: the detail panel becomes a footer under the grid, which keeps the free height. */
 @media (max-width: 680px) {
-  .levels-body {
+  .levels-body,
+  .levels-map-body {
     flex-direction: column;
     gap: 8px;
   }
@@ -989,7 +1083,8 @@
 
 /* Short landscape: narrower right column. */
 @media (orientation: landscape) and (max-height: 500px) {
-  .levels-body {
+  .levels-body,
+  .levels-map-body {
     --levels-detail-width: 220px;
     flex-direction: row;
     gap: 8px;
@@ -1391,6 +1486,31 @@
 }
 
 /* The Settings sections: a rule and an even gap between groups, the heading centred above its controls. */
+.settings-groups-grid {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+}
+
+@media (min-width: 720px) {
+  .modal-card.settings-modal {
+    max-width: 680px;
+  }
+  .settings-groups-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 16px;
+    align-items: start;
+  }
+  .settings-groups-grid > .settings-group {
+    margin-top: 0;
+    padding: 12px;
+    border: 1px solid var(--border-subtle);
+    border-radius: 10px;
+    background: var(--surface-sunken);
+  }
+}
+
 .settings-group {
   --settings-group-gap: 12px;
   width: 100%;
