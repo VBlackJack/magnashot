@@ -4,6 +4,14 @@ All notable changes to **MagnaShot** are documented in this file.
 
 ## [Unreleased]
 
+## [1.36.1] - 2026-11-22
+
+### Changed
+- **Tabbed Play Hub (`#modal-play`)** (`index.html`, `src/ui/PlayHubView.js`, `src/ui/UIManager.js`, `src/ui/UIInputBindings.js`, `styles/modals.css`, `styles/responsive.css`, `locales/*.json`): reorganized the Play Hub from a single dense wall into 3 focused tabs (**Featured**, **Arcade**, **Duel & Lab**) with keyboard (`ArrowLeft`/`ArrowRight`/`Home`/`End`) and gamepad (`LB`/`RB`) tab switching, automatic tab selection for the running mode or expanded disclosure, a uniform 3-column desktop Arcade grid with integrated Puzzle/Flux footer toggles, 2-line readable descriptions, auto-hidden empty Arcade subheads, and a dedicated **Duel & Lab** pane housing Polarity Duel, 2-player local entry, and the Mutator Lab.
+
+### Fixed
+- **Play Hub Arcade Filter Cross-Tab Isolation** (`src/ui/PlayHubView.js`): scoped Arcade filter matching strictly to the 13 Arcade modes so filtering no longer hides the Weekly Flux card (Featured tab) or Polarity Duel card (Duel & Lab tab), and reset stale filters when opening directly onto a running Arcade mode or disclosure.
+
 ## [1.36.0] - 2026-11-22
 
 ### Added
