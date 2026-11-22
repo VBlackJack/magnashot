@@ -140,6 +140,13 @@
       <p id="hud-compact-info" class="hud-compact-info"></p>
     </section>
 
+    <nav id="desktop-quick-actions" class="desktop-quick-actions" data-i18n-aria-label="app.nav.groups.quickActions">
+      <button id="btn-quick-play" type="button" class="nav-btn primary" aria-haspopup="dialog" data-i18n="app.drawer.button.play"></button>
+      <button id="btn-quick-shop" type="button" class="nav-btn gold" aria-haspopup="dialog" data-i18n="app.nav.button.shop"></button>
+      <button id="btn-quick-pause" type="button" class="nav-btn" data-i18n="app.nav.button.pause" data-i18n-title="app.nav.button.pauseTooltip"></button>
+      <button id="btn-quick-settings" type="button" class="nav-btn" aria-haspopup="dialog"><span class="settings-btn-icon" aria-hidden="true" data-i18n="app.nav.button.settingsIcon"></span> <span data-i18n="app.nav.button.settings"></span></button>
+    </nav>
+
     <main class="stage-container">
       <h1 class="visually-hidden" data-i18n="app.header.title.main"></h1>
       <div class="stage-column">
@@ -156,6 +163,7 @@
             </div>
             <div id="special-equipped-banner" class="special-equipped-banner hidden" aria-live="polite"></div>
             <div id="cancel-aim-banner" class="cancel-aim-banner hidden" data-i18n="hud.launcher.cancel.hint"></div>
+            <span class="canvas-swap-cue" aria-hidden="true" data-i18n="hud.launcher.swap.icon"></span>
           </div>
         </div>
         <div class="launcher-controls-dock">
@@ -258,6 +266,7 @@
           </div>
           <div id="play-hub-filters" class="play-hub-filters" role="group" data-i18n-aria-label="modals.play.filters.aria">
             <button type="button" class="play-hub-filter-chip" data-arcade-filter="all" aria-pressed="true" data-i18n="modals.play.filters.all"></button>
+            <button type="button" class="play-hub-filter-chip" data-arcade-filter="unlocked" aria-pressed="false" data-i18n="modals.play.filters.unlocked"></button>
             <button type="button" class="play-hub-filter-chip" data-arcade-filter="quick" aria-pressed="false" data-i18n="modals.play.filters.quick"></button>
             <button type="button" class="play-hub-filter-chip" data-arcade-filter="endless" aria-pressed="false" data-i18n="modals.play.filters.endless"></button>
             <button type="button" class="play-hub-filter-chip" data-arcade-filter="unmastered" aria-pressed="false" data-i18n="modals.play.filters.unmastered"></button>

@@ -557,6 +557,7 @@ function refreshArcadeRecordLines(els, storage, gameConfig) {
 
 export const PLAY_HUB_FILTERS = Object.freeze({
   ALL: 'all',
+  UNLOCKED: 'unlocked',
   QUICK: 'quick',
   ENDLESS: 'endless',
   UNMASTERED: 'unmastered'
@@ -569,7 +570,10 @@ const QUICK_ARCADE_MODES = new Set([
   GAME_MODES.SLINGSHOT
 ]);
 
-export function matchesArcadeFilter(mode, filter, masteryEntry) {
+export function matchesArcadeFilter(mode, filter, masteryEntry, unlocked = true) {
+  if (filter === PLAY_HUB_FILTERS.UNLOCKED) {
+    return Boolean(unlocked);
+  }
   if (filter === PLAY_HUB_FILTERS.QUICK) {
     return QUICK_ARCADE_MODES.has(mode);
   }
@@ -599,11 +603,12 @@ function getArcadeCardWrapper(card) {
   return card?.closest?.('.play-hub-cell') || card;
 }
 
-function applyPlayHubArcadeFilter(els, filter, mastery) {
+function applyPlayHubArcadeFilter(els, filter, mastery, access) {
   const activeFilter = Object.values(PLAY_HUB_FILTERS).includes(filter) ? filter : PLAY_HUB_FILTERS.ALL;
   for (const [mode, spec] of Object.entries(ARCADE_CARD_SPECS)) {
     const wrapper = getArcadeCardWrapper(els?.[spec.card]);
-    wrapper?.classList?.toggle(HIDDEN_CLASS, !matchesArcadeFilter(mode, activeFilter, mastery[mode]));
+    const unlocked = access ? isModeUnlocked(access, mode) : true;
+    wrapper?.classList?.toggle(HIDDEN_CLASS, !matchesArcadeFilter(mode, activeFilter, mastery[mode], unlocked));
   }
   const filterBar = typeof document !== 'undefined' ? document.getElementById?.('play-hub-filters') : null;
   for (const chip of filterBar?.querySelectorAll?.('[data-arcade-filter]') ?? []) {
@@ -819,7 +824,7 @@ function refreshRecentModesBar(els, storage, gameConfig) {
   }
 }
 
-function refreshPlayHubMastery(els, storage, gameConfig, filter = PLAY_HUB_FILTERS.ALL) {
+function refreshPlayHubMastery(els, storage, gameConfig, filter = PLAY_HUB_FILTERS.ALL, access = null) {
   const mastery = resolveModeMasteryProgress(storage, gameConfig);
   const starSymbol = gameConfig?.theme?.starFilledSymbol || '';
   const masteredLabel = t('modals.levelSelect.arcade.masteredBadge');
@@ -837,7 +842,7 @@ function refreshPlayHubMastery(els, storage, gameConfig, filter = PLAY_HUB_FILTE
     masteredLabel,
     campaignMastery ? { ...campaignMastery, showMeter: false } : null
   );
-  applyPlayHubArcadeFilter(els, filter, mastery);
+  applyPlayHubArcadeFilter(els, filter, mastery, access);
   refreshSmartPickButton(storage, gameConfig);
   refreshGrandMasteryBadge(mastery, starSymbol);
   refreshDailyPuzzleChip(storage, gameConfig);
@@ -908,7 +913,7 @@ export const uiPlayHubMethods = {
         : 'modals.play.weeklyMastery.titleBonus';
       setTextIfChanged(els.playWeeklyMasteryTitle, t(titleKey, { coins: formatNumber(bonus) }));
     }
-    refreshPlayHubMastery(els, storage, this.gameConfig, this.playHubFilter);
+    refreshPlayHubMastery(els, storage, this.gameConfig, this.playHubFilter, this.getModeAccess?.() || null);
   },
 
   /** What the primary Campaign button does right now (see resolveContinueTarget). */

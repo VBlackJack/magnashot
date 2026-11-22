@@ -86,7 +86,8 @@
         "calibrateIcon": "⏱"
       },
       "groups": {
-        "round": "Current round"
+        "round": "Current round",
+        "quickActions": "Quick actions"
       },
       "locked": {
         "label": "🔒 {{mode}}",
@@ -1990,6 +1991,7 @@
       "filters": {
         "aria": "Filter arcade modes",
         "all": "All",
+        "unlocked": "Unlocked",
         "quick": "Quick",
         "endless": "Endless",
         "unmastered": "Unmastered"

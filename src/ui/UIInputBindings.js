@@ -360,6 +360,13 @@ function bindHeaderAndShellControls(ui) {
   els.quotaBadge?.addEventListener('click', () => openSettingsWithRefresh(ui));
   els.btnCloseSettings?.addEventListener('click', () => ui.closeOverlayModal(els.modalSettings));
 
+  if (typeof document !== 'undefined' && typeof document.getElementById === 'function') {
+    document.getElementById('btn-quick-play')?.addEventListener('click', () => els.btnPlay?.click());
+    document.getElementById('btn-quick-shop')?.addEventListener('click', () => els.btnShop?.click());
+    document.getElementById('btn-quick-pause')?.addEventListener('click', () => els.btnPause?.click());
+    document.getElementById('btn-quick-settings')?.addEventListener('click', () => els.btnSettings?.click());
+  }
+
   els.btnRestart.addEventListener('click', () => {
     ui.requestDestructiveAction(
       () => {

@@ -339,7 +339,28 @@
     padding: 6px 8px;
     border-radius: 14px 0 0 14px;
     border-right: 0;
+    border-color: var(--accent-blue);
     box-shadow: -4px 4px 16px var(--shadow-alpha-60);
+  }
+  :root:not([data-input='gamepad'])
+    .stage-container:not(.powerups-drawer-open):not([data-launcher-posture='dropRail'])
+    .polarity-floating-btn::after {
+    content: '+';
+    font-size: 0.78rem;
+    font-weight: 800;
+    line-height: 1;
+    color: var(--accent-blue);
+  }
+  :root:not([data-input='gamepad'])
+    .stage-container:not(.powerups-drawer-open):not([data-launcher-posture='dropRail'])
+    .polarity-floating-btn.active {
+    border-color: var(--accent-danger);
+  }
+  :root:not([data-input='gamepad'])
+    .stage-container:not(.powerups-drawer-open):not([data-launcher-posture='dropRail'])
+    .polarity-floating-btn.active::after {
+    content: '-';
+    color: var(--text-danger-soft);
   }
   :root:not([data-input='gamepad'])
     .stage-container:not(.powerups-drawer-open):not([data-launcher-posture='dropRail'])
@@ -448,6 +469,21 @@
     height: auto;
     padding: 0 max(6px, env(safe-area-inset-right)) var(--side-drawer-dock-pad-bottom)
       max(6px, env(safe-area-inset-left));
+  }
+  /* Subtle tap-to-swap cue between the launcher and next ball when the swap button is hidden. */
+  :root:not([data-input='gamepad']) .stage-container:not([data-launcher-posture='dropRail']) .canvas-swap-cue {
+    display: block;
+    position: absolute;
+    left: 41%;
+    bottom: 6.5%;
+    transform: translate(-50%, 50%);
+    font-size: 0.85rem;
+    font-weight: 800;
+    line-height: 1;
+    color: var(--accent-blue);
+    opacity: 0.78;
+    pointer-events: none;
+    z-index: 4;
   }
   /* Tap-to-swap on the board handles swapping on touch; keep the button for gamepad or drop-rail. */
   :root:not([data-input='gamepad']) .stage-container:not([data-launcher-posture='dropRail']) #btn-swap-ball {
@@ -654,6 +690,10 @@
   .hud-bar {
     align-items: start;
   }
+  .launcher-controls-dock {
+    align-self: flex-end;
+    padding-bottom: 6px;
+  }
   .polarity-floating-btn .launcher-text,
   .swap-floating-btn .launcher-text {
     position: absolute;
@@ -702,13 +742,30 @@
   }
   .hud-bar {
     grid-column: 1;
-    grid-row: 1 / span 3;
+    grid-row: 1 / span 2;
     align-self: start;
     grid-template-columns: var(--touch-target) minmax(0, 1fr) minmax(0, calc(50% - 5px));
     align-content: start;
     align-items: start;
     gap: 18px 10px;
     padding: 16px 14px;
+  }
+  .desktop-quick-actions {
+    grid-column: 1;
+    grid-row: 3;
+    align-self: end;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+    padding: 10px;
+    background: var(--bg-panel-alpha-85);
+    border: 1px solid var(--bg-panel-border);
+    border-radius: 12px;
+  }
+  .desktop-quick-actions .nav-btn {
+    min-height: 36px;
+    padding: 6px 8px;
+    font-size: 0.8rem;
   }
   .hud-menu-btn {
     grid-column: 1;
@@ -871,11 +928,15 @@
   .powerup-name {
     font-size: 0.6875rem;
   }
+  #modal-puzzle-builder.modal-backdrop {
+    padding-left: max(4px, env(safe-area-inset-left));
+    padding-right: max(4px, env(safe-area-inset-right));
+  }
   .puzzle-builder-modal {
-    padding: 12px;
+    padding: 10px 6px;
   }
   .puzzle-builder-grid {
-    gap: 3px;
+    gap: 2px;
   }
 }
 

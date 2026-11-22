@@ -543,6 +543,8 @@ body {
 }
 
 .drawer-stats,
+.desktop-quick-actions,
+.canvas-swap-cue,
 .hud-compact-info,
 .launcher-caption {
   display: none;
