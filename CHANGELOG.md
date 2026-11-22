@@ -4,6 +4,22 @@ All notable changes to **MagnaShot** are documented in this file.
 
 ## [Unreleased]
 
+## [1.36.0] - 2026-11-22
+
+### Added
+- **Desktop Quick-Action Bar with Live Badges** (`index.html`, `styles/main.css`, `styles/responsive.css`, `src/ui/UIInputBindings.js`, `src/ui/UIHudRefresh.js`, `locales/*.json`): exposed 1-click *Play*, *Workshop*, *Pause*, and *Settings* controls under the left desktop HUD column (`>= 900px`), mirroring the live affordable-upgrade count/glow and Play *New* badge.
+- **Play Hub `Unlocked` Filter & Empty State** (`index.html`, `src/ui/PlayHubView.js`, `src/ui/UIInputBindings.js`, `styles/modals.css`, `locales/*.json`): added an *Unlocked* filter chip to hide locked Arcade modes in 1 tap, plus a contextual empty-state banner with a 1-click *All* reset button when a filter matches 0 cards.
+- **Mobile Touch Ergonomics** (`index.html`, `styles/main.css`, `styles/responsive.css`, `src/ui/UIInputBindings.js`): exposed a dedicated 1-tap Polarity floating button with `+`/`-` visual state above the mobile portrait drawer tab, added a subtle `⇄` tap-to-swap cue between the launcher and next sphere, added swipe-to-dismiss gestures on `#app-drawer` and `#powerups-panel`, restored inline star glyphs in the portrait HUD, moved landscape phone launcher controls into the bottom-right thumb zone, and switched mobile Workshop tabs to a single scrollable row.
+
+### Changed
+- **Unified Modal Headers & Balanced Desktop Settings** (`index.html`, `styles/modals.css`, `styles/responsive.css`, `src/ui/UIModals.js`, `tests/settingsGroups.test.js`): aligned neutral top-right *Close* buttons across Play, Campaign Map, Workshop, Settings, Stats, and Puzzle Builder, reset modal scroll position to top on open, and balanced the desktop **Settings** dialog into a 2-column layout (`Audio`, `Accessibility`, `Controller` on the left; `Gameplay` on the right) that fits without scrolling on `1280x720`.
+- **Puzzle Builder Visual & Mobile Polish** (`styles/modals.css`, `styles/responsive.css`): styled `#puzzle-builder-shots` and `#puzzle-builder-obstacle` selects to match the dark theme, added high-contrast color dots and borders on color swatches, compacted desktop spacing so action buttons stay above the fold at `1280x720`, and fit all 7 grid columns edge to edge at `>= 44px` per cell on `360px` phones with zero horizontal scroll.
+- **Typography & French Localization Consistency** (`styles/main.css`, `styles/modals.css`, `styles/responsive.css`, `locales/fr.json`): raised sub-11px labels to `>= 11px`, restored 1-line Arcade descriptions on mobile, and harmonized remaining French `tu` strings to formal `vous`.
+
+### Fixed
+- **Campaign Map (`#modal-levels`) Layout Mismatch** (`styles/modals.css`, `styles/responsive.css`): wired `.levels-map-header` and `.levels-map-body` to the flex layout rules so the level grid and detail panel sit side by side on desktop and keep the selected-level details and *Play* CTA visible on mobile portrait.
+- **Settings Auto-Scroll & Play Hub / Landscape Polish** (`src/ui/UIModals.js`, `src/ui/PlayHubView.js`, `styles/modals.css`, `styles/responsive.css`): fixed `#modal-settings` scrolling to the bottom on open, enforced `>= 44px` coarse-pointer targets across all Play Hub chips/toggles, prevented orphan `->` wrapping in the Play Hub spotlight, aligned the *Arcade* section title and single-card *Duel* width, prevented lock-hint truncation on *Weekly Flux*, faded tutorial banners while the mobile powerups drawer is open, and fixed HUD alignment and orphan `: Normale` wrapping on landscape phones (`844x390`).
+
 ## [1.35.1] - 2026-11-20
 
 ### Fixed
