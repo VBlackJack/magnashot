@@ -224,6 +224,7 @@ function bindPlayHubEvents(ui) {
   });
   els.playBountiesList?.addEventListener('click', (e) => handleBountyButtonClick(ui, e));
   els.playWeeklyMasteryList?.addEventListener('click', (e) => handleBountyButtonClick(ui, e));
+  bindTabList(ui.getPlayHubTabs?.() ?? [], (name) => ui.switchPlayHubTab(name));
 }
 
 /** Campaign map: chapter switcher, jump, filter, the tile grid (one delegated listener) and the detail Play. */
@@ -595,28 +596,31 @@ function bindLauncherAndHintControls(ui) {
   bindPlayHubToolbar(ui);
 }
 
-function bindShopTabs(ui) {
-  const shopTabs = ui.getShopTabs();
-  for (let i = 0; i < shopTabs.length; i++) {
-    const { name, el } = shopTabs[i];
-    el.addEventListener('click', () => ui.switchShopTab(name));
+function bindTabList(tabs, switchTab) {
+  for (let i = 0; i < tabs.length; i++) {
+    const { name, el } = tabs[i];
+    el.addEventListener('click', () => switchTab(name));
     el.addEventListener('keydown', (e) => {
       let nextIdx = -1;
       if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
         const dir = e.key === 'ArrowRight' ? 1 : -1;
-        nextIdx = (i + dir + shopTabs.length) % shopTabs.length;
+        nextIdx = (i + dir + tabs.length) % tabs.length;
       } else if (e.key === 'Home') {
         nextIdx = 0;
       } else if (e.key === 'End') {
-        nextIdx = shopTabs.length - 1;
+        nextIdx = tabs.length - 1;
       }
       if (nextIdx >= 0) {
         e.preventDefault();
-        ui.switchShopTab(shopTabs[nextIdx].name);
-        shopTabs[nextIdx].el.focus();
+        switchTab(tabs[nextIdx].name);
+        tabs[nextIdx].el.focus();
       }
     });
   }
+}
+
+function bindShopTabs(ui) {
+  bindTabList(ui.getShopTabs(), (name) => ui.switchShopTab(name));
 }
 
 function bindBackdropDismiss(modalEl, onDismiss) {

@@ -587,19 +587,34 @@
   text-align: left;
 }
 
+.play-hub-tabs {
+  margin: 4px 0 6px;
+}
+
 .play-hub-layout {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.play-hub-pane {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+
+.play-hub-pane.hidden {
+  display: none;
 }
 
 .play-hub-section {
-  --play-hub-columns: 2;
+  --play-hub-columns: 1;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 10px;
   min-width: 0;
-  padding: 8px 10px;
+  padding: 12px 14px;
   background: var(--surface-sunken);
   border: 1px solid var(--border-subtle);
   border-radius: 10px;
@@ -613,7 +628,7 @@
 .play-hub-section > h3,
 .play-hub-section .play-section-title {
   margin: 0;
-  font-size: 0.72rem;
+  font-size: 0.74rem;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.06em;
@@ -623,12 +638,12 @@
 .play-hub-grid {
   display: grid;
   grid-template-columns: repeat(var(--play-hub-columns), minmax(0, 1fr));
-  gap: 6px;
+  gap: 10px;
   align-items: stretch;
 }
 
 .play-hub-arcade .play-hub-grid {
-  align-items: start;
+  align-items: stretch;
 }
 
 .play-hub-arcade-head {
@@ -941,12 +956,20 @@
 
 .play-hub-subhead {
   grid-column: 1 / -1;
-  margin: 4px 0 0;
-  font-size: 0.68rem;
+  margin: 6px 0 0;
+  font-size: 0.7rem;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.06em;
   color: var(--text-muted);
+}
+
+.play-hub-subhead:first-child {
+  margin-top: 0;
+}
+
+.play-hub-subhead.hidden {
+  display: none;
 }
 
 #modal-play .play-hub-campaign {
@@ -971,11 +994,11 @@
   display: none;
 }
 
-/* A card and its disclosure toggle share one grid cell. */
+/* A card and its disclosure toggle share one uniform grid cell. */
 .play-hub-cell {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 0;
   min-width: 0;
 }
 
@@ -983,19 +1006,27 @@
   flex: 1 1 auto;
 }
 
+.play-hub-cell:has(> .arcade-card-toggle:not(.hidden)) > .arcade-mode-card {
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+  border-bottom-color: transparent;
+}
+
 .play-hub-cell > .arcade-card-toggle {
-  align-self: flex-end;
-  padding: 4px 10px;
-  font-size: 0.7rem;
+  width: 100%;
+  padding: 5px 10px;
+  font-size: 0.72rem;
   min-height: 28px;
-  margin-top: -2px;
+  border-top-left-radius: 0;
+  border-top-right-radius: 0;
+  border-top-style: dashed;
 }
 
 #modal-play .play-hub-arcade .arcade-mode-card:not(.is-locked) .arcade-card-desc {
   display: -webkit-box;
   -webkit-box-orient: vertical;
-  -webkit-line-clamp: 1;
-  line-clamp: 1;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
   overflow: hidden;
 }
 
@@ -1082,10 +1113,10 @@
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
   align-content: start;
-  gap: 2px 0;
+  gap: 3px 0;
   min-width: 0;
   min-height: var(--touch-target);
-  padding: 6px 8px;
+  padding: 10px 12px;
   overflow-wrap: anywhere;
   white-space: normal;
   transition: transform 0.12s ease, border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
@@ -2168,9 +2199,21 @@
 }
 
 .play-mutator-lab {
-  margin-top: 10px;
-  padding-top: 8px;
-  border-top: 1px solid var(--border-subtle);
+  gap: 8px;
+}
+
+#modal-play #btn-versus-local-hub {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 72px;
+  padding: 12px 16px;
+  white-space: normal;
+  text-align: center;
+}
+
+#modal-play #btn-versus-local-hub.hidden {
+  display: none;
 }
 
 .play-mutator-lab-head {

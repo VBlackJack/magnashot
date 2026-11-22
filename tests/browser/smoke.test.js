@@ -276,22 +276,25 @@ async function captureVersusEngines(page) {
   });
 }
 
-/** Opens the Play hub from the slide-in menu, the one dialog that lists every mode. */
-async function openPlayHub(page, viewport) {
+/** Opens the Play hub from the slide-in menu, optionally switching to a specific tab. */
+async function openPlayHub(page, viewport, tabSelector = null) {
   await clickMenuButton(page, viewport, '#btn-play');
   await waitShown(page, '#modal-play');
+  if (tabSelector) {
+    await page.click(tabSelector);
+  }
 }
 
 /** Opens the Play hub, then the campaign map from its Campaign card. */
 async function openCampaignMap(page, viewport) {
-  await openPlayHub(page, viewport);
+  await openPlayHub(page, viewport, '#tab-play-featured');
   await page.click('#btn-campaign-map');
   await waitShown(page, '#modal-levels');
 }
 
 /** Opens the Play hub, then the difficulty picker of Polarity Duel from its Duel card. */
 async function openVersusTierPicker(page, viewport) {
-  await openPlayHub(page, viewport);
+  await openPlayHub(page, viewport, '#tab-play-duel');
   await page.click('#btn-mode-versus');
   await waitShown(page, '#modal-versus-tiers');
 }
@@ -1473,7 +1476,7 @@ describe('end of round (desktop)', () => {
   test('an existing player starts Classic from the Play hub', async () => {
     const { context, page, errors } = await openGame(desktop, { initStorage: EXISTING_PLAYER_STORAGE });
     try {
-      await openPlayHub(page, desktop);
+      await openPlayHub(page, desktop, '#tab-play-arcade');
       assert.equal(await isMenuItemLocked(page, CLASSIC_CARD_SELECTOR), false, 'the Classic card is open');
       await page.click(CLASSIC_CARD_SELECTOR);
       await page.waitForFunction(
@@ -2282,7 +2285,7 @@ function installTwoPadStub() {
 
 /** Opens the Play hub and the two-player lobby from its Duel card (the picker opens under the lobby). */
 async function openVersusLocalLobby(page, viewport) {
-  await openPlayHub(page, viewport);
+  await openPlayHub(page, viewport, '#tab-play-duel');
   await waitShown(page, '#btn-versus-local-hub');
   await page.click('#btn-versus-local-hub');
   await waitShown(page, '#modal-versus-local');
@@ -2500,7 +2503,7 @@ describe('Polarity Duel, two players entry by layout', () => {
     test(`the two-player entry is ${isHidden ? 'hidden' : 'offered'} on ${viewport.name}`, async () => {
       const { context, page, errors } = await openGame(viewport, { initStorage: LOCAL_PLAYER_STORAGE });
       try {
-        await openPlayHub(page, viewport);
+        await openPlayHub(page, viewport, '#tab-play-duel');
         assert.equal(await isShown(page, '#btn-versus-local-hub'), !isHidden, 'the Play hub offers the entry only where two boards fit');
         assert.equal(await isShown(page, '#versus-local-hub-hint'), isHidden, 'the hint stands in where the entry is hidden');
         // The difficulty picker keeps the same entry rule.
@@ -2521,7 +2524,7 @@ describe('Polarity Duel, two players entry by layout', () => {
       const { context, page, errors } = await openGame(viewport, { initStorage: LOCAL_PLAYER_STORAGE });
       try {
         await captureVersusEngines(page);
-        await openPlayHub(page, viewport);
+        await openPlayHub(page, viewport, '#tab-play-duel');
         const isOffered = await isShown(page, '#btn-versus-local-hub');
         assert.equal(isOffered, height >= LOCAL_SHORT_DESKTOP_FITS_FROM, 'the entry follows the split layout requirement');
         assert.equal(await isShown(page, '#versus-local-hub-hint'), !isOffered, 'the hint stands in where the entry is hidden');
@@ -3213,7 +3216,7 @@ for (const viewport of VIEWPORTS) {
             'the running level is offered for resuming'
           );
           const headings = await page.evaluate(() =>
-            [...document.querySelectorAll('#modal-play section[aria-labelledby]')].map((section) => {
+            [...document.querySelectorAll('#modal-play section.play-hub-section:not(.play-mutator-lab)[aria-labelledby]')].map((section) => {
               // The accessible name leaves out decorative (aria-hidden) icons.
               const heading = document.getElementById(section.getAttribute('aria-labelledby'))?.cloneNode(true);
               heading?.querySelectorAll('[aria-hidden="true"]').forEach((icon) => icon.remove());
@@ -3322,6 +3325,7 @@ for (const viewport of VIEWPORTS) {
         );
         assert.deepEqual(domOrder, expectedOrder, 'the arcade cards are listed in the order the campaign opens them');
 
+        await page.click('#tab-play-duel');
         const isHidden = LOCAL_ENTRY_HIDDEN_VIEWPORTS.includes(viewport.name);
         assert.equal(await isShown(page, '#btn-versus-local-hub'), !isHidden, 'the 2 players entry follows the room for two boards');
         assert.equal(await isShown(page, '#versus-local-hub-hint'), isHidden, 'the hint explains where the entry is hidden');
@@ -3538,7 +3542,7 @@ describe('play hub (desktop)', () => {
   test('the Puzzle and seed disclosures open one at a time, a puzzle stage starts at once, and a seed is checked', async () => {
     const { context, page, errors } = await openGame(desktop, { initStorage: EXISTING_PLAYER_STORAGE });
     try {
-      await openPlayHub(page, desktop);
+      await openPlayHub(page, desktop, '#tab-play-arcade');
       assert.equal(await isShown(page, '#puzzle-stages-strip'), false, 'the stages start folded');
       assert.equal(await page.getAttribute('#btn-puzzle-stages-toggle', 'aria-expanded'), 'false');
       await page.click('#btn-puzzle-stages-toggle');
@@ -3585,7 +3589,7 @@ describe('play hub (desktop)', () => {
   test('the seed entry works on a fresh profile while Flux is locked, and starts the shared seed', async () => {
     const { context, page, errors } = await openGame(desktop);
     try {
-      await openPlayHub(page, desktop);
+      await openPlayHub(page, desktop, '#tab-play-arcade');
       assert.equal(await isMenuItemLocked(page, '#btn-flux'), true, 'Flux is locked');
       await page.click('#btn-flux-seed-toggle');
       await waitShown(page, '#flux-seed-entry');
@@ -3625,6 +3629,7 @@ describe('play hub (desktop)', () => {
         localeText('en', 'modals.play.campaign.continue', { level: suggested }),
         'no campaign run: Continue offers the furthest level'
       );
+      await page.click('#tab-play-featured');
       await page.click('#btn-campaign-continue');
       await page.waitForFunction(
         ([mode, level, playing]) =>
@@ -3689,7 +3694,7 @@ for (const viewport of VIEWPORTS) {
     test('every stage button is a full touch target, a cleared stage shows its stars and a locked one is dashed at full opacity', async () => {
       const { context, page, errors } = await openGame(viewport, { initStorage: PUZZLE_SEEDED_STORAGE });
       try {
-        await openPlayHub(page, viewport);
+        await openPlayHub(page, viewport, '#tab-play-arcade');
         await page.click('#btn-puzzle-stages-toggle');
         await waitShown(page, '#puzzle-stages-strip');
         const looks = await page.evaluate(
@@ -3752,7 +3757,7 @@ describe('puzzle stage intro (desktop)', () => {
     const desktop = VIEWPORTS[0];
     const { context, page, errors } = await openGame(desktop, { initStorage: PUZZLE_SEEDED_STORAGE });
     try {
-      await openPlayHub(page, desktop);
+      await openPlayHub(page, desktop, '#tab-play-arcade');
       await page.click('#btn-puzzle-stages-toggle');
       await waitShown(page, '#puzzle-stages-strip');
       await page.click('#puzzle-stages-strip .puzzle-stage-btn[data-puzzle-stage="1"]');
@@ -3793,7 +3798,7 @@ describe('Merge shake', () => {
   };
 
   async function startBasin(page, viewport) {
-    await openPlayHub(page, viewport);
+    await openPlayHub(page, viewport, '#tab-play-arcade');
     await page.locator('#btn-mode-merge').click();
     await page.waitForFunction(() => window.__fluxEngine.mode === 'merge' && window.__fluxEngine.isRunPlaying());
   }
@@ -4164,7 +4169,7 @@ describe('Progress transfer', () => {
       await captureEngine(target.page);
       assert.deepEqual(await target.page.evaluate((keys) => keys.map((key) => localStorage.getItem(key)),
         [unlockedKey, coinsKey, contrastKey, foreignKey]), [newLevel, '30', null, 'target']);
-      await openPlayHub(target.page, viewport);
+      await openPlayHub(target.page, viewport, '#tab-play-arcade');
       await target.page.locator('#btn-mode-merge').click();
       await waitShown(target.page, '#btn-merge-shake');
       assert.deepEqual([...source.errors, ...target.errors], []);
@@ -4209,7 +4214,7 @@ describe('Lot E and audit smoke checks', () => {
     const desktop = await openGame(VIEWPORTS[0], { initStorage: fullProfileStorage });
     try {
       for (const [selector, mode] of arcadeCards) {
-        await openPlayHub(desktop.page, VIEWPORTS[0]);
+        await openPlayHub(desktop.page, VIEWPORTS[0], '#tab-play-arcade');
         await desktop.page.click(selector);
         await desktop.page.waitForFunction((expected) => window.__fluxEngine.mode === expected, mode);
         await assertLayoutFits(desktop.page, mode);
@@ -4241,7 +4246,7 @@ describe('Lot E and audit smoke checks', () => {
     const phoneViewport = VIEWPORTS.find((viewport) => viewport.name === 'phone portrait');
     const phone = await openGame(phoneViewport, { initStorage: fullProfileStorage });
     try {
-      await openPlayHub(phone.page, phoneViewport);
+      await openPlayHub(phone.page, phoneViewport, '#tab-play-arcade');
       await phone.page.click('#btn-mode-hex-grid');
       await phone.page.waitForFunction((expected) => window.__fluxEngine.mode === expected, GAME_MODES.HEX_GRID);
       await assertLayoutFits(phone.page, GAME_MODES.HEX_GRID);
@@ -4324,7 +4329,7 @@ describe('Lot E and audit smoke checks', () => {
         true
       );
 
-      await openPlayHub(page, viewport);
+      await openPlayHub(page, viewport, '#tab-play-arcade');
 
       await page.click('#btn-puzzle-stages-toggle');
       await waitShown(page, '#puzzle-stages-strip');

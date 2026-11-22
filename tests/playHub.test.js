@@ -21,6 +21,8 @@ import { GAME_MODES, GAME_STATES } from '../src/core/Constants.js';
 import { WEEKLY_ACCESS_KEY } from '../src/ui/UIHelpers.js';
 import {
   CONTINUE_KINDS,
+  PLAY_HUB_FILTERS,
+  PLAY_HUB_TABS,
   describeDailyReward,
   describeWeeklyReward,
   isModeRunning,
@@ -28,6 +30,7 @@ import {
   resolveInitialFocusKey,
   resolveModeMastery,
   resolveModeMasteryProgress,
+  resolvePlayHubTabForFocusKey,
   resolveVersusLocalEntry,
   sumChapterStars,
   uiPlayHubMethods
@@ -510,4 +513,124 @@ test('resolveModeMasteryProgress computes clamped ratios and refreshPlayHubRecor
   } finally {
     globalThis.document = prevDoc;
   }
+});
+
+test('resolvePlayHubTabForFocusKey maps featured, arcade, and duel cards to their tabs', () => {
+  assert.equal(resolvePlayHubTabForFocusKey('btnCampaignContinue'), PLAY_HUB_TABS.FEATURED);
+  assert.equal(resolvePlayHubTabForFocusKey('btnDaily'), PLAY_HUB_TABS.FEATURED);
+  assert.equal(resolvePlayHubTabForFocusKey('btnWeekly'), PLAY_HUB_TABS.FEATURED);
+  assert.equal(resolvePlayHubTabForFocusKey('btnEndless'), PLAY_HUB_TABS.ARCADE);
+  assert.equal(resolvePlayHubTabForFocusKey('btnModeBlitz'), PLAY_HUB_TABS.ARCADE);
+  assert.equal(resolvePlayHubTabForFocusKey('btnModeSlingshot'), PLAY_HUB_TABS.ARCADE);
+  assert.equal(resolvePlayHubTabForFocusKey('btnModeVersus'), PLAY_HUB_TABS.DUEL);
+  assert.equal(resolvePlayHubTabForFocusKey(null), PLAY_HUB_TABS.FEATURED);
+});
+
+test('switchPlayHubTab syncs active class, aria-selected, tabIndex, pane visibility, and scrollTop', () => {
+  const modalCard = { scrollTop: 240 };
+  const elements = {
+    modalPlay: { querySelector: () => modalCard },
+    tabPlayFeatured: fakeElement(),
+    tabPlayArcade: fakeElement(),
+    tabPlayDuel: fakeElement(),
+    playPaneFeatured: fakeElement(),
+    playPaneArcade: fakeElement({ hidden: true }),
+    playPaneDuel: fakeElement({ hidden: true })
+  };
+  const ctx = {
+    elements,
+    getPlayHubTabs: uiPlayHubMethods.getPlayHubTabs
+  };
+
+  uiPlayHubMethods.switchPlayHubTab.call(ctx, PLAY_HUB_TABS.ARCADE);
+  assert.equal(ctx.activePlayHubTab, PLAY_HUB_TABS.ARCADE);
+  assert.equal(elements.tabPlayArcade.classList.contains('active'), true);
+  assert.equal(elements.tabPlayArcade.getAttribute('aria-selected'), 'true');
+  assert.equal(elements.tabPlayArcade.tabIndex, 0);
+  assert.equal(elements.playPaneArcade.classList.contains('hidden'), false);
+  assert.equal(elements.playPaneFeatured.classList.contains('hidden'), true);
+  assert.equal(elements.tabPlayFeatured.tabIndex, -1);
+  assert.equal(modalCard.scrollTop, 0);
+
+  uiPlayHubMethods.switchPlayHubTab.call(ctx, 'unknown-tab');
+  assert.equal(ctx.activePlayHubTab, PLAY_HUB_TABS.FEATURED);
+  assert.equal(elements.playPaneFeatured.classList.contains('hidden'), false);
+});
+
+test('openPlayHub selects the tab of the running mode or expanded disclosure and resets stale Arcade filters', () => {
+  const switched = [];
+  const focused = [];
+  const makeHubCtx = ({ mode, unlocked = true, filter = PLAY_HUB_FILTERS.ALL, puzzleToggleHidden = false }) => {
+    const elements = {
+      modalPlay: {},
+      playHubHint: fakeElement(),
+      btnCampaignContinue: fakeElement(),
+      btnEndless: fakeElement(),
+      btnModeVersus: fakeElement(),
+      btnClosePlay: fakeElement(),
+      btnPuzzleStagesToggle: fakeElement({ hidden: puzzleToggleHidden }),
+      puzzleStagesStrip: fakeElement({ hidden: true }),
+      btnFluxSeedToggle: fakeElement(),
+      fluxSeedEntry: fakeElement({ hidden: true })
+    };
+    return {
+      elements,
+      engine: engineOf(mode, GAME_STATES.PAUSED),
+      playHubFilter: filter,
+      getModeAccess: () => ({ [mode]: { unlocked } }),
+      refreshPlayHubRecords: () => {},
+      refreshVersusCard: () => {},
+      renderPuzzleStagesStrip: () => {},
+      refreshModeLocks: () => {},
+      refreshPlayHubCampaign: () => {},
+      collapsePlayHubDisclosures: uiPlayHubMethods.collapsePlayHubDisclosures,
+      togglePlayHubDisclosure: uiPlayHubMethods.togglePlayHubDisclosure,
+      syncPlayHubVersusLocal: () => {},
+      switchPlayHubTab: (tab) => switched.push(tab),
+      openOverlayModal: (_modal, target) => focused.push(target)
+    };
+  };
+
+  const arcadeCtx = makeHubCtx({ mode: GAME_MODES.ENDLESS, filter: PLAY_HUB_FILTERS.QUICK });
+  uiPlayHubMethods.openPlayHub.call(arcadeCtx);
+  assert.equal(arcadeCtx.playHubFilter, PLAY_HUB_FILTERS.ALL, 'stale filter resets before focusing running Arcade card');
+  assert.equal(switched.at(-1), PLAY_HUB_TABS.ARCADE);
+  assert.equal(focused.at(-1), arcadeCtx.elements.btnEndless);
+
+  const lockedCtx = makeHubCtx({ mode: GAME_MODES.ENDLESS, unlocked: false });
+  uiPlayHubMethods.openPlayHub.call(lockedCtx);
+  assert.equal(switched.at(-1), PLAY_HUB_TABS.FEATURED, 'locked running mode falls back to Featured tab');
+  assert.equal(focused.at(-1), lockedCtx.elements.btnCampaignContinue);
+
+  const duelCtx = makeHubCtx({ mode: GAME_MODES.VERSUS });
+  uiPlayHubMethods.openPlayHub.call(duelCtx);
+  assert.equal(switched.at(-1), PLAY_HUB_TABS.DUEL);
+  assert.equal(focused.at(-1), duelCtx.elements.btnModeVersus);
+
+  const expandCtx = makeHubCtx({ mode: GAME_MODES.CAMPAIGN, filter: PLAY_HUB_FILTERS.ENDLESS });
+  uiPlayHubMethods.openPlayHub.call(expandCtx, { expand: 'puzzle' });
+  assert.equal(expandCtx.playHubFilter, PLAY_HUB_FILTERS.ALL);
+  assert.equal(switched.at(-1), PLAY_HUB_TABS.ARCADE);
+});
+
+test('Arcade filter does not hide Weekly or Versus cards in other tabs', () => {
+  const elements = {
+    btnEndless: fakeElement(),
+    btnModeBlitz: fakeElement(),
+    btnWeekly: fakeElement(),
+    btnModeVersus: fakeElement()
+  };
+  const ctx = {
+    gameConfig: { puzzles: [{}], scoring: { maxStars: 3 }, theme: { starFilledSymbol: '*' } },
+    storageManager: {},
+    elements,
+    playHubFilter: PLAY_HUB_FILTERS.QUICK,
+    describeDailyRewardChip: () => ({ text: '', ariaLabel: '' }),
+    describeWeeklyRewardChip: () => ({ text: '', ariaLabel: '' })
+  };
+  uiPlayHubMethods.refreshPlayHubRecords.call(ctx);
+  assert.equal(elements.btnEndless.classList.contains('hidden'), true, 'non-quick Arcade mode is hidden');
+  assert.equal(elements.btnModeBlitz.classList.contains('hidden'), false, 'quick Arcade mode stays visible');
+  assert.equal(elements.btnWeekly.classList.contains('hidden'), false, 'Weekly card in Featured tab is untouched');
+  assert.equal(elements.btnModeVersus.classList.contains('hidden'), false, 'Versus card in Duel tab is untouched');
 });

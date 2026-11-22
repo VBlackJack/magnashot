@@ -1978,6 +1978,12 @@
     },
     "play": {
       "title": "Jouer",
+      "tabs": {
+        "aria": "Sections du menu Jouer",
+        "featured": "À la une",
+        "arcade": "Arcade",
+        "duel": "Duel & Labo"
+      },
       "section": {
         "campaign": "Campagne",
         "challenges": "Défis",

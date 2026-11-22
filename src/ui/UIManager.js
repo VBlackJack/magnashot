@@ -31,7 +31,7 @@ import {
   uiLevelSelectMethods
 } from './LevelSelectView.js';
 import { ProgressBackupView } from './ProgressBackupView.js';
-import { uiPlayHubMethods } from './PlayHubView.js';
+import { PLAY_HUB_TABS, uiPlayHubMethods } from './PlayHubView.js';
 import { installMethods } from '../core/installMethods.js';
 import {
   STANDALONE_DISPLAY_QUERY,
@@ -235,9 +235,21 @@ function cacheMutatorLabElements() {
   };
 }
 
+function cachePlayHubTabElements() {
+  return {
+    tabPlayFeatured: document.getElementById('tab-play-featured'),
+    tabPlayArcade: document.getElementById('tab-play-arcade'),
+    tabPlayDuel: document.getElementById('tab-play-duel'),
+    playPaneFeatured: document.getElementById('play-pane-featured'),
+    playPaneArcade: document.getElementById('play-pane-arcade'),
+    playPaneDuel: document.getElementById('play-pane-duel')
+  };
+}
+
 function cachePlayAndLevelsElements() {
   return {
     ...cacheMutatorLabElements(),
+    ...cachePlayHubTabElements(),
     modalPlay: document.getElementById('modal-play'),
     modalPuzzleBuilder: document.getElementById('modal-puzzle-builder'),
     btnPuzzleBuilder: document.getElementById('btn-puzzle-builder'),
@@ -506,6 +518,7 @@ function initUiRuntimeState(ui, engine, renderer) {
   ui.hintsResetConfirmed = false;
   ui.dailyCountdownTimer = null;
   ui.activeShopTab = SHOP_TABS.UPGRADES;
+  ui.activePlayHubTab = PLAY_HUB_TABS.FEATURED;
   // The deferred install prompt, kept until the player asks for it from Settings.
   ui.installPromptEvent = null;
   ui.levelsChapterIndex = 0;

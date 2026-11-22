@@ -210,166 +210,190 @@
         <button id="btn-close-play" type="button" class="modal-btn" data-i18n="modals.levelSelect.button.close"></button>
       </div>
       <p id="play-hub-hint" class="modal-subtext hidden" role="status" aria-live="polite"></p>
-      <button id="play-hub-spotlight" type="button" class="play-hub-spotlight hidden"></button>
-      <div id="play-hub-recent" class="play-hub-recent hidden" role="group" data-i18n-aria-label="modals.play.recent.aria"></div>
+      <div class="modal-tabs play-hub-tabs" role="tablist" data-i18n-aria-label="modals.play.tabs.aria">
+        <button id="tab-play-featured" type="button" class="modal-tab active" role="tab" aria-selected="true" aria-controls="play-pane-featured" tabindex="0" data-i18n="modals.play.tabs.featured"></button>
+        <button id="tab-play-arcade" type="button" class="modal-tab" role="tab" aria-selected="false" aria-controls="play-pane-arcade" tabindex="-1" data-i18n="modals.play.tabs.arcade"></button>
+        <button id="tab-play-duel" type="button" class="modal-tab" role="tab" aria-selected="false" aria-controls="play-pane-duel" tabindex="-1" data-i18n="modals.play.tabs.duel"></button>
+      </div>
       <div class="play-hub-layout">
-        <section class="play-hub-section play-hub-campaign" aria-labelledby="play-section-campaign-title">
-          <h3 id="play-section-campaign-title" class="play-section-title"><span class="play-section-icon" aria-hidden="true" data-i18n="modals.play.icon.campaign"></span> <span data-i18n="modals.play.section.campaign"></span></h3>
-          <p id="play-campaign-summary" class="play-campaign-summary"></p>
-          <div id="play-campaign-meter" class="star-meter play-campaign-meter" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" aria-labelledby="play-campaign-summary"><span id="play-campaign-meter-fill" class="star-meter-fill"></span></div>
-          <div class="play-hub-campaign-actions">
-            <button id="btn-campaign-continue" type="button" class="modal-btn primary"></button>
-            <button id="btn-campaign-map" type="button" class="modal-btn" aria-haspopup="dialog" data-i18n="modals.play.campaign.map"></button>
-          </div>
-        </section>
-        <section class="play-hub-section play-hub-challenges" aria-labelledby="play-section-challenges-title">
-          <h3 id="play-section-challenges-title" class="play-section-title" data-i18n="modals.play.section.challenges"></h3>
-          <div class="play-hub-grid">
-            <button id="btn-daily" type="button" class="arcade-mode-card">
-              <span class="arcade-card-icon" aria-hidden="true" data-i18n="modals.play.icon.daily"></span>
-              <span class="arcade-card-title" data-i18n="app.nav.button.daily"></span>
-              <span class="arcade-card-desc" data-i18n="modals.play.daily.desc"></span>
-              <span id="daily-reward" class="arcade-card-best gold-text hidden"></span>
-            </button>
-            <button id="btn-weekly" type="button" class="arcade-mode-card">
-              <span class="arcade-card-icon" aria-hidden="true" data-i18n="modals.play.icon.weekly"></span>
-              <span class="arcade-card-title" data-i18n="app.nav.button.weekly"></span>
-              <span class="arcade-card-desc" data-i18n="modals.play.weekly.desc"></span>
-              <span id="weekly-reward" class="arcade-card-best gold-text hidden"></span>
-            </button>
-            <button id="btn-daily-puzzle" type="button" class="arcade-mode-card">
-              <span class="arcade-card-icon" aria-hidden="true" data-i18n="modals.play.icon.puzzle"></span>
-              <span class="arcade-card-title" data-i18n="modals.play.dailyPuzzle.title"></span>
-              <span class="arcade-card-desc" data-i18n="modals.play.dailyPuzzle.desc"></span>
-              <span id="daily-puzzle-stage-label" class="arcade-card-best gold-text"></span>
-            </button>
-          </div>
-          <button id="btn-contracts-toggle" type="button" class="play-contracts-toggle" aria-expanded="false" aria-controls="play-contracts-panel"></button>
-          <div id="play-contracts-panel" class="play-bounties-row hidden">
-            <div id="play-bounties" class="play-bounties">
-              <h4 class="play-bounties-title" data-i18n="modals.play.bounties.title"></h4>
-              <ul id="play-bounties-list" class="play-bounties-list"></ul>
+        <div id="play-pane-featured" class="play-hub-pane" role="tabpanel" aria-labelledby="tab-play-featured">
+          <button id="play-hub-spotlight" type="button" class="play-hub-spotlight hidden"></button>
+          <div id="play-hub-recent" class="play-hub-recent hidden" role="group" data-i18n-aria-label="modals.play.recent.aria"></div>
+          <section class="play-hub-section play-hub-campaign" aria-labelledby="play-section-campaign-title">
+            <h3 id="play-section-campaign-title" class="play-section-title"><span class="play-section-icon" aria-hidden="true" data-i18n="modals.play.icon.campaign"></span> <span data-i18n="modals.play.section.campaign"></span></h3>
+            <p id="play-campaign-summary" class="play-campaign-summary"></p>
+            <div id="play-campaign-meter" class="star-meter play-campaign-meter" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" aria-labelledby="play-campaign-summary"><span id="play-campaign-meter-fill" class="star-meter-fill"></span></div>
+            <div class="play-hub-campaign-actions">
+              <button id="btn-campaign-continue" type="button" class="modal-btn primary"></button>
+              <button id="btn-campaign-map" type="button" class="modal-btn" aria-haspopup="dialog" data-i18n="modals.play.campaign.map"></button>
             </div>
-            <div id="play-weekly-mastery" class="play-bounties">
-              <h4 id="play-weekly-mastery-title" class="play-bounties-title" data-i18n="modals.play.weeklyMastery.title"></h4>
-              <ul id="play-weekly-mastery-list" class="play-bounties-list"></ul>
+          </section>
+          <section class="play-hub-section play-hub-challenges" aria-labelledby="play-section-challenges-title">
+            <h3 id="play-section-challenges-title" class="play-section-title" data-i18n="modals.play.section.challenges"></h3>
+            <div class="play-hub-grid">
+              <button id="btn-daily" type="button" class="arcade-mode-card">
+                <span class="arcade-card-icon" aria-hidden="true" data-i18n="modals.play.icon.daily"></span>
+                <span class="arcade-card-title" data-i18n="app.nav.button.daily"></span>
+                <span class="arcade-card-desc" data-i18n="modals.play.daily.desc"></span>
+                <span id="daily-reward" class="arcade-card-best gold-text hidden"></span>
+              </button>
+              <button id="btn-weekly" type="button" class="arcade-mode-card">
+                <span class="arcade-card-icon" aria-hidden="true" data-i18n="modals.play.icon.weekly"></span>
+                <span class="arcade-card-title" data-i18n="app.nav.button.weekly"></span>
+                <span class="arcade-card-desc" data-i18n="modals.play.weekly.desc"></span>
+                <span id="weekly-reward" class="arcade-card-best gold-text hidden"></span>
+              </button>
+              <button id="btn-daily-puzzle" type="button" class="arcade-mode-card">
+                <span class="arcade-card-icon" aria-hidden="true" data-i18n="modals.play.icon.puzzle"></span>
+                <span class="arcade-card-title" data-i18n="modals.play.dailyPuzzle.title"></span>
+                <span class="arcade-card-desc" data-i18n="modals.play.dailyPuzzle.desc"></span>
+                <span id="daily-puzzle-stage-label" class="arcade-card-best gold-text"></span>
+              </button>
             </div>
-          </div>
-        </section>
-        <section class="play-hub-section play-hub-arcade" aria-labelledby="play-section-arcade-title">
-          <div class="play-hub-arcade-head">
-            <h3 id="play-section-arcade-title" class="play-section-title" data-i18n="modals.play.section.arcade"></h3>
-            <div class="play-hub-head-actions">
-              <button id="btn-puzzle-builder" type="button" class="nav-btn badge-btn play-hub-smart-btn" aria-haspopup="dialog" data-i18n="modals.puzzleBuilder.openButton"></button>
-              <button id="btn-play-next-unmastered" type="button" class="nav-btn badge-btn play-hub-smart-btn hidden"></button>
+            <button id="btn-contracts-toggle" type="button" class="play-contracts-toggle" aria-expanded="false" aria-controls="play-contracts-panel"></button>
+            <div id="play-contracts-panel" class="play-bounties-row hidden">
+              <div id="play-bounties" class="play-bounties">
+                <h4 class="play-bounties-title" data-i18n="modals.play.bounties.title"></h4>
+                <ul id="play-bounties-list" class="play-bounties-list"></ul>
+              </div>
+              <div id="play-weekly-mastery" class="play-bounties">
+                <h4 id="play-weekly-mastery-title" class="play-bounties-title" data-i18n="modals.play.weeklyMastery.title"></h4>
+                <ul id="play-weekly-mastery-list" class="play-bounties-list"></ul>
+              </div>
             </div>
-          </div>
-          <div id="play-hub-filters" class="play-hub-filters" role="group" data-i18n-aria-label="modals.play.filters.aria">
-            <button type="button" class="play-hub-filter-chip" data-arcade-filter="all" aria-pressed="true" data-i18n="modals.play.filters.all"></button>
-            <button type="button" class="play-hub-filter-chip" data-arcade-filter="unlocked" aria-pressed="false" data-i18n="modals.play.filters.unlocked"></button>
-            <button type="button" class="play-hub-filter-chip" data-arcade-filter="quick" aria-pressed="false" data-i18n="modals.play.filters.quick"></button>
-            <button type="button" class="play-hub-filter-chip" data-arcade-filter="endless" aria-pressed="false" data-i18n="modals.play.filters.endless"></button>
-            <button type="button" class="play-hub-filter-chip" data-arcade-filter="unmastered" aria-pressed="false" data-i18n="modals.play.filters.unmastered"></button>
-          </div>
-          <div class="play-hub-grid">
-            <h4 class="play-hub-subhead" data-i18n="modals.play.arcadeSubhead.core"></h4>
-            <button id="btn-endless" type="button" class="arcade-mode-card">
+          </section>
+        </div>
+        <div id="play-pane-arcade" class="play-hub-pane hidden" role="tabpanel" aria-labelledby="tab-play-arcade">
+          <section class="play-hub-section play-hub-arcade" aria-labelledby="play-section-arcade-title">
+            <div class="play-hub-arcade-head">
+              <h3 id="play-section-arcade-title" class="play-section-title" data-i18n="modals.play.section.arcade"></h3>
+              <div class="play-hub-head-actions">
+                <button id="btn-puzzle-builder" type="button" class="nav-btn badge-btn play-hub-smart-btn" aria-haspopup="dialog" data-i18n="modals.puzzleBuilder.openButton"></button>
+                <button id="btn-play-next-unmastered" type="button" class="nav-btn badge-btn play-hub-smart-btn hidden"></button>
+              </div>
+            </div>
+            <div id="play-hub-filters" class="play-hub-filters" role="group" data-i18n-aria-label="modals.play.filters.aria">
+              <button type="button" class="play-hub-filter-chip" data-arcade-filter="all" aria-pressed="true" data-i18n="modals.play.filters.all"></button>
+              <button type="button" class="play-hub-filter-chip" data-arcade-filter="unlocked" aria-pressed="false" data-i18n="modals.play.filters.unlocked"></button>
+              <button type="button" class="play-hub-filter-chip" data-arcade-filter="quick" aria-pressed="false" data-i18n="modals.play.filters.quick"></button>
+              <button type="button" class="play-hub-filter-chip" data-arcade-filter="endless" aria-pressed="false" data-i18n="modals.play.filters.endless"></button>
+              <button type="button" class="play-hub-filter-chip" data-arcade-filter="unmastered" aria-pressed="false" data-i18n="modals.play.filters.unmastered"></button>
+            </div>
+            <div class="play-hub-grid">
+              <h4 class="play-hub-subhead" data-arcade-group="core" data-i18n="modals.play.arcadeSubhead.core"></h4>
+              <button id="btn-endless" type="button" class="arcade-mode-card">
                 <span class="arcade-card-icon" aria-hidden="true" data-i18n="modals.play.icon.endless"></span>
                 <span class="arcade-card-title" data-i18n="app.nav.button.endless"></span>
                 <span class="arcade-card-desc" data-i18n="modals.play.arcade.endlessDesc"></span>
                 <span id="arcade-best-endless" class="arcade-card-best gold-text"></span>
               </button>
-            <button id="btn-mode-classic" type="button" class="arcade-mode-card">
+              <button id="btn-mode-classic" type="button" class="arcade-mode-card">
                 <span class="arcade-card-icon" aria-hidden="true" data-i18n="modals.play.icon.classic"></span>
                 <span class="arcade-card-title" data-i18n="modals.levelSelect.arcade.classic"></span>
                 <span class="arcade-card-desc" data-i18n="modals.levelSelect.arcade.classicDesc"></span>
                 <span id="arcade-best-classic" class="arcade-card-best gold-text"></span>
               </button>
-            <div class="play-hub-cell">
-              <button id="btn-mode-puzzle" type="button" class="arcade-mode-card">
-                <span class="arcade-card-icon" aria-hidden="true" data-i18n="modals.play.icon.puzzle"></span>
-                <span class="arcade-card-title" data-i18n="modals.levelSelect.arcade.puzzle"></span>
-                <span class="arcade-card-desc" data-i18n="modals.levelSelect.arcade.puzzleDesc"></span>
-                <span id="arcade-best-puzzle" class="arcade-card-best gold-text"></span>
-              </button>
-              <button id="btn-puzzle-stages-toggle" type="button" class="nav-btn badge-btn arcade-card-toggle" aria-expanded="false" aria-controls="puzzle-stages-strip" data-i18n="modals.play.puzzle.stagesToggle"></button>
-            </div>
-            <button id="btn-mode-blitz" type="button" class="arcade-mode-card">
+              <div class="play-hub-cell">
+                <button id="btn-mode-puzzle" type="button" class="arcade-mode-card">
+                  <span class="arcade-card-icon" aria-hidden="true" data-i18n="modals.play.icon.puzzle"></span>
+                  <span class="arcade-card-title" data-i18n="modals.levelSelect.arcade.puzzle"></span>
+                  <span class="arcade-card-desc" data-i18n="modals.levelSelect.arcade.puzzleDesc"></span>
+                  <span id="arcade-best-puzzle" class="arcade-card-best gold-text"></span>
+                </button>
+                <button id="btn-puzzle-stages-toggle" type="button" class="nav-btn badge-btn arcade-card-toggle" aria-expanded="false" aria-controls="puzzle-stages-strip" data-i18n="modals.play.puzzle.stagesToggle"></button>
+              </div>
+              <button id="btn-mode-blitz" type="button" class="arcade-mode-card">
                 <span class="arcade-card-icon" aria-hidden="true" data-i18n="modals.play.icon.blitz"></span>
                 <span class="arcade-card-title" data-i18n="modals.levelSelect.arcade.blitz"></span>
                 <span class="arcade-card-desc" data-i18n="modals.levelSelect.arcade.blitzDesc"></span>
                 <span id="arcade-best-blitz" class="arcade-card-best gold-text"></span>
               </button>
-            <div class="play-hub-cell">
-              <button id="btn-flux" type="button" class="arcade-mode-card">
-                <span class="arcade-card-icon" aria-hidden="true" data-i18n="modals.play.icon.flux"></span>
-                <span class="arcade-card-title" data-i18n="app.nav.button.flux"></span>
-                <span class="arcade-card-desc" data-i18n="modals.play.arcade.fluxDesc"></span>
-                <span id="arcade-best-flux" class="arcade-card-best gold-text"></span>
-              </button>
-              <button id="btn-flux-seed-toggle" type="button" class="nav-btn badge-btn arcade-card-toggle" aria-expanded="false" aria-controls="flux-seed-entry" data-i18n="modals.play.flux.seedToggle"></button>
-            </div>
-            <button id="btn-mode-cascade" type="button" class="arcade-mode-card">
+              <div class="play-hub-cell">
+                <button id="btn-flux" type="button" class="arcade-mode-card">
+                  <span class="arcade-card-icon" aria-hidden="true" data-i18n="modals.play.icon.flux"></span>
+                  <span class="arcade-card-title" data-i18n="app.nav.button.flux"></span>
+                  <span class="arcade-card-desc" data-i18n="modals.play.arcade.fluxDesc"></span>
+                  <span id="arcade-best-flux" class="arcade-card-best gold-text"></span>
+                </button>
+                <button id="btn-flux-seed-toggle" type="button" class="nav-btn badge-btn arcade-card-toggle" aria-expanded="false" aria-controls="flux-seed-entry" data-i18n="modals.play.flux.seedToggle"></button>
+              </div>
+              <button id="btn-mode-cascade" type="button" class="arcade-mode-card">
                 <span class="arcade-card-icon" aria-hidden="true" data-i18n="modals.play.icon.cascade"></span>
                 <span class="arcade-card-title" data-i18n="modals.levelSelect.arcade.cascade"></span>
                 <span class="arcade-card-desc" data-i18n="modals.levelSelect.arcade.cascadeDesc"></span>
                 <span id="arcade-best-cascade" class="arcade-card-best gold-text"></span>
               </button>
-            <button id="btn-mode-boss-rush" type="button" class="arcade-mode-card">
+              <button id="btn-mode-boss-rush" type="button" class="arcade-mode-card">
                 <span class="arcade-card-icon" aria-hidden="true" data-i18n="modals.play.icon.bossRush"></span>
                 <span class="arcade-card-title" data-i18n="modals.levelSelect.arcade.bossRush"></span>
                 <span class="arcade-card-desc" data-i18n="modals.levelSelect.arcade.bossRushDesc"></span>
                 <span id="arcade-best-boss-rush" class="arcade-card-best gold-text"></span>
               </button>
-            <h4 class="play-hub-subhead" data-i18n="modals.play.arcadeSubhead.labs"></h4>
-            <button id="btn-mode-hex-grid" type="button" class="arcade-mode-card">
+              <h4 class="play-hub-subhead" data-arcade-group="labs" data-i18n="modals.play.arcadeSubhead.labs"></h4>
+              <button id="btn-mode-hex-grid" type="button" class="arcade-mode-card">
                 <span class="arcade-card-icon" aria-hidden="true" data-i18n="modals.play.icon.hexGrid"></span>
                 <span class="arcade-card-title" data-i18n="modals.levelSelect.arcade.hexGrid"></span>
                 <span class="arcade-card-desc" data-i18n="modals.levelSelect.arcade.hexGridDesc"></span>
                 <span id="arcade-best-hex-grid" class="arcade-card-best gold-text"></span>
               </button>
-            <button id="btn-mode-pinball" type="button" class="arcade-mode-card">
+              <button id="btn-mode-pinball" type="button" class="arcade-mode-card">
                 <span class="arcade-card-icon" aria-hidden="true" data-i18n="modals.play.icon.pinball"></span>
                 <span class="arcade-card-title" data-i18n="modals.levelSelect.arcade.pinball"></span>
                 <span class="arcade-card-desc" data-i18n="modals.levelSelect.arcade.pinballDesc"></span>
                 <span id="arcade-best-pinball" class="arcade-card-best gold-text"></span>
               </button>
-            <button id="btn-mode-orbital" type="button" class="arcade-mode-card">
+              <button id="btn-mode-orbital" type="button" class="arcade-mode-card">
                 <span class="arcade-card-icon" aria-hidden="true" data-i18n="modals.play.icon.orbital"></span>
                 <span class="arcade-card-title" data-i18n="modals.levelSelect.arcade.orbital"></span>
                 <span class="arcade-card-desc" data-i18n="modals.levelSelect.arcade.orbitalDesc"></span>
                 <span id="arcade-best-orbital" class="arcade-card-best gold-text"></span>
               </button>
-            <button id="btn-mode-convoy" type="button" class="arcade-mode-card">
+              <button id="btn-mode-convoy" type="button" class="arcade-mode-card">
                 <span class="arcade-card-icon" aria-hidden="true" data-i18n="modals.play.icon.convoy"></span>
                 <span class="arcade-card-title" data-i18n="modals.levelSelect.arcade.convoy"></span>
                 <span class="arcade-card-desc" data-i18n="modals.levelSelect.arcade.convoyDesc"></span>
                 <span id="arcade-best-convoy" class="arcade-card-best gold-text"></span>
               </button>
-            <button id="btn-mode-merge" type="button" class="arcade-mode-card">
+              <button id="btn-mode-merge" type="button" class="arcade-mode-card">
                 <span class="arcade-card-icon" aria-hidden="true" data-i18n="modals.play.icon.merge"></span>
                 <span class="arcade-card-title" data-i18n="modals.levelSelect.arcade.merge"></span>
                 <span class="arcade-card-desc" data-i18n="modals.levelSelect.arcade.mergeDesc"></span>
                 <span id="arcade-best-merge" class="arcade-card-best gold-text"></span>
               </button>
-            <button id="btn-mode-slingshot" type="button" class="arcade-mode-card">
+              <button id="btn-mode-slingshot" type="button" class="arcade-mode-card">
                 <span class="arcade-card-icon" aria-hidden="true" data-i18n="modals.play.icon.slingshot"></span>
                 <span class="arcade-card-title" data-i18n="modals.levelSelect.arcade.slingshot"></span>
                 <span class="arcade-card-desc" data-i18n="modals.levelSelect.arcade.slingshotDesc"></span>
                 <span id="arcade-best-slingshot" class="arcade-card-best gold-text"></span>
               </button>
-          </div>
-          <div id="play-hub-filter-empty" class="play-hub-filter-empty hidden" role="status" aria-live="polite">
-            <span id="play-hub-filter-empty-text"></span>
-            <button id="btn-play-hub-reset-filter" type="button" class="nav-btn badge-btn" data-i18n="modals.play.filters.all"></button>
-          </div>
-          <div id="puzzle-stages-strip" class="puzzle-stages-strip play-disclosure hidden" role="group" data-i18n-aria-label="modals.play.puzzle.stagesToggle"></div>
-          <div id="flux-seed-entry" class="flux-seed-entry play-disclosure hidden">
-            <input id="input-flux-seed" type="text" class="flux-seed-input" autocomplete="off" spellcheck="false" data-i18n-placeholder="modals.levelSelect.fluxSeed.placeholder" data-i18n-aria-label="modals.levelSelect.fluxSeed.ariaLabel">
-            <button id="btn-flux-seed-go" type="button" class="nav-btn badge-btn" data-i18n="modals.levelSelect.fluxSeed.launch"></button>
-            <p id="flux-seed-error" class="flux-seed-error hidden"></p>
-          </div>
-          <div id="play-mutator-lab" class="play-mutator-lab">
+            </div>
+            <div id="play-hub-filter-empty" class="play-hub-filter-empty hidden" role="status" aria-live="polite">
+              <span id="play-hub-filter-empty-text"></span>
+              <button id="btn-play-hub-reset-filter" type="button" class="nav-btn badge-btn" data-i18n="modals.play.filters.all"></button>
+            </div>
+            <div id="puzzle-stages-strip" class="puzzle-stages-strip play-disclosure hidden" role="group" data-i18n-aria-label="modals.play.puzzle.stagesToggle"></div>
+            <div id="flux-seed-entry" class="flux-seed-entry play-disclosure hidden">
+              <input id="input-flux-seed" type="text" class="flux-seed-input" autocomplete="off" spellcheck="false" data-i18n-placeholder="modals.levelSelect.fluxSeed.placeholder" data-i18n-aria-label="modals.levelSelect.fluxSeed.ariaLabel">
+              <button id="btn-flux-seed-go" type="button" class="nav-btn badge-btn" data-i18n="modals.levelSelect.fluxSeed.launch"></button>
+              <p id="flux-seed-error" class="flux-seed-error hidden"></p>
+            </div>
+          </section>
+        </div>
+        <div id="play-pane-duel" class="play-hub-pane hidden" role="tabpanel" aria-labelledby="tab-play-duel">
+          <section class="play-hub-section play-hub-duel" aria-labelledby="play-section-duel-title">
+            <h3 id="play-section-duel-title" class="play-section-title" data-i18n="modals.play.section.duel"></h3>
+            <div class="play-hub-grid">
+              <button id="btn-mode-versus" type="button" class="arcade-mode-card" aria-haspopup="dialog">
+                <span class="arcade-card-icon" aria-hidden="true" data-i18n="modals.play.icon.versus"></span>
+                <span class="arcade-card-title" data-i18n="versus.card.title"></span>
+                <span class="arcade-card-desc" data-i18n="versus.card.description"></span>
+                <span id="arcade-best-versus" class="arcade-card-best gold-text"></span>
+              </button>
+              <button id="btn-versus-local-hub" type="button" class="modal-btn hidden" aria-haspopup="dialog" data-i18n="versus.local.entry"></button>
+              <p id="versus-local-hub-hint" class="modal-subtext hidden" data-i18n="versus.local.entryHint"></p>
+            </div>
+          </section>
+          <section id="play-mutator-lab" class="play-hub-section play-mutator-lab" aria-labelledby="btn-mutator-lab-toggle">
             <div class="play-mutator-lab-head">
               <button id="btn-mutator-lab-toggle" type="button" class="nav-btn badge-btn" aria-expanded="false" aria-controls="mutator-lab-panel" data-i18n="modals.play.mutatorLab.toggle"></button>
               <span id="mutator-lab-mult" class="play-mutator-lab-mult"></span>
@@ -391,21 +415,8 @@
                 <button id="btn-lab-classic" type="button" class="modal-btn" data-i18n="modals.play.mutatorLab.launchClassic"></button>
               </div>
             </div>
-          </div>
-        </section>
-        <section class="play-hub-section play-hub-duel" aria-labelledby="play-section-duel-title">
-          <h3 id="play-section-duel-title" class="play-section-title" data-i18n="modals.play.section.duel"></h3>
-          <div class="play-hub-grid">
-            <button id="btn-mode-versus" type="button" class="arcade-mode-card" aria-haspopup="dialog">
-                <span class="arcade-card-icon" aria-hidden="true" data-i18n="modals.play.icon.versus"></span>
-                <span class="arcade-card-title" data-i18n="versus.card.title"></span>
-                <span class="arcade-card-desc" data-i18n="versus.card.description"></span>
-                <span id="arcade-best-versus" class="arcade-card-best gold-text"></span>
-              </button>
-              <button id="btn-versus-local-hub" type="button" class="modal-btn hidden" aria-haspopup="dialog" data-i18n="versus.local.entry"></button>
-              <p id="versus-local-hub-hint" class="modal-subtext hidden" data-i18n="versus.local.entryHint"></p>
-          </div>
-        </section>
+          </section>
+        </div>
       </div>
     </div>
   </div>

@@ -1978,6 +1978,12 @@
     },
     "play": {
       "title": "Play",
+      "tabs": {
+        "aria": "Play sections",
+        "featured": "Featured",
+        "arcade": "Arcade",
+        "duel": "Duel & Lab"
+      },
       "section": {
         "campaign": "Campaign",
         "challenges": "Challenges",

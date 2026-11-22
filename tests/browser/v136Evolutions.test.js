@@ -58,6 +58,7 @@ describe('v1.36 / v1.37 browser E2E flows', () => {
     assert.equal(weeklyItems, 3, 'Weekly Mastery Trio should display 3 objectives');
 
     // 2. Mutator Lab: toggle, pick 2 mutators -> x1.5 -> launch Survival -> Lab x1.5 in HUD
+    await page.click('#tab-play-duel');
     await page.click('#btn-mutator-lab-toggle');
     await page.waitForSelector('#mutator-lab-panel:not(.hidden)');
     await page.click('[data-lab-mutator="hyperGravity"]');
@@ -77,6 +78,7 @@ describe('v1.36 / v1.37 browser E2E flows', () => {
     // 3. Puzzle Builder v3: place sphere + free bumper -> Save to My Puzzles -> Clear -> Reload -> Play
     await page.click('#hud-mode-banner');
     await page.waitForSelector('#modal-play:not(.hidden)');
+    await page.click('#tab-play-arcade');
     await page.click('#btn-puzzle-builder');
     await page.waitForSelector('#modal-puzzle-builder:not(.hidden)');
 

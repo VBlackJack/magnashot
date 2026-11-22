@@ -361,6 +361,8 @@ const EXPECTED_PROTOTYPE_NAMES = [
   'collapsePlayHubDisclosures',
   'syncPlayHubVersusLocal',
   'openPlayHubVersusLocal',
+  'getPlayHubTabs',
+  'switchPlayHubTab',
   'openPlayHub',
   'getStatusHintTarget',
   'stepLevelChapter',

@@ -153,16 +153,19 @@
     padding: 4px 6px;
     font-size: 0.78rem;
   }
-  #modal-shop .modal-tabs {
+  #modal-shop .modal-tabs,
+  #modal-play .modal-tabs {
     flex-wrap: nowrap;
     overflow-x: auto;
     scrollbar-width: none;
     -webkit-overflow-scrolling: touch;
   }
-  #modal-shop .modal-tabs::-webkit-scrollbar {
+  #modal-shop .modal-tabs::-webkit-scrollbar,
+  #modal-play .modal-tabs::-webkit-scrollbar {
     display: none;
   }
-  #modal-shop .modal-tab {
+  #modal-shop .modal-tab,
+  #modal-play .modal-tab {
     flex: 0 0 auto;
     white-space: nowrap;
     padding: 4px 10px;
@@ -1045,8 +1048,17 @@
 
 /* Play hub and campaign map breakpoints, after the shared phone rules they extend. */
 @media (min-width: 681px) {
+  .play-hub-challenges {
+    --play-hub-columns: 3;
+  }
   .play-hub-arcade {
     --play-hub-columns: 3;
+  }
+  .play-hub-duel {
+    --play-hub-columns: 2;
+  }
+  .play-hub-duel:has(#btn-versus-local-hub.hidden) {
+    --play-hub-columns: 1;
   }
   .play-bounties-row {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1054,38 +1066,11 @@
   }
 }
 
-@media (min-width: 900px) {
-  .play-hub-layout {
-    grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
-    grid-template-rows: auto;
-    grid-template-areas:
-      'campaign duel'
-      'challenges challenges'
-      'arcade arcade';
-  }
-  .play-hub-campaign {
-    grid-area: campaign;
-  }
-  .play-hub-challenges {
-    grid-area: challenges;
-    --play-hub-columns: 3;
-  }
-  .play-hub-arcade {
-    grid-area: arcade;
-    --play-hub-columns: 4;
-  }
-  .play-hub-duel {
-    grid-area: duel;
-    align-self: stretch;
-    --play-hub-columns: 2;
-  }
-  .play-hub-duel:has(#btn-versus-local-hub.hidden) {
-    --play-hub-columns: 1;
-  }
-}
-
 /* Phones: unlocked cards keep a single-line hint; locked cards keep up to three lines so the unlock rule never clips. */
 @media (max-width: 680px), (orientation: landscape) and (max-height: 500px) {
+  .play-hub-arcade {
+    --play-hub-columns: 2;
+  }
   .arcade-mode-card .arcade-card-desc {
     display: -webkit-box;
     -webkit-box-orient: vertical;
@@ -1109,35 +1094,23 @@
   }
 }
 
-/* Short landscape: two columns, Campaign and Challenges on the left, Arcade and Duel on the right. */
+/* Short landscape: compact vertical padding inside tabbed panes. */
 @media (orientation: landscape) and (max-height: 500px) {
-  .play-hub-layout {
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-    grid-template-areas:
-      'campaign arcade'
-      'challenges arcade'
-      'challenges duel';
-    gap: 8px;
-  }
   .play-hub-section {
     gap: 6px;
-    padding: 6px 8px;
-  }
-  .play-hub-campaign {
-    grid-area: campaign;
+    padding: 8px 10px;
   }
   .play-hub-challenges {
-    grid-area: challenges;
-    --play-hub-columns: 2;
+    --play-hub-columns: 3;
   }
   .play-hub-arcade {
-    grid-area: arcade;
-    --play-hub-columns: 2;
+    --play-hub-columns: 3;
   }
   .play-hub-duel {
-    grid-area: duel;
-    align-self: start;
     --play-hub-columns: 2;
+  }
+  .play-hub-duel:has(#btn-versus-local-hub.hidden) {
+    --play-hub-columns: 1;
   }
 }
 

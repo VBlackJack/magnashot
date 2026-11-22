@@ -50,6 +50,39 @@ export const CONTINUE_KINDS = Object.freeze({
   MAP: 'map'
 });
 
+/** Tabs of the Play hub dialog. */
+export const PLAY_HUB_TABS = Object.freeze({
+  FEATURED: 'featured',
+  ARCADE: 'arcade',
+  DUEL: 'duel'
+});
+
+/** Arcade modes grouped by subhead (excludes Versus and Weekly which live in other tabs). */
+const ARCADE_GROUPS = Object.freeze({
+  core: Object.freeze([
+    GAME_MODES.ENDLESS,
+    GAME_MODES.CLASSIC,
+    GAME_MODES.PUZZLE,
+    GAME_MODES.BLITZ,
+    GAME_MODES.FLUX,
+    GAME_MODES.CASCADE,
+    GAME_MODES.BOSS_RUSH
+  ]),
+  labs: Object.freeze([
+    GAME_MODES.HEX_GRID,
+    GAME_MODES.PINBALL,
+    GAME_MODES.ORBITAL,
+    GAME_MODES.CONVOY,
+    GAME_MODES.MERGE,
+    GAME_MODES.SLINGSHOT
+  ])
+});
+
+const ARCADE_TAB_MODES = Object.freeze([
+  ...ARCADE_GROUPS.core,
+  ...ARCADE_GROUPS.labs
+]);
+
 /** Disclosure names, each with the toggle button and the panel it shows (UIManager.elements keys). */
 export const PLAY_HUB_DISCLOSURES = Object.freeze({
   puzzle: Object.freeze({ toggle: 'btnPuzzleStagesToggle', panel: 'puzzleStagesStrip' }),
@@ -116,7 +149,7 @@ export function cardElementKeyForMode(modeKey) {
   if (modeKey === WEEKLY_ACCESS_KEY) {
     return WEEKLY_CARD_KEY;
   }
-  return MODE_BUTTON_KEYS[modeKey]?.[0] ?? null;
+  return MODE_BUTTON_KEYS[modeKey]?.[0] ?? ARCADE_CARD_SPECS[modeKey]?.card ?? null;
 }
 
 /**
@@ -135,6 +168,26 @@ export function resolveInitialFocusKey({ engine, access, weekKey }) {
     return CONTINUE_KEY;
   }
   return cardKey;
+}
+
+/**
+ * Maps a resolved initial focus element key to the Play hub tab that contains it.
+ * @param {string|null|undefined} focusKey - UIManager.elements key.
+ * @returns {string} One of PLAY_HUB_TABS.
+ */
+export function resolvePlayHubTabForFocusKey(focusKey) {
+  if (!focusKey) {
+    return PLAY_HUB_TABS.FEATURED;
+  }
+  if (focusKey === ARCADE_CARD_SPECS[GAME_MODES.VERSUS]?.card) {
+    return PLAY_HUB_TABS.DUEL;
+  }
+  for (const mode of ARCADE_TAB_MODES) {
+    if (ARCADE_CARD_SPECS[mode]?.card === focusKey) {
+      return PLAY_HUB_TABS.ARCADE;
+    }
+  }
+  return PLAY_HUB_TABS.FEATURED;
 }
 
 /**
@@ -625,18 +678,44 @@ function syncPlayHubFilterEmptyState(visibleCount, activeFilter) {
   }
 }
 
-function applyPlayHubArcadeFilter(els, filter, mastery, access) {
-  const activeFilter = Object.values(PLAY_HUB_FILTERS).includes(filter) ? filter : PLAY_HUB_FILTERS.ALL;
-  let visibleCount = 0;
-  for (const [mode, spec] of Object.entries(ARCADE_CARD_SPECS)) {
+function syncArcadeSubheadsVisibility(groupVisibleCounts) {
+  if (typeof document === 'undefined' || typeof document.querySelectorAll !== 'function') {
+    return;
+  }
+  for (const subhead of document.querySelectorAll('[data-arcade-group]')) {
+    const group = subhead.dataset?.arcadeGroup;
+    if (group && Object.hasOwn(groupVisibleCounts, group)) {
+      subhead.classList.toggle(HIDDEN_CLASS, groupVisibleCounts[group] === 0);
+    }
+  }
+}
+
+function applyArcadeGroupFilter(els, modes, activeFilter, mastery, access) {
+  let groupVisible = 0;
+  for (const mode of modes) {
+    const spec = ARCADE_CARD_SPECS[mode];
+    if (!spec) {
+      continue;
+    }
     const wrapper = getArcadeCardWrapper(els?.[spec.card]);
     const unlocked = access ? isModeUnlocked(access, mode) : true;
     const isMatch = matchesArcadeFilter(mode, activeFilter, mastery[mode], unlocked);
     wrapper?.classList?.toggle(HIDDEN_CLASS, !isMatch);
     if (isMatch) {
-      visibleCount += 1;
+      groupVisible += 1;
     }
   }
+  return groupVisible;
+}
+
+function applyPlayHubArcadeFilter(els, filter, mastery, access) {
+  const activeFilter = Object.values(PLAY_HUB_FILTERS).includes(filter) ? filter : PLAY_HUB_FILTERS.ALL;
+  const groupVisibleCounts = {
+    core: applyArcadeGroupFilter(els, ARCADE_GROUPS.core, activeFilter, mastery, access),
+    labs: applyArcadeGroupFilter(els, ARCADE_GROUPS.labs, activeFilter, mastery, access)
+  };
+  const visibleCount = groupVisibleCounts.core + groupVisibleCounts.labs;
+  syncArcadeSubheadsVisibility(groupVisibleCounts);
   const filterBar = typeof document !== 'undefined' ? document.getElementById?.('play-hub-filters') : null;
   for (const chip of filterBar?.querySelectorAll?.('[data-arcade-filter]') ?? []) {
     setAttributeIfChanged(chip, 'aria-pressed', String(chip.dataset.arcadeFilter === activeFilter));
@@ -876,6 +955,16 @@ function refreshPlayHubMastery(els, storage, gameConfig, filter = PLAY_HUB_FILTE
   refreshDailyPuzzleChip(storage, gameConfig);
   refreshPlayHubSpotlight(els, storage, gameConfig);
   refreshRecentModesBar(els, storage, gameConfig);
+}
+
+function resolvePlayHubOpenFocus(els, focusKey, expand, expanded) {
+  const fallback = els[focusKey] || els[CONTINUE_KEY] || els.btnClosePlay;
+  if (!expanded) {
+    return fallback;
+  }
+  const target = PLAY_HUB_DISCLOSURES[expand];
+  const panel = els[target.panel];
+  return panel?.querySelector?.('.puzzle-stage-btn.active, input') || els[target.toggle] || fallback;
 }
 
 /** Methods installed on UIManager (see installMethods). `this` is the UIManager. */
@@ -1123,6 +1212,34 @@ export const uiPlayHubMethods = {
     });
   },
 
+  /** The Play hub tabs in display order, each with its tab button and panel. */
+  getPlayHubTabs() {
+    const els = this.elements || {};
+    return [
+      { name: PLAY_HUB_TABS.FEATURED, el: els.tabPlayFeatured, pane: els.playPaneFeatured },
+      { name: PLAY_HUB_TABS.ARCADE, el: els.tabPlayArcade, pane: els.playPaneArcade },
+      { name: PLAY_HUB_TABS.DUEL, el: els.tabPlayDuel, pane: els.playPaneDuel }
+    ].filter((tab) => tab.el && tab.pane);
+  },
+
+  /** Switches the active Play hub tab and resets scroll to the top of the card. */
+  switchPlayHubTab(tabName) {
+    const tabs = this.getPlayHubTabs();
+    const resolved = tabs.some((tab) => tab.name === tabName) ? tabName : PLAY_HUB_TABS.FEATURED;
+    this.activePlayHubTab = resolved;
+    for (const { name, el, pane } of tabs) {
+      const isActive = name === resolved;
+      el.classList.toggle('active', isActive);
+      el.setAttribute('aria-selected', String(isActive));
+      el.tabIndex = isActive ? 0 : -1;
+      pane.classList.toggle(HIDDEN_CLASS, !isActive);
+    }
+    const card = this.elements?.modalPlay?.querySelector?.('.modal-card');
+    if (card && typeof card.scrollTop === 'number') {
+      card.scrollTop = 0;
+    }
+  },
+
   /**
    * Opens the Play hub over the run.
    * @param {{expand?: 'puzzle'|'seed'}} [options] - A disclosure to open at once.
@@ -1130,21 +1247,27 @@ export const uiPlayHubMethods = {
   openPlayHub({ expand } = {}) {
     const els = this.elements;
     els.playHubHint?.classList.add(HIDDEN_CLASS);
+    const access = this.getModeAccess();
+    const focusKey = resolveInitialFocusKey({
+      engine: this.engine,
+      access,
+      weekKey: getUtcIsoWeekKey(Date.now())
+    });
+    const initialTabFromFocus = resolvePlayHubTabForFocusKey(focusKey);
+    const expectsArcade = Boolean(expand && PLAY_HUB_DISCLOSURES[expand]) || initialTabFromFocus === PLAY_HUB_TABS.ARCADE;
+    if (expectsArcade && this.playHubFilter && this.playHubFilter !== PLAY_HUB_FILTERS.ALL) {
+      this.playHubFilter = PLAY_HUB_FILTERS.ALL;
+    }
     this.refreshPlayHubRecords();
     this.refreshVersusCard();
     this.renderPuzzleStagesStrip();
-    this.refreshModeLocks(this.getModeAccess());
+    this.refreshModeLocks(access);
     this.refreshPlayHubCampaign();
     this.collapsePlayHubDisclosures();
     const expanded = expand ? this.togglePlayHubDisclosure(expand, true) : false;
     this.syncPlayHubVersusLocal();
-    let focusTarget = this.getPlayHubInitialFocus();
-    if (expanded) {
-      const target = PLAY_HUB_DISCLOSURES[expand];
-      const panel = els[target.panel];
-      focusTarget =
-        panel?.querySelector?.('.puzzle-stage-btn.active, input') || els[target.toggle] || focusTarget;
-    }
+    this.switchPlayHubTab?.(expanded ? PLAY_HUB_TABS.ARCADE : initialTabFromFocus);
+    const focusTarget = resolvePlayHubOpenFocus(els, focusKey, expand, expanded);
     this.openOverlayModal(els.modalPlay, focusTarget);
   }
 };
