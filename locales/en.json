@@ -1994,7 +1994,9 @@
         "unlocked": "Unlocked",
         "quick": "Quick",
         "endless": "Endless",
-        "unmastered": "Unmastered"
+        "unmastered": "Unmastered",
+        "emptyUnlocked": "No arcade mode unlocked yet. Clear campaign levels to unlock new modes.",
+        "emptyGeneric": "No arcade modes match this filter."
       },
       "smartPick": {
         "nextUnmastered": "Next to master: {{mode}}"

@@ -673,6 +673,24 @@
   color: var(--text-bright);
 }
 
+.play-hub-filter-empty {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px dashed var(--border-strong);
+  background: var(--surface-raised);
+  color: var(--text-secondary);
+  font-size: var(--caption-font-size);
+}
+
+.play-hub-filter-empty.hidden {
+  display: none;
+}
+
 .play-hub-title-group {
   display: inline-flex;
   align-items: center;

@@ -1994,7 +1994,9 @@
         "unlocked": "Débloqués",
         "quick": "Rapide",
         "endless": "Infini",
-        "unmastered": "À maîtriser"
+        "unmastered": "À maîtriser",
+        "emptyUnlocked": "Aucun mode Arcade débloqué pour l'instant. Terminez des niveaux de campagne pour en ouvrir.",
+        "emptyGeneric": "Aucun mode Arcade ne correspond à ce filtre."
       },
       "smartPick": {
         "nextUnmastered": "Prochain à maîtriser : {{mode}}"

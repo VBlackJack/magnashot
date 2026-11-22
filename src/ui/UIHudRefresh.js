@@ -200,13 +200,18 @@ function refreshHeaderMetrics(ui, engine) {
   );
 
   const affordableCount = ui.getAffordableUpgradeCount();
-  setTextIfChanged(
-    ui.elements.btnShop,
-    affordableCount > 0
-      ? t('app.nav.button.shopBadge', { count: formatNumber(affordableCount) })
-      : t('app.nav.button.shop')
-  );
+  const shopLabel = affordableCount > 0
+    ? t('app.nav.button.shopBadge', { count: formatNumber(affordableCount) })
+    : t('app.nav.button.shop');
+  setTextIfChanged(ui.elements.btnShop, shopLabel);
   ui.elements.btnShop.classList.toggle('has-affordable', affordableCount > 0);
+  if (typeof document !== 'undefined' && typeof document.getElementById === 'function') {
+    const quickShop = document.getElementById('btn-quick-shop');
+    if (quickShop) {
+      setTextIfChanged(quickShop, shopLabel);
+      quickShop.classList.toggle('has-affordable', affordableCount > 0);
+    }
+  }
 }
 
 function setModeButtonActiveState(button, isActive) {
@@ -1449,6 +1454,10 @@ export const uiHudRefreshMethods = {
   refreshPlayNewBadge(isAnyModeNew) {
     const button = this.elements.btnPlay;
     this.elements.playNewBadge?.classList.toggle('hidden', !isAnyModeNew);
+    if (typeof document !== 'undefined' && typeof document.getElementById === 'function') {
+      document.getElementById('quick-play-new-badge')?.classList.toggle('hidden', !isAnyModeNew);
+      document.getElementById('btn-quick-play')?.classList.toggle(MODE_NEW_CLASS, isAnyModeNew);
+    }
     if (!button) {
       return;
     }

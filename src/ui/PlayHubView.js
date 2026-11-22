@@ -603,17 +603,45 @@ function getArcadeCardWrapper(card) {
   return card?.closest?.('.play-hub-cell') || card;
 }
 
+function syncPlayHubFilterEmptyState(visibleCount, activeFilter) {
+  if (typeof document === 'undefined' || typeof document.getElementById !== 'function') {
+    return;
+  }
+  const emptyBox = document.getElementById('play-hub-filter-empty');
+  if (!emptyBox) {
+    return;
+  }
+  const isEmpty = visibleCount === 0;
+  emptyBox.classList.toggle(HIDDEN_CLASS, !isEmpty);
+  if (!isEmpty) {
+    return;
+  }
+  const emptyText = document.getElementById('play-hub-filter-empty-text');
+  if (emptyText) {
+    const key = activeFilter === PLAY_HUB_FILTERS.UNLOCKED
+      ? 'modals.play.filters.emptyUnlocked'
+      : 'modals.play.filters.emptyGeneric';
+    setTextIfChanged(emptyText, t(key));
+  }
+}
+
 function applyPlayHubArcadeFilter(els, filter, mastery, access) {
   const activeFilter = Object.values(PLAY_HUB_FILTERS).includes(filter) ? filter : PLAY_HUB_FILTERS.ALL;
+  let visibleCount = 0;
   for (const [mode, spec] of Object.entries(ARCADE_CARD_SPECS)) {
     const wrapper = getArcadeCardWrapper(els?.[spec.card]);
     const unlocked = access ? isModeUnlocked(access, mode) : true;
-    wrapper?.classList?.toggle(HIDDEN_CLASS, !matchesArcadeFilter(mode, activeFilter, mastery[mode], unlocked));
+    const isMatch = matchesArcadeFilter(mode, activeFilter, mastery[mode], unlocked);
+    wrapper?.classList?.toggle(HIDDEN_CLASS, !isMatch);
+    if (isMatch) {
+      visibleCount += 1;
+    }
   }
   const filterBar = typeof document !== 'undefined' ? document.getElementById?.('play-hub-filters') : null;
   for (const chip of filterBar?.querySelectorAll?.('[data-arcade-filter]') ?? []) {
     setAttributeIfChanged(chip, 'aria-pressed', String(chip.dataset.arcadeFilter === activeFilter));
   }
+  syncPlayHubFilterEmptyState(visibleCount, activeFilter);
 }
 
 function refreshSmartPickButton(storage, gameConfig) {

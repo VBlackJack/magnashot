@@ -141,7 +141,7 @@
     </section>
 
     <nav id="desktop-quick-actions" class="desktop-quick-actions" data-i18n-aria-label="app.nav.groups.quickActions">
-      <button id="btn-quick-play" type="button" class="nav-btn primary" aria-haspopup="dialog" data-i18n="app.drawer.button.play"></button>
+      <button id="btn-quick-play" type="button" class="nav-btn primary" aria-haspopup="dialog"><span data-i18n="app.drawer.button.play"></span> <span id="quick-play-new-badge" class="mode-new-badge hidden" aria-hidden="true" data-i18n="app.nav.locked.newBadge"></span></button>
       <button id="btn-quick-shop" type="button" class="nav-btn gold" aria-haspopup="dialog" data-i18n="app.nav.button.shop"></button>
       <button id="btn-quick-pause" type="button" class="nav-btn" data-i18n="app.nav.button.pause" data-i18n-title="app.nav.button.pauseTooltip"></button>
       <button id="btn-quick-settings" type="button" class="nav-btn" aria-haspopup="dialog"><span class="settings-btn-icon" aria-hidden="true" data-i18n="app.nav.button.settingsIcon"></span> <span data-i18n="app.nav.button.settings"></span></button>
@@ -358,6 +358,10 @@
                 <span class="arcade-card-desc" data-i18n="modals.levelSelect.arcade.slingshotDesc"></span>
                 <span id="arcade-best-slingshot" class="arcade-card-best gold-text"></span>
               </button>
+          </div>
+          <div id="play-hub-filter-empty" class="play-hub-filter-empty hidden" role="status" aria-live="polite">
+            <span id="play-hub-filter-empty-text"></span>
+            <button id="btn-play-hub-reset-filter" type="button" class="nav-btn badge-btn" data-i18n="modals.play.filters.all"></button>
           </div>
           <div id="puzzle-stages-strip" class="puzzle-stages-strip play-disclosure hidden" role="group" data-i18n-aria-label="modals.play.puzzle.stagesToggle"></div>
           <div id="flux-seed-entry" class="flux-seed-entry play-disclosure hidden">

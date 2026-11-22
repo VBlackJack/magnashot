@@ -153,6 +153,20 @@
     padding: 4px 6px;
     font-size: 0.78rem;
   }
+  #modal-shop .modal-tabs {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+  }
+  #modal-shop .modal-tabs::-webkit-scrollbar {
+    display: none;
+  }
+  #modal-shop .modal-tab {
+    flex: 0 0 auto;
+    white-space: nowrap;
+    padding: 4px 10px;
+  }
 }
 
 /*
@@ -1560,7 +1574,7 @@
   .settings-groups-grid {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 16px;
+    gap: 12px 16px;
     align-items: start;
   }
   .settings-groups-grid > .settings-group {
@@ -1569,6 +1583,22 @@
     border: 1px solid var(--border-subtle);
     border-radius: 10px;
     background: var(--surface-sunken);
+  }
+  .settings-groups-grid > .settings-group:nth-child(1) {
+    grid-column: 1;
+    grid-row: 1;
+  }
+  .settings-groups-grid > .settings-group:nth-child(2) {
+    grid-column: 2;
+    grid-row: 1 / span 3;
+  }
+  .settings-groups-grid > .settings-group:nth-child(3) {
+    grid-column: 1;
+    grid-row: 2;
+  }
+  .settings-groups-grid > .settings-group:nth-child(4) {
+    grid-column: 1;
+    grid-row: 3;
   }
 }
 

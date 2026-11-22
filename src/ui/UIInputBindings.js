@@ -38,6 +38,8 @@ import { CONTINUE_KINDS, PLAY_HUB_DISCLOSURES } from './PlayHubView.js';
 import { STATS_TABS } from './UIStats.js';
 
 const HIDDEN_CLASS = 'hidden';
+const DRAWER_SWIPE_THRESHOLD_PX = 48;
+const DRAWER_SWIPE_MAX_VERTICAL_RATIO = 0.75;
 const LEVEL_TILE_SELECTOR = '[data-level-id]';
 /** Chapter step of the PageUp and PageDown keys and of the previous and next buttons. */
 const CHAPTER_STEP = 1;
@@ -349,6 +351,37 @@ function bindPreferenceToggles(ui) {
   });
 }
 
+function bindDrawerSwipeToClose(element, isOpen, getCloseDirection, closeFn) {
+  if (!element || typeof element.addEventListener !== 'function') {
+    return;
+  }
+  let startX = null;
+  let startY = null;
+  element.addEventListener('touchstart', (event) => {
+    const touch = event.touches?.[0];
+    if (!touch || !isOpen()) {
+      startX = null;
+      return;
+    }
+    startX = touch.clientX;
+    startY = touch.clientY;
+  }, { passive: true });
+  element.addEventListener('touchend', (event) => {
+    const touch = event.changedTouches?.[0];
+    if (startX === null || !touch || !isOpen()) {
+      startX = null;
+      return;
+    }
+    const dx = touch.clientX - startX;
+    const dy = touch.clientY - startY;
+    startX = null;
+    const dir = getCloseDirection();
+    if (dx * dir >= DRAWER_SWIPE_THRESHOLD_PX && Math.abs(dy) <= Math.abs(dx) * DRAWER_SWIPE_MAX_VERTICAL_RATIO) {
+      closeFn();
+    }
+  }, { passive: true });
+}
+
 function bindHeaderAndShellControls(ui) {
   const els = ui.elements;
   els.btnStats?.addEventListener('click', () => ui.openStatsModal(STATS_TABS.OVERVIEW));
@@ -365,6 +398,17 @@ function bindHeaderAndShellControls(ui) {
     document.getElementById('btn-quick-shop')?.addEventListener('click', () => els.btnShop?.click());
     document.getElementById('btn-quick-pause')?.addEventListener('click', () => els.btnPause?.click());
     document.getElementById('btn-quick-settings')?.addEventListener('click', () => els.btnSettings?.click());
+    document.getElementById('btn-play-hub-reset-filter')?.addEventListener('click', () => {
+      ui.playHubFilter = 'all';
+      ui.refreshPlayHubRecords?.();
+    });
+    bindDrawerSwipeToClose(document.getElementById('app-drawer'), () => ui.isDrawerOpen, () => -1, () => ui.closeDrawer());
+    bindDrawerSwipeToClose(
+      document.getElementById('powerups-panel'),
+      () => ui.isPowerupsDrawerOpen,
+      () => (document.documentElement?.classList?.contains('left-handed-mobile') ? -1 : 1),
+      () => setPowerupsDrawerOpen(ui, false)
+    );
   }
 
   els.btnRestart.addEventListener('click', () => {
